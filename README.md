@@ -101,4 +101,4 @@ nexora-analytics-website/
   - Data Generation: Faker, Pandas, NumPy
 
 ### License
-  - Apache License 2.0. See LICENSE.
+  - Apache License 2.0.
