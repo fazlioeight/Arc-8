@@ -95,10 +95,10 @@ API Endpoints
 
 Technologies
 
-   Frontend: React, Bootstrap, React Router
-   Backend: FastAPI, Pandas, PyJWT
-   Dashboards: Streamlit
-   Data Generation: Faker, Pandas, NumPy
+  - Frontend: React, Bootstrap, React Router
+  - Backend: FastAPI, Pandas, PyJWT
+  - Dashboards: Streamlit
+  - Data Generation: Faker, Pandas, NumPy
 
 License
    Apache License 2.0. See LICENSE.
