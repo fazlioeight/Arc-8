@@ -62,10 +62,12 @@ nexora-analytics-website/
    pip install -r requirements.txt
 
 2. **Generate synthetic data:**
-python scripts/generate_synthetic_data.py
+   ```sh
+   python scripts/generate_synthetic_data.py
 
 3. **Run FastAPI server:**
-uvicorn app.main:app --reload
+   ```sh
+   uvicorn app.main:app --reload
 
 ### Frontend
 
