@@ -1,0 +1,36 @@
+// pages/Insights.js - Converted from blog.html, renamed for professionalism
+import React from 'react';
+
+const Insights = () => (
+  <div className="container py-5">
+    <h1 className="text-center mb-4">Insights</h1>
+    <p className="lead text-center">Insights on healthcare analytics, risk management, and value-based care.</p>
+    
+    <div className="blog-post" style={{ borderBottom: '1px solid #ddd', padding: '20px 0' }}>
+      <h3>The Future of Capitation in Value-Based Care</h3>
+      <p>Published: August 10, 2025</p>
+      <p>Explore how advanced analytics can optimize capitation models for payers...</p>
+      <a href="#">Read More</a>
+    </div>
+    
+    <div className="blog-post" style={{ borderBottom: '1px solid #ddd', padding: '20px 0' }}>
+      <h3>Reducing Risks with Predictive Modeling</h3>
+      <p>Published: July 25, 2025</p>
+      <p>Learn how AI-driven tools identify high-risk members early...</p>
+      <a href="#">Read More</a>
+    </div>
+    
+    <div className="blog-post" style={{ borderBottom: '1px solid #ddd', padding: '20px 0' }}>
+      <h3>Cost Savings Strategies for Payer Groups</h3>
+      <p>Published: June 15, 2025</p>
+      <p>Discover data-backed approaches to lower healthcare costs...</p>
+      <a href="#">Read More</a>
+    </div>
+
+    <footer className="bg-dark text-white text-center py-3 mt-5">
+      <p>&copy; 2025 Nexora Analytics. All rights reserved. | <a href="#" className="text-white">Privacy Policy</a> | <a href="#" className="text-white">Terms of Service</a></p>
+    </footer>
+  </div>
+);
+
+export default Insights;
