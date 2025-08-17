@@ -83,22 +83,22 @@ nexora-analytics-website/
 ### Dashboards
 
 1. **Run Streamlit dashboards:**
-   ```sh
+   ```py
    streamlit run backend/dashboards/member_cost_dashboard.py
    streamlit run backend/dashboards/member_risk_dashboard.py
    streamlit run backend/dashboards/utilization_dashboard.py
 
-API Endpoints
+**API Endpoints**
 
-   GET /member/{member_id}/costs — Get total costs for a member.
-   POST /api/login — Authenticate user (returns JWT).
+  - GET /member/{member_id}/costs — Get total costs for a member.
+  - POST /api/login — Authenticate user (returns JWT).
 
-Technologies
+**Technologies**
 
   - Frontend: React, Bootstrap, React Router
   - Backend: FastAPI, Pandas, PyJWT
   - Dashboards: Streamlit
   - Data Generation: Faker, Pandas, NumPy
 
-License
-   Apache License 2.0. See LICENSE.
+**License**
+  - Apache License 2.0. See LICENSE.
