@@ -1,18 +1,44 @@
-// pages/About.js - Converted from about.html
 import React from 'react';
 
+const team = [
+  {
+    name: 'Jane Doe, CEO',
+    bio: '20+ years in healthcare analytics.',
+    img: '/images/jane.jpg', // Add actual image paths
+    alt: 'Jane Doe, CEO',
+  },
+  {
+    name: 'John Smith, CTO',
+    bio: 'Expert in AI and data platforms.',
+    img: '/images/john.jpg',
+    alt: 'John Smith, CTO',
+  },
+  {
+    name: 'Emily Johnson, CMO',
+    bio: 'Specialist in payer strategies.',
+    img: '/images/emily.jpg',
+    alt: 'Emily Johnson, CMO',
+  },
+];
+
 const About = () => (
-  <div className="container py-5">
-    <h1 className="text-center mb-4">About Nexora Analytics</h1>
-    <p className="lead text-center">We are a healthcare tech startup dedicated to providing advanced analytics for payer groups to achieve healthier member outcomes.</p>
+  <main className="container py-5" aria-labelledby="about-title">
+    <header>
+      <h1 id="about-title" className="text-center mb-4">About Nexora Analytics</h1>
+      <p className="lead text-center">
+        We are a healthcare tech startup dedicated to providing advanced analytics for payer groups to achieve healthier member outcomes.
+      </p>
+    </header>
     
-    <section className="mb-5">
-      <h2>Our Mission</h2>
-      <p>To empower payers with data-driven insights on capitation, costs, and risks, fostering value-based care that improves lives and reduces inefficiencies.</p>
+    <section className="mb-5" aria-labelledby="mission-title">
+      <h2 id="mission-title">Our Mission</h2>
+      <p>
+        To empower payers with data-driven insights on capitation, costs, and risks, fostering value-based care that improves lives and reduces inefficiencies.
+      </p>
     </section>
     
-    <section className="mb-5">
-      <h2>Our Values</h2>
+    <section className="mb-5" aria-labelledby="values-title">
+      <h2 id="values-title">Our Values</h2>
       <ul>
         <li>Innovation in analytics and AI</li>
         <li>Commitment to data security and HIPAA compliance</li>
@@ -21,28 +47,34 @@ const About = () => (
       </ul>
     </section>
     
-    <section>
-      <h2>Our Team</h2>
+    <section aria-labelledby="team-title">
+      <h2 id="team-title">Our Team</h2>
       <div className="row">
-        <div className="col-md-4">
-          <h4>Jane Doe, CEO</h4>
-          <p>20+ years in healthcare analytics.</p>
-        </div>
-        <div className="col-md-4">
-          <h4>John Smith, CTO</h4>
-          <p>Expert in AI and data platforms.</p>
-        </div>
-        <div className="col-md-4">
-          <h4>Emily Johnson, CMO</h4>
-          <p>Specialist in payer strategies.</p>
-        </div>
+        {team.map((member) => (
+          <div className="col-md-4 mb-4" key={member.name}>
+            <div className="card h-100 shadow-sm">
+              <img src={member.img} alt={member.alt} className="card-img-top" style={{objectFit: 'cover', height: '200px'}} />
+              <div className="card-body">
+                <h4 className="card-title">{member.name}</h4>
+                <p className="card-text">{member.bio}</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
 
-    <footer className="bg-dark text-white text-center py-3 mt-5">
-      <p>&copy; 2025 Nexora Analytics. All rights reserved. | <a href="#" className="text-white">Privacy Policy</a> | <a href="#" className="text-white">Terms of Service</a></p>
+    <footer className="bg-dark text-white text-center py-3 mt-5" role="contentinfo">
+      <p>
+        &copy; 2025 Nexora Analytics. All rights reserved. |{' '}
+        <a href="/privacy" className="text-white text-decoration-underline">Privacy Policy</a> |{' '}
+        <a href="/terms" className="text-white text-decoration-underline">Terms of Service</a>
+      </p>
+      <address className="mt-2" style={{fontStyle: 'normal'}}>
+        Contact us: <a href="mailto:info@nexora.com" className="text-white">info@nexora.com</a>
+      </address>
     </footer>
-  </div>
+  </main>
 );
 
 export default About;
