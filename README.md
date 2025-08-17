@@ -70,30 +70,33 @@ uvicorn app.main:app --reload
 ### Frontend
 
 1. **Install dependencies:**
-cd frontend
-npm install
+   ```sh
+   cd frontend
+   npm install
 
 2. **Start React app:**
-npm start
+   ```sh
+   npm start
 
 ### Dashboards
 
 1. **Run Streamlit dashboards:**
-streamlit run backend/dashboards/member_cost_dashboard.py
-streamlit run backend/dashboards/member_risk_dashboard.py
-streamlit run backend/dashboards/utilization_dashboard.py
+   ```sh
+   streamlit run backend/dashboards/member_cost_dashboard.py
+   streamlit run backend/dashboards/member_risk_dashboard.py
+   streamlit run backend/dashboards/utilization_dashboard.py
 
 API Endpoints
 
-GET /member/{member_id}/costs — Get total costs for a member.
-POST /api/login — Authenticate user (returns JWT).
+   GET /member/{member_id}/costs — Get total costs for a member.
+   POST /api/login — Authenticate user (returns JWT).
 
 Technologies
 
-Frontend: React, Bootstrap, React Router
-Backend: FastAPI, Pandas, PyJWT
-Dashboards: Streamlit
-Data Generation: Faker, Pandas, NumPy
+   Frontend: React, Bootstrap, React Router
+   Backend: FastAPI, Pandas, PyJWT
+   Dashboards: Streamlit
+   Data Generation: Faker, Pandas, NumPy
 
 License
-Apache License 2.0. See LICENSE.
+   Apache License 2.0. See LICENSE.
