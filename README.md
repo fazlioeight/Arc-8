@@ -13,9 +13,9 @@ Nexora Platform is a healthcare analytics solution for payer groups, providing a
 ## Project Structure
 
 nexora-analytics-website/
-├── backend/                # Python backend (API, auth, data analytics)
-│   ├── app/                # Main app code
-│   │   ├── __init__.py
+- backend/                # Python backend (API, auth, data analytics)
+ - app/                # Main app code
+  - __init__.py
 │   │   ├── main.py         # Entry point (e.g., FastAPI app)
 │   │   ├── routes/         # API endpoints (e.g., auth, dashboard data)
 │   │   │   ├── __init__.py
