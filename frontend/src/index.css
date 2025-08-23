@@ -1,0 +1,18 @@
+.dark-mode {
+  background-color: #181a1b !important;
+  color: #eaeaea !important;
+  min-height: 100vh;
+}
+.dark-mode .bg-light {
+  background-color: #23272b !important;
+  color: #eaeaea !important;
+}
+.dark-mode .navbar,
+.dark-mode .navbar.bg-primary {
+  background-color: #23272b !important;
+  color: #eaeaea !important;
+}
+.dark-mode .card {
+  background-color: #23272b !important;
+  color: #eaeaea !important;
+}
