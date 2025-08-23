@@ -33,7 +33,7 @@ const About = () => (
       </p>
     </header>
 
-    <section className="mb-5" aria-labelledby="mission-title">
+    <section className="text-center mb-5" aria-labelledby="mission-title">
       <h2 id="mission-title">Our Mission</h2>
       <p>
         To empower payers with data-driven insights on capitation, costs, and
@@ -42,14 +42,14 @@ const About = () => (
       </p>
     </section>
 
-    <section className="mb-5" aria-labelledby="values-title">
+    <section className="text-center mb-5" aria-labelledby="values-title">
       <h2 id="values-title">Our Values</h2>
-      <ul>
-        <li>Innovation in analytics and AI</li>
-        <li>Commitment to data security and HIPAA compliance</li>
-        <li>Focus on user-centered design for seamless experiences</li>
-        <li>Partnerships for long-term success</li>
-      </ul>
+      <div>
+        Innovation in analytics and AI<br />
+        Commitment to data security and HIPAA compliance<br />
+        Focus on user-centered design for seamless experiences<br />
+        Partnerships for long-term success
+      </div>
     </section>
 
     <section aria-labelledby="team-title">
