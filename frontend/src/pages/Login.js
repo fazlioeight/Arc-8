@@ -1,8 +1,12 @@
-// pages/Login.js - Converted from login.html with form state
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext"; // Adjust path if needed
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const { login } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -10,8 +14,7 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Add API call here, e.g., axios.post('/api/login', formData)
-    console.log("Login submitted:", formData);
+    setError("");
     try {
       const response = await fetch("http://localhost:8000/api/login", {
         method: "POST",
@@ -20,14 +23,13 @@ const Login = () => {
       });
       const data = await response.json();
       if (response.ok) {
-        // Handle successful login (e.g., save JWT, redirect)
-        console.log("Login success:", data);
+        login(data); // Call login from context
+        navigate("/dashboard"); // Redirect after login
       } else {
-        // Handle error (e.g., show message)
-        console.error("Login failed:", data);
+        setError(data.message || "Login failed. Please try again.");
       }
     } catch (error) {
-      console.error("Network error:", error);
+      setError("Network error. Please try again.");
     }
   };
 
@@ -72,6 +74,9 @@ const Login = () => {
               required
             />
           </div>
+          {error && (
+            <div className="alert alert-danger text-center py-2">{error}</div>
+          )}
           <div className="text-center">
             <button type="submit" className="btn btn-primary w-100">
               Login

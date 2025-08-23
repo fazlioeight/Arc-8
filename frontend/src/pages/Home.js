@@ -50,7 +50,7 @@ const Home = () => (
       <div className="row">
         <div className="col-md-4">
           <div
-            className="card p-3"
+            className="card p-3 text-center"
             style={{ border: "none", boxShadow: "0 4px 8px rgba(0,0,0,0.1)" }}
           >
             <h4>Risk Management</h4>
@@ -69,7 +69,7 @@ const Home = () => (
         </div>
         <div className="col-md-4">
           <div
-            className="card p-3"
+            className="card p-3 text-center"
             style={{ border: "none", boxShadow: "0 4px 8px rgba(0,0,0,0.1)" }}
           >
             <h4>Cost Optimization</h4>
@@ -88,7 +88,7 @@ const Home = () => (
         </div>
         <div className="col-md-4">
           <div
-            className="card p-3"
+            className="card p-3 text-center"
             style={{ border: "none", boxShadow: "0 4px 8px rgba(0,0,0,0.1)" }}
           >
             <h4>Health Outcomes</h4>
@@ -121,7 +121,7 @@ const Home = () => (
           industry trends.
         </p>
         <div className="row">
-          <div className="col-md-4">
+          <div className="col-md-4 text-center">
             <div className="card">
               <div className="card-body">
                 <h5>AI Evolution in Healthcare</h5>
@@ -139,7 +139,7 @@ const Home = () => (
               </div>
             </div>
           </div>
-          <div className="col-md-4">
+          <div className="col-md-4 text-center">
             <div className="card">
               <div className="card-body">
                 <h5>Data Readiness for Payers</h5>
@@ -157,7 +157,7 @@ const Home = () => (
               </div>
             </div>
           </div>
-          <div className="col-md-4">
+          <div className="col-md-4 text-center">
             <div className="card">
               <div className="card-body">
                 <h5>Ethical AI in Health Analytics</h5>
@@ -191,7 +191,7 @@ const Home = () => (
       </p>
       <div className="row">
         <div className="col-md-6">
-          <div className="card mb-4">
+          <div className="card mb-4 text-center">
             <div className="card-body">
               <h5>How We Helped a Major Payer Reduce Costs by 15%</h5>
               <p>Using our platform to optimize capitation and risk models.</p>
@@ -206,7 +206,7 @@ const Home = () => (
           </div>
         </div>
         <div className="col-md-6">
-          <div className="card mb-4">
+          <div className="card mb-4 text-center">
             <div className="card-body">
               <h5>Improving Member Outcomes with Predictive Analytics</h5>
               <p>
