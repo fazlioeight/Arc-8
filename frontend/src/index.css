@@ -1,18 +1,139 @@
+/* Dark mode color palette */
+:root {
+  --dm-bg: #181a1b;
+  --dm-bg-light: #23272b;
+  --dm-bg-card: #23272b;
+  --dm-text: #eaeaea;
+  --dm-border: #2c2f31;
+  --dm-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  --dm-accent: #3a3f44;
+  --lm-bg: #f7f9fa;
+  --lm-bg-light: #ffffff;
+  --lm-bg-card: #ffffff;
+  --lm-text: #222;
+  --lm-border: #e3e6ea;
+  --lm-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  --lm-accent: #f0f4f8;
+}
+
 .dark-mode {
-  background-color: #181a1b !important;
-  color: #eaeaea !important;
+  background-color: var(--dm-bg) !important;
+  color: var(--dm-text) !important;
   min-height: 100vh;
+  font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s, color 0.3s;
 }
+
 .dark-mode .bg-light {
-  background-color: #23272b !important;
-  color: #eaeaea !important;
+  background-color: var(--dm-bg-light) !important;
+  color: var(--dm-text) !important;
+  border: 1px solid var(--dm-border);
+  transition: background-color 0.3s, color 0.3s;
 }
+
 .dark-mode .navbar,
 .dark-mode .navbar.bg-primary {
-  background-color: #23272b !important;
-  color: #eaeaea !important;
+  background-color: var(--dm-bg-light) !important;
+  color: var(--dm-text) !important;
+  box-shadow: var(--dm-shadow);
+  border-bottom: 1px solid var(--dm-border);
+  transition: background-color 0.3s, color 0.3s;
 }
+
 .dark-mode .card {
-  background-color: #23272b !important;
-  color: #eaeaea !important;
+  background-color: var(--dm-bg-card) !important;
+  color: var(--dm-text) !important;
+  border: 1px solid var(--dm-border);
+  box-shadow: var(--dm-shadow);
+  border-radius: 8px;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Interactive states */
+.dark-mode button,
+.dark-mode .btn {
+  background-color: var(--dm-accent);
+  color: var(--dm-text);
+  border: 1px solid var(--dm-border);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.dark-mode button:hover,
+.dark-mode .btn:hover {
+  background-color: var(--dm-bg-light);
+  color: var(--dm-text);
+}
+
+/* Links */
+.dark-mode a {
+  color: #8ab4f8;
+  transition: color 0.2s;
+}
+
+.dark-mode a:hover {
+  color: #a3c9fa;
+  text-decoration: underline;
+}
+
+/* Light mode color palette */
+
+.light-mode {
+  background-color: var(--lm-bg) !important;
+  color: var(--lm-text) !important;
+  min-height: 100vh;
+  font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.light-mode .bg-light {
+  background-color: var(--lm-bg-light) !important;
+  color: var(--lm-text) !important;
+  border: 1px solid var(--lm-border);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.light-mode .navbar,
+.light-mode .navbar.bg-primary {
+  background-color: var(--lm-bg-light) !important;
+  color: var(--lm-text) !important;
+  box-shadow: var(--lm-shadow);
+  border-bottom: 1px solid var(--lm-border);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.light-mode .card {
+  background-color: var(--lm-bg-card) !important;
+  color: var(--lm-text) !important;
+  border: 1px solid var(--lm-border);
+  box-shadow: var(--lm-shadow);
+  border-radius: 8px;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Interactive states */
+.light-mode button,
+.light-mode .btn {
+  background-color: var(--lm-accent);
+  color: var(--lm-text);
+  border: 1px solid var(--lm-border);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.light-mode button:hover,
+.light-mode .btn:hover {
+  background-color: var(--lm-bg-light);
+  color: var(--lm-text);
+}
+
+/* Links */
+.light-mode a {
+  color: #2563eb;
+  transition: color 0.2s;
+}
+
+.light-mode a:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
 }
