@@ -50,6 +50,36 @@
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* Dark mode form improvements */
+.dark-mode input,
+.dark-mode textarea,
+.dark-mode select {
+  background-color: var(--dm-bg-light) !important;
+  color: var(--dm-text) !important;
+  border: 1px solid var(--dm-border) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.dark-mode input::placeholder,
+.dark-mode textarea::placeholder {
+  color: #b0b3b8 !important;
+  opacity: 1;
+}
+
+.dark-mode .form-label,
+.dark-mode label {
+  color: var(--dm-text) !important;
+}
+
+/* Optional: Add a subtle highlight on focus */
+.dark-mode input:focus,
+.dark-mode textarea:focus,
+.dark-mode select:focus {
+  border-color: #8ab4f8 !important;
+  outline: none;
+}
+
 /* Interactive states */
 .dark-mode button,
 .dark-mode .btn {
@@ -135,5 +165,4 @@
 
 .light-mode a:hover {
   color: #1d4ed8;
-  text-decoration: underline;
-}
+  text
