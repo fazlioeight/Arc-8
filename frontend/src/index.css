@@ -165,4 +165,5 @@
 
 .light-mode a:hover {
   color: #1d4ed8;
-  text
+  text-decoration: underline;
+}

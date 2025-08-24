@@ -15,6 +15,17 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // Dummy login: username 'admin', password 'admin'
+    if (
+      formData.email === "admin@admin.com" &&
+      formData.password === "admin"
+    ) {
+      login({ email: "admin@admin.com", token: "dummy-token" });
+      navigate("/dashboard");
+      return;
+    }
+
     try {
       const response = await fetch("http://localhost:8000/api/login", {
         method: "POST",
