@@ -7,7 +7,11 @@ function DarkModeToggle({ darkMode, setDarkMode }) {
       onClick={() => setDarkMode(!darkMode)}
       aria-label="Toggle dark mode"
     >
-      {darkMode ? 'Light Mode' : 'Dark Mode'}
+      {darkMode ? (
+        <i className="bi bi-sun-fill"></i>
+      ) : (
+        <i className="bi bi-moon-stars-fill"></i>
+      )}
     </button>
   );
 }
