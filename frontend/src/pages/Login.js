@@ -22,7 +22,7 @@ const Login = () => {
       formData.password === "admin"
     ) {
       login({ email: "admin@admin.com", token: "dummy-token" });
-      navigate("/dashboard");
+      navigate("../portal_page/portalPage");
       return;
     }
 
@@ -35,7 +35,7 @@ const Login = () => {
       const data = await response.json();
       if (response.ok) {
         login(data); // Call login from context
-        navigate("/dashboard"); // Redirect after login
+        navigate("/portal_page/portalPage"); // Redirect after login
       } else {
         setError(data.message || "Login failed. Please try again.");
       }

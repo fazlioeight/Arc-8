@@ -1,5 +1,6 @@
+// Updated portalPage.js 
 import React, { useState, useEffect } from "react";
-import "./PortalDashboard.css"; // Assuming a separate CSS file for styling
+import "../../index.css"; // Updated to use the correct CSS file path
 
 const PortalDashboard = () => {
   const [data, setData] = useState({
@@ -7,22 +8,32 @@ const PortalDashboard = () => {
     raf: 0,
     memberCount: 0,
     gaps: 0,
-    // Additional details can be added here, e.g., trends, charts data, etc.
     loading: true,
     error: null,
   });
 
   useEffect(() => {
-    // Fetch data from the backend API after user authentication
-    // Assuming the backend provides an endpoint like /api/company-metrics
-    // This would be protected by JWT or session from login
-    // Multi-tenant: The backend should resolve the company based on user token
+    // For testing without backend, use mocked data
+    // Comment this out and uncomment the real fetch when you have a backend
+    const mockMetrics = {
+      bur: 12345,
+      raf: 1.25,
+      memberCount: 5000,
+      gaps: 150,
+    };
+    setData({
+      ...mockMetrics,
+      loading: false,
+    });
+
+    // Real fetch (commented out for testing)
+    /*
     const fetchCompanyMetrics = async () => {
       try {
         const response = await fetch("https://api.nexora.com/company-metrics", {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`, // Assuming token stored after login
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
         });
@@ -45,6 +56,7 @@ const PortalDashboard = () => {
     };
 
     fetchCompanyMetrics();
+    */
   }, []);
 
   if (data.loading) {
@@ -61,8 +73,7 @@ const PortalDashboard = () => {
         <h1>Welcome to Nexora Analytics Portal</h1>
         <p>
           Dashboard for {localStorage.getItem("companyName") || "Your Company"}
-        </p>{" "}
-        {/* Assuming company name stored after login */}
+        </p>
       </header>
 
       <main className="metrics-grid">
@@ -90,15 +101,12 @@ const PortalDashboard = () => {
           <small>Care or Compliance Gaps</small>
         </div>
 
-        {/* Additional details section - can expand with charts using libraries like Recharts or Chart.js */}
         <div className="details-section">
           <h3>More Details</h3>
           <p>
             Here you can add charts, trends, historical data, or drill-down
             reports.
           </p>
-          {/* Example: Integrate a chart component */}
-          {/* <ChartComponent data={additionalData} /> */}
         </div>
       </main>
 
