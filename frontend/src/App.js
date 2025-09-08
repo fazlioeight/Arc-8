@@ -12,6 +12,7 @@ import Contact from './pages/Contact';
 import Signup from './pages/Signup';
 import Login from './pages/Login';
 import PortalPage from './pages/portal_page/portalPage'; // adjust path as needed
+import RideBooking from './pages/RideBooking';
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -42,6 +43,7 @@ function App() {
             <Route path="/signup" element={<Signup />} />
             <Route path="/login" element={<Login />} />
             <Route path="/portal_page/portalPage" element={<PortalPage />} />
+            <Route path="/RideBooking" element={<RideBooking />} />
           </Routes>
         </Router>
       </AuthProvider>

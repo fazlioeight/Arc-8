@@ -1,5 +1,6 @@
 // Updated portalPage.js 
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "../../index.css"; // Updated to use the correct CSS file path
 
 const PortalDashboard = () => {
@@ -11,6 +12,7 @@ const PortalDashboard = () => {
     loading: true,
     error: null,
   });
+  const navigate = useNavigate();
 
   useEffect(() => {
     // For testing without backend, use mocked data
@@ -74,6 +76,13 @@ const PortalDashboard = () => {
         <p>
           Dashboard for {localStorage.getItem("companyName") || "Your Company"}
         </p>
+        <button
+          className="btn btn-success mt-3"
+          style={{ fontWeight: "bold" }}
+          onClick={() => navigate("/RideBooking")}
+        >
+          Book a Ride
+        </button>
       </header>
 
       <main className="metrics-grid">
