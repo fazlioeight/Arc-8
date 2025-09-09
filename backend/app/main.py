@@ -42,12 +42,14 @@ class LoginRequest(BaseModel):
 @app.post("/api/login")
 def login(request: LoginRequest):
     conn = psycopg2.connect(
-        "dbname=yourdb user=youruser password=yourpass host=localhost"
+    "dbname=nexora user=Admin password=Admin host=localhost"
     )
     cur = conn.cursor()
     cur.execute("SELECT password_hash FROM users WHERE email = %s", (request.email,))
     result = cur.fetchone()
-    if not result or not verify_password(request.password, result[0]):
+        if not result:
         raise HTTPException(status_code=401, detail="Invalid credentials")
+        hashed_password = result[0]
+        if not bcrypt.checkpw(request.password.encode(), hashed_password.encode()):
     # Return JWT or session token
     return {"token": "example-jwt"}
