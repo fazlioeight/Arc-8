@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 const RideBooking = () => {
   const [pickup, setPickup] = useState("");
   const [dropoff, setDropoff] = useState("");
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [dropoffAddress, setDropoffAddress] = useState("");
+  const [memberId, setMemberId] = useState("");
   const [rideType, setRideType] = useState("Uber");
   const [status, setStatus] = useState("");
 
@@ -11,7 +14,7 @@ const RideBooking = () => {
     e.preventDefault();
     // Simulate booking logic
     setStatus(
-      `Ride booked with ${rideType}!\nPickup: ${pickup}\nDropoff: ${dropoff}`
+      `Ride booked with ${rideType}!\nMember ID: ${memberId}\nPickup: ${pickup} (${pickupAddress})\nDropoff: ${dropoff} (${dropoffAddress})`
     );
   };
 
@@ -20,8 +23,21 @@ const RideBooking = () => {
       <h2 className="mb-4">Book a Ride</h2>
       <form onSubmit={handleSubmit}>
         <div className="mb-3">
+          <label htmlFor="memberId" className="form-label">
+            Member ID
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            id="memberId"
+            value={memberId}
+            onChange={(e) => setMemberId(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-3">
           <label htmlFor="pickup" className="form-label">
-            Pickup Location
+            Pickup Location (Facility or Name)
           </label>
           <input
             type="text"
@@ -33,8 +49,21 @@ const RideBooking = () => {
           />
         </div>
         <div className="mb-3">
+          <label htmlFor="pickupAddress" className="form-label">
+            Pickup Address
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            id="pickupAddress"
+            value={pickupAddress}
+            onChange={(e) => setPickupAddress(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-3">
           <label htmlFor="dropoff" className="form-label">
-            Dropoff Location
+            Dropoff Location (Facility or Name)
           </label>
           <input
             type="text"
@@ -42,6 +71,19 @@ const RideBooking = () => {
             id="dropoff"
             value={dropoff}
             onChange={(e) => setDropoff(e.target.value)}
+            required
+          />
+        </div>
+        <div className="mb-3">
+          <label htmlFor="dropoffAddress" className="form-label">
+            Dropoff Address
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            id="dropoffAddress"
+            value={dropoffAddress}
+            onChange={(e) => setDropoffAddress(e.target.value)}
             required
           />
         </div>
