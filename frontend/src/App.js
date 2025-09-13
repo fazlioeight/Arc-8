@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, AuthContext } from './context/AuthContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
@@ -14,6 +14,28 @@ import PortalPage from './pages/portal_page/portalPage'; // adjust path as neede
 import RideBooking from './pages/RideBooking';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
+
+const Shell = ({ themePreference, setThemePreference }) => {
+  const { isAuthenticated, loading } = useContext(AuthContext) || {};
+  return (
+    <Router>
+      {(!loading && !isAuthenticated) && <Navbar />}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/insights" element={<Insights />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/portal_page/portalPage" element={<PortalPage />} />
+        <Route path="/RideBooking" element={<RideBooking />} />
+        <Route path="/settings" element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </Router>
+  );
+};
 
 function App() {
   const [themePreference, setThemePreference] = useState(() => {
@@ -45,22 +67,7 @@ function App() {
   return (
     <div>
       <AuthProvider>
-        <Router>
-          <Navbar />
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/insights" element={<Insights />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/portal_page/portalPage" element={<PortalPage />} />
-            <Route path="/RideBooking" element={<RideBooking />} />
-            <Route path="/settings" element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-          </Routes>
-        </Router>
+        <Shell themePreference={themePreference} setThemePreference={setThemePreference} />
       </AuthProvider>
     </div>
   );

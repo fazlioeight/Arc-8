@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import "../../index.css"; // base styles
 import "./portalPage.sfdc.css"; // Salesforce-like portal styles
 import { AuthContext } from "../../context/AuthContext";
+import D3BarChart from "../../components/D3BarChart";
 
 const PortalDashboard = () => {
   const [data, setData] = useState({
@@ -90,6 +91,7 @@ const PortalDashboard = () => {
   }
 
   const initials = (user?.email || "?").slice(0, 1).toUpperCase();
+  const tenantName = user?.tenant || localStorage.getItem("companyName") || "Tenant";
 
   return (
     <div className="sfdc-portal">
@@ -106,10 +108,6 @@ const PortalDashboard = () => {
               <svg viewBox="0 0 24 24"><path d="M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z"/></svg>
             </button>
             <span className="sfdc-avatar" aria-hidden>{initials}</span>
-            <div className="sfdc-identity">
-              <div className="sfdc-identity__name">{user?.email || "Guest"}</div>
-              <div className="sfdc-identity__meta">{user?.tenant || localStorage.getItem("companyName") || "Tenant"}</div>
-            </div>
           </div>
           <div className="sfdc-utilitybar__right">
             <button className="sfdc-iconbutton" title="Search" aria-label="Search" onClick={()=>navigate('/products')}>
@@ -134,6 +132,7 @@ const PortalDashboard = () => {
               onClick={(e)=>{ e.stopPropagation(); setShowUser((s)=>!s); setShowNotif(false); setShowWaffle(false); }}>
               <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8V22h19.2v-2.8c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
             </button>
+            <span className="sfdc-identity__name" style={{marginLeft: 8}}>{user?.email || "Guest"}</span>
           </div>
           {showWaffle && (
             <div className="sfdc-waffle" onClick={(e)=>e.stopPropagation()}>
@@ -213,16 +212,10 @@ const PortalDashboard = () => {
       </div>
       <section className="sfdc-hero">
         <div className="sfdc-hero__content">
-          <h1 className="sfdc-hero__title">Nexora Analytics</h1>
+          <h1 className="sfdc-hero__title">{tenantName}</h1>
           <p className="sfdc-hero__subtitle">
             {localStorage.getItem("companyName") || "Your Company"} Portal
           </p>
-          <button
-            className="sfdc-button_brand mt-2"
-            onClick={() => navigate("/RideBooking")}
-          >
-            Book a Ride
-          </button>
         </div>
       </section>
 
@@ -252,10 +245,18 @@ const PortalDashboard = () => {
         </div>
 
         <div className="sfdc-card sfdc-card--full slide-up" style={{ animationDelay: "200ms" }}>
-          <div className="sfdc-card__title">More Details</div>
-          <p className="sfdc-card__body">
-            Add charts, trends, historical data, or drill-down reports here.
-          </p>
+          <div className="sfdc-card__title">Metrics Overview</div>
+          <div className="sfdc-card__body">
+            <D3BarChart
+              height={260}
+              data={[
+                { label: "BUR", value: data.bur },
+                { label: "RAF", value: data.raf },
+                { label: "Members", value: data.memberCount },
+                { label: "Gaps", value: data.gaps },
+              ]}
+            />
+          </div>
         </div>
       </main>
 
