@@ -8,7 +8,7 @@ import About from './pages/About';
 import Products from './pages/Products';
 import Insights from './pages/Insights';
 import Contact from './pages/Contact';
-import Signup from './pages/Signup';
+import Pricing from './pages/Pricing';
 import Login from './pages/Login';
 import PortalPage from './pages/portal_page/portalPage'; // adjust path as needed
 import RideBooking from './pages/RideBooking';
@@ -40,7 +40,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
         <Route path="/products" element={<Products />} />
         <Route path="/insights" element={<Insights />} />
         <Route path="/contact" element={<Contact />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/portal_page/portalPage" element={<PortalPage />} />
         <Route path="/RideBooking" element={<RideBooking />} />

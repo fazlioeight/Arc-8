@@ -78,8 +78,8 @@ const Navbar = () => {
               <NavDropdown.Item as={NavLink} to="/contact/info">Company Info</NavDropdown.Item>
             </NavDropdown>
 
-            <Nav.Link as={NavLink} to="/signup">
-              Sign Up
+            <Nav.Link as={NavLink} to="/pricing">
+              Pricing
             </Nav.Link>
             <Nav.Link as={NavLink} to="/login">
               Login

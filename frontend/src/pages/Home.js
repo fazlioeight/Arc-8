@@ -115,7 +115,7 @@ const Home = () => (
         </div>
         <div className="nx-cta__actions">
           <a className="nx-btn_primary" href="/contact">Request a demo</a>
-          <a className="nx-btn_ghost" href="/signup">Start free</a>
+            <a className="nx-btn_ghost" href="/pricing">View pricing</a>
         </div>
       </div>
     </section>
@@ -141,6 +141,7 @@ const Home = () => (
             <h4>Resources</h4>
             <a className="nx-footer__link" href="/insights">Insights</a>
             <a className="nx-footer__link" href="/docs">Docs</a>
+            <a className="nx-footer__link" href="/pricing">Pricing</a>
             <a className="nx-footer__link" href="/contact/form">Contact</a>
           </div>
           <div className="nx-footer__col">

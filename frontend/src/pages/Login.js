@@ -98,7 +98,7 @@ const Login = () => {
             <div className="sfdc-auth__links">
               <a href="#">Forgot password?</a>
               <span>
-                Don't have an account? <a href="/signup">Sign up</a>
+                Don't have an account? <a href="/pricing">See pricing</a>
               </span>
             </div>
           </form>
