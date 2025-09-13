@@ -1,27 +1,19 @@
 /* Salesforce-inspired styling for the portal page (no external deps) */
 
 :root {
-  --sfdc-bg: #f4f6f9;
-  --sfdc-card: #ffffff;
-  --sfdc-text: #1f2d3d;
-  --sfdc-muted: #6b778c;
-  --sfdc-border: #e2e5ea;
-  --sfdc-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  --sfdc-shadow-lg: 0 8px 24px rgba(1, 118, 211, 0.18);
-  --sfdc-brand: #0176d3;    /* Salesforce primary */
-  --sfdc-brand-dark: #0e5bb7;
+  --sfdc-bg: var(--bg);
+  --sfdc-card: var(--bg-card);
+  --sfdc-text: var(--text);
+  --sfdc-muted: var(--text-muted, #6f7780);
+  --sfdc-border: var(--border);
+  --sfdc-shadow: var(--shadow);
+  --sfdc-shadow-lg: 0 8px 24px rgba(10, 102, 194, 0.18);
+  --sfdc-brand: #0a66c2;         /* LinkedIn blue */
+  --sfdc-brand-dark: #004182;    /* darker blue */
   --sfdc-brand-contrast: #ffffff;
 }
 
-.dark-mode {
-  --sfdc-bg: #161a1d;
-  --sfdc-card: #1e2327;
-  --sfdc-text: #e8eaed;
-  --sfdc-muted: #a2a9b1;
-  --sfdc-border: #2c3237;
-  --sfdc-shadow: 0 2px 10px rgba(0,0,0,0.35);
-  --sfdc-shadow-lg: 0 8px 24px rgba(1,118,211,0.25);
-}
+.dark-mode { /* variables above read from global tokens */ }
 
 .sfdc-portal {
   background: var(--sfdc-bg);
@@ -119,6 +111,10 @@
   left: 0; right: 0; bottom: -1px; height: 110px;
   background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="1" d="M0,224L48,213.3C96,203,192,181,288,165.3C384,149,480,139,576,133.3C672,128,768,128,864,149.3C960,171,1056,213,1152,213.3C1248,213,1344,171,1392,149.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') center bottom/cover no-repeat;
   pointer-events: none;
+}
+
+.dark-mode .sfdc-hero::after {
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%231d2226" fill-opacity="1" d="M0,224L48,213.3C96,203,192,181,288,165.3C384,149,480,139,576,133.3C672,128,768,128,864,149.3C960,171,1056,213,1152,213.3C1248,213,1344,171,1392,149.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') center bottom/cover no-repeat;
 }
 
 .sfdc-hero__content {

@@ -10,32 +10,36 @@ html:focus-within { scroll-behavior: smooth; }
   color-scheme: light dark;
   --font-sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 
-  /* Dark tokens */
-  --dm-bg: #181a1b;
-  --dm-bg-light: #23272b;
-  --dm-bg-card: #23272b;
-  --dm-text: #eaeaea;
-  --dm-border: #2c2f31;
-  --dm-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  --dm-accent: #3a3f44;
+  /* LinkedIn-inspired Dark tokens */
+  --dm-bg: #1d2226;            /* page background */
+  --dm-bg-light: #21262b;      /* surfaces, inputs */
+  --dm-bg-card: #22262a;       /* cards */
+  --dm-text: #e6e9ec;          /* primary text */
+  --dm-border: #2b3338;        /* borders */
+  --dm-shadow: 0 1px 2px rgba(0,0,0,0.45); /* subtler elevation */
+  --dm-accent: #2a2f34;        /* subtle accents */
+  --dm-input: #262c31;         /* inputs slightly lighter than cards */
 
-  /* Light tokens */
-  --lm-bg: #f7f9fa;
-  --lm-bg-light: #ffffff;
-  --lm-bg-card: #ffffff;
-  --lm-text: #222;
-  --lm-border: #e3e6ea;
-  --lm-shadow: 0 2px 8px rgba(0,0,0,0.07);
-  --lm-accent: #f0f4f8;
+  /* LinkedIn-inspired Light tokens */
+  --lm-bg: #f3f2ef;            /* page background */
+  --lm-bg-light: #ffffff;      /* surfaces, inputs */
+  --lm-bg-card: #ffffff;       /* cards */
+  --lm-text: #1d2226;          /* primary text */
+  --lm-text-muted: #6f7780;    /* secondary text */
+  --lm-border: #e0e0e0;        /* borders */
+  --lm-shadow: 0 1px 3px rgba(0,0,0,0.08); /* subtler elevation */
+  --lm-accent: #eef3f8;        /* subtle accents */
 
   /* Semantic mapping (default to light) */
   --bg: var(--lm-bg);
   --bg-light: var(--lm-bg-light);
   --bg-card: var(--lm-bg-card);
   --text: var(--lm-text);
+  --text-muted: var(--lm-text-muted);
   --border: var(--lm-border);
   --shadow: var(--lm-shadow);
   --accent: var(--lm-accent);
+  --input-bg: var(--lm-bg-light);
 
   /* Bootstrap variable hooks for consistent theming */
   --bs-body-bg: var(--bg);
@@ -43,8 +47,8 @@ html:focus-within { scroll-behavior: smooth; }
   --bs-card-bg: var(--bg-card);
   --bs-card-color: var(--text);
   --bs-border-color: var(--border);
-  --bs-link-color: #2563eb;
-  --bs-link-hover-color: #1d4ed8;
+  --bs-link-color: #0a66c2;
+  --bs-link-hover-color: #084c8a;
   --bs-navbar-bg: var(--bg-light);
   --bs-navbar-color: var(--text);
   --bs-btn-bg: var(--accent);
@@ -52,7 +56,7 @@ html:focus-within { scroll-behavior: smooth; }
   --bs-btn-border-color: var(--border);
 
   /* Brand + tier accents */
-  --brand-primary: #2563eb;   /* primary blue */
+  --brand-primary: #0a66c2;   /* LinkedIn blue */
   --brand-accent: #22c55e;    /* success green */
   --tier-free: #64748b;       /* slate */
   --tier-team: #06b6d4;       /* cyan */
@@ -71,9 +75,11 @@ html:focus-within { scroll-behavior: smooth; }
   --bg-light: var(--dm-bg-light);
   --bg-card: var(--dm-bg-card);
   --text: var(--dm-text);
+  --text-muted: #a8b3bd;
   --border: var(--dm-border);
   --shadow: var(--dm-shadow);
   --accent: var(--dm-accent);
+  --input-bg: var(--dm-input);
 
   color-scheme: dark;
   background-color: var(--bg) !important;
@@ -117,17 +123,14 @@ html:focus-within { scroll-behavior: smooth; }
 
 /* Dark mode form improvements */
 .dark-mode :where(input, textarea, select) {
-  background-color: var(--bg-light) !important;
+  background-color: var(--input-bg) !important;
   color: var(--text) !important;
   border: 1px solid var(--border) !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  box-shadow: none;
   transition: background-color 0.3s, color 0.3s;
 }
 
-.dark-mode :where(input, textarea)::placeholder {
-  color: #b0b3b8 !important;
-  opacity: 1;
-}
+.dark-mode :where(input, textarea)::placeholder { color: var(--text-muted) !important; opacity: 1; }
 
 .dark-mode :where(.form-label, label) {
   color: var(--text) !important;
@@ -155,12 +158,12 @@ html:focus-within { scroll-behavior: smooth; }
 
 /* Links */
 .dark-mode a {
-  color: #8ab4f8;
+  color: #70b5f9;
   transition: color 0.2s;
 }
 
 .dark-mode a:hover {
-  color: #a3c9fa;
+  color: #9ec9ff;
   text-decoration: underline;
 }
 
@@ -202,6 +205,23 @@ html:focus-within { scroll-behavior: smooth; }
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* Light mode form improvements (tokenized) */
+.light-mode :where(input, textarea, select) {
+  background-color: var(--input-bg) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.light-mode :where(input, textarea)::placeholder { color: var(--text-muted) !important; opacity: 1; }
+
+.light-mode :where(input:focus-visible, textarea:focus-visible, select:focus-visible) {
+  border-color: color-mix(in oklab, var(--bs-link-color) 60%, var(--border)) !important;
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--bs-link-color) 25%, transparent);
+}
+
 /* Interactive states */
 .light-mode :where(button, .btn) {
   background-color: var(--accent);
@@ -236,7 +256,7 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
 :focus-visible { outline: 2px solid #8ab4f8; outline-offset: 2px; }
 
 /* Form accent color */
-:root { accent-color: #2563eb; }
+:root { accent-color: #0a66c2; }
 
 /* PortalDashboard.css - Basic styling for the dashboard */
 .portal-dashboard {
@@ -250,7 +270,7 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
 .dashboard-header {
   text-align: center;
   margin-bottom: 30px;
-  color: #333;
+  color: var(--text);
 }
 
 .dashboard-header h1 {
@@ -287,7 +307,7 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
 }
 
 .metric-card small {
-  color: #666;
+  color: var(--text-muted);
   font-style: italic;
 }
 
