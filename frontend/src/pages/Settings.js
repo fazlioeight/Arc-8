@@ -1,8 +1,9 @@
 import React from "react";
 import "../index.css";
 import "./portal_page/portalPage.sfdc.css";
+import DarkModeToggle from "../components/DarkModeToggle";
 
-const Settings = () => {
+const Settings = ({ themePreference, setThemePreference }) => {
   return (
     <div className="sfdc-portal">
       <section className="sfdc-hero">
@@ -14,7 +15,10 @@ const Settings = () => {
       <main className="sfdc-grid" style={{paddingBottom: '24px'}}>
         <div className="sfdc-card sfdc-card--full">
           <div className="sfdc-card__title">Appearance</div>
-          <p className="sfdc-card__body">Theme preferences are available via the toggle in the navbar.</p>
+          <p className="sfdc-card__body">Choose how Nexora looks on this device.</p>
+          <div style={{marginTop: 8}}>
+            <DarkModeToggle themePreference={themePreference} setThemePreference={setThemePreference} />
+          </div>
         </div>
         <div className="sfdc-card">
           <div className="sfdc-card__title">Profile</div>
@@ -30,4 +34,3 @@ const Settings = () => {
 };
 
 export default Settings;
-

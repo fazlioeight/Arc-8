@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Navbar from './components/Navbar';
-import DarkModeToggle from './components/DarkModeToggle';
 import Home from './pages/Home';
 import About from './pages/About';
 import Products from './pages/Products';
@@ -48,9 +47,6 @@ function App() {
       <AuthProvider>
         <Router>
           <Navbar />
-          <div className="container mt-2 mb-2 d-flex justify-content-end">
-            <DarkModeToggle themePreference={themePreference} setThemePreference={setThemePreference} />
-          </div>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
@@ -61,7 +57,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/portal_page/portalPage" element={<PortalPage />} />
             <Route path="/RideBooking" element={<RideBooking />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings" element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
             <Route path="/dashboard" element={<Dashboard />} />
           </Routes>
         </Router>
