@@ -1,6 +1,8 @@
 import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext"; // Adjust path if needed
+import "../index.css";
+import "./Login.sfdc.css";
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "", tenant: "demo" });
@@ -45,87 +47,66 @@ const Login = () => {
   };
 
   return (
-    <div className="container py-5" style={{ backgroundColor: "#f8f9fa" }}>
-      <div
-        className="login-form"
-        style={{
-          maxWidth: "400px",
-          margin: "auto",
-          padding: "40px",
-          background: "white",
-          borderRadius: "8px",
-          boxShadow: "0 0 10px rgba(0,0,0,0.1)",
-        }}
-      >
-        <h2 className="text-center mb-4">Login to Your Account</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label htmlFor="tenant" className="form-label">
-              Tenant
-            </label>
-            <input
-              type="text"
-              className="form-control"
-              id="tenant"
-              value={formData.tenant}
-              onChange={handleChange}
-              placeholder="e.g., demo"
-            />
-          </div>
-          <div className="mb-3">
-            <label htmlFor="email" className="form-label">
-              Email Address
-            </label>
-            <input
-              type="email"
-              className="form-control"
-              id="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="mb-3">
-            <label htmlFor="password" className="form-label">
-              Password
-            </label>
-            <input
-              type="password"
-              className="form-control"
-              id="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          {error && (
-            <div className="alert alert-danger text-center py-2">{error}</div>
-          )}
-          <div className="text-center">
-            <button type="submit" className="btn btn-primary w-100">
-              Login
-            </button>
-          </div>
-          <p className="text-center mt-3">
-            <a href="#">Forgot Password?</a>
-          </p>
-          <p className="text-center">
-            Don't have an account? <a href="/signup">Sign Up</a>
-          </p>
-        </form>
-      </div>
+    <div className="sfdc-auth">
+      <section className="sfdc-auth__hero">
+        <div className="sfdc-auth__heroContent">
+          <div className="sfdc-auth__brand">Nexora Analytics</div>
+          <div className="sfdc-auth__blurb">Welcome back. Sign in to continue.</div>
+        </div>
+      </section>
 
-      <footer className="bg-dark text-white text-center py-3 mt-auto">
-        <p>
-          &copy; 2025 Nexora Analytics. All rights reserved. |{" "}
-          <a href="#" className="text-white">
-            Privacy Policy
-          </a>{" "}
-          |{" "}
-          <a href="#" className="text-white">
-            Terms of Service
-          </a>
-        </p>
+      <main className="sfdc-auth__wrap">
+        <div className="sfdc-auth__card fade-in" style={{ animationDelay: "60ms" }}>
+          <h2 className="sfdc-auth__title">Sign in</h2>
+          <form onSubmit={handleSubmit} className="sfdc-form">
+            <div className="sfdc-input">
+              <label htmlFor="tenant">Tenant</label>
+              <input
+                type="text"
+                id="tenant"
+                value={formData.tenant}
+                onChange={handleChange}
+                placeholder="e.g., demo"
+              />
+            </div>
+            <div className="sfdc-input">
+              <label htmlFor="email">Email address</label>
+              <input
+                type="email"
+                id="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div className="sfdc-input">
+              <label htmlFor="password">Password</label>
+              <input
+                type="password"
+                id="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            {error && (
+              <div className="sfdc-error" role="alert">{error}</div>
+            )}
+            <button type="submit" className="sfdc-button_brand sfdc-auth__submit">
+              Sign in
+            </button>
+            <div className="sfdc-auth__links">
+              <a href="#">Forgot password?</a>
+              <span>
+                Don't have an account? <a href="/signup">Sign up</a>
+              </span>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      <footer className="sfdc-auth__footer">
+        <p>&copy; 2025 Nexora Analytics</p>
       </footer>
     </div>
   );

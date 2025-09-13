@@ -19,7 +19,7 @@ const Products = () => (
             modeling, and member stratification. Features customizable views and
             AI insights.
           </p>
-          <a href="/contact" className="btn btn-primary">
+          <a href="/contact" className={`btn ${styles.btnBrandPrimary}`}>
             Request Demo
           </a>
         </div>
@@ -31,7 +31,7 @@ const Products = () => (
             Tools to break down costs, forecast capitation rates, and identify
             savings opportunities with detailed reporting.
           </p>
-          <a href="/contact" className="btn btn-primary">
+          <a href="/contact" className={`btn ${styles.btnBrandPrimary}`}>
             Request Demo
           </a>
         </div>
@@ -43,7 +43,7 @@ const Products = () => (
             Personalized analytics to track member health trends, recommend
             interventions, and measure outcomes.
           </p>
-          <a href="/contact" className="btn btn-primary">
+          <a href="/contact" className={`btn ${styles.btnBrandAccent}`}>
             Request Demo
           </a>
         </div>
@@ -55,7 +55,7 @@ const Products = () => (
             Seamless API integrations with EHRs, claims data, and third-party
             systems for unified analytics.
           </p>
-          <a href="/contact" className="btn btn-primary">
+          <a href="/contact" className={`btn ${styles.btnBrandPrimary}`}>
             Request Demo
           </a>
         </div>

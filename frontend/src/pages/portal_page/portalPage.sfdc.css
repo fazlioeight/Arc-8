@@ -1,0 +1,223 @@
+/* Salesforce-inspired styling for the portal page (no external deps) */
+
+:root {
+  --sfdc-bg: #f4f6f9;
+  --sfdc-card: #ffffff;
+  --sfdc-text: #1f2d3d;
+  --sfdc-muted: #6b778c;
+  --sfdc-border: #e2e5ea;
+  --sfdc-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  --sfdc-shadow-lg: 0 8px 24px rgba(1, 118, 211, 0.18);
+  --sfdc-brand: #0176d3;    /* Salesforce primary */
+  --sfdc-brand-dark: #0e5bb7;
+  --sfdc-brand-contrast: #ffffff;
+}
+
+.dark-mode {
+  --sfdc-bg: #161a1d;
+  --sfdc-card: #1e2327;
+  --sfdc-text: #e8eaed;
+  --sfdc-muted: #a2a9b1;
+  --sfdc-border: #2c3237;
+  --sfdc-shadow: 0 2px 10px rgba(0,0,0,0.35);
+  --sfdc-shadow-lg: 0 8px 24px rgba(1,118,211,0.25);
+}
+
+.sfdc-portal {
+  background: var(--sfdc-bg);
+  min-height: 100vh;
+}
+
+/* Compact top utility bar */
+.sfdc-utilitybar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: saturate(1.2) blur(6px);
+  background: color-mix(in oklab, var(--sfdc-card) 88%, transparent);
+  border-bottom: 1px solid var(--sfdc-border);
+}
+
+.sfdc-utilitybar__content {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: relative;
+}
+
+.sfdc-utilitybar__left { display: flex; align-items: center; gap: 10px; }
+.sfdc-utilitybar__right { display: flex; align-items: center; gap: 6px; }
+
+.sfdc-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--sfdc-brand), var(--sfdc-brand-dark));
+  color: #fff; display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.9rem; box-shadow: var(--sfdc-shadow);
+}
+
+.sfdc-identity { line-height: 1; }
+.sfdc-identity__name { font-weight: 600; color: var(--sfdc-text); font-size: 0.95rem; }
+.sfdc-identity__meta { color: var(--sfdc-muted); font-size: 0.8rem; }
+
+.sfdc-iconbutton {
+  background: transparent; border: 1px solid var(--sfdc-border);
+  border-radius: 8px; padding: 6px 8px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; color: var(--sfdc-text);
+  transition: background 120ms var(--easing-standard), transform 120ms var(--easing-standard);
+}
+.sfdc-iconbutton:hover { background: color-mix(in oklab, var(--sfdc-card) 85%, transparent); transform: translateY(-1px); }
+.sfdc-iconbutton:active { transform: translateY(0); }
+.sfdc-iconbutton svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* Dropdowns and menus */
+.sfdc-dropdown {
+  position: absolute;
+  top: 44px;
+  right: 12px;
+  background: var(--sfdc-card);
+  border: 1px solid var(--sfdc-border);
+  border-radius: 10px;
+  box-shadow: var(--sfdc-shadow);
+  min-width: 260px;
+  padding: 8px;
+  z-index: 20;
+}
+
+.sfdc-dropdown__header { font-weight: 700; color: var(--sfdc-text); padding: 6px 8px; }
+.sfdc-dropdown__item { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; color: var(--sfdc-text); }
+.sfdc-dropdown__item:hover { background: color-mix(in oklab, var(--sfdc-card) 85%, transparent); }
+.sfdc-dropdown__hint { color: var(--sfdc-muted); font-size: .85rem; }
+
+/* App Launcher (waffle) */
+.sfdc-waffle { position: absolute; top: 44px; left: 12px; background: var(--sfdc-card); border: 1px solid var(--sfdc-border); border-radius: 12px; box-shadow: var(--sfdc-shadow); width: min(90vw, 560px); padding: 12px; z-index: 20; }
+.sfdc-waffle__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.sfdc-app {
+  display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--sfdc-border); border-radius: 10px; cursor: pointer;
+}
+.sfdc-app:hover { background: color-mix(in oklab, var(--sfdc-card) 85%, transparent); }
+.sfdc-app__icon { width: 34px; height: 34px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; box-shadow: var(--sfdc-shadow); }
+.sfdc-app__name { color: var(--sfdc-text); font-weight: 600; }
+.sfdc-app__desc { color: var(--sfdc-muted); font-size: .85rem; }
+
+.sfdc-hero {
+  position: relative;
+  background: linear-gradient(135deg, var(--sfdc-brand), var(--sfdc-brand-dark));
+  color: var(--sfdc-brand-contrast);
+  padding: 36px 20px 72px;
+  box-shadow: var(--sfdc-shadow-lg);
+  overflow: hidden;
+}
+
+/* Decorative wave reminiscent of Salesforce cloud motif */
+.sfdc-hero::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px; height: 110px;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="1" d="M0,224L48,213.3C96,203,192,181,288,165.3C384,149,480,139,576,133.3C672,128,768,128,864,149.3C960,171,1056,213,1152,213.3C1248,213,1344,171,1392,149.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') center bottom/cover no-repeat;
+  pointer-events: none;
+}
+
+.sfdc-hero__content {
+  max-width: 1120px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.sfdc-hero__title {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.sfdc-hero__subtitle {
+  margin: 6px 0 16px;
+  font-size: 1rem;
+  opacity: 0.95;
+}
+
+.sfdc-button_brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--sfdc-brand);
+  color: var(--sfdc-brand-contrast);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-weight: 600;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.05), var(--sfdc-shadow);
+  transition: transform 120ms var(--easing-standard), filter 160ms var(--easing-standard);
+  cursor: pointer;
+}
+
+.sfdc-button_brand:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.sfdc-button_brand:active { transform: translateY(0); }
+.sfdc-button_brand:focus-visible { outline: 2px solid #8ab4f8; outline-offset: 2px; }
+
+.sfdc-grid {
+  max-width: 1120px;
+  margin: -52px auto 24px; /* pull up towards the hero wave */
+  padding: 0 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.sfdc-card {
+  background: var(--sfdc-card);
+  border: 1px solid var(--sfdc-border);
+  border-radius: 10px;
+  box-shadow: var(--sfdc-shadow);
+  padding: 16px 18px 18px;
+  transition: transform var(--dur-fast) var(--easing-standard), box-shadow var(--dur-fast) var(--easing-standard);
+}
+
+.sfdc-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+}
+
+.sfdc-card__title {
+  color: var(--sfdc-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+.sfdc-card__value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--sfdc-text);
+}
+
+.sfdc-card__hint {
+  color: var(--sfdc-muted);
+  font-size: 0.9rem;
+  margin-top: 6px;
+}
+
+.sfdc-card__body {
+  color: var(--sfdc-text);
+  margin: 0;
+}
+
+.sfdc-card--full {
+  grid-column: 1 / -1;
+}
+
+.sfdc-footer {
+  text-align: center;
+  color: var(--sfdc-muted);
+  padding: 8px 16px 28px;
+}
+
+/* Respect existing animation utilities if present */
+.fade-in { opacity: 0; transform: translateY(4px); animation: sfdcFadeIn var(--dur-med) var(--easing-standard) forwards; }
+.slide-up { opacity: 0; transform: translateY(12px); animation: sfdcSlideUp var(--dur-slow) var(--easing-standard) forwards; }
+@keyframes sfdcFadeIn { to { opacity: 1; transform: none; } }
+@keyframes sfdcSlideUp { to { opacity: 1; transform: none; } }

@@ -3,6 +3,8 @@ import React, { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import "../index.css";
+import "./portal_page/portalPage.sfdc.css";
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -39,22 +41,41 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="container py-5">
-      <h1>Welcome, {user?.name}!</h1>
-      <p>Your personalized analytics dashboard.</p>
-      {analyticsData ? (
-        <div>
-          {/* Render data, e.g., charts or tables */}
-          <h3>Risk Overview</h3>
-          <p>High-risk members: {analyticsData.highRiskCount}</p>
-          {/* Add more UI elements */}
+    <div className="sfdc-portal">
+      <section className="sfdc-hero">
+        <div className="sfdc-hero__content">
+          <h1 className="sfdc-hero__title">Dashboard</h1>
+          <p className="sfdc-hero__subtitle">Your personalized analytics</p>
         </div>
-      ) : (
-        <p>Loading data...</p>
-      )}
-      <button onClick={handleLogout} className="btn btn-danger mt-3">
-        Logout
-      </button>
+      </section>
+      <main className="sfdc-grid">
+        {analyticsData ? (
+          <>
+            <div className="sfdc-card">
+              <div className="sfdc-card__title">Risk Overview</div>
+              <div className="sfdc-card__value">High-risk: {analyticsData.highRiskCount}</div>
+              <div className="sfdc-card__hint">Based on latest scoring</div>
+            </div>
+            <div className="sfdc-card">
+              <div className="sfdc-card__title">Members</div>
+              <div className="sfdc-card__value">{analyticsData.memberCount ?? '—'}</div>
+              <div className="sfdc-card__hint">Active population</div>
+            </div>
+            <div className="sfdc-card sfdc-card--full">
+              <div className="sfdc-card__title">Notes</div>
+              <p className="sfdc-card__body">Charts and deep-dive views coming soon.</p>
+            </div>
+          </>
+        ) : (
+          <div className="sfdc-card sfdc-card--full">
+            <div className="sfdc-card__title">Loading</div>
+            <p className="sfdc-card__body">Fetching your analytics data...</p>
+          </div>
+        )}
+        <div className="sfdc-card sfdc-card--full">
+          <button onClick={handleLogout} className="sfdc-button_brand">Logout</button>
+        </div>
+      </main>
     </div>
   );
 };

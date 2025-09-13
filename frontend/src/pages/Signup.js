@@ -1,5 +1,7 @@
 // pages/Signup.js - Converted from signup.html with form state
 import React, { useState } from "react";
+import "../index.css";
+import "./Login.sfdc.css";
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -24,94 +26,70 @@ const Signup = () => {
   };
 
   return (
-    <div className="container py-5" style={{ backgroundColor: "#f8f9fa" }}>
-      <div
-        className="signup-form"
-        style={{
-          maxWidth: "400px",
-          margin: "auto",
-          padding: "40px",
-          background: "white",
-          borderRadius: "8px",
-          boxShadow: "0 0 10px rgba(0,0,0,0.1)",
-        }}
-      >
-        <h2 className="text-center mb-4">Create a New Account</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label htmlFor="name" className="form-label">
-              Full Name
-            </label>
-            <input
-              type="text"
-              className="form-control"
-              id="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="mb-3">
-            <label htmlFor="email" className="form-label">
-              Email Address
-            </label>
-            <input
-              type="email"
-              className="form-control"
-              id="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="mb-3">
-            <label htmlFor="password" className="form-label">
-              Password
-            </label>
-            <input
-              type="password"
-              className="form-control"
-              id="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="mb-3">
-            <label htmlFor="confirm-password" className="form-label">
-              Confirm Password
-            </label>
-            <input
-              type="password"
-              className="form-control"
-              id="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-            />
-          </div>
-          <div className="text-center">
-            <button type="submit" className="btn btn-primary w-100">
-              Sign Up
-            </button>
-          </div>
-          <p className="text-center mt-3">
-            Already have an account? <a href="/login">Login</a>
-          </p>
-        </form>
-      </div>
+    <div className="sfdc-auth">
+      <section className="sfdc-auth__hero">
+        <div className="sfdc-auth__heroContent">
+          <div className="sfdc-auth__brand">Nexora Analytics</div>
+          <div className="sfdc-auth__blurb">Create your account</div>
+        </div>
+      </section>
 
-      <footer className="bg-dark text-white text-center py-3 mt-auto">
-        <p>
-          &copy; 2025 Nexora Analytics. All rights reserved. |{" "}
-          <a href="#" className="text-white">
-            Privacy Policy
-          </a>{" "}
-          |{" "}
-          <a href="#" className="text-white">
-            Terms of Service
-          </a>
-        </p>
+      <main className="sfdc-auth__wrap">
+        <div className="sfdc-auth__card fade-in" style={{ animationDelay: "60ms" }}>
+          <h2 className="sfdc-auth__title">Sign up</h2>
+          <form onSubmit={handleSubmit} className="sfdc-form">
+            <div className="sfdc-input">
+              <label htmlFor="name">Full name</label>
+              <input
+                type="text"
+                id="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div className="sfdc-input">
+              <label htmlFor="email">Email address</label>
+              <input
+                type="email"
+                id="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div className="sfdc-input">
+              <label htmlFor="password">Password</label>
+              <input
+                type="password"
+                id="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div className="sfdc-input">
+              <label htmlFor="confirmPassword">Confirm password</label>
+              <input
+                type="password"
+                id="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <button type="submit" className="sfdc-button_brand">Create account</button>
+            <div className="sfdc-auth__links">
+              <span>
+                Already have an account? <a href="/login">Login</a>
+              </span>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      <footer className="sfdc-auth__footer">
+        <p>&copy; 2025 Nexora Analytics</p>
       </footer>
     </div>
   );

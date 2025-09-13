@@ -1,18 +1,34 @@
 import React from 'react';
 
-function DarkModeToggle({ darkMode, setDarkMode }) {
+// themePreference: 'system' | 'light' | 'dark'
+function DarkModeToggle({ themePreference, setThemePreference }) {
   return (
-    <button
-      className="btn btn-outline-secondary ms-2"
-      onClick={() => setDarkMode(!darkMode)}
-      aria-label="Toggle dark mode"
-    >
-      {darkMode ? (
-        <i className="bi bi-sun-fill"></i>
-      ) : (
-        <i className="bi bi-moon-stars-fill"></i>
-      )}
-    </button>
+    <div className="btn-group" role="group" aria-label="Theme preference">
+      <button
+        type="button"
+        className={`btn btn-outline-secondary ${themePreference === 'system' ? 'active' : ''}`}
+        onClick={() => setThemePreference('system')}
+      >
+        <i className="bi bi-circle-half"></i>
+        <span className="ms-1 d-none d-md-inline">System</span>
+      </button>
+      <button
+        type="button"
+        className={`btn btn-outline-secondary ${themePreference === 'light' ? 'active' : ''}`}
+        onClick={() => setThemePreference('light')}
+      >
+        <i className="bi bi-sun"></i>
+        <span className="ms-1 d-none d-md-inline">Light</span>
+      </button>
+      <button
+        type="button"
+        className={`btn btn-outline-secondary ${themePreference === 'dark' ? 'active' : ''}`}
+        onClick={() => setThemePreference('dark')}
+      >
+        <i className="bi bi-moon-stars"></i>
+        <span className="ms-1 d-none d-md-inline">Dark</span>
+      </button>
+    </div>
   );
 }
 

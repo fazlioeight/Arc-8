@@ -17,3 +17,8 @@
 .badgeTeam { composes: badge; background: color-mix(in srgb, var(--tier-team), transparent 70%); color: var(--tier-team); }
 .badgeEnterprise { composes: badge; background: color-mix(in srgb, var(--tier-enterprise), transparent 70%); color: var(--tier-enterprise); }
 
+/* Brand buttons */
+.btnBrandPrimary { background: var(--brand-primary); color: #fff; border: none; }
+.btnBrandPrimary:hover { filter: brightness(1.05); }
+.btnBrandAccent { background: var(--brand-accent); color: #0a2f14; border: none; }
+.btnBrandAccent:hover { filter: brightness(1.05); }

@@ -13,27 +13,43 @@ import Signup from './pages/Signup';
 import Login from './pages/Login';
 import PortalPage from './pages/portal_page/portalPage'; // adjust path as needed
 import RideBooking from './pages/RideBooking';
+import Settings from './pages/Settings';
+import Dashboard from './pages/Dashboard';
 
 function App() {
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved !== null) return saved === 'true';
-    // Fall back to system preference on first load
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const [themePreference, setThemePreference] = useState(() => {
+    const saved = localStorage.getItem('themePreference');
+    return saved || 'system';
   });
 
+  // Compute effective theme and apply class
   useEffect(() => {
-    // Persist darkMode to localStorage whenever it changes
-    localStorage.setItem('darkMode', darkMode);
-  }, [darkMode]);
+    const root = document.documentElement;
+    const applyTheme = (pref) => {
+      const isDark = pref === 'dark' || (pref === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      root.classList.toggle('dark-mode', !!isDark);
+      root.classList.toggle('light-mode', !isDark);
+    };
+    applyTheme(themePreference);
+    localStorage.setItem('themePreference', themePreference);
+    // Listen to system changes when in system mode
+    const mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    const handler = () => themePreference === 'system' && applyTheme('system');
+    if (mql && mql.addEventListener) mql.addEventListener('change', handler);
+    else if (mql && mql.addListener) mql.addListener(handler);
+    return () => {
+      if (mql && mql.removeEventListener) mql.removeEventListener('change', handler);
+      else if (mql && mql.removeListener) mql.removeListener(handler);
+    };
+  }, [themePreference]);
 
   return (
-    <div className={darkMode ? 'dark-mode' : ''}>
+    <div>
       <AuthProvider>
         <Router>
           <Navbar />
           <div className="container mt-2 mb-2 d-flex justify-content-end">
-            <DarkModeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+            <DarkModeToggle themePreference={themePreference} setThemePreference={setThemePreference} />
           </div>
           <Routes>
             <Route path="/" element={<Home />} />
@@ -45,6 +61,8 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/portal_page/portalPage" element={<PortalPage />} />
             <Route path="/RideBooking" element={<RideBooking />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/dashboard" element={<Dashboard />} />
           </Routes>
         </Router>
       </AuthProvider>
