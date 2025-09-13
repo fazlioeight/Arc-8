@@ -1,13 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../index.css";
 import "./portal_page/portalPage.sfdc.css";
 import "./settings/settings.css";
 import DarkModeToggle from "../components/DarkModeToggle";
 import ToggleSwitch from "../components/ToggleSwitch";
+import PortalUtilityBar from "../components/PortalUtilityBar";
+import { AuthContext } from "../context/AuthContext";
 
 const Settings = ({ themePreference, setThemePreference }) => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useContext(AuthContext) || {};
   const [active, setActive] = useState("general");
 
   const [prefs, setPrefs] = useState(() => {
@@ -111,6 +114,7 @@ const Settings = ({ themePreference, setThemePreference }) => {
 
   return (
     <div className="li-settings">
+      {isAuthenticated && <PortalUtilityBar />}
       <header className="li-settings__header">
         <div className="li-settings__headerbar">
           <div>

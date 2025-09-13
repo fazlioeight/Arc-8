@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import Navbar from './components/Navbar';
@@ -31,36 +31,48 @@ import CompanyInfo from './pages/contact/CompanyInfo';
 
 const Shell = ({ themePreference, setThemePreference }) => {
   const { isAuthenticated, loading } = useContext(AuthContext) || {};
+
+  const Inner = () => {
+    const location = useLocation();
+    const hideNavbarOn = ['/portal_page/portalPage', '/RideBooking', '/dashboard', '/settings'];
+    const hideNavbar = hideNavbarOn.some(p => location.pathname.startsWith(p));
+    return (
+      <>
+        {!hideNavbar && <Navbar />}
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/insights" element={<Insights />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/portal_page/portalPage" element={<PortalPage />} />
+          <Route path="/RideBooking" element={<RideBooking />} />
+          <Route path="/settings" element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/docs" element={<Docs />} />
+          {/* Section routes */}
+          <Route path="/about/mission" element={<Mission />} />
+          <Route path="/about/values" element={<Values />} />
+          <Route path="/about/team" element={<Team />} />
+          <Route path="/products/risk-analysis" element={<RiskAnalysis />} />
+          <Route path="/products/capitation-analyzer" element={<CapitationAnalyzer />} />
+          <Route path="/products/member-health-insights" element={<MemberHealthInsights />} />
+          <Route path="/products/integration-suite" element={<IntegrationSuite />} />
+          <Route path="/insights/future-capitation" element={<FutureCapitation />} />
+          <Route path="/insights/predictive-modeling" element={<PredictiveModeling />} />
+          <Route path="/insights/cost-savings" element={<CostSavings />} />
+          <Route path="/contact/form" element={<ContactFormPage />} />
+          <Route path="/contact/info" element={<CompanyInfo />} />
+        </Routes>
+      </>
+    );
+  };
+
   return (
     <Router>
-      {(!loading && !isAuthenticated) && <Navbar />}
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/insights" element={<Insights />} />
-        <Route path="/contact" element={<Contact />} />
-        <Route path="/pricing" element={<Pricing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/portal_page/portalPage" element={<PortalPage />} />
-        <Route path="/RideBooking" element={<RideBooking />} />
-        <Route path="/settings" element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/docs" element={<Docs />} />
-        {/* Section routes */}
-        <Route path="/about/mission" element={<Mission />} />
-        <Route path="/about/values" element={<Values />} />
-        <Route path="/about/team" element={<Team />} />
-        <Route path="/products/risk-analysis" element={<RiskAnalysis />} />
-        <Route path="/products/capitation-analyzer" element={<CapitationAnalyzer />} />
-        <Route path="/products/member-health-insights" element={<MemberHealthInsights />} />
-        <Route path="/products/integration-suite" element={<IntegrationSuite />} />
-        <Route path="/insights/future-capitation" element={<FutureCapitation />} />
-        <Route path="/insights/predictive-modeling" element={<PredictiveModeling />} />
-        <Route path="/insights/cost-savings" element={<CostSavings />} />
-        <Route path="/contact/form" element={<ContactFormPage />} />
-        <Route path="/contact/info" element={<CompanyInfo />} />
-      </Routes>
+      <Inner />
     </Router>
   );
 };

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../index.css";
 import "./portal_page/portalPage.sfdc.css";
+import PortalUtilityBar from "../components/PortalUtilityBar";
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -42,6 +43,7 @@ const Dashboard = () => {
 
   return (
     <div className="sfdc-portal">
+      {user && <PortalUtilityBar />}
       <section className="sfdc-hero">
         <div className="sfdc-hero__content">
           <h1 className="sfdc-hero__title">Dashboard</h1>

@@ -1,7 +1,11 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
+import PortalUtilityBar from "../components/PortalUtilityBar";
+import "./portal_page/portalPage.sfdc.css";
 
 const RideBooking = () => {
+  const { isAuthenticated } = useContext(AuthContext) || {};
   const [pickup, setPickup] = useState("");
   const [dropoff, setDropoff] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
@@ -19,7 +23,9 @@ const RideBooking = () => {
   };
 
   return (
-    <div className="container py-5" style={{ maxWidth: 500, margin: "auto" }}>
+    <>
+      {isAuthenticated && <PortalUtilityBar />}
+      <div className="container py-5" style={{ maxWidth: 500, margin: "auto" }}>
       <h2 className="mb-4">Book a Ride</h2>
       <form onSubmit={handleSubmit}>
         <div className="mb-3">
@@ -112,6 +118,7 @@ const RideBooking = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 
