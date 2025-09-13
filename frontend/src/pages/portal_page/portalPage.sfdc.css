@@ -212,6 +212,14 @@
   padding: 8px 16px 28px;
 }
 
+/* Search Overlay */
+.sfdc-overlay { position: fixed; inset: 0; background: color-mix(in oklab, var(--sfdc-bg) 70%, #000 30%); backdrop-filter: blur(4px); display: grid; place-items: start center; padding-top: 14vh; z-index: 50; }
+.sfdc-overlay__panel { width: min(880px, 92vw); background: var(--sfdc-card); border: 1px solid var(--sfdc-border); border-radius: 12px; box-shadow: var(--sfdc-shadow-lg); overflow: hidden; }
+.sfdc-overlay__header { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 12px; border-bottom: 1px solid var(--sfdc-border); }
+.sfdc-overlay__input { width: 100%; padding: 10px 12px; border: 1px solid var(--sfdc-border); border-radius: 8px; background: var(--sfdc-bg); color: var(--sfdc-text); font-size: 1rem; }
+.sfdc-overlay__body { padding: 14px; color: var(--sfdc-text); }
+.sfdc-overlay__hint { color: var(--sfdc-muted); font-size: .95rem; }
+
 /* Respect existing animation utilities if present */
 .fade-in { opacity: 0; transform: translateY(4px); animation: sfdcFadeIn var(--dur-med) var(--easing-standard) forwards; }
 .slide-up { opacity: 0; transform: translateY(12px); animation: sfdcSlideUp var(--dur-slow) var(--easing-standard) forwards; }

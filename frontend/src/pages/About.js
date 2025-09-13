@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { useLocation } from 'react-router-dom';
 
 const team = [
   {
@@ -21,7 +22,17 @@ const team = [
   },
 ];
 
-const About = () => (
+const About = () => {
+  const location = useLocation();
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location]);
+
+  return (
   <main className="container py-5" aria-labelledby="about-title">
     <header>
       <h1 id="about-title" className="text-center mb-4">
@@ -96,6 +107,7 @@ const About = () => (
       </address>
     </footer>
   </main>
-);
+  );
+};
 
 export default About;

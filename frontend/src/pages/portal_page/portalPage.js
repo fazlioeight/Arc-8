@@ -20,6 +20,9 @@ const PortalDashboard = () => {
   const [showWaffle, setShowWaffle] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const [showUser, setShowUser] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef(null);
   const barRef = useRef(null);
 
   useEffect(() => {
@@ -82,6 +85,24 @@ const PortalDashboard = () => {
     return () => document.removeEventListener("click", onDocClick);
   }, []);
 
+  useEffect(() => {
+    if (showSearch && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [showSearch]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setShowSearch(false);
+      }
+    };
+    if (showSearch) {
+      window.addEventListener('keydown', onKey);
+    }
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showSearch]);
+
   if (data.loading) {
     return <div className="loading">Loading Nexora Analytics Portal...</div>;
   }
@@ -110,7 +131,7 @@ const PortalDashboard = () => {
             <span className="sfdc-avatar" aria-hidden>{initials}</span>
           </div>
           <div className="sfdc-utilitybar__right">
-            <button className="sfdc-iconbutton" title="Search" aria-label="Search" onClick={()=>navigate('/products')}>
+            <button className="sfdc-iconbutton" title="Search" aria-label="Search" onClick={(e)=>{ e.stopPropagation(); setShowSearch(true); setShowWaffle(false); setShowNotif(false); setShowUser(false); }}>
               <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L20 21.5 21.5 20l-6-6zM10 14a4 4 0 110-8 4 4 0 010 8z"/></svg>
             </button>
             <button
@@ -145,13 +166,7 @@ const PortalDashboard = () => {
                     <div className="sfdc-app__desc">Metrics & insights</div>
                   </div>
                 </div>
-                <div className="sfdc-app" onClick={()=>navigate('/products')}>
-                  <div className="sfdc-app__icon" style={{background:'#22c55e'}}>PR</div>
-                  <div>
-                    <div className="sfdc-app__name">Products</div>
-                    <div className="sfdc-app__desc">Apps & features</div>
-                  </div>
-                </div>
+                {/* Products tile removed from pinned apps as requested */}
                 <div className="sfdc-app" onClick={()=>navigate('/RideBooking')}>
                   <div className="sfdc-app__icon" style={{background:'#0ea5e9'}}>RB</div>
                   <div>
@@ -210,6 +225,33 @@ const PortalDashboard = () => {
           )}
         </div>
       </div>
+      {showSearch && (
+        <div className="sfdc-overlay" role="dialog" aria-modal="true" onClick={()=>setShowSearch(false)}>
+          <div className="sfdc-overlay__panel" onClick={(e)=>e.stopPropagation()}>
+            <div className="sfdc-overlay__header">
+              <input
+                ref={searchInputRef}
+                className="sfdc-overlay__input"
+                type="text"
+                placeholder="Search Nexora Analytics Docs"
+                value={searchQuery}
+                onChange={(e)=>setSearchQuery(e.target.value)}
+                onKeyDown={(e)=>{ if (e.key === 'Enter') { navigate(`/docs?q=${encodeURIComponent(searchQuery)}`); setShowSearch(false); } }}
+              />
+              <button
+                className="sfdc-button_brand"
+                onClick={()=>{ navigate(`/docs?q=${encodeURIComponent(searchQuery)}`); setShowSearch(false); }}
+              >Search</button>
+              <button className="sfdc-iconbutton" aria-label="Close search" onClick={()=>setShowSearch(false)}>
+                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"/></svg>
+              </button>
+            </div>
+            <div className="sfdc-overlay__body">
+              <div className="sfdc-overlay__hint">Type a query and press Enter to search docs.</div>
+            </div>
+          </div>
+        </div>
+      )}
       <section className="sfdc-hero">
         <div className="sfdc-hero__content">
           <h1 className="sfdc-hero__title">{tenantName}</h1>

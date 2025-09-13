@@ -1,8 +1,19 @@
 // pages/Products.js - Converted from products.html
-import React from "react";
+import React, { useEffect } from "react";
+import { useLocation } from 'react-router-dom';
 import styles from "../styles/theme.module.css";
 
-const Products = () => (
+const Products = () => {
+  const location = useLocation();
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location]);
+
+  return (
   <div className="container py-5">
     <h1 className="text-center mb-4">Our Products</h1>
     <p className="lead text-center">
@@ -12,7 +23,7 @@ const Products = () => (
 
     <div className="row">
       <div className="col-md-6">
-        <div className={`${styles.productCard} mb-4 fade-in`}>
+        <div className={`${styles.productCard} mb-4 fade-in`} id="risk-analysis">
           <h3>Risk Analysis Dashboard <span className={styles.badgeEnterprise}>Enterprise</span></h3>
           <p>
             Interactive dashboard for real-time risk scoring, predictive
@@ -25,7 +36,7 @@ const Products = () => (
         </div>
       </div>
       <div className="col-md-6">
-        <div className={`${styles.productCard} mb-4 fade-in`}>
+        <div className={`${styles.productCard} mb-4 fade-in`} id="capitation-analyzer">
           <h3>Cost & Capitation Analyzer <span className={styles.badgeTeam}>Team</span></h3>
           <p>
             Tools to break down costs, forecast capitation rates, and identify
@@ -37,7 +48,7 @@ const Products = () => (
         </div>
       </div>
       <div className="col-md-6">
-        <div className={`${styles.productCard} mb-4 fade-in`}>
+        <div className={`${styles.productCard} mb-4 fade-in`} id="member-health-insights">
           <h3>Member Health Insights</h3>
           <p>
             Personalized analytics to track member health trends, recommend
@@ -49,7 +60,7 @@ const Products = () => (
         </div>
       </div>
       <div className="col-md-6">
-        <div className={`${styles.productCard} mb-4 fade-in`}>
+        <div className={`${styles.productCard} mb-4 fade-in`} id="integration-suite">
           <h3>Integration Suite</h3>
           <p>
             Seamless API integrations with EHRs, claims data, and third-party
@@ -75,6 +86,7 @@ const Products = () => (
       </p>
     </footer>
   </div>
-);
+  );
+};
 
 export default Products;

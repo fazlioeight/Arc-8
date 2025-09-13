@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 const Contact = () => {
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
@@ -38,9 +39,18 @@ const Contact = () => {
     // For real API: await axios.post('/api/contact', formData)
   };
 
+  const location = useLocation();
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.replace('#', '');
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location]);
+
   return (
     <div className="container py-5">
-      <h1 className="text-center mb-4">Contact Us</h1>
+      <h1 className="text-center mb-4" id="info">Contact Us</h1>
       <p className="lead text-center">Get in touch for demos, questions, or partnerships. We're here to help.</p>
       
       {submitted && (
@@ -49,7 +59,7 @@ const Contact = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="row g-3" aria-label="Contact form" noValidate>
+      <form onSubmit={handleSubmit} id="form" className="row g-3" aria-label="Contact form" noValidate>
         <div className="col-md-6">
           <label htmlFor="name" className="form-label">Name</label>
           <input
