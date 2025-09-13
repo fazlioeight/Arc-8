@@ -4,6 +4,12 @@ from pydantic import BaseModel
 import psycopg2
 import bcrypt
 import uvicorn
+# Routers
+from .routes import analytics as analytics_router
+from .routes import member_cost as member_cost_router
+from .routes import utilization as utilization_router
+from .routes import member_risk as member_risk_router
+from .utils.security import create_access_token
 
 app = FastAPI()
 
@@ -54,7 +60,9 @@ def login(request: LoginRequest):
         if not bcrypt.checkpw(request.password.encode(), hashed_password.encode()):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        return {"token": "example-jwt"}  # Replace with real JWT later
+        # Issue JWT
+        token = create_access_token({"sub": request.email})
+        return {"token": token, "email": request.email}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -63,6 +71,12 @@ def login(request: LoginRequest):
             cur.close()
         if conn:
             conn.close()
+
+# Include routers
+app.include_router(analytics_router.router)
+app.include_router(member_cost_router.router)
+app.include_router(utilization_router.router)
+app.include_router(member_risk_router.router)
 
 # Run the app
 if __name__ == "__main__":

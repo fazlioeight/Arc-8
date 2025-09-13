@@ -1,104 +1,133 @@
 # Nexora Platform
 
-Nexora Platform is a healthcare analytics solution for payer groups, providing advanced tools for risk management, cost optimization, and member health insights. The platform includes a React frontend, FastAPI backend, and interactive dashboards.
+Nexora Platform is a healthcare analytics solution for payer groups, providing tools for risk management, cost optimization, and member insights. It comprises a FastAPI backend, a React frontend, and optional Streamlit dashboards.
 
 ## Features
 
-- **Risk Analysis Dashboard:** Real-time risk scoring, predictive modeling, and member stratification.
-- **Cost & Capitation Analyzer:** Cost breakdowns, capitation forecasting, and savings identification.
-- **Member Health Insights:** Personalized analytics for member health trends and interventions.
-- **Integration Suite:** API integrations with EHRs, claims data, and third-party systems.
-- **Utilization Management:** Flag overutilization and manage visit thresholds.
+- Risk analytics and member stratification
+- Cost analysis backed by claims CSV data
+- Simple JWT-based authentication for protected APIs
+- Utilization flags via tunable thresholds
 
 ## Project Structure
 
-nexora-analytics-website/
-- backend/                # Python backend (API, auth, data analytics)
-   - app/                # Main app code
+```
+nexora-platform/
+- backend/
+  - app/
+    - __init__.py
+    - main.py                 # FastAPI app, mounts routers and handles login
+    - routes/
       - __init__.py
-      - main.py         # Entry point (e.g., FastAPI app)
-      - routes/         # API endpoints (e.g., auth, dashboard data)
-         - __init__.py
-         - auth.py     # Login/signup endpoints
-         - analytics.py # Endpoints for risk/cost data
-      - models/         # Data models (e.g., Pydantic for validation)
-   - requirements.txt    # Python dependencies (e.g., fastapi, uvicorn, pydantic)
-   - .env                # Environment variables (e.g., API keys, DB URL)
-   - run.sh              # Script to start the backend
-- frontend/               # React frontend
-   - public/             # Static assets (e.g., index.html, favicon)
-   - src/                # React source code
-      - components/     # Reusable UI components (e.g., Navbar, Hero)
-         - Navbar.js
-         - Hero.js     # Adapted from the hero section
-         - Card.js     # For features, testimonials, etc.
-      - pages/          # Page components (e.g., Home, About, Products)
-         - Home.js     # Main index page
-         - About.js
-         - Products.js
-         - Blog.js     # Or Insights
-         - Contact.js
-         - Signup.js
-         - Login.js
-      - App.js          # Main app with routing (using React Router)
-      - index.js        # Entry point
-      - styles/         # CSS files (or use styled-components)
-         - App.css
-      - package.json        # React dependencies (e.g., react, react-dom, bootstrap, react-router-dom)
-      - .env                # Frontend env vars (e.g., API base URL)
-      - yarn.lock           # Or package-lock.json if using npm
-- docs/                   # Optional: Documentation, wireframes, or API specs
-- .gitignore              # Ignore node_modules, .env, etc.
-- README.md               # Project overview, setup instructions, tech stack
-- LICENSE                 # Your chosen license
+      - analytics.py          # /api/analytics/dashboard (JWT-protected)
+      - member_cost.py        # /member/{member_id}/costs (CSV-backed)
+      - member_risk.py        # /member/{member_id}/risk (JWT-protected, stub)
+      - utilization.py        # /overutilization/ (public for Streamlit)
+    - models/
+      - analytics_models.py   # (placeholder)
+    - utils/
+      - __init__.py
+      - audit_logger.py
+      - security.py           # JWT create/verify helpers
+  - dashboards/
+    - utilization_dashboard.py
+    - member_cost_dashboard.py (placeholder)
+    - member_risk_dashboard.py (placeholder)
+    - main_dashboard.py (placeholder)
+  - claims_data.csv
+  - requirements.txt
+- frontend/
+  - public/
+  - src/
+    - App.js, index.js, index.css
+    - components/ (Navbar, DarkModeToggle, ProtectedRoute)
+    - context/ (AuthContext)
+    - pages/ (Home, About, Products, Insights, Contact, Signup, Login, etc.)
+    - services/ (memberCostService, ...)
+    - __tests__/ (Jest tests)
+  - package.json, jest.config.js, babel.config.js
+- LICENSE
+```
 
-## Getting Started
+## Prerequisites
 
-### Backend
+- Python 3.9+
+- Node.js 16+ and npm
+- Local PostgreSQL (optional for login), default credentials used by the app:
+  - DB: `nexora`, User: `admin`, Password: `admin`, Host: `localhost`
 
-1. **Install dependencies:**
-   ```sh
-   cd backend
-   pip install -r requirements.txt
+## Backend Setup
 
-2. **Generate synthetic data:**
-   ```py
-   python scripts/generate_synthetic_data.py
+From repo root:
 
-3. **Run FastAPI server:**
-   ```py
-   uvicorn app.main:app --reload
+- Create and activate a virtual environment (Windows PowerShell):
+  - `cd backend`
+  - `python -m venv .venv`
+  - `.\\.venv\\Scripts\\Activate.ps1`
+  - If blocked: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
 
-### Frontend
+- Install dependencies:
+  - `pip install -r requirements.txt`
 
-1. **Install dependencies:**
-   ```sh
-   cd frontend  
-   npm install
+- Run the API (dev):
+  - `python -m uvicorn app.main:app --reload`
 
-2. **Start React app:**
-   ```js
-   npm start
+Notes
+- CORS is configured for `http://localhost:3000` in `app/main.py`.
+- Login issues a JWT and returns `{ token, email }`.
+- Member cost endpoint reads `backend/claims_data.csv` once on startup.
 
-### Dashboards
+## Frontend Setup
 
-1. **Run Streamlit dashboards:**
-   ```js
-   streamlit run backend/dashboards/member_cost_dashboard.py
-   streamlit run backend/dashboards/member_risk_dashboard.py
-   streamlit run backend/dashboards/utilization_dashboard.py
+From repo root:
 
-### API Endpoints
+- `cd frontend`
+- `npm install`
+- `npm start`
 
-  - GET /member/{member_id}/costs — Get total costs for a member.
-  - POST /api/login — Authenticate user (returns JWT).
+The app runs at `http://localhost:3000`.
 
-### Technologies
+## Tests (Frontend)
 
-  - Frontend: React, Bootstrap, React Router
-  - Backend: FastAPI, Pandas, PyJWT
-  - Dashboards: Streamlit
-  - Data Generation: Faker, Pandas, NumPy
+- Run tests: `cd frontend && npm test`
+- Jest runs in `jsdom`. Tests avoid extra libs by using server-rendering and virtual mocks.
 
-### License
-  - Apache License 2.0.
+## API Endpoints
+
+- `POST /api/login`
+  - Body: `{ "email": string, "password": string }`
+  - Returns: `{ "token": string, "email": string }`
+- `GET /api/analytics/dashboard` (Bearer token required)
+  - Header: `Authorization: Bearer <JWT>`
+  - Returns example metrics
+- `GET /member/{member_id}/costs`
+  - Returns: `{ member_id, total_cost }` (from CSV)
+- `GET /member/{member_id}/risk` (Bearer token required)
+  - Returns: `{ member_id, risk_score }` (stub)
+- `GET /overutilization/?threshold=<int>`
+  - Returns: flagged members above threshold (stub), unauthenticated for Streamlit demo
+
+## Streamlit Dashboards
+
+- Utilization demo (no auth):
+  - `streamlit run backend/dashboards/utilization_dashboard.py`
+  - Requires the FastAPI server running on `http://localhost:8000`
+
+## Configuration
+
+- Secrets: `backend/app/utils/security.py` uses a hardcoded `SECRET_KEY` for development. For production, load from environment variables.
+- Database: `app/main.py` connects to Postgres per request for login. Replace with pooled connections and `.env` config for production.
+
+## Troubleshooting
+
+- uvicorn not found:
+  - Use `python -m uvicorn app.main:app --reload` from `backend`, or activate the virtualenv first.
+- CORS errors:
+  - Update `allow_origins` in `backend/app/main.py` to match your frontend origin.
+- CSV not found:
+  - Ensure `backend/claims_data.csv` exists. A synthetic generator script is available at `backend/scripts/generate_synthetic_data.py`.
+
+## License
+
+Apache License 2.0
+

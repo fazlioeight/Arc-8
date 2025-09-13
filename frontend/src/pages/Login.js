@@ -37,7 +37,7 @@ const Login = () => {
         login(data); // Call login from context
         navigate("/portal_page/portalPage"); // Redirect after login
       } else {
-        setError(data.message || "Login failed. Please try again.");
+        setError(data.detail || "Login failed. Please try again.");
       }
     } catch (error) {
       setError("Network error. Please try again.");
