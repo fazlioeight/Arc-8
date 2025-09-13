@@ -4,12 +4,7 @@ import { Navbar as BSNavbar, Nav } from "react-bootstrap";
 import { NavLink } from "react-router-dom";
 
 const Navbar = () => (
-  <BSNavbar
-    bg="primary"
-    variant="dark"
-    expand="lg"
-    style={{ backgroundColor: "#e9f7ff" }}
-  >
+  <BSNavbar bg="light" variant="light" expand="lg">
     <div className="container">
       <BSNavbar.Brand
         as={NavLink}

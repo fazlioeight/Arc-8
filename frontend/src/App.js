@@ -16,9 +16,10 @@ import RideBooking from './pages/RideBooking';
 
 function App() {
   const [darkMode, setDarkMode] = useState(() => {
-    // Read initial value from localStorage
     const saved = localStorage.getItem('darkMode');
-    return saved === 'true';
+    if (saved !== null) return saved === 'true';
+    // Fall back to system preference on first load
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
   useEffect(() => {

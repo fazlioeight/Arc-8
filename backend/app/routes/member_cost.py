@@ -1,22 +1,23 @@
-from pathlib import Path
-
-from fastapi import APIRouter
-import pandas as pd
+from fastapi import APIRouter, Request, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from ..db.session import get_db
+from ..models.tables import Claim, Tenant
 
 router = APIRouter()
 
-# Resolve CSV path relative to repository structure
-BASE_DIR = Path(__file__).resolve().parents[2]  # points to backend/
-CLAIMS_CSV = BASE_DIR / "claims_data.csv"
-
-# Load once at startup
-claims_df = pd.read_csv(CLAIMS_CSV)
-claims_df["ServiceDate"] = pd.to_datetime(claims_df["ServiceDate"])
-claims_df["Cost"] = claims_df["Cost"].astype(float)
-
-
 @router.get("/member/{member_id}/costs")
-def get_member_costs(member_id: str):
-    member_data = claims_df[claims_df["MemberID"] == member_id]
-    total_cost = float(member_data["Cost"].sum())
-    return {"member_id": member_id, "total_cost": total_cost}
+def get_member_costs(member_id: str, request: Request, db: Session = Depends(get_db)):
+    tenant_key = getattr(request.state, "tenant_id", None) or "demo"
+    tenant = db.query(Tenant).filter(Tenant.key == tenant_key).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    total = db.query(func.coalesce(func.sum(Claim.cost), 0)).filter(
+        Claim.tenant_id == tenant.id,
+        Claim.member_key == member_id,
+    ).scalar()
+    try:
+        total_cost = float(total)
+    except Exception:
+        total_cost = 0.0
+    return {"member_id": member_id, "total_cost": total_cost, "tenant": tenant_key}

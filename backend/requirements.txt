@@ -8,3 +8,9 @@ psycopg2-binary
 pandas
 requests
 streamlit
+alembic
+SQLAlchemy
+pytest
+requests_mock
+pytest
+requests_mock

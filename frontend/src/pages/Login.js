@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext"; // Adjust path if needed
 
 const Login = () => {
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [formData, setFormData] = useState({ email: "", password: "", tenant: "demo" });
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
   const [error, setError] = useState("");
@@ -21,7 +21,7 @@ const Login = () => {
       formData.email === "admin@admin.com" &&
       formData.password === "admin"
     ) {
-      login({ email: "admin@admin.com", token: "dummy-token" });
+      login({ email: "admin@admin.com", token: "dummy-token", tenant: formData.tenant || 'demo' });
       navigate("../portal_page/portalPage");
       return;
     }
@@ -59,6 +59,19 @@ const Login = () => {
       >
         <h2 className="text-center mb-4">Login to Your Account</h2>
         <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <label htmlFor="tenant" className="form-label">
+              Tenant
+            </label>
+            <input
+              type="text"
+              className="form-control"
+              id="tenant"
+              value={formData.tenant}
+              onChange={handleChange}
+              placeholder="e.g., demo"
+            />
+          </div>
           <div className="mb-3">
             <label htmlFor="email" className="form-label">
               Email Address

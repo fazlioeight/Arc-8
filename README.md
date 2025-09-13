@@ -74,8 +74,19 @@ From repo root:
 
 Notes
 - CORS is configured for `http://localhost:3000` in `app/main.py`.
-- Login issues a JWT and returns `{ token, email }`.
-- Member cost endpoint reads `backend/claims_data.csv` once on startup.
+- Login issues a JWT and returns `{ token, email, tenant }`.
+- Member cost endpoint now queries the database; use the seed script to load sample claims from `backend/claims_data.csv`.
+
+### Database Setup
+
+- Configure `DATABASE_URL` (Postgres recommended) in environment or `.env` at `backend/`.
+  - Example: `DATABASE_URL=postgresql://admin:admin@localhost:5432/nexora`
+  - If not set, the app uses a local SQLite file `backend/nexora.db` for development.
+- Create tables via Alembic:
+  - `cd backend`
+  - `alembic upgrade head`
+- Seed demo data (tenant `demo`, user `admin@admin.com` / `admin`, and claims from CSV):
+  - `python scripts/seed_demo.py`
 
 ## Frontend Setup
 
@@ -100,18 +111,27 @@ The app runs at `http://localhost:3000`.
 - `GET /api/analytics/dashboard` (Bearer token required)
   - Header: `Authorization: Bearer <JWT>`
   - Returns example metrics
+- `GET /api/analytics/summary` (Bearer token required)
+  - Returns: `{ tenant, total_claims, total_cost }`
 - `GET /member/{member_id}/costs`
-  - Returns: `{ member_id, total_cost }` (from CSV)
+  - Returns: `{ member_id, total_cost }` (from database; seed with `scripts/seed_demo.py`)
 - `GET /member/{member_id}/risk` (Bearer token required)
   - Returns: `{ member_id, risk_score }` (stub)
 - `GET /overutilization/?threshold=<int>`
-  - Returns: flagged members above threshold (stub), unauthenticated for Streamlit demo
+  - Returns: flagged members above threshold (stub), now requires bearer token
 
 ## Streamlit Dashboards
 
-- Utilization demo (no auth):
+- Utilization demo (with auth):
   - `streamlit run backend/dashboards/utilization_dashboard.py`
-  - Requires the FastAPI server running on `http://localhost:8000`
+  - Provide a JWT token in the dashboard (obtain via `POST /api/login`).
+  - Requires the FastAPI server running on `http://localhost:8000`.
+
+## Tests (Backend)
+
+- Install backend dev deps: `cd backend && pip install -r requirements.txt`
+- Run: `pytest`
+- Tests cover JWT roundtrip and analytics summary contract. For richer tests, set `DATABASE_URL` and run the seed script.
 
 ## Configuration
 
@@ -130,4 +150,3 @@ The app runs at `http://localhost:3000`.
 ## License
 
 Apache License 2.0
-

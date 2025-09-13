@@ -1,5 +1,16 @@
-/* Dark mode color palette */
+/* Base reset and modern defaults */
+*, *::before, *::after { box-sizing: border-box; }
+html:focus-within { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Token palettes and Bootstrap variable hooks */
 :root {
+  color-scheme: light dark;
+  --font-sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+
+  /* Dark tokens */
   --dm-bg: #181a1b;
   --dm-bg-light: #23272b;
   --dm-bg-card: #23272b;
@@ -7,6 +18,8 @@
   --dm-border: #2c2f31;
   --dm-shadow: 0 2px 8px rgba(0,0,0,0.15);
   --dm-accent: #3a3f44;
+
+  /* Light tokens */
   --lm-bg: #f7f9fa;
   --lm-bg-light: #ffffff;
   --lm-bg-card: #ffffff;
@@ -14,85 +27,130 @@
   --lm-border: #e3e6ea;
   --lm-shadow: 0 2px 8px rgba(0,0,0,0.07);
   --lm-accent: #f0f4f8;
+
+  /* Semantic mapping (default to light) */
+  --bg: var(--lm-bg);
+  --bg-light: var(--lm-bg-light);
+  --bg-card: var(--lm-bg-card);
+  --text: var(--lm-text);
+  --border: var(--lm-border);
+  --shadow: var(--lm-shadow);
+  --accent: var(--lm-accent);
+
+  /* Bootstrap variable hooks for consistent theming */
+  --bs-body-bg: var(--bg);
+  --bs-body-color: var(--text);
+  --bs-card-bg: var(--bg-card);
+  --bs-card-color: var(--text);
+  --bs-border-color: var(--border);
+  --bs-link-color: #2563eb;
+  --bs-link-hover-color: #1d4ed8;
+  --bs-navbar-bg: var(--bg-light);
+  --bs-navbar-color: var(--text);
+  --bs-btn-bg: var(--accent);
+  --bs-btn-color: var(--text);
+  --bs-btn-border-color: var(--border);
+
+  /* Brand + tier accents */
+  --brand-primary: #2563eb;   /* primary blue */
+  --brand-accent: #22c55e;    /* success green */
+  --tier-free: #64748b;       /* slate */
+  --tier-team: #06b6d4;       /* cyan */
+  --tier-enterprise: #a855f7; /* purple */
+
+  /* Motion tokens */
+  --easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur-med: 200ms;
+  --dur-slow: 320ms;
 }
 
 .dark-mode {
-  background-color: var(--dm-bg) !important;
-  color: var(--dm-text) !important;
+  /* Switch semantic tokens to dark */
+  --bg: var(--dm-bg);
+  --bg-light: var(--dm-bg-light);
+  --bg-card: var(--dm-bg-card);
+  --text: var(--dm-text);
+  --border: var(--dm-border);
+  --shadow: var(--dm-shadow);
+  --accent: var(--dm-accent);
+
+  color-scheme: dark;
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
   min-height: 100vh;
-  font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* Animation utilities */
+.fade-in { opacity: 0; transform: translateY(4px); animation: fadeIn var(--dur-med) var(--easing-standard) forwards; }
+.slide-up { opacity: 0; transform: translateY(12px); animation: slideUp var(--dur-slow) var(--easing-standard) forwards; }
+@keyframes fadeIn { to { opacity: 1; transform: none; } }
+@keyframes slideUp { to { opacity: 1; transform: none; } }
+
 .dark-mode .bg-light {
-  background-color: var(--dm-bg-light) !important;
-  color: var(--dm-text) !important;
-  border: 1px solid var(--dm-border);
+  background-color: var(--bg-light) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border);
   transition: background-color 0.3s, color 0.3s;
 }
 
 .dark-mode .navbar,
 .dark-mode .navbar.bg-primary {
-  background-color: var(--dm-bg-light) !important;
-  color: var(--dm-text) !important;
-  box-shadow: var(--dm-shadow);
-  border-bottom: 1px solid var(--dm-border);
+  background-color: var(--bg-light) !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow);
+  border-bottom: 1px solid var(--border);
   transition: background-color 0.3s, color 0.3s;
 }
 
 .dark-mode .card {
-  background-color: var(--dm-bg-card) !important;
-  color: var(--dm-text) !important;
-  border: 1px solid var(--dm-border);
-  box-shadow: var(--dm-shadow);
+  background-color: var(--bg-card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
   border-radius: 8px;
   transition: background-color 0.3s, color 0.3s;
 }
 
 /* Dark mode form improvements */
-.dark-mode input,
-.dark-mode textarea,
-.dark-mode select {
-  background-color: var(--dm-bg-light) !important;
-  color: var(--dm-text) !important;
-  border: 1px solid var(--dm-border) !important;
+.dark-mode :where(input, textarea, select) {
+  background-color: var(--bg-light) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
   box-shadow: 0 1px 4px rgba(0,0,0,0.18);
   transition: background-color 0.3s, color 0.3s;
 }
 
-.dark-mode input::placeholder,
-.dark-mode textarea::placeholder {
+.dark-mode :where(input, textarea)::placeholder {
   color: #b0b3b8 !important;
   opacity: 1;
 }
 
-.dark-mode .form-label,
-.dark-mode label {
-  color: var(--dm-text) !important;
+.dark-mode :where(.form-label, label) {
+  color: var(--text) !important;
 }
 
 /* Optional: Add a subtle highlight on focus */
-.dark-mode input:focus,
-.dark-mode textarea:focus,
-.dark-mode select:focus {
+.dark-mode :where(input:focus-visible, textarea:focus-visible, select:focus-visible) {
   border-color: #8ab4f8 !important;
   outline: none;
+  box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.35);
 }
 
 /* Interactive states */
-.dark-mode button,
-.dark-mode .btn {
-  background-color: var(--dm-accent);
-  color: var(--dm-text);
-  border: 1px solid var(--dm-border);
+.dark-mode :where(button, .btn) {
+  background-color: var(--accent);
+  color: var(--text);
+  border: 1px solid var(--border);
   transition: background-color 0.2s, color 0.2s;
 }
 
-.dark-mode button:hover,
-.dark-mode .btn:hover {
-  background-color: var(--dm-bg-light);
-  color: var(--dm-text);
+.dark-mode :where(button:hover, .btn:hover) {
+  background-color: var(--bg-light);
+  color: var(--text);
 }
 
 /* Links */
@@ -108,73 +166,85 @@
 
 /* Light mode color palette */
 
+/* Optional light-mode class (default is light via :root mapping) */
 .light-mode {
-  background-color: var(--lm-bg) !important;
-  color: var(--lm-text) !important;
+  color-scheme: light;
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
   min-height: 100vh;
-  font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.3s, color 0.3s;
 }
 
 .light-mode .bg-light {
-  background-color: var(--lm-bg-light) !important;
-  color: var(--lm-text) !important;
-  border: 1px solid var(--lm-border);
+  background-color: var(--bg-light) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border);
   transition: background-color 0.3s, color 0.3s;
 }
 
 .light-mode .navbar,
 .light-mode .navbar.bg-primary {
-  background-color: var(--lm-bg-light) !important;
-  color: var(--lm-text) !important;
-  box-shadow: var(--lm-shadow);
-  border-bottom: 1px solid var(--lm-border);
+  background-color: var(--bg-light) !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow);
+  border-bottom: 1px solid var(--border);
   transition: background-color 0.3s, color 0.3s;
 }
 
 .light-mode .card {
-  background-color: var(--lm-bg-card) !important;
-  color: var(--lm-text) !important;
-  border: 1px solid var(--lm-border);
-  box-shadow: var(--lm-shadow);
+  background-color: var(--bg-card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
   border-radius: 8px;
   transition: background-color 0.3s, color 0.3s;
 }
 
 /* Interactive states */
-.light-mode button,
-.light-mode .btn {
-  background-color: var(--lm-accent);
-  color: var(--lm-text);
-  border: 1px solid var(--lm-border);
+.light-mode :where(button, .btn) {
+  background-color: var(--accent);
+  color: var(--text);
+  border: 1px solid var(--border);
   transition: background-color 0.2s, color 0.2s;
 }
 
-.light-mode button:hover,
-.light-mode .btn:hover {
-  background-color: var(--lm-bg-light);
-  color: var(--lm-text);
+.light-mode :where(button:hover, .btn:hover) {
+  background-color: var(--bg-light);
+  color: var(--text);
 }
 
 /* Links */
 .light-mode a {
-  color: #2563eb;
+  color: var(--bs-link-color);
   transition: color 0.2s;
 }
 
 .light-mode a:hover {
-  color: #1d4ed8;
+  color: var(--bs-link-hover-color);
   text-decoration: underline;
 }
 
+/* Global typography scale */
+body { font-family: var(--font-sans); line-height: 1.6; }
+h1 { font-size: clamp(1.8rem, 1.2rem + 2.2vw, 2.5rem); }
+h2 { font-size: clamp(1.5rem, 1rem + 1.5vw, 2rem); }
+h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
+
+/* Improve focus visibility */
+:focus-visible { outline: 2px solid #8ab4f8; outline-offset: 2px; }
+
+/* Form accent color */
+:root { accent-color: #2563eb; }
+
 /* PortalDashboard.css - Basic styling for the dashboard */
 .portal-dashboard {
-  font-family: Arial, sans-serif;
+  font-family: var(--font-sans);
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-  background-color: #f5f5f5;
+  background-color: var(--bg);
 }
 
 .dashboard-header {
@@ -196,23 +266,23 @@
 }
 
 .metric-card {
-  background: white;
+  background: var(--bg-card);
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow);
   text-align: center;
 }
 
 .metric-card h2 {
   margin: 0 0 10px;
   font-size: 1.5em;
-  color: #007bff;
+  color: var(--bs-link-color);
 }
 
 .metric-value {
   font-size: 2em;
   font-weight: bold;
-  color: #28a745;
+  color: #22c55e;
   margin: 10px 0;
 }
 
@@ -223,10 +293,10 @@
 
 .details-section {
   grid-column: 1 / -1;
-  background: white;
+  background: var(--bg-card);
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow);
 }
 
 .loading, .error {
