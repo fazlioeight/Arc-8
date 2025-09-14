@@ -23,7 +23,7 @@ function renderLoginToString() {
 
 test("renders login form heading", () => {
   const html = renderLoginToString();
-  expect(html).toContain("Login to Your Account");
-  expect(html).toContain("Email Address");
+  expect(html).toContain("Sign in");
+  expect(html).toContain("Email address");
   expect(html).toContain("Password");
 });

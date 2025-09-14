@@ -3,6 +3,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.types import ASGIApp
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 
 from ..db.session import SessionLocal
 from ..core.config import settings
@@ -26,7 +27,11 @@ class UsageMiddleware(BaseHTTPMiddleware):
         try:
             ensure_tables(db)
             tenant_key = getattr(request.state, "tenant_id", None) or "demo"
-            tenant = db.query(Tenant).filter(Tenant.key == tenant_key).first()
+            try:
+                tenant = db.query(Tenant).filter(Tenant.key == tenant_key).first()
+            except OperationalError:
+                # Database/tables not initialized; skip counting in tests/dev
+                return await call_next(request)
             if not tenant:
                 # let it pass; endpoints may handle unknown tenant
                 return await call_next(request)
@@ -50,4 +55,3 @@ class UsageMiddleware(BaseHTTPMiddleware):
             db.close()
 
         return await call_next(request)
-

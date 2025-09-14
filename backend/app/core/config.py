@@ -1,4 +1,5 @@
-from pydantic import BaseSettings, AnyHttpUrl
+from pydantic import AnyHttpUrl
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional
 
 
@@ -21,9 +22,10 @@ class Settings(BaseSettings):
     # Usage limits
     USAGE_DAILY_LIMIT: int = 10000
 
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_file=".env",
+    )
 
 
 settings = Settings()

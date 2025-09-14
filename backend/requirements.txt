@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 pydantic
+pydantic-settings
 python-dotenv
 PyJWT
 bcrypt
@@ -12,5 +13,6 @@ alembic
 SQLAlchemy
 pytest
 requests_mock
+httpx
 pytest
 requests_mock
