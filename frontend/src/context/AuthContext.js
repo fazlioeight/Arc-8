@@ -1,40 +1,46 @@
-// AuthContext.js - Sample implementation for authentication context
-import React, { createContext, useState, useEffect } from 'react';
+﻿import React, { createContext, useState, useEffect } from 'react';
 
 export const AuthContext = createContext();
 
+const STORAGE_KEY = 'authState';
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [authState, setAuthState] = useState(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Check for existing token on app load
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
+    if (authState) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(authState));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
     }
-    setLoading(false);
-  }, []);
+  }, [authState]);
 
-  const login = (userData) => {
-    localStorage.setItem('token', userData.token);
-    localStorage.setItem('user', JSON.stringify({ email: userData.email, tenant: userData.tenant }));
-    setUser({ email: userData.email, tenant: userData.tenant });
+  const login = (sessionData) => {
+    setAuthState({
+      email: sessionData.email,
+      tenant: sessionData.tenant,
+      token: sessionData.token,
+      role: sessionData.role || 'user',
+    });
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
+    setAuthState(null);
   };
 
   const value = {
-    user,
-    isAuthenticated: !!user,
+    user: authState,
+    token: authState?.token,
+    tenant: authState?.tenant,
+    role: authState?.role,
+    isAuthenticated: !!authState?.token,
     login,
     logout,
-    loading
+    loading,
   };
 
   return (

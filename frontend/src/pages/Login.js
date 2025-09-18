@@ -1,14 +1,17 @@
-import React, { useState, useContext } from "react";
+﻿import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext"; // Adjust path if needed
+import { AuthContext } from "../context/AuthContext";
 import "../index.css";
 import "./Login.sfdc.css";
+
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8000";
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "", tenant: "demo" });
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -17,32 +20,26 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-
-    // Dummy login: username 'admin', password 'admin'
-    if (
-      formData.email === "admin@admin.com" &&
-      formData.password === "admin"
-    ) {
-      login({ email: "admin@admin.com", token: "dummy-token", tenant: formData.tenant || 'demo' });
-      navigate("../portal_page/portalPage");
-      return;
-    }
-
+    setSubmitting(true);
     try {
-      const response = await fetch("http://localhost:8000/api/login", {
+      const response = await fetch(`${API_BASE}/api/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Tenant-Key": formData.tenant.trim(),
+        },
         body: JSON.stringify(formData),
       });
       const data = await response.json();
-      if (response.ok) {
-        login(data); // Call login from context
-        navigate("/portal_page/portalPage"); // Redirect after login
-      } else {
-        setError(data.detail || "Login failed. Please try again.");
+      if (!response.ok) {
+        throw new Error(data.detail || "Login failed. Please try again.");
       }
-    } catch (error) {
-      setError("Network error. Please try again.");
+      login(data);
+      navigate("/portal_page/portalPage");
+    } catch (err) {
+      setError(err.message || "An unexpected error occurred.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -67,6 +64,7 @@ const Login = () => {
                 value={formData.tenant}
                 onChange={handleChange}
                 placeholder="e.g., demo"
+                required
               />
             </div>
             <div className="sfdc-input">
@@ -92,8 +90,8 @@ const Login = () => {
             {error && (
               <div className="sfdc-error" role="alert">{error}</div>
             )}
-            <button type="submit" className="sfdc-button_brand sfdc-auth__submit">
-              Sign in
+            <button type="submit" className="sfdc-button_brand sfdc-auth__submit" disabled={submitting}>
+              {submitting ? "Signing in..." : "Sign in"}
             </button>
             <div className="sfdc-auth__links">
               <a href="#">Forgot password?</a>

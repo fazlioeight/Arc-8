@@ -1,9 +1,36 @@
-# audit_logger.py
+﻿from __future__ import annotations
+
+import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-logging.basicConfig(filename='audit.log', level=logging.INFO)
+from sqlalchemy.ext.asyncio import AsyncSession
 
-def log_access(user_id, endpoint):
-    timestamp = datetime.now().isoformat()
-    logging.info(f"{timestamp} | User: {user_id} | Accessed: {endpoint}")
+from ..models.tables import TenantAuditEvent
+
+_audit_logger = logging.getLogger("audit")
+
+
+async def record_audit_event(
+    session: AsyncSession,
+    tenant_id: int,
+    actor: str,
+    event_type: str,
+    payload: Optional[Dict[str, Any]] = None,
+) -> None:
+    event = TenantAuditEvent(
+        tenant_id=tenant_id,
+        actor=actor,
+        event_type=event_type,
+        payload=payload or {},
+        created_at=datetime.now(timezone.utc),
+    )
+    session.add(event)
+    await session.flush()
+    _audit_logger.info(json.dumps({
+        "tenant_id": tenant_id,
+        "actor": actor,
+        "event_type": event_type,
+        "payload": payload or {},
+    }))

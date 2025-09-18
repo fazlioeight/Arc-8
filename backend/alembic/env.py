@@ -1,21 +1,24 @@
-from logging.config import fileConfig
+﻿from logging.config import fileConfig
 import os
 
 from sqlalchemy import engine_from_config, pool
 from alembic import context
-from app.models.tables import Base
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+from app.models.tables import ControlBase
+
 config = context.config
-
-# Interpret the config file for Python logging.
 fileConfig(config.config_file_name)
 
-target_metadata = Base.metadata
+target_metadata = ControlBase.metadata
+
 
 def get_url():
-    return os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    url = os.getenv("CONTROL_DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    if url.startswith("sqlite+aiosqlite"):
+        return url.replace("sqlite+aiosqlite", "sqlite")
+    if url.startswith("postgresql+asyncpg"):
+        return url.replace("postgresql+asyncpg", "postgresql")
+    return url
 
 
 def run_migrations_offline():

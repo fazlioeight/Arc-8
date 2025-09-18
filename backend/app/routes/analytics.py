@@ -1,22 +1,34 @@
+﻿from __future__ import annotations
+
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from ..utils.security import get_current_user
-from ..db.session import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..dependencies.tenant import get_tenant_context, get_tenant_session
+from ..db.tenant_manager import TenantContext
 from ..services.analytics_service import tenant_totals
+from ..utils.security import AuthenticatedUser, get_current_user
 
 router = APIRouter()
 
 
 @router.get("/api/analytics/dashboard")
-async def get_dashboard(current_user: dict = Depends(get_current_user)):
-    # Fetch/mock data from DB or analytics logic
+async def get_dashboard(
+    tenant: TenantContext = Depends(get_tenant_context),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
     return {
-        "user": current_user["email"],
+        "user": current_user.email,
+        "tenant": tenant.key,
         "highRiskCount": 42,
-        "otherMetrics": "example data",
+        "featureFlags": tenant.feature_flags,
     }
 
 
 @router.get("/api/analytics/summary")
-def get_summary(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    return tenant_totals(db, current_user["tenant_id"])
+async def get_summary(
+    tenant: TenantContext = Depends(get_tenant_context),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    totals = await tenant_totals(session)
+    return {"tenant": tenant.key, **totals}

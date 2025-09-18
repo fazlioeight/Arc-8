@@ -1,25 +1,40 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+﻿from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from functools import lru_cache
+from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+
 from ..core.config import settings
 
 
-def _make_url() -> str:
-    # Default to local SQLite for dev if DATABASE_URL not set
-    return settings.DATABASE_URL or "sqlite:///./nexora.db"
+@lru_cache(maxsize=1)
+def _create_control_engine() -> AsyncEngine:
+    return create_async_engine(
+        settings.CONTROL_DATABASE_URL,
+        echo=False,
+        future=True,
+        pool_pre_ping=True,
+    )
 
 
-engine = create_engine(
-    _make_url(),
-    connect_args={"check_same_thread": False} if _make_url().startswith("sqlite") else {},
-)
+@lru_cache(maxsize=1)
+def _control_session_factory() -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(
+        _create_control_engine(),
+        expire_on_commit=False,
+        autoflush=False,
+    )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+@asynccontextmanager
+async def control_session() -> AsyncGenerator[AsyncSession, None]:
+    factory = _control_session_factory()
+    async with factory() as session:
+        yield session
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
+async def get_control_session() -> AsyncGenerator[AsyncSession, None]:
+    async with control_session() as session:
+        yield session

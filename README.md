@@ -1,151 +1,128 @@
-# Nexora Platform
+﻿# Nexora Platform
 
-Nexora Platform is a healthcare analytics solution for payer groups, providing tools for risk management, cost optimization, and member insights. It comprises a FastAPI backend, a React frontend, and optional Streamlit dashboards.
+Nexora Platform is a healthcare analytics solution for payer groups, now hardened for HIPAA-compliant, multi-tenant SaaS operation. The system is split between a control plane (FastAPI + PostgreSQL/SQLite) that manages tenants, users, and audit trails, and isolated tenant data planes where PHI lives in per-tenant schemas or databases. A React SPA consumes the public APIs, and optional Streamlit dashboards can be layered on top of the API for ad-hoc analytics.
 
-## Features
+## Architecture Overview
 
-- Risk analytics and member stratification
-- Cost analysis backed by claims CSV data
-- Simple JWT-based authentication for protected APIs
-- Utilization flags via tunable thresholds
+- **Control Plane (FastAPI + SQLAlchemy async)**
+  - Stores tenants, users, billing plans, feature flags, and audit events.
+  - Issues JWTs with tenant scoping and enforces per-request tenant context.
+  - Exposes provisioning helpers (`app/services/provisioning.py`) to onboard new tenants and hydrate their data stores.
+- **Tenant Data Plane**
+  - Each tenant has an independent schema or database. SQLAlchemy connects dynamically per request using the resolved tenant context.
+  - PHI endpoints (`/member/*`, analytics) run against the tenant-bound `Member` and `Claim` tables.
+- **Cross-cutting controls**
+  - Redis-backed rate limiting middleware (`RateLimitMiddleware`) applies token-bucket throttles per tenant.
+  - Structured logging + dedicated audit logger persist immutable audit trails to both file (`logs/audit.log`) and the control plane.
+  - Tenant-aware request logging middleware stamps log lines with tenant and user identity for observability.
 
 ## Project Structure
 
 ```
 nexora-platform/
-- backend/
-  - app/
-    - __init__.py
-    - main.py                 # FastAPI app, mounts routers and handles login
-    - routes/
-      - __init__.py
-      - analytics.py          # /api/analytics/dashboard (JWT-protected)
-      - member_cost.py        # /member/{member_id}/costs (CSV-backed)
-      - member_risk.py        # /member/{member_id}/risk (JWT-protected, stub)
-      - utilization.py        # /overutilization/ (public for Streamlit)
-    - models/
-      - analytics_models.py   # (placeholder)
-    - utils/
-      - __init__.py
-      - audit_logger.py
-      - security.py           # JWT create/verify helpers
-  - dashboards/
-    - utilization_dashboard.py
-    - member_cost_dashboard.py (placeholder)
-    - member_risk_dashboard.py (placeholder)
-    - main_dashboard.py (placeholder)
-  - claims_data.csv
-  - requirements.txt
-- frontend/
-  - public/
-  - src/
-    - App.js, index.js, index.css
-    - components/ (Navbar, DarkModeToggle, ProtectedRoute)
-    - context/ (AuthContext)
-    - pages/ (Home, About, Products, Insights, Contact, Signup, Login, etc.)
-    - services/ (memberCostService, ...)
-    - __tests__/ (Jest tests)
-  - package.json, jest.config.js, babel.config.js
-- LICENSE
+├── backend/
+│   ├── app/
+│   │   ├── core/                # settings, logging, redis helpers
+│   │   ├── db/                  # async control + tenant session managers
+│   │   ├── dependencies/        # FastAPI dependencies (tenant context, sessions)
+│   │   ├── middleware/          # tenant resolver, rate limiting, request logging
+│   │   ├── models/              # control-plane + tenant-plane SQLAlchemy models
+│   │   ├── routes/              # FastAPI routers (analytics, member endpoints)
+│   │   ├── services/            # analytics, tenant registry, provisioning helpers
+│   │   └── utils/               # security helpers, audit logging
+│   ├── scripts/seed_demo.py     # Async control/tenant seeding for demo data
+│   ├── alembic/                 # Control plane migrations
+│   └── tests/                   # pytest + httpx async tests for tenant isolation
+└── frontend/
+    ├── src/context/AuthContext.js          # stores token + tenant context
+    ├── src/pages/Login.js                  # multi-tenant aware login flow
+    ├── src/services/memberCostService.js   # tenant-authenticated API calls
+    └── src/__tests__/                      # Jest tests
 ```
-
-## Prerequisites
-
-- Python 3.9+
-- Node.js 16+ and npm
-- Local PostgreSQL (optional for login), default credentials used by the app:
-  - DB: `nexora`, User: `admin`, Password: `admin`, Host: `localhost`
 
 ## Backend Setup
 
-From repo root:
+1. **Environment**
+   ```powershell
+   cd backend
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   pip install -r requirements.txt
+   ```
 
-- Create and activate a virtual environment (Windows PowerShell):
-  - `cd backend`
-  - `python -m venv .venv`
-  - `.\\.venv\\Scripts\\Activate.ps1`
-  - If blocked: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+2. **Configuration** (set in shell or `.env`):
+   - `ENVIRONMENT` (`development` | `test` | `production`)
+   - `SECRET_KEY` (required in production; auto-generated for dev/tests)
+   - `CONTROL_DATABASE_URL` (e.g. `postgresql+asyncpg://user:pass@host/db` or `sqlite+aiosqlite:///./nexora_control.db`)
+   - `DEFAULT_TENANT_DATABASE_URL` or `TENANT_DATABASE_URL_TEMPLATE` (e.g. `postgresql+asyncpg://.../{tenant_key}`)
+   - `TENANT_DATABASE_SCHEMA_TEMPLATE` (optional; e.g. `tenant_{tenant_slug}`)
+   - `REDIS_URL` (`redis://localhost:6379/0`) to enable rate limiting
+   - Optional: `CANONICAL_HOST_DOMAIN`, `ALLOWED_TENANT_HOSTS`, `AUDIT_LOG_PATH`, `USAGE_DAILY_LIMIT`, `RATE_LIMIT_MAX_PER_MINUTE`
 
-- Install dependencies:
-  - `pip install -r requirements.txt`
+3. **Database migrations**
+   ```powershell
+   cd backend
+   alembic upgrade head
+   ```
 
-- Run the API (dev):
-  - `python -m uvicorn app.main:app --reload`
+4. **Seed demo tenant (control + tenant DB):**
+   ```powershell
+   python scripts/seed_demo.py
+   ```
 
-Notes
-- CORS is configured for `http://localhost:3000` in `app/main.py`.
-- Login issues a JWT and returns `{ token, email, tenant }`.
-- Member cost endpoint now queries the database; use the seed script to load sample claims from `backend/claims_data.csv`.
+5. **Run API (async Uvicorn):**
+   ```powershell
+   python -m uvicorn app.main:app --reload
+   ```
 
-### Database Setup
+### Tenant Provisioning
 
-- Configure `DATABASE_URL` (Postgres recommended) in environment or `.env` at `backend/`.
-  - Example: `DATABASE_URL=postgresql://admin:admin@localhost:5432/nexora`
-  - If not set, the app uses a local SQLite file `backend/nexora.db` for development.
-- Create tables via Alembic:
-  - `cd backend`
-  - `alembic upgrade head`
-- Seed demo data (tenant `demo`, user `admin@admin.com` / `admin`, and claims from CSV):
-  - `python scripts/seed_demo.py`
+Use `app/services/provisioning.py::provision_tenant` inside an async control-plane session to create new tenants. The helper merges global feature flags, writes tenant metadata, and ensures tenant schemas/databases are created before returning.
+
+### Compliance & Observability
+
+- All API calls must include both `Authorization: Bearer <JWT>` and `X-Tenant-Key` headers. Tenant context can also be inferred from subdomains when deployed.
+- Sensitive endpoints append audit events to the control database and `logs/audit.log` with actor, tenant, and payload metadata.
+- Rate limiting headers (`X-RateLimit-*`) surface token bucket state to clients.
 
 ## Frontend Setup
 
-From repo root:
+1. Install & run:
+   ```powershell
+   cd frontend
+   npm install
+   npm start
+   ```
+2. Configure `REACT_APP_API_BASE` (defaults to `http://localhost:8000`).
+3. The login view now sends `X-Tenant-Key` and persists `{ token, tenant, role }` in `AuthContext`. Service calls use those values when hitting backend APIs.
 
-- `cd frontend`
-- `npm install`
-- `npm start`
+## Testing
 
-The app runs at `http://localhost:3000`.
+- **Backend**: `cd backend && pytest` (uses async httpx client, bootstraps control + tenant test databases under `backend/tests/`).
+- **Frontend**: `cd frontend && npm test`.
 
-## Tests (Frontend)
+## Key API Endpoints
 
-- Run tests: `cd frontend && npm test`
-- Jest runs in `jsdom`. Tests avoid extra libs by using server-rendering and virtual mocks.
+> All endpoints expect `X-Tenant-Key` and a valid JWT unless noted.
 
-## API Endpoints
-
-- `POST /api/login`
-  - Body: `{ "email": string, "password": string }`
-  - Returns: `{ "token": string, "email": string }`
-- `GET /api/analytics/dashboard` (Bearer token required)
-  - Header: `Authorization: Bearer <JWT>`
-  - Returns example metrics
-- `GET /api/analytics/summary` (Bearer token required)
-  - Returns: `{ tenant, total_claims, total_cost }`
+- `POST /api/login` → `{ token, email, tenant, role }`
+- `GET /api/tenant/self` → tenant metadata, feature flags, current user context
+- `GET /api/analytics/summary`
 - `GET /member/{member_id}/costs`
-  - Returns: `{ member_id, total_cost }` (from database; seed with `scripts/seed_demo.py`)
-- `GET /member/{member_id}/risk` (Bearer token required)
-  - Returns: `{ member_id, risk_score }` (stub)
-- `GET /overutilization/?threshold=<int>`
-  - Returns: flagged members above threshold (stub), now requires bearer token
+- `GET /member/{member_id}/risk`
+- `GET /overutilization/?threshold=`
+
+Unauthorized or cross-tenant attempts return `401/403`. Excessive calls return `429` with rate-limit headers.
 
 ## Streamlit Dashboards
 
-- Utilization demo (with auth):
-  - `streamlit run backend/dashboards/utilization_dashboard.py`
-  - Provide a JWT token in the dashboard (obtain via `POST /api/login`).
-  - Requires the FastAPI server running on `http://localhost:8000`.
-
-## Tests (Backend)
-
-- Install backend dev deps: `cd backend && pip install -r requirements.txt`
-- Run: `pytest`
-- Tests cover JWT roundtrip and analytics summary contract. For richer tests, set `DATABASE_URL` and run the seed script.
-
-## Configuration
-
-- Secrets: `backend/app/utils/security.py` uses a hardcoded `SECRET_KEY` for development. For production, load from environment variables.
-- Database: `app/main.py` connects to Postgres per request for login. Replace with pooled connections and `.env` config for production.
+Dashboards remain optional; ensure `Authorization` header and `X-Tenant-Key` are forwarded when invoking API calls inside Streamlit apps.
 
 ## Troubleshooting
 
-- uvicorn not found:
-  - Use `python -m uvicorn app.main:app --reload` from `backend`, or activate the virtualenv first.
-- CORS errors:
-  - Update `allow_origins` in `backend/app/main.py` to match your frontend origin.
-- CSV not found:
-  - Ensure `backend/claims_data.csv` exists. A synthetic generator script is available at `backend/scripts/generate_synthetic_data.py`.
+- Missing Redis: rate limiting gracefully degrades but is required for production hard-limits.
+- Tenant resolution errors: verify DNS/host mappings (`ALLOWED_TENANT_HOSTS`) or include `X-Tenant-Key` explicitly.
+- Async database drivers: install `asyncpg` for Postgres or `aiosqlite` for SQLite (included in `requirements.txt`).
 
 ## License
 
