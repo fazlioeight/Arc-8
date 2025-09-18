@@ -2,7 +2,16 @@
 import React from "react";
 import "./home.landing.css";
 
-const Home = () => (
+const Home = () => {
+  const trustLogos = [
+    { src: "/images/nexoraAnalyticsLogo.png", alt: "HealthCo" },
+    { src: "/images/nexoraAnalyticsNavBarLogo.png", alt: "PayerOne" },
+    { src: "/images/nexoraAnalyticsLogo.png", alt: "CarePlus" },
+    { src: "/images/nexoraAnalyticsNavBarLogo.png", alt: "Optiview" },
+    { src: "/images/nexoraAnalyticsLogo.png", alt: "WellMetrics" },
+  ];
+
+  return (
   <div className="nx-landing">
     {/* Hero */}
     <section className="nx-hero">
@@ -16,25 +25,34 @@ const Home = () => (
             <a className="nx-btn_ghost" href="/products">Explore products</a>
           </div>
         </div>
-        <div className="nx-hero__media fade-in" style={{ animationDelay: '120ms' }}>Hero media placeholder</div>
+        <div className="nx-hero__media fade-in" style={{ animationDelay: '120ms' }}>
+          <img
+            src="/images/nexoraAnalyticsLogo.png"
+            alt="Nexora platform branding"
+            loading="lazy"
+            decoding="async"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
+          />
+        </div>
       </div>
       <div className="nx-trust">
         <div className="nx-trust__label">Trusted by teams like</div>
-        <div className="nx-logos">
-          <div className="nx-logo fade-in" style={{ animationDelay: '60ms' }}>
-            <img src="/images/nexoraAnalyticsLogo.png" alt="HealthCo" width="120" height="36" loading="lazy" decoding="async" />
-          </div>
-          <div className="nx-logo fade-in" style={{ animationDelay: '100ms' }}>
-            <img src="/images/nexoraAnalyticsNavBarLogo.png" alt="PayerOne" width="120" height="36" loading="lazy" decoding="async" />
-          </div>
-          <div className="nx-logo fade-in" style={{ animationDelay: '140ms' }}>
-            <img src="/images/nexoraAnalyticsLogo.png" alt="CarePlus" width="120" height="36" loading="lazy" decoding="async" />
-          </div>
-          <div className="nx-logo fade-in" style={{ animationDelay: '180ms' }}>
-            <img src="/images/nexoraAnalyticsNavBarLogo.png" alt="Optiview" width="120" height="36" loading="lazy" decoding="async" />
-          </div>
-          <div className="nx-logo fade-in" style={{ animationDelay: '220ms' }}>
-            <img src="/images/nexoraAnalyticsLogo.png" alt="WellMetrics" width="120" height="36" loading="lazy" decoding="async" />
+        <div className="nx-carousel" aria-label="Trusted logos carousel">
+          <div className="nx-carousel__track" role="list">
+            <div className="nx-logos" aria-hidden="false">
+              {trustLogos.map((l, idx) => (
+                <div className="nx-logo" role="listitem" key={`logo-a-${idx}`}>
+                  <img src={l.src} alt={l.alt} width="120" height="36" loading="lazy" decoding="async" />
+                </div>
+              ))}
+            </div>
+            <div className="nx-logos" aria-hidden="true">
+              {trustLogos.map((l, idx) => (
+                <div className="nx-logo" role="listitem" key={`logo-b-${idx}`}>
+                  <img src={l.src} alt="" aria-hidden="true" width="120" height="36" loading="lazy" decoding="async" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -174,6 +192,7 @@ const Home = () => (
       </div>
     </footer>
   </div>
-);
+  );
+};
 
 export default Home;

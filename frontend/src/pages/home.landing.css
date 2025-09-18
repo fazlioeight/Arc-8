@@ -24,6 +24,22 @@
 .nx-logo { height: 36px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; display: grid; place-items: center; font-size: .85rem; color: var(--text-muted); padding: 6px; }
 .nx-logo img { width: 100%; height: 100%; object-fit: contain; filter: grayscale(1) contrast(1.05); }
 
+/* Trust logos carousel */
+.nx-trust .nx-carousel { overflow: hidden; position: relative; mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%); -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%); }
+.nx-trust .nx-carousel__track { display: flex; width: max-content; gap: 0; will-change: transform; animation: nx-marquee 28s linear infinite; }
+.nx-trust:hover .nx-carousel__track { animation-play-state: paused; }
+.nx-trust .nx-carousel .nx-logos { display: flex; gap: 24px; opacity: .8; filter: grayscale(1); }
+.nx-trust .nx-carousel .nx-logos .nx-logo { flex: 0 0 auto; min-width: 160px; }
+
+@keyframes nx-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-trust .nx-carousel__track { animation: none; }
+}
+
 .nx-features { max-width: 1120px; margin: 44px auto; padding: 0 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 .nx-feature { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 18px; }
 .nx-feature__icon { width: 36px; height: 36px; border-radius: 8px; background: color-mix(in oklab, var(--nx-primary) 18%, var(--bg)); color: var(--nx-primary); display: inline-grid; place-items: center; margin-bottom: 10px; }
