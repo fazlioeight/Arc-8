@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
 
@@ -18,6 +18,7 @@ const STATUS_OPTIONS = [
 const LOB_OPTIONS = ['Commercial', 'Medicare Advantage', 'DSNP', 'Exchange'];
 
 const CodingMembersPage = () => {
+  const { registerCommands } = useCommandPalette();
   const navigate = useNavigate();
   const { token, tenant, isAuthenticated, recordAuditEvent } = useContext(AuthContext) || {};
 
@@ -31,6 +32,14 @@ const CodingMembersPage = () => {
   const [lobFilter, setLobFilter] = useState('');
 
   const canQuery = useMemo(() => token && tenant, [token, tenant]);
+
+  const loadSampleMembers = useCallback(() => {
+    setMembers(SAMPLE_CODING_MEMBERS);
+    setTotal(SAMPLE_CODING_MEMBERS.length);
+    setError(null);
+    setLoading(false);
+    recordAuditEvent?.('coding.load_sample_members');
+  }, [recordAuditEvent]);
 
   useEffect(() => {
     if (!isAuthenticated || !canQuery) return;
@@ -79,14 +88,6 @@ const CodingMembersPage = () => {
       setLoading(false);
     }
   };
-
-  const loadSampleMembers = useCallback(() => {
-    setMembers(SAMPLE_CODING_MEMBERS);
-    setTotal(SAMPLE_CODING_MEMBERS.length);
-    setError(null);
-    setLoading(false);
-    recordAuditEvent?.('coding.load_sample_members');
-  }, [recordAuditEvent]);
 
   const handleSubmit = event => {
     event.preventDefault();
@@ -252,3 +253,4 @@ const CodingMembersPage = () => {
 };
 
 export default CodingMembersPage;
+
