@@ -102,16 +102,33 @@ function App() {
   // Compute effective theme and apply class
   useEffect(() => {
     const root = document.documentElement;
+    const mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
     const applyTheme = (pref) => {
-      const isDark = pref === 'dark' || (pref === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-      root.classList.toggle('dark-mode', !!isDark);
-      root.classList.toggle('light-mode', !isDark);
+      const useDark = pref === 'dark' || (pref === 'system' && Boolean(mql?.matches));
+      const resolvedTheme = useDark ? 'dark' : 'light';
+
+      root.classList.toggle('dark-mode', useDark);
+      root.classList.toggle('light-mode', !useDark);
+      root.dataset.theme = resolvedTheme;
+      root.setAttribute('data-bs-theme', resolvedTheme);
+
+      if (document.body) {
+        document.body.classList.toggle('dark-mode', useDark);
+        document.body.classList.toggle('light-mode', !useDark);
+        document.body.dataset.theme = resolvedTheme;
+        document.body.setAttribute('data-bs-theme', resolvedTheme);
+      }
     };
+
     applyTheme(themePreference);
     localStorage.setItem('themePreference', themePreference);
     // Listen to system changes when in system mode
-    const mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-    const handler = () => themePreference === 'system' && applyTheme('system');
+    const handler = () => {
+      if (themePreference === 'system') {
+        applyTheme('system');
+      }
+    };
     if (mql && mql.addEventListener) mql.addEventListener('change', handler);
     else if (mql && mql.addListener) mql.addListener(handler);
     return () => {

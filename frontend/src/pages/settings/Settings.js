@@ -15,28 +15,30 @@ const Settings = ({ themePreference, setThemePreference }) => {
 
   const [prefs, setPrefs] = useState(() => {
     const saved = localStorage.getItem("liSettings");
-    return (
-      JSON.parse(saved || "null") || {
-        // General
-        theme: "system", // mirror themePreference for coherence
-        language: "English",
-        // Data Controls
-        chatHistory: true,
-        training: true,
-        // Personalization
-        personalization: true,
-        // Memory
-        memoryEnabled: false,
-        // Notifications
-        desktopNotifications: false,
-        emailProduct: true,
-        emailResearch: false,
-        // Beta Features
-        betaAdvancedDataAnalysis: false,
-        betaWebBrowsing: false,
-        betaPlugins: false,
-      }
-    );
+    const basePrefs = {
+      theme: themePreference || "system",
+      language: "English",
+      chatHistory: true,
+      training: true,
+      personalization: true,
+      memoryEnabled: false,
+      desktopNotifications: false,
+      emailProduct: true,
+      emailResearch: false,
+      betaAdvancedDataAnalysis: false,
+      betaWebBrowsing: false,
+      betaPlugins: false,
+    };
+    if (!saved) {
+      return basePrefs;
+    }
+    try {
+      const parsed = JSON.parse(saved);
+      return { ...basePrefs, ...parsed, theme: parsed?.theme || basePrefs.theme };
+    } catch (error) {
+      console.warn("Failed to parse stored settings", error);
+      return basePrefs;
+    }
   });
 
   useEffect(() => {
@@ -44,13 +46,6 @@ const Settings = ({ themePreference, setThemePreference }) => {
   }, [prefs]);
 
   const updatePref = (key, value) => setPrefs((p) => ({ ...p, [key]: value }));
-
-  // Keep themePreference synced with General theme
-  useEffect(() => {
-    if (prefs.theme && prefs.theme !== themePreference) {
-      setThemePreference(prefs.theme);
-    }
-  }, [prefs.theme]);
 
   useEffect(() => {
     if (themePreference && themePreference !== prefs.theme) {
