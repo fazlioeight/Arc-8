@@ -1,9 +1,9 @@
-﻿import React, { useContext, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 import PortalUtilityBar from "../../components/PortalUtilityBar";
 import "../portal_page/portalPage.sfdc.css";
-import { addRideRecord } from "../../services/rideBookingService";
+import { addRideRecord, getRideCompaniesForDate } from "../../services/rideBookingService";
 
 const RideBooking = () => {
   const { isAuthenticated } = useContext(AuthContext) || {};
@@ -16,8 +16,26 @@ const RideBooking = () => {
   const [dropoff, setDropoff] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
-  const [rideType, setRideType] = useState("Uber");
+  const [rideOptions, setRideOptions] = useState([]);
+  const [rideType, setRideType] = useState("");
   const [status, setStatus] = useState("");
+  const refreshRideOptions = () => {
+    const options = getRideCompaniesForDate(new Date());
+    setRideOptions(options);
+    return options;
+  };
+
+  useEffect(() => {
+    const options = refreshRideOptions();
+    if (options.length > 0) {
+      setRideType(options[0]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (rideOptions.length === 0) return;
+    setRideType(current => (current && rideOptions.includes(current) ? current : rideOptions[0]));
+  }, [rideOptions]);
 
   const resetForm = () => {
     setMemberId("");
@@ -27,16 +45,16 @@ const RideBooking = () => {
     setDropoff("");
     setPickupAddress("");
     setDropoffAddress("");
-    setRideType("Uber");
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const selectedCompany = rideType || rideOptions[0] || 'Other';
     const record = addRideRecord({
       memberId,
       firstName,
       lastName,
-      rideType,
+      rideType: selectedCompany,
       pickup,
       dropoff,
       pickupAddress,
@@ -46,21 +64,31 @@ const RideBooking = () => {
       `Ride booked with ${record.rideType}!\nMember ID: ${record.memberId}\nMember: ${record.firstName} ${record.lastName}\nPickup: ${record.pickup} (${record.pickupAddress})\nDropoff: ${record.dropoff} (${record.dropoffAddress})`
     );
     resetForm();
+    refreshRideOptions();
   };
 
   return (
     <>
       {isAuthenticated && <PortalUtilityBar />}
       <div className="container py-5" style={{ maxWidth: 520, margin: "auto" }}>
-        <div className="d-flex justify-content-between align-items-center mb-4">
+        <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
           <h2 className="mb-0">Book a Ride</h2>
-          <button
-            type="button"
-            className="btn btn-link"
-            onClick={() => navigate("/RideBooking")}
-          >
-            View recent rides
-          </button>
+          <div className="d-flex gap-2">
+            <button
+              type="button"
+              className="btn btn-link"
+              onClick={() => navigate("/RideBooking")}
+            >
+              View recent rides
+            </button>
+            <button
+              type="button"
+              className="btn btn-link"
+              onClick={() => navigate("/RideBooking/partners")}
+            >
+              Manage partners
+            </button>
+          </div>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
@@ -158,16 +186,31 @@ const RideBooking = () => {
             <label htmlFor="rideType" className="form-label">
               Ride Share Company
             </label>
-            <select
-              className="form-select"
-              id="rideType"
-              value={rideType}
-              onChange={(e) => setRideType(e.target.value)}
-            >
-              <option value="Uber">Uber</option>
-              <option value="Lyft">Lyft</option>
-              <option value="Other">Other</option>
-            </select>
+            <div className="d-flex align-items-start gap-2">
+              <select
+                className="form-select"
+                id="rideType"
+                value={rideType}
+                onChange={(e) => setRideType(e.target.value)}
+                required
+              >
+                {rideOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm"
+                onClick={refreshRideOptions}
+              >
+                Refresh
+              </button>
+            </div>
+            <div className="form-text">
+              Partners with open rides today appear automatically.
+            </div>
           </div>
           <button type="submit" className="btn btn-primary w-100">
             Book Ride

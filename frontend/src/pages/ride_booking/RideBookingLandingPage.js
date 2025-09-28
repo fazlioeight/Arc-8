@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Form, InputGroup, Table } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 
@@ -43,6 +43,9 @@ const RideBookingLandingPage = () => {
             <div className="d-flex flex-wrap justify-content-center gap-2 mt-2">
               <Button variant="light" onClick={() => navigate('/RideBooking/book')}>
                 Book a ride
+              </Button>
+              <Button variant="outline-light" onClick={() => navigate('/RideBooking/partners')}>
+                Manage ride partners
               </Button>
             </div>
           </div>

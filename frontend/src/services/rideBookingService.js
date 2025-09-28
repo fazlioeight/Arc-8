@@ -1,4 +1,5 @@
-﻿const STORAGE_KEY = 'rideBookingHistory';
+﻿import { getAvailablePartnersForDate } from './ridePartnerService';
+const STORAGE_KEY = 'rideBookingHistory';
 
 const DEFAULT_RIDES = [
   {
@@ -84,3 +85,12 @@ export const clearRideHistory = () => {
   if (!hasBrowserStorage()) return;
   window.localStorage.removeItem(STORAGE_KEY);
 };
+
+export const BASE_RIDE_COMPANIES = ['Uber', 'Lyft', 'Other'];
+
+export const getRideCompaniesForDate = (date = new Date()) => {
+  const partnerCompanies = getAvailablePartnersForDate(date).map(partner => partner.companyName);
+  const combined = [...BASE_RIDE_COMPANIES, ...partnerCompanies];
+  return Array.from(new Set(combined));
+};
+

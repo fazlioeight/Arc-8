@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -13,6 +13,7 @@ import Login from './pages/Login';
 import PortalPage from './pages/portal_page/portalPage'; // adjust path as needed
 import RideBookingLandingPage from './pages/ride_booking/RideBookingLandingPage';
 import RideBooking from './pages/ride_booking/RideBooking';
+import RidePartnerManagementPage from './pages/ride_booking/RidePartnerManagementPage';
 import Settings from './pages/settings/Settings';
 import Dashboard from './pages/dashboard/Dashboard';
 import Docs from './pages/docs/Docs';
@@ -54,7 +55,9 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/portal_page/portalPage" element={<PortalPage />} />
-          <Route path="/RideBooking" element={<RideBooking />} />
+          <Route path="/RideBooking" element={<RideBookingLandingPage />} />
+          <Route path="/RideBooking/book" element={<RideBooking />} />
+          <Route path="/RideBooking/partners" element={<RidePartnerManagementPage />} />
           <Route path="/settings" element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/docs" element={<Docs />} />
@@ -125,6 +128,3 @@ function App() {
 }
 
 export default App;
-
-
-
