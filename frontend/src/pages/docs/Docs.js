@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import './portal_page/portalPage.sfdc.css';
-import { AuthContext } from '../context/AuthContext';
+import '../portal_page/portalPage.sfdc.css';
+import { AuthContext } from '../../context/AuthContext';
 
 const useQuery = () => {
   const { search } = useLocation();

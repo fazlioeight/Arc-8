@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +31,8 @@ from ..utils.security import AuthenticatedUser, get_current_user
 router = APIRouter(prefix="/api/coding", tags=["coding"])
 
 
-def _member_to_summary(member) -> CodingMemberSummary:
+def _member_to_summary(member, assignment: Optional[Dict[str, list]] = None) -> CodingMemberSummary:
+    assignment = assignment or {}
     return CodingMemberSummary(
         id=member.id,
         member_key=member.member_key,
@@ -42,11 +43,13 @@ def _member_to_summary(member) -> CodingMemberSummary:
         risk_score=float(member.risk_score) if member.risk_score is not None else None,
         pcp_name=member.pcp_name,
         pcp_npi=member.pcp_npi,
+        assigned_coder_ids=assignment.get("assigned_coder_ids", []),
+        assigned_coder_emails=assignment.get("assigned_coder_emails", []),
     )
 
 
-def _member_to_detail(member) -> CodingMemberDetail:
-    summary = _member_to_summary(member)
+def _member_to_detail(member, assignment: Optional[Dict[str, list]] = None) -> CodingMemberDetail:
+    summary = _member_to_summary(member, assignment=assignment)
     data = summary.model_dump()
     data.update(
         {
@@ -79,6 +82,26 @@ def _chase_to_schema(chase) -> CodingChase:
         created_at=chase.created_at,
         updated_at=chase.updated_at,
     )
+
+
+def _extract_assignment_metadata(chases) -> Dict[str, list]:
+    coder_ids = set()
+    email_map: Dict[str, str] = {}
+    for chase in chases:
+        status = (chase.status or '').lower()
+        if status == 'closed':
+            continue
+        if chase.assigned_coder_id is not None:
+            coder_ids.add(chase.assigned_coder_id)
+        email_value = (chase.assigned_coder_email or '').strip()
+        if email_value:
+            normalized = email_value.lower()
+            if normalized not in email_map:
+                email_map[normalized] = email_value
+    return {
+        "assigned_coder_ids": sorted(coder_ids),
+        "assigned_coder_emails": sorted(email_map.values()),
+    }
 
 
 def _note_to_schema(note) -> CodingNote:
@@ -148,7 +171,18 @@ async def list_coding_members(
         page=page,
         page_size=page_size,
     )
-    items = [_member_to_summary(member) for member in members]
+    assignments_map: Dict[int, Dict[str, list]] = {}
+    if members:
+        member_ids = [member.id for member in members]
+        chases = await coding_members.list_chases_for_members(session, member_ids=member_ids)
+        grouped: Dict[int, list] = {}
+        for chase in chases:
+            grouped.setdefault(chase.member_id, []).append(chase)
+        assignments_map = {
+            member_id: _extract_assignment_metadata(grouped.get(member_id, []))
+            for member_id in member_ids
+        }
+    items = [_member_to_summary(member, assignments_map.get(member.id)) for member in members]
     await record_audit_event(
         session,
         tenant_id=tenant.id,
@@ -195,6 +229,7 @@ async def get_coding_member(
     chases = await coding_members.list_chases_for_member(session, member_id)
     notes = await coding_members.list_notes(session, member_id)
     attachments = await coding_members.list_attachments(session, member_id)
+    assignment_snapshot = _extract_assignment_metadata(chases)
     await record_audit_event(
         session,
         tenant_id=tenant.id,
@@ -204,7 +239,7 @@ async def get_coding_member(
     )
     await session.commit()
     return CodingMemberDetailResponse(
-        member=_member_to_detail(member),
+        member=_member_to_detail(member, assignment_snapshot),
         chases=[_chase_to_schema(chase) for chase in chases],
         notes=[_note_to_schema(note) for note in notes],
         attachments=[_attachment_to_schema(attachment) for attachment in attachments],

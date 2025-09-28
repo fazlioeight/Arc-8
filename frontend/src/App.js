@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+﻿import React, { useState, useEffect, useContext } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -11,13 +11,16 @@ import Contact from './pages/Contact';
 import Pricing from './pages/Pricing';
 import Login from './pages/Login';
 import PortalPage from './pages/portal_page/portalPage'; // adjust path as needed
-import RideBooking from './pages/RideBooking';
-import Settings from './pages/Settings';
-import Dashboard from './pages/Dashboard';
-import Docs from './pages/Docs';
-import CodingMembersPage from './pages/CodingMembersPage';
-import CodingMemberDetailPage from './pages/CodingMemberDetailPage';
-import CodingProvidersPage from './pages/CodingProvidersPage';
+import RideBookingLandingPage from './pages/ride_booking/RideBookingLandingPage';
+import RideBooking from './pages/ride_booking/RideBooking';
+import Settings from './pages/settings/Settings';
+import Dashboard from './pages/dashboard/Dashboard';
+import Docs from './pages/docs/Docs';
+import CodingMembersPage from './pages/coding/CodingMembersPage';
+import CodingMemberDetailPage from './pages/coding/CodingMemberDetailPage';
+import CodingProvidersPage from './pages/coding/CodingProvidersPage';
+import CodingLandingPage from './pages/coding/CodingLandingPage';
+import CodingProviderDetailPage from './pages/coding/CodingProviderDetailPage';
 // Section pages
 import Mission from './pages/about/Mission';
 import Values from './pages/about/Values';
@@ -37,7 +40,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
 
   const Inner = () => {
     const location = useLocation();
-    const hideNavbarOn = ['/portal_page/portalPage', '/RideBooking', '/dashboard', '/settings'];
+    const hideNavbarOn = ['/portal_page/portalPage', '/RideBooking', '/dashboard', '/settings', '/coding'];
     const hideNavbar = hideNavbarOn.some(p => location.pathname.startsWith(p));
     return (
       <>
@@ -68,9 +71,11 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/insights/cost-savings" element={<CostSavings />} />
           <Route path="/contact/form" element={<ContactFormPage />} />
           <Route path="/contact/info" element={<CompanyInfo />} />
+          <Route path="/coding" element={<CodingLandingPage />} />
           <Route path="/coding/members" element={<CodingMembersPage />} />
           <Route path="/coding/members/:memberId" element={<CodingMemberDetailPage />} />
           <Route path="/coding/providers" element={<CodingProvidersPage />} />
+          <Route path="/coding/providers/:providerId" element={<CodingProviderDetailPage />} />
         </Routes>
       </>
     );
@@ -120,5 +125,6 @@ function App() {
 }
 
 export default App;
+
 
 

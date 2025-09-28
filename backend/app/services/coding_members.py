@@ -121,6 +121,20 @@ async def list_chases_for_member(
     return list((await session.scalars(stmt)).all())
 
 
+async def list_chases_for_members(
+    session: AsyncSession,
+    member_ids: Sequence[int],
+) -> list[CodingMemberChase]:
+    if not member_ids:
+        return []
+    stmt = (
+        select(CodingMemberChase)
+        .where(CodingMemberChase.member_id.in_(member_ids))
+        .order_by(CodingMemberChase.member_id, CodingMemberChase.created_at.desc())
+    )
+    return list((await session.scalars(stmt)).all())
+
+
 async def create_note(
     session: AsyncSession,
     *,

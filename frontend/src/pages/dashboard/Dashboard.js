@@ -1,11 +1,11 @@
 // pages/Dashboard.js (enhanced example)
 import React, { useContext, useEffect, useState } from "react";
-import { AuthContext } from "../context/AuthContext";
+import { AuthContext } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import "../index.css";
-import "./portal_page/portalPage.sfdc.css";
-import PortalUtilityBar from "../components/PortalUtilityBar";
+import "../../index.css";
+import "../portal_page/portalPage.sfdc.css";
+import PortalUtilityBar from "../../components/PortalUtilityBar";
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);

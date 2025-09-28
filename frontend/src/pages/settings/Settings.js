@@ -1,12 +1,12 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "../index.css";
-import "./portal_page/portalPage.sfdc.css";
-import "./settings/settings.css";
-import DarkModeToggle from "../components/DarkModeToggle";
-import ToggleSwitch from "../components/ToggleSwitch";
-import PortalUtilityBar from "../components/PortalUtilityBar";
-import { AuthContext } from "../context/AuthContext";
+import "../../index.css";
+import "../portal_page/portalPage.sfdc.css";
+import "./settings.css";
+import DarkModeToggle from "../../components/DarkModeToggle";
+import ToggleSwitch from "../../components/ToggleSwitch";
+import PortalUtilityBar from "../../components/PortalUtilityBar";
+import { AuthContext } from "../../context/AuthContext";
 
 const Settings = ({ themePreference, setThemePreference }) => {
   const navigate = useNavigate();

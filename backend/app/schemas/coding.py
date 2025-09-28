@@ -16,6 +16,8 @@ class CodingMemberSummary(BaseModel):
     risk_score: Optional[float] = None
     pcp_name: Optional[str] = None
     pcp_npi: Optional[str] = None
+    assigned_coder_ids: list[int] = Field(default_factory=list)
+    assigned_coder_emails: list[str] = Field(default_factory=list)
 
 
 class CodingMemberDetail(CodingMemberSummary):

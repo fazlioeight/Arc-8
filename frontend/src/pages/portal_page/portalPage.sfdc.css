@@ -225,3 +225,30 @@
 .slide-up { opacity: 0; transform: translateY(12px); animation: sfdcSlideUp var(--dur-slow) var(--easing-standard) forwards; }
 @keyframes sfdcFadeIn { to { opacity: 1; transform: none; } }
 @keyframes sfdcSlideUp { to { opacity: 1; transform: none; } }
+
+.coding-portal {
+  --coding-header-offset: 64px;
+}
+
+@media (max-width: 768px) {
+  .coding-portal {
+    --coding-header-offset: 72px;
+  }
+}
+
+.coding-portal .coding-content {
+  margin-top: var(--coding-header-offset);
+}
+
+.coding-portal .sfdc-hero {
+  padding-bottom: 32px;
+}
+
+.coding-portal .sfdc-hero::after {
+  display: none;
+}
+
+.coding-portal .sfdc-grid {
+  margin: 24px auto 24px;
+}
+

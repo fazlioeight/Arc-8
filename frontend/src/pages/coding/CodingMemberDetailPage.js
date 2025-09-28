@@ -2,12 +2,12 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Alert, Badge, Button, Card, Col, Form, ListGroup, Row, Spinner, Table } from 'react-bootstrap';
 
-import { AuthContext } from '../context/AuthContext';
+import { AuthContext } from '../../context/AuthContext';
 import {
   createCodingNote,
   fetchCodingMemberDetail,
   updateCodingChase,
-} from '../services/codingService';
+} from '../../services/codingService';
 
 const CodingMemberDetailPage = () => {
   const { memberId } = useParams();

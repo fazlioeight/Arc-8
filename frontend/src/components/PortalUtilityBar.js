@@ -90,28 +90,35 @@ const PortalUtilityBar = () => {
             <div className="sfdc-waffle" onClick={(e)=>e.stopPropagation()}>
               <div className="sfdc-dropdown__header">Pinned Apps</div>
               <div className="sfdc-waffle__grid">
-                <div className="sfdc-app" onClick={()=>navigate('/portal_page/portalPage')}>
+                <div className="sfdc-app" onClick={() => navigate('/portal_page/portalPage')}>
                   <div className="sfdc-app__icon" style={{background:'#0176d3'}}>NP</div>
                   <div>
                     <div className="sfdc-app__name">Nexora Portal</div>
                     <div className="sfdc-app__desc">Metrics & insights</div>
                   </div>
                 </div>
-                <div className="sfdc-app" onClick={()=>navigate('/RideBooking')}>
+                <div className="sfdc-app" onClick={() => navigate('/coding')}>
+                  <div className="sfdc-app__icon" style={{background:'#0f172a'}}>CD</div>
+                  <div>
+                    <div className="sfdc-app__name">Coding Worklists</div>
+                    <div className="sfdc-app__desc">Member reviews</div>
+                  </div>
+                </div>
+                <div className="sfdc-app" onClick={() => navigate('/RideBooking')}>
                   <div className="sfdc-app__icon" style={{background:'#0ea5e9'}}>RB</div>
                   <div>
                     <div className="sfdc-app__name">Ride Booking</div>
                     <div className="sfdc-app__desc">Transportation</div>
                   </div>
                 </div>
-                <div className="sfdc-app" onClick={()=>navigate('/dashboard')}>
+                <div className="sfdc-app" onClick={() => navigate('/dashboard')}>
                   <div className="sfdc-app__icon" style={{background:'#a855f7'}}>DB</div>
                   <div>
                     <div className="sfdc-app__name">Dashboard</div>
                     <div className="sfdc-app__desc">Analytics view</div>
                   </div>
                 </div>
-                <div className="sfdc-app" onClick={()=>navigate('/settings')}>
+                <div className="sfdc-app" onClick={() => navigate('/settings')}>
                   <div className="sfdc-app__icon" style={{background:'#64748b'}}>ST</div>
                   <div>
                     <div className="sfdc-app__name">Settings</div>
@@ -190,4 +197,5 @@ const PortalUtilityBar = () => {
 };
 
 export default PortalUtilityBar;
+
 
