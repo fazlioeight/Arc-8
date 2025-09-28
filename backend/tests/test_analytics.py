@@ -1,21 +1,21 @@
 ﻿import pytest
-from httpx import AsyncClient
-
-from app.main import app
+from httpx import ASGITransport, AsyncClient
 
 BASE_URL = "https://demo.localhost"
 
 
-@pytest.mark.anyio
-async def test_analytics_summary_requires_token():
-    async with AsyncClient(app=app, base_url=BASE_URL) as client:
+pytestmark = pytest.mark.anyio("asyncio")
+
+async def test_analytics_summary_requires_token(fastapi_app):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
         resp = await client.get("/api/analytics/summary")
     assert resp.status_code in (401, 403)
 
 
-@pytest.mark.anyio
-async def test_analytics_summary_with_token_returns_shape():
-    async with AsyncClient(app=app, base_url=BASE_URL) as client:
+async def test_analytics_summary_with_token_returns_shape(fastapi_app):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
         login_resp = await client.post(
             "/api/login",
             json={"email": "user@example.com", "password": "password", "tenant": "demo"},

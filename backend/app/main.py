@@ -19,6 +19,7 @@ from .middleware.request_logging import RequestLoggingMiddleware
 from .middleware.tenant import TenantMiddleware
 from .models.tables import User
 from .routes import analytics as analytics_router
+from .routes import coding as coding_router
 from .routes import member_cost as member_cost_router
 from .routes import member_risk as member_risk_router
 from .routes import utilization as utilization_router
@@ -33,9 +34,15 @@ app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(TenantMiddleware, default_tenant="demo", require_known_tenant=settings.HIPAA_MODE)
 
+cors_origins = []
+for origin in settings.CORS_ORIGINS:
+    origin_str = str(origin).rstrip('/')
+    cors_origins.append(origin_str)
+    cors_origins.append(f"{origin_str}/")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=sorted(set(cors_origins)),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -111,6 +118,7 @@ async def tenant_self(
 
 
 app.include_router(analytics_router.router)
+app.include_router(coding_router.router)
 app.include_router(member_cost_router.router)
 app.include_router(utilization_router.router)
 app.include_router(member_risk_router.router)

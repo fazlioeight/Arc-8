@@ -14,6 +14,7 @@ BACKEND_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, os.pardir))
 if BACKEND_ROOT not in sys.path:
     sys.path.insert(0, BACKEND_ROOT)
 
+from app.core import config as config_module
 from app.core.config import get_settings
 from app.models.tables import (
     Claim,
@@ -23,12 +24,31 @@ from app.models.tables import (
     TenantDataBase,
     User,
 )
+from app.models.coding import (
+    CodingMember,
+    CodingMemberChase,
+    CodingMemberNote,
+    CodingProvider,
+    CodingProviderLocation,
+)
 
 TEST_CONTROL_DB = "sqlite+aiosqlite:///./tests/test_control.db"
 TEST_TENANT_DB_TEMPLATE = "sqlite+aiosqlite:///./tests/tenants/{tenant_key}.db"
 TEST_SECRET = "super-secret-for-tests"
 TEST_TENANT_KEY = "demo"
 
+
+os.environ["ENVIRONMENT"] = "test"
+os.environ["SECRET_KEY"] = TEST_SECRET
+os.environ["CONTROL_DATABASE_URL"] = TEST_CONTROL_DB
+os.environ["DEFAULT_TENANT_DATABASE_URL"] = TEST_TENANT_DB_TEMPLATE
+os.environ["ALLOW_DUMMY_LOGIN"] = "false"
+
+
+config_module.settings.CONTROL_DATABASE_URL = TEST_CONTROL_DB
+config_module.settings.DEFAULT_TENANT_DATABASE_URL = TEST_TENANT_DB_TEMPLATE
+config_module.settings.SECRET_KEY = TEST_SECRET
+config_module.settings.ALLOW_DUMMY_LOGIN = False
 
 def _tests_dir() -> Path:
     return Path(BACKEND_ROOT) / "tests"
@@ -45,11 +65,19 @@ async def _bootstrap_async():
     os.environ["DEFAULT_TENANT_DATABASE_URL"] = TEST_TENANT_DB_TEMPLATE
     os.environ["ALLOW_DUMMY_LOGIN"] = "false"
 
+    config_module.settings.CONTROL_DATABASE_URL = TEST_CONTROL_DB
+    config_module.settings.DEFAULT_TENANT_DATABASE_URL = TEST_TENANT_DB_TEMPLATE
+    config_module.settings.SECRET_KEY = TEST_SECRET
+    config_module.settings.ALLOW_DUMMY_LOGIN = False
+
     _tests_dir().mkdir(parents=True, exist_ok=True)
     _tenant_dir().mkdir(parents=True, exist_ok=True)
 
     get_settings.cache_clear()
     settings = get_settings()
+
+    from app.core import config as config_reload
+    config_reload.settings = settings
 
     control_engine = create_async_engine(settings.CONTROL_DATABASE_URL, future=True, echo=False)
 
@@ -92,6 +120,43 @@ async def _bootstrap_async():
         await session.flush()
         claim = Claim(member_key="M001", service_date=None, cost=Decimal("100.00"))
         session.add(claim)
+
+        coding_member = CodingMember(
+            member_key="COD001",
+            first_name="Case",
+            last_name="Manager",
+            status="active",
+            line_of_business="Commercial",
+        )
+        session.add(coding_member)
+        await session.flush()
+        session.add(
+            CodingMemberChase(
+                member_id=coding_member.id,
+                chase_code="CHASE-1",
+                status="open",
+                priority="high",
+            )
+        )
+        session.add(
+            CodingMemberNote(
+                member_id=coding_member.id,
+                author_email="user@example.com",
+                body="Seed note",
+            )
+        )
+        provider = CodingProvider(name="Provider One", npi="9999999999", tax_id="12-3456789")
+        session.add(provider)
+        await session.flush()
+        session.add(
+            CodingProviderLocation(
+                provider_id=provider.id,
+                address_line1="100 Main St",
+                city="Austin",
+                state="TX",
+                postal_code="73301",
+            )
+        )
         await session.commit()
 
 
@@ -99,3 +164,26 @@ async def _bootstrap_async():
 def bootstrap_test_environment():
     asyncio.run(_bootstrap_async())
 
+
+
+@pytest.fixture
+def fastapi_app(bootstrap_test_environment):
+    from app import main as app_module
+
+    assert app_module.settings.CONTROL_DATABASE_URL == TEST_CONTROL_DB
+    return app_module.app
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+def disable_audit(monkeypatch):
+    async def _noop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr('app.utils.audit_logger.record_audit_event', _noop)
+    monkeypatch.setattr('app.routes.coding.record_audit_event', _noop)
+    monkeypatch.setattr('app.main.record_audit_event', _noop)

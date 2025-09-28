@@ -15,6 +15,9 @@ import RideBooking from './pages/RideBooking';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import Docs from './pages/Docs';
+import CodingMembersPage from './pages/CodingMembersPage';
+import CodingMemberDetailPage from './pages/CodingMemberDetailPage';
+import CodingProvidersPage from './pages/CodingProvidersPage';
 // Section pages
 import Mission from './pages/about/Mission';
 import Values from './pages/about/Values';
@@ -65,6 +68,9 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/insights/cost-savings" element={<CostSavings />} />
           <Route path="/contact/form" element={<ContactFormPage />} />
           <Route path="/contact/info" element={<CompanyInfo />} />
+          <Route path="/coding/members" element={<CodingMembersPage />} />
+          <Route path="/coding/members/:memberId" element={<CodingMemberDetailPage />} />
+          <Route path="/coding/providers" element={<CodingProvidersPage />} />
         </Routes>
       </>
     );

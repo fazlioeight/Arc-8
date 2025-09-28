@@ -1,16 +1,16 @@
 ﻿import pytest
-from httpx import AsyncClient
-
-from app.main import app
+from httpx import ASGITransport, AsyncClient
 from app.utils.security import create_access_token
 
 BASE_URL = "https://demo.localhost"
 
 
-@pytest.mark.anyio
-async def test_cross_tenant_access_denied():
+pytestmark = pytest.mark.anyio("asyncio")
+
+async def test_cross_tenant_access_denied(fastapi_app):
     token = create_access_token({"sub": "user@example.com", "tid": "other", "uid": 999})
-    async with AsyncClient(app=app, base_url=BASE_URL) as client:
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
         resp = await client.get(
             "/api/analytics/summary",
             headers={

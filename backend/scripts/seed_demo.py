@@ -17,6 +17,8 @@ from app.models.tables import (
     ControlBase,
     User,
 )
+from app.services.coding_members import ensure_seed_data
+
 
 TENANT_KEY = "demo"
 TENANT_SLUG = "demo"
@@ -124,6 +126,7 @@ async def seed_tenant_data(tenant: Tenant) -> None:
                         cost=cost,
                     )
                     session.add(claim)
+        await ensure_seed_data(session)
         await session.commit()
 
 
