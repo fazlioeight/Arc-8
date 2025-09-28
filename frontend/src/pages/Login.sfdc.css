@@ -53,3 +53,63 @@
 .sfdc-auth__links a:hover { text-decoration: underline; }
 
 .sfdc-auth__footer { text-align: center; color: var(--sfdc-muted); padding: 8px 16px 20px; }
+.sfdc-auth__sso {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--sfdc-card);
+  color: var(--sfdc-text);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.sfdc-auth__sso:hover {
+  border-color: rgba(14, 165, 233, 0.6);
+  transform: translateY(-1px);
+}
+
+.sfdc-auth__sso:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.sfdc-auth__divider {
+  margin: 14px 0 10px;
+  display: flex;
+  align-items: center;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--sfdc-muted);
+  gap: 12px;
+}
+
+.sfdc-auth__divider::before,
+.sfdc-auth__divider::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.35);
+}
+
+.sfdc-linkbutton {
+  margin-top: 6px;
+  background: transparent;
+  color: var(--sfdc-brand);
+  border: none;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.sfdc-linkbutton:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,78 @@
+﻿.session-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+.session-lock__panel {
+  max-width: 420px;
+  width: 100%;
+  background: var(--sfdc-card);
+  border: 1px solid var(--sfdc-border);
+  border-radius: 16px;
+  padding: 28px 24px;
+  box-shadow: var(--sfdc-shadow);
+  display: grid;
+  gap: 18px;
+  text-align: center;
+}
+
+.session-lock__panel h2 {
+  margin: 0;
+}
+
+.session-lock__meta {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: var(--sfdc-muted);
+}
+
+.session-lock__meta strong {
+  color: var(--sfdc-text);
+}
+
+.session-lock__actions {
+  display: grid;
+  gap: 12px;
+}
+
+.session-lock__primary {
+  border: none;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.session-lock__primary:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.session-lock__secondary {
+  border: 1px solid var(--sfdc-border);
+  border-radius: 10px;
+  padding: 10px 16px;
+  background: transparent;
+  color: var(--sfdc-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.session-lock__secondary:hover {
+  border-color: rgba(14, 165, 233, 0.4);
+}
+
+.session-lock__hint {
+  font-size: 0.8rem;
+  color: var(--sfdc-muted);
+}

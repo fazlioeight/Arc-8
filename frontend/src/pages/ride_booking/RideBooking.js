@@ -1,9 +1,10 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 import PortalUtilityBar from "../../components/PortalUtilityBar";
 import "../portal_page/portalPage.sfdc.css";
 import { addRideRecord, getRideCompaniesForDate } from "../../services/rideBookingService";
+import useGooglePlacesAutocomplete from "../../hooks/useGooglePlacesAutocomplete";
 
 const RideBooking = () => {
   const { isAuthenticated } = useContext(AuthContext) || {};
@@ -19,6 +20,19 @@ const RideBooking = () => {
   const [rideOptions, setRideOptions] = useState([]);
   const [rideType, setRideType] = useState("");
   const [status, setStatus] = useState("");
+
+  const pickupAddressInputRef = useRef(null);
+  const dropoffAddressInputRef = useRef(null);
+
+  const isPickupAutocompleteReady = useGooglePlacesAutocomplete(
+    pickupAddressInputRef,
+    setPickupAddress
+  );
+  const isDropoffAutocompleteReady = useGooglePlacesAutocomplete(
+    dropoffAddressInputRef,
+    setDropoffAddress
+  );
+
   const refreshRideOptions = () => {
     const options = getRideCompaniesForDate(new Date());
     setRideOptions(options);
@@ -151,10 +165,15 @@ const RideBooking = () => {
               type="text"
               className="form-control"
               id="pickupAddress"
+              ref={pickupAddressInputRef}
+              autoComplete="off"
               value={pickupAddress}
               onChange={(e) => setPickupAddress(e.target.value)}
               required
             />
+            {isPickupAutocompleteReady && (
+              <div className="form-text">Start typing to search for a verified address with Google Maps.</div>
+            )}
           </div>
           <div className="mb-3">
             <label htmlFor="dropoff" className="form-label">
@@ -177,10 +196,15 @@ const RideBooking = () => {
               type="text"
               className="form-control"
               id="dropoffAddress"
+              ref={dropoffAddressInputRef}
+              autoComplete="off"
               value={dropoffAddress}
               onChange={(e) => setDropoffAddress(e.target.value)}
               required
             />
+            {isDropoffAutocompleteReady && (
+              <div className="form-text">Start typing to search for a verified address with Google Maps.</div>
+            )}
           </div>
           <div className="mb-3">
             <label htmlFor="rideType" className="form-label">
@@ -229,3 +253,4 @@ const RideBooking = () => {
 };
 
 export default RideBooking;
+

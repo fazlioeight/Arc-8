@@ -62,6 +62,7 @@ const MasterAdminPage = () => {
   const [mode, setMode] = useState("view"); // "view" | "create" | "edit"
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [sampleMode, setSampleMode] = useState(false);
   const [search, setSearch] = useState("");
 
   const isAdmin = role === "admin";
@@ -92,6 +93,8 @@ const MasterAdminPage = () => {
         const sortedUsers = [...(usersResponse.users || [])].sort((a, b) => a.email.localeCompare(b.email));
         setApps(sortedApps);
         setUsers(sortedUsers);
+        const sampleActive = Boolean(appsResponse.__sample || usersResponse.__sample);
+        setSampleMode(sampleActive);
         if (sortedUsers.length) {
           const first = sortedUsers[0];
           setSelectedUserId(first.id);
@@ -116,6 +119,7 @@ const MasterAdminPage = () => {
       } catch (err) {
         console.error(err);
         if (!isActive) return;
+        setSampleMode(false);
         setError(err.message || API_ERROR_FALLBACK);
       } finally {
         if (isActive) setLoading(false);
@@ -208,18 +212,43 @@ const MasterAdminPage = () => {
 
     setSaving(true);
     try {
+      const normalizedApplications = buildApplicationState(apps, form.applications);
       if (mode === "create") {
+        const email = form.email.trim().toLowerCase();
+        if (sampleMode) {
+          const created = {
+            id: `sample-user-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+            email,
+            role: form.role,
+            is_active: form.is_active,
+            applications: normalizedApplications,
+          };
+          const nextUsers = [...users, created].sort((a, b) => a.email.localeCompare(b.email));
+          setUsers(nextUsers);
+          handleSelectUser(created);
+          setForm({
+            email: created.email,
+            password: "",
+            role: created.role,
+            is_active: created.is_active,
+            applications: buildApplicationState(apps, created.applications),
+          });
+          setMode("edit");
+          setStatusMessage(`Created user ${created.email} (sample)`);
+          return;
+        }
+
         const payload = {
-          email: form.email.trim().toLowerCase(),
+          email,
           password: form.password,
           role: form.role,
           is_active: form.is_active,
           applications: toPayloadApplications(form.applications),
+          __fullApplications: normalizedApplications,
         };
         const created = await createAdminUser({ token, tenant, payload });
         const nextUsers = [...users, created].sort((a, b) => a.email.localeCompare(b.email));
         setUsers(nextUsers);
-        setStatusMessage(`Created user ${created.email}`);
         handleSelectUser(created);
         setForm({
           email: created.email,
@@ -229,19 +258,45 @@ const MasterAdminPage = () => {
           applications: buildApplicationState(apps, created.applications),
         });
         setMode("edit");
+        setStatusMessage(`Created user ${created.email}`);
       } else if (mode === "edit" && selectedUser) {
         const payload = {
           role: form.role,
           is_active: form.is_active,
           applications: toPayloadApplications(form.applications),
+          __fullApplications: normalizedApplications,
         };
         if (form.password) {
           payload.password = form.password;
         }
+
+        if (sampleMode) {
+          const updated = {
+            ...selectedUser,
+            role: form.role,
+            is_active: form.is_active,
+            applications: normalizedApplications,
+          };
+          const nextUsers = users
+            .map((u) => (u.id === updated.id ? updated : u))
+            .sort((a, b) => a.email.localeCompare(b.email));
+          setUsers(nextUsers);
+          setForm({
+            email: updated.email,
+            password: "",
+            role: updated.role,
+            is_active: updated.is_active,
+            applications: buildApplicationState(apps, updated.applications),
+          });
+          setStatusMessage(`Updated user ${updated.email} (sample)`);
+          return;
+        }
+
         const updated = await updateAdminUser({ token, tenant, userId: selectedUser.id, payload });
-        const nextUsers = users.map((u) => (u.id === updated.id ? updated : u)).sort((a, b) => a.email.localeCompare(b.email));
+        const nextUsers = users
+          .map((u) => (u.id === updated.id ? updated : u))
+          .sort((a, b) => a.email.localeCompare(b.email));
         setUsers(nextUsers);
-        setStatusMessage(`Updated user ${updated.email}`);
         setForm({
           email: updated.email,
           password: "",
@@ -249,10 +304,11 @@ const MasterAdminPage = () => {
           is_active: updated.is_active,
           applications: buildApplicationState(apps, updated.applications),
         });
+        setStatusMessage(`Updated user ${updated.email}`);
       }
     } catch (err) {
       console.error(err);
-      setError(err.message || "Operation failed");
+      setError(err.message || 'Operation failed');
     } finally {
       setSaving(false);
     }
@@ -280,6 +336,11 @@ const MasterAdminPage = () => {
           </div>
         </header>
 
+        {sampleMode && (
+          <div className="master-admin__sample" role="status">
+            <strong>Sandbox mode.</strong> User management is running on sample data while the API token is unavailable.
+          </div>
+        )}
         {statusMessage && <div className="master-admin__status">{statusMessage}</div>}
         {error && <div className="master-admin__error" role="alert">{error}</div>}
 

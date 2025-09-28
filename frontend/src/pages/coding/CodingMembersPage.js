@@ -1,9 +1,11 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
 import { AuthContext } from '../../context/AuthContext';
+import { useCommandPalette } from '../../context/CommandPaletteContext';
+import { SAMPLE_CODING_MEMBERS } from '../../utils/sampleData';
 import { fetchCodingMembers } from '../../services/codingService';
 
 const STATUS_OPTIONS = [
@@ -17,7 +19,7 @@ const LOB_OPTIONS = ['Commercial', 'Medicare Advantage', 'DSNP', 'Exchange'];
 
 const CodingMembersPage = () => {
   const navigate = useNavigate();
-  const { token, tenant, isAuthenticated } = useContext(AuthContext) || {};
+  const { token, tenant, isAuthenticated, recordAuditEvent } = useContext(AuthContext) || {};
 
   const [members, setMembers] = useState([]);
   const [total, setTotal] = useState(0);
@@ -35,6 +37,28 @@ const CodingMembersPage = () => {
     void loadMembers();
     // eslint-disable-next-line
   }, [isAuthenticated, canQuery]);
+
+  useEffect(() => {
+    registerCommands([
+      {
+        id: 'coding-members-load-sample',
+        label: 'Load sample coding members',
+        category: 'Coding',
+        action: loadSampleMembers,
+      },
+      {
+        id: 'coding-members-clear-filters',
+        label: 'Clear member filters',
+        category: 'Coding',
+        action: () => {
+          setStatusFilter('active');
+          setLobFilter('');
+          setSearchValue('');
+        },
+      },
+    ]);
+    return () => registerCommands([]);
+  }, [registerCommands, loadSampleMembers]);
 
   const loadMembers = async (overrides = {}) => {
     if (!canQuery) return;
@@ -55,6 +79,14 @@ const CodingMembersPage = () => {
       setLoading(false);
     }
   };
+
+  const loadSampleMembers = useCallback(() => {
+    setMembers(SAMPLE_CODING_MEMBERS);
+    setTotal(SAMPLE_CODING_MEMBERS.length);
+    setError(null);
+    setLoading(false);
+    recordAuditEvent?.('coding.load_sample_members');
+  }, [recordAuditEvent]);
 
   const handleSubmit = event => {
     event.preventDefault();
@@ -168,7 +200,12 @@ const CodingMembersPage = () => {
             {!loading && members.length === 0 && (
               <tr>
                 <td colSpan={6} className="text-center text-muted py-4">
-                  No members match your filters.
+                  <div className="coding-empty">
+                    <p>No members match your filters.</p>
+                    <Button variant="outline-primary" size="sm" onClick={loadSampleMembers}>
+                      Load sandbox sample members
+                    </Button>
+                  </div>
                 </td>
               </tr>
             )}

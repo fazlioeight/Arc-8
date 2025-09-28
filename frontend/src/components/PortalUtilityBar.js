@@ -1,195 +1,331 @@
-// components/PortalUtilityBar.js - Shared top utility bar used across portal apps
+﻿// components/PortalUtilityBar.js - Shared top utility bar used across portal apps
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useCommandPalette } from '../context/CommandPaletteContext';
+import { SAMPLE_TENANT_COMMENTS } from '../utils/sampleData';
 import '../pages/portal_page/portalPage.sfdc.css';
 
 const PortalUtilityBar = () => {
   const navigate = useNavigate();
-  const { user, logout, hasApplicationAccess } = useContext(AuthContext) || {};
+  const {
+    user,
+    logout,
+    hasApplicationAccess,
+    availableTenants = [],
+    tenant,
+    tenantInfo,
+    setTenant,
+    isImpersonating,
+    impersonation,
+    endImpersonation,
+    auditTrail = [],
+    recordAuditEvent,
+  } = useContext(AuthContext) || {};
+  const { openPalette } = useCommandPalette();
+
   const [showWaffle, setShowWaffle] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const [showUser, setShowUser] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchInputRef = useRef(null);
+  const [showTenantMenu, setShowTenantMenu] = useState(false);
   const barRef = useRef(null);
 
+  const closeAll = () => {
+    setShowWaffle(false);
+    setShowNotif(false);
+    setShowUser(false);
+    setShowTenantMenu(false);
+  };
+
   useEffect(() => {
-    const onDocClick = (e) => {
+    const onDocClick = (event) => {
       if (!barRef.current) return;
-      if (!barRef.current.contains(e.target)) {
-        setShowWaffle(false);
-        setShowNotif(false);
-        setShowUser(false);
+      if (!barRef.current.contains(event.target)) {
+        closeAll();
       }
     };
     document.addEventListener('click', onDocClick);
     return () => document.removeEventListener('click', onDocClick);
   }, []);
 
-  useEffect(() => {
-    if (showSearch && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [showSearch]);
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape') setShowSearch(false);
-    };
-    if (showSearch) window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [showSearch]);
-
-  const applicationTiles = useMemo(() => ([
-    { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: '/portal_page/portalPage' },
-    { key: 'coding', label: 'Coding Worklists', desc: 'Member reviews', icon: 'CD', color: '#0f172a', path: '/coding' },
-    { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: '/RideBooking' },
-    { key: 'dashboard', label: 'Dashboard', desc: 'Analytics view', icon: 'DB', color: '#a855f7', path: '/dashboard' },
-    { key: 'docs', label: 'Docs Library', desc: 'Knowledge base', icon: 'DL', color: '#6366f1', path: '/docs' },
-    { key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: '/settings' },
-    { key: 'admin_console', label: 'Master Admin', desc: 'Roles & access', icon: 'MA', color: '#dc2626', path: '/admin/master' },
-  ]), []);
+  const applicationTiles = useMemo(
+    () => [
+      { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: '/portal_page/portalPage' },
+      { key: 'dashboard', label: 'Analytics Dashboard', desc: 'KPIs & RAF', icon: 'DB', color: '#a855f7', path: '/dashboard' },
+      { key: 'coding', label: 'Coding Worklists', desc: 'Member reviews', icon: 'CD', color: '#0f172a', path: '/coding' },
+      { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: '/RideBooking' },
+      { key: 'docs', label: 'Docs Library', desc: 'Knowledge base', icon: 'DL', color: '#6366f1', path: '/docs' },
+      { key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: '/settings' },
+      { key: 'job_center', label: 'Job Center', desc: 'Logs & retry', icon: 'JC', color: '#0f766e', path: '/jobs/status-center' },
+      { key: 'admin_console', label: 'Master Admin', desc: 'Roles & access', icon: 'MA', color: '#dc2626', path: '/admin/master', requiredLevel: 'admin' },
+    ],
+    []
+  );
 
   const accessibleApps = useMemo(() => {
+    if (!hasApplicationAccess) return [];
     return applicationTiles.filter((app) => {
-      if (!hasApplicationAccess) return false;
-      if (app.key === 'admin_console') {
-        return hasApplicationAccess(app.key, 'admin');
-      }
-      return hasApplicationAccess(app.key);
+      const level = app.requiredLevel || 'user';
+      return hasApplicationAccess(app.key, level);
     });
   }, [applicationTiles, hasApplicationAccess]);
+
+  const recentEvents = useMemo(() => (auditTrail || []).slice(0, 4), [auditTrail]);
+
+  const jobAlerts = useMemo(() => {
+    const items = [];
+    const failedJob = recentEvents.find((event) => event.action === 'job.failed');
+    if (failedJob) {
+      items.push({
+        id: failedJob.id,
+        title: 'A job needs attention',
+        hint: failedJob.metadata?.jobName || 'Review in Job Center',
+        status: 'error',
+      });
+    }
+    if (!failedJob && hasApplicationAccess?.('job_center')) {
+      items.push({
+        id: 'job-center',
+        title: 'Monitor long-running jobs',
+        hint: 'Check progress or download logs',
+        status: 'info',
+      });
+    }
+    const impersonationEvent = isImpersonating
+      ? { id: 'impersonation', title: `Impersonating ${impersonation?.name || impersonation?.email}`, hint: 'All actions are audit logged.', status: 'warning' }
+      : null;
+    if (impersonationEvent) items.unshift(impersonationEvent);
+    return items;
+  }, [recentEvents, hasApplicationAccess, isImpersonating, impersonation]);
+
+  const handleTenantSelect = (tenantKey) => {
+    setTenant?.(tenantKey);
+    setShowTenantMenu(false);
+    recordAuditEvent?.('tenant.switch.via_utility', { tenant: tenantKey });
+  };
+
+  const handleCommandPalette = () => {
+    closeAll();
+    recordAuditEvent?.('command_palette.open', { source: 'utility_bar' });
+    openPalette();
+  };
 
   const initials = (user?.email || '?').slice(0, 1).toUpperCase();
 
   return (
     <>
+      {isImpersonating && (
+        <div className="portal-impersonation" role="status">
+          <div>
+            Acting as <strong>{impersonation?.name || impersonation?.email}</strong>
+            <span> — all actions are recorded.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              recordAuditEvent?.('impersonation.banner_exit');
+              endImpersonation?.();
+            }}
+          >
+            Return to self
+          </button>
+        </div>
+      )}
       <div className="sfdc-utilitybar" ref={barRef}>
         <div className="sfdc-utilitybar__content">
           <div className="sfdc-utilitybar__left">
             <button
               className="sfdc-iconbutton"
-              title="App Launcher"
+              title="App launcher"
               aria-haspopup="true"
               aria-expanded={showWaffle}
-              onClick={(e) => { e.stopPropagation(); setShowWaffle((s) => !s); setShowNotif(false); setShowUser(false); }}
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowWaffle((value) => !value);
+                setShowNotif(false);
+                setShowUser(false);
+                setShowTenantMenu(false);
+              }}
             >
               <svg viewBox="0 0 24 24"><path d="M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z"/></svg>
             </button>
-            <span className="sfdc-avatar" aria-hidden>{initials}</span>
+            <button
+              className="sfdc-iconbutton"
+              title="Home"
+              aria-label="Home"
+              onClick={(event) => {
+                event.stopPropagation();
+                closeAll();
+                navigate('/portal_page/portalPage');
+              }}
+            >
+              <svg viewBox="0 0 24 24"><path d="M12 3l9 7h-2v9h-5v-6H10v6H5v-9H3l9-7z"/></svg>
+            </button>
+            <button
+              className="sfdc-iconbutton"
+              title="Command palette"
+              aria-label="Command palette"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleCommandPalette();
+              }}
+            >
+              <svg viewBox="0 0 24 24"><path d="M5 4h14a1 1 0 011 1v3H4V5a1 1 0 011-1zm-1 7h16a1 1 0 011 1v7H3v-7a1 1 0 011-1zm4 2v2h2v-2H8zm4 0v2h2v-2h-2z"/></svg>
+              <span className="sfdc-badge">⌘K</span>
+            </button>
+            <button
+              className="sfdc-tenantbutton"
+              aria-haspopup="true"
+              aria-expanded={showTenantMenu}
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowTenantMenu((value) => !value);
+                setShowWaffle(false);
+                setShowNotif(false);
+                setShowUser(false);
+              }}
+            >
+              <span className="sfdc-tenantbutton__label">{tenantInfo?.name || tenant}</span>
+              <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg>
+            </button>
           </div>
           <div className="sfdc-utilitybar__right">
-            <button className="sfdc-iconbutton" title="Search" aria-label="Search" onClick={(e)=>{ e.stopPropagation(); setShowSearch(true); setShowWaffle(false); setShowNotif(false); setShowUser(false); }}>
-              <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L20 21.5 21.5 20l-6-6zM10 14a4 4 0 110-8 4 4 0 010 8z"/></svg>
-            </button>
+            {hasApplicationAccess?.('job_center') && (
+              <button
+                className="sfdc-iconbutton"
+                title="Job & Status Center"
+                aria-label="Job and status center"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeAll();
+                  navigate('/jobs/status-center');
+                }}
+              >
+                <svg viewBox="0 0 24 24"><path d="M5 4h14l1 4H4l1-4zm-1 6h16v9H4v-9zm4 2v5h2v-5H8zm4 0v5h2v-5h-2z"/></svg>
+              </button>
+            )}
             <button
               className="sfdc-iconbutton"
               title="Notifications"
               aria-haspopup="true"
               aria-expanded={showNotif}
-              onClick={(e)=>{ e.stopPropagation(); setShowNotif((s)=>!s); setShowWaffle(false); setShowUser(false); }}>
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowNotif((value) => !value);
+                setShowWaffle(false);
+                setShowUser(false);
+                setShowTenantMenu(false);
+              }}
+            >
               <svg viewBox="0 0 24 24"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V9a6 6 0 10-12 0v7L4 18v1h16v-1l-2-2z"/></svg>
             </button>
-            <button className="sfdc-iconbutton" title="Settings" aria-label="Settings" onClick={()=>navigate('/settings')}>
-              <svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.994 7.994 0 000-1.88l2.03-1.58a.5.5 0 00.12-.65l-1.92-3.32a.5.5 0 00-.61.22l-2.39.96a7.992 7.992 0 00-1.63-.94l-.36-2.54A.5.5 0 0013.98 0h-3.96a.5.5 0 00-.49.42l-.36 2.54a7.992 7.992 0 00-1.63.94l-2.39-.96a.5.5 0 00-.61.22L.62 6.41a.5.5 0 00.12.65l2.03 1.58a7.994 7.994 0 000 1.88L.74 12.1a.5.5 0 00-.12.65l1.92 3.32c.13.23.39.32.61.22l2.39-.96c.5.38 1.05.7 1.63.94l.36 2.54c.04.24.25.42.49.42h3.96c.24 0 .45-.18.49-.42l.36-2.54c.58-.24 1.13-.56 1.63-.94l2.39.96c.23.1.49.01.61-.22l1.92-3.32a.5.5 0 00-.12-.65l-2.03-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z"/></svg>
-            </button>
             <button
-              className="sfdc-iconbutton"
-              title="User menu"
+              className="sfdc-avatar"
+              title="Account"
               aria-haspopup="true"
               aria-expanded={showUser}
-              onClick={(e)=>{ e.stopPropagation(); setShowUser((s)=>!s); setShowNotif(false); setShowWaffle(false); }}>
-              <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8V22h19.2v-2.8c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowUser((value) => !value);
+                setShowWaffle(false);
+                setShowNotif(false);
+                setShowTenantMenu(false);
+              }}
+            >
+              {initials}
             </button>
-            <span className="sfdc-identity__name" style={{marginLeft: 8}}>{user?.email || 'Guest'}</span>
           </div>
+        </div>
 
-          {showWaffle && (
-            <div className="sfdc-waffle" onClick={(e)=>e.stopPropagation()}>
-              <div className="sfdc-dropdown__header">Pinned Apps</div>
-              <div className="sfdc-waffle__grid">
-                {accessibleApps.map((app) => (
-                  <div key={app.key} className="sfdc-app" onClick={() => navigate(app.path)}>
-                    <div className="sfdc-app__icon" style={{background: app.color}}>{app.icon}</div>
+        {showWaffle && (
+          <div className="sfdc-dropdown" onClick={(event) => event.stopPropagation()}>
+            <div className="sfdc-dropdown__header">Apps</div>
+            <div className="sfdc-dropdown__grid">
+              {accessibleApps.map((app) => (
+                <div key={app.key} className="sfdc-app" onClick={() => { closeAll(); navigate(app.path); }}>
+                  <div className="sfdc-app__icon" style={{ background: app.color }}>{app.icon}</div>
+                  <div>
+                    <div className="sfdc-app__name">{app.label}</div>
+                    <div className="sfdc-app__desc">{app.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showTenantMenu && (
+          <div className="sfdc-dropdown sfdc-dropdown--tenant" onClick={(event) => event.stopPropagation()}>
+            <div className="sfdc-dropdown__header">Switch tenant</div>
+            <div className="sfdc-dropdown__body">
+              {availableTenants.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`sfdc-tenantoption${option.key === tenant ? ' is-active' : ''}`}
+                  onClick={() => handleTenantSelect(option.key)}
+                >
+                  <div className="sfdc-tenantoption__title">{option.name}</div>
+                  <div className="sfdc-tenantoption__meta">{option.region || 'Unknown region'} • {option.timezone || 'Timezone TBD'}</div>
+                  {SAMPLE_TENANT_COMMENTS[option.key] && (
+                    <div className="sfdc-tenantoption__hint">{SAMPLE_TENANT_COMMENTS[option.key]}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="sfdc-dropdown__footer">
+              Need a sandbox reset? Contact support.
+            </div>
+          </div>
+        )}
+
+        {showNotif && (
+          <div className="sfdc-dropdown" onClick={(event) => event.stopPropagation()}>
+            <div className="sfdc-dropdown__header">Notifications</div>
+            {jobAlerts.length === 0 && (
+              <div className="sfdc-dropdown__empty">No alerts. You're all caught up!</div>
+            )}
+            {jobAlerts.map((alert) => (
+              <div key={alert.id} className={`sfdc-dropdown__item sfdc-dropdown__item--${alert.status || 'info'}`}>
+                <div>
+                  <div>{alert.title}</div>
+                  <div className="sfdc-dropdown__hint">{alert.hint}</div>
+                </div>
+              </div>
+            ))}
+            {recentEvents.length > 0 && (
+              <div className="sfdc-dropdown__section">
+                <div className="sfdc-dropdown__header">Recent activity</div>
+                {recentEvents.map((event) => (
+                  <div key={event.id} className="sfdc-dropdown__item">
                     <div>
-                      <div className="sfdc-app__name">{app.label}</div>
-                      <div className="sfdc-app__desc">{app.desc}</div>
+                      <div>{event.action}</div>
+                      <div className="sfdc-dropdown__hint">{new Date(event.timestamp).toLocaleString()}</div>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {showNotif && (
-            <div className="sfdc-dropdown" style={{right: 108}} onClick={(e)=>e.stopPropagation()}>
-              <div className="sfdc-dropdown__header">Notifications</div>
-              <div className="sfdc-dropdown__item">
-                <svg viewBox="0 0 24 24" style={{width:16,height:16}}><circle cx="12" cy="12" r="6"/></svg>
-                <div>
-                  <div>System update scheduled</div>
-                  <div className="sfdc-dropdown__hint">Tonight at 11:00 PM</div>
-                </div>
-              </div>
-              <div className="sfdc-dropdown__item">
-                <svg viewBox="0 0 24 24" style={{width:16,height:16}}><path d="M12 2l3 7h7l-5.5 4.1L18 20l-6-4-6 4 1.5-6.9L2 9h7z"/></svg>
-                <div>
-                  <div>New insights available</div>
-                  <div className="sfdc-dropdown__hint">View in Dashboard</div>
-                </div>
-              </div>
+        {showUser && (
+          <div className="sfdc-dropdown" onClick={(event) => event.stopPropagation()}>
+            <div className="sfdc-dropdown__item" onClick={() => { closeAll(); navigate('/settings'); }}>
+              <div>Profile & preferences</div>
             </div>
-          )}
-
-          {showUser && (
-            <div className="sfdc-dropdown" onClick={(e)=>e.stopPropagation()}>
-              <div className="sfdc-dropdown__item" onClick={()=>navigate('/settings')}>
-                <div>Profile</div>
-              </div>
-              <div className="sfdc-dropdown__item" onClick={()=>navigate('/settings')}>
-                <div>Preferences</div>
-              </div>
-              <div className="sfdc-dropdown__item" onClick={()=>{ logout && logout(); navigate('/login'); }}>
-                <div>Logout</div>
-              </div>
+            <div className="sfdc-dropdown__item" onClick={() => { closeAll(); handleCommandPalette(); }}>
+              <div>Open command palette</div>
+              <div className="sfdc-dropdown__hint">⌘K</div>
             </div>
-          )}
-        </div>
-      </div>
-
-      {showSearch && (
-        <div className="sfdc-overlay" role="dialog" aria-modal="true" onClick={()=>setShowSearch(false)}>
-          <div className="sfdc-overlay__panel" onClick={(e)=>e.stopPropagation()}>
-            <div className="sfdc-overlay__header">
-              <input
-                ref={searchInputRef}
-                className="sfdc-overlay__input"
-                type="text"
-                placeholder="Search Nexora Analytics Docs"
-                value={searchQuery}
-                onChange={(e)=>setSearchQuery(e.target.value)}
-                onKeyDown={(e)=>{ if (e.key === 'Enter') { navigate(`/docs?q=${encodeURIComponent(searchQuery)}`); setShowSearch(false); } }}
-              />
-              <button
-                className="sfdc-button_brand"
-                onClick={()=>{ navigate(`/docs?q=${encodeURIComponent(searchQuery)}`); setShowSearch(false); }}
-              >Search</button>
-              <button className="sfdc-iconbutton" aria-label="Close search" onClick={()=>setShowSearch(false)}>
-                <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"/></svg>
-              </button>
-            </div>
-            <div className="sfdc-overlay__body">
-              <div className="sfdc-overlay__hint">Type a query and press Enter to search docs.</div>
+            <div className="sfdc-dropdown__item" onClick={() => { closeAll(); logout?.(); navigate('/login'); }}>
+              <div>Logout</div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </>
   );
 };
 
 export default PortalUtilityBar;
-
-

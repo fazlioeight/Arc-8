@@ -1,85 +1,136 @@
-// pages/Dashboard.js (enhanced example)
-import React, { useContext, useEffect, useState } from "react";
-import { AuthContext } from "../../context/AuthContext";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import React, { useState, useEffect, useContext } from "react";
 import "../../index.css";
 import "../portal_page/portalPage.sfdc.css";
+import { AuthContext } from "../../context/AuthContext";
+import D3BarChart from "../../components/D3BarChart";
 import PortalUtilityBar from "../../components/PortalUtilityBar";
 
 const Dashboard = () => {
-  const { user, logout } = useContext(AuthContext);
-  const navigate = useNavigate();
-  const [analyticsData, setAnalyticsData] = useState(null); // e.g., risk insights
+  const [data, setData] = useState({
+    bur: 0,
+    raf: 0,
+    memberCount: 0,
+    gaps: 0,
+    loading: true,
+    error: null,
+  });
+  const { user } = useContext(AuthContext);
 
   useEffect(() => {
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-    // Fetch data from Python backend
-    const fetchData = async () => {
+    // Mocked metrics until backend integration
+    const mockMetrics = {
+      bur: 12345,
+      raf: 1.25,
+      memberCount: 5000,
+      gaps: 150,
+    };
+    setData({
+      ...mockMetrics,
+      loading: false,
+    });
+
+    // Real fetch placeholder
+    /*
+    const fetchCompanyMetrics = async () => {
       try {
-        const response = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/analytics/dashboard`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-            },
-          }
-        );
-        setAnalyticsData(response.data);
+        const response = await fetch("https://api.nexora.com/company-metrics", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch metrics");
+        }
+
+        const metrics = await response.json();
+        setData({
+          bur: metrics.bur || 0,
+          raf: metrics.raf || 0,
+          memberCount: metrics.memberCount || 0,
+          gaps: metrics.gaps || 0,
+          loading: false,
+        });
       } catch (err) {
-        console.error("Error fetching dashboard data:", err);
+        setData((prev) => ({ ...prev, loading: false, error: err.message }));
       }
     };
-    fetchData();
-  }, [user, navigate]);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+    fetchCompanyMetrics();
+    */
+  }, []);
+
+  if (data.loading) {
+    return <div className="loading">Loading Nexora Analytics Portal...</div>;
+  }
+
+  if (data.error) {
+    return <div className="error">Error: {data.error}</div>;
+  }
+
+  const tenantName = user?.tenant || localStorage.getItem("companyName") || "Tenant";
 
   return (
     <div className="sfdc-portal">
-      {user && <PortalUtilityBar />}
+      <PortalUtilityBar />
       <section className="sfdc-hero">
         <div className="sfdc-hero__content">
-          <h1 className="sfdc-hero__title">Dashboard</h1>
-          <p className="sfdc-hero__subtitle">Your personalized analytics</p>
+          <h1 className="sfdc-hero__title">{tenantName}</h1>
+          <p className="sfdc-hero__subtitle">
+            {localStorage.getItem("companyName") || "Your Company"} Portal
+          </p>
         </div>
       </section>
+
       <main className="sfdc-grid">
-        {analyticsData ? (
-          <>
-            <div className="sfdc-card">
-              <div className="sfdc-card__title">Risk Overview</div>
-              <div className="sfdc-card__value">High-risk: {analyticsData.highRiskCount}</div>
-              <div className="sfdc-card__hint">Based on latest scoring</div>
-            </div>
-            <div className="sfdc-card">
-              <div className="sfdc-card__title">Members</div>
-              <div className="sfdc-card__value">{analyticsData.memberCount ?? '—'}</div>
-              <div className="sfdc-card__hint">Active population</div>
-            </div>
-            <div className="sfdc-card sfdc-card--full">
-              <div className="sfdc-card__title">Notes</div>
-              <p className="sfdc-card__body">Charts and deep-dive views coming soon.</p>
-            </div>
-          </>
-        ) : (
-          <div className="sfdc-card sfdc-card--full">
-            <div className="sfdc-card__title">Loading</div>
-            <p className="sfdc-card__body">Fetching your analytics data...</p>
+        <div className="sfdc-card fade-in" style={{ animationDelay: "40ms" }}>
+          <div className="sfdc-card__title">BUR</div>
+          <div className="sfdc-card__value">{data.bur.toLocaleString()}</div>
+          <div className="sfdc-card__hint">Business Utilization Report</div>
+        </div>
+
+        <div className="sfdc-card fade-in" style={{ animationDelay: "80ms" }}>
+          <div className="sfdc-card__title">RAF</div>
+          <div className="sfdc-card__value">{data.raf.toFixed(2)}</div>
+          <div className="sfdc-card__hint">Risk Adjustment Factor</div>
+        </div>
+
+        <div className="sfdc-card fade-in" style={{ animationDelay: "120ms" }}>
+          <div className="sfdc-card__title">Member Count</div>
+          <div className="sfdc-card__value">{data.memberCount.toLocaleString()}</div>
+          <div className="sfdc-card__hint">Total Active Members</div>
+        </div>
+
+        <div className="sfdc-card fade-in" style={{ animationDelay: "160ms" }}>
+          <div className="sfdc-card__title">Gaps</div>
+          <div className="sfdc-card__value">{data.gaps.toLocaleString()}</div>
+          <div className="sfdc-card__hint">Care or Compliance Gaps</div>
+        </div>
+
+        <div className="sfdc-card sfdc-card--full slide-up" style={{ animationDelay: "200ms" }}>
+          <div className="sfdc-card__title">Metrics Overview</div>
+          <div className="sfdc-card__body">
+            <D3BarChart
+              height={260}
+              data={[
+                { label: "BUR", value: data.bur },
+                { label: "RAF", value: data.raf },
+                { label: "Members", value: data.memberCount },
+                { label: "Gaps", value: data.gaps },
+              ]}
+            />
           </div>
-        )}
-        <div className="sfdc-card sfdc-card--full">
-          <button onClick={handleLogout} className="sfdc-button_brand">Logout</button>
         </div>
       </main>
+
+      <footer className="sfdc-footer">
+        <p>&copy; 2025 Nexora - Multi-tenant Analytics Platform</p>
+      </footer>
     </div>
   );
 };
 
 export default Dashboard;
+

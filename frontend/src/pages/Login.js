@@ -1,6 +1,7 @@
 ﻿import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { SAMPLE_SESSION } from "../utils/sampleData";
 import "../index.css";
 import "./Login.sfdc.css";
 
@@ -12,6 +13,29 @@ const Login = () => {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const handleSsoLogin = () => {
+    setError('');
+    setSubmitting(true);
+    setTimeout(() => {
+      login({
+        ...SAMPLE_SESSION,
+        tenant: formData.tenant || SAMPLE_SESSION.tenant,
+      });
+      navigate('/portal_page/portalPage');
+      setSubmitting(false);
+    }, 350);
+  };
+
+  const handleSampleLogin = () => {
+    setError('');
+    const payload = {
+      ...SAMPLE_SESSION,
+      tenant: formData.tenant || SAMPLE_SESSION.tenant,
+    };
+    login(payload);
+    navigate('/portal_page/portalPage');
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -55,6 +79,12 @@ const Login = () => {
       <main className="sfdc-auth__wrap">
         <div className="sfdc-auth__card fade-in" style={{ animationDelay: "60ms" }}>
           <h2 className="sfdc-auth__title">Sign in</h2>
+          <button type="button" className="sfdc-auth__sso" onClick={handleSsoLogin} disabled={submitting}>
+            Continue with SSO
+          </button>
+          <div className="sfdc-auth__divider" role="presentation">
+            <span>or use email</span>
+          </div>
           <form onSubmit={handleSubmit} className="sfdc-form">
             <div className="sfdc-input">
               <label htmlFor="tenant">Tenant</label>
@@ -93,6 +123,9 @@ const Login = () => {
             <button type="submit" className="sfdc-button_brand sfdc-auth__submit" disabled={submitting}>
               {submitting ? "Signing in..." : "Sign in"}
             </button>
+            <button type="button" className="sfdc-linkbutton" onClick={handleSampleLogin}>
+              Explore with sample sandbox data
+            </button>
             <div className="sfdc-auth__links">
               <a href="#">Forgot password?</a>
               <span>
@@ -111,3 +144,5 @@ const Login = () => {
 };
 
 export default Login;
+
+
