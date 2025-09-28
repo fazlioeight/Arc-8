@@ -1,1 +1,2 @@
 2025-09-27 16:59:18,263 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "login.success", "payload": {"tenant": "demo"}}
+2025-09-27 17:01:58,721 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "login.success", "payload": {"tenant": "demo"}}
