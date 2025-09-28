@@ -6,3 +6,8 @@
 2025-09-27 18:20:29,014 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "login.success", "payload": {"tenant": "demo"}}
 2025-09-28 08:00:04,757 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "login.success", "payload": {"tenant": "demo"}}
 2025-09-28 08:39:18,170 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "login.success", "payload": {"tenant": "demo"}}
+2025-09-28 10:28:52,184 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "login.success", "payload": {"tenant": "demo"}}
+2025-09-28 10:31:21,765 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "login.success", "payload": {"tenant": "demo"}}
+2025-09-28 10:34:29,067 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "login.success", "payload": {"tenant": "demo"}}
+2025-09-28 10:35:13,274 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "user.update", "payload": {"user_id": 1, "updates": {"password": "adminadmin", "role": "admin", "is_active": true, "applications": {"coding": "admin", "dashboard": "admin", "docs": "admin", "admin_console": "admin", "portal": "admin", "ride_booking": "admin", "settings": "admin"}}}}
+2025-09-28 10:40:41,318 INFO audit {"tenant_id": 1, "actor": "admin@admin.com", "event_type": "login.success", "payload": {"tenant": "demo"}}

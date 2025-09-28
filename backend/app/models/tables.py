@@ -76,6 +76,7 @@ class User(ControlBase):
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(64), default="user")
+    app_permissions: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
     is_active: Mapped[bool] = mapped_column(default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -98,3 +99,4 @@ class Claim(TenantDataBase):
     member_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     service_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+

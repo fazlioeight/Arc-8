@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -27,6 +27,7 @@ class AuthenticatedUser:
     tenant_key: str
     role: str
     scopes: list[str]
+    app_permissions: Dict[str, str]
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -75,6 +76,8 @@ async def get_current_user(
     if user.email != sub:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User identity mismatch")
 
+    app_permissions = dict(user.app_permissions or {})
+
     request.state.user_email = user.email
     return AuthenticatedUser(
         id=user.id,
@@ -83,4 +86,13 @@ async def get_current_user(
         tenant_key=tenant.key,
         role=role,
         scopes=scopes if isinstance(scopes, list) else [str(scopes)],
+        app_permissions=app_permissions,
     )
+
+async def require_admin(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> AuthenticatedUser:
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
+    return current_user
+

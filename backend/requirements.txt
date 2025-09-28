@@ -4,6 +4,7 @@ pydantic
 pydantic-settings
 python-dotenv
 PyJWT
+email-validator
 bcrypt
 sqlalchemy[asyncio]
 asyncpg

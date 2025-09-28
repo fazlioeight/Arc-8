@@ -44,6 +44,17 @@ class Settings(BaseSettings):
 
     FEATURE_FLAG_DEFAULTS: Dict[str, bool] = {"analytics": True}
 
+    PORTAL_APPLICATIONS: Dict[str, Dict[str, str]] = {
+        "portal": {"label": "Nexora Portal", "description": "Metrics & insights"},
+        "coding": {"label": "Coding Worklists", "description": "Member reviews"},
+        "ride_booking": {"label": "Ride Booking", "description": "Transportation"},
+        "dashboard": {"label": "Dashboard", "description": "Analytics view"},
+        "docs": {"label": "Docs Library", "description": "Knowledge base"},
+        "settings": {"label": "Settings", "description": "Preferences"},
+        "admin_console": {"label": "Master Admin", "description": "Roles & access"},
+    }
+
+
     HIPAA_MODE: bool = True
     ALLOW_DUMMY_LOGIN: bool = False
 

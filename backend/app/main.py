@@ -18,12 +18,14 @@ from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.request_logging import RequestLoggingMiddleware
 from .middleware.tenant import TenantMiddleware
 from .models.tables import User
+from .routes import admin as admin_router
 from .routes import analytics as analytics_router
 from .routes import coding as coding_router
 from .routes import member_cost as member_cost_router
 from .routes import member_risk as member_risk_router
 from .routes import utilization as utilization_router
 from .utils.audit_logger import record_audit_event
+from .utils.bootstrap import ensure_control_bootstrap
 from .utils.security import AuthenticatedUser, create_access_token, get_current_user
 
 setup_logging()
@@ -49,6 +51,11 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def startup_bootstrap() -> None:
+    await ensure_control_bootstrap()
+
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -70,8 +77,9 @@ async def login(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant mismatch")
 
     if settings.ALLOW_DUMMY_LOGIN and credentials.email == "admin@admin.com" and credentials.password == "admin":
-        token = create_access_token({"sub": credentials.email, "tid": tenant.key, "role": "admin"})
-        return {"token": token, "email": credentials.email, "tenant": tenant.key}
+        applications = {key: "admin" for key in settings.PORTAL_APPLICATIONS}
+        token = create_access_token({"sub": credentials.email, "tid": tenant.key, "role": "admin", "scp": list(applications.keys())})
+        return {"token": token, "email": credentials.email, "tenant": tenant.key, "role": "admin", "applications": applications}
 
     user_stmt = (
         select(User)
@@ -99,8 +107,11 @@ async def login(
     )
     await session.commit()
 
-    token = create_access_token({"sub": credentials.email, "tid": tenant.key, "uid": user.id, "role": user.role})
-    return {"token": token, "email": credentials.email, "tenant": tenant.key, "role": user.role}
+    applications = dict(user.app_permissions or {})
+    if "portal" in settings.PORTAL_APPLICATIONS and "portal" not in applications:
+        applications["portal"] = "user"
+    token = create_access_token({"sub": credentials.email, "tid": tenant.key, "uid": user.id, "role": user.role or "user", "scp": list(applications.keys())})
+    return {"token": token, "email": credentials.email, "tenant": tenant.key, "role": user.role or "user", "applications": applications}
 
 
 @app.get("/api/tenant/self")
@@ -113,10 +124,11 @@ async def tenant_self(
         "tenant_id": tenant.id,
         "billing_plan": tenant.billing_plan,
         "feature_flags": tenant.feature_flags,
-        "user": {"email": current_user.email, "role": current_user.role},
+        "user": {"email": current_user.email, "role": current_user.role, "applications": current_user.app_permissions},
     }
 
 
+app.include_router(admin_router.router)
 app.include_router(analytics_router.router)
 app.include_router(coding_router.router)
 app.include_router(member_cost_router.router)

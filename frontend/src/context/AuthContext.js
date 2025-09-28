@@ -7,7 +7,14 @@ const STORAGE_KEY = 'authState';
 export const AuthProvider = ({ children }) => {
   const [authState, setAuthState] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) return null;
+    try {
+      const parsed = JSON.parse(stored);
+      return { applications: {}, ...parsed };
+    } catch (error) {
+      console.warn('Failed to parse stored auth state', error);
+      return null;
+    }
   });
   const [loading, setLoading] = useState(false);
 
@@ -25,6 +32,7 @@ export const AuthProvider = ({ children }) => {
       tenant: sessionData.tenant,
       token: sessionData.token,
       role: sessionData.role || 'user',
+      applications: sessionData.applications || {},
     });
   };
 
@@ -32,12 +40,21 @@ export const AuthProvider = ({ children }) => {
     setAuthState(null);
   };
 
+  const hasApplicationAccess = (appKey, requiredLevel = 'user') => {
+    const level = authState?.applications?.[appKey];
+    if (!level) return false;
+    if (requiredLevel === 'admin') return level === 'admin';
+    return level === 'admin' || level === 'user';
+  };
+
   const value = {
     user: authState,
     token: authState?.token,
     tenant: authState?.tenant,
     role: authState?.role,
+    applications: authState?.applications || {},
     isAuthenticated: !!authState?.token,
+    hasApplicationAccess,
     login,
     logout,
     loading,
@@ -49,3 +66,4 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+

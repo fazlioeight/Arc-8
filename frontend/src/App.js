@@ -22,6 +22,7 @@ import CodingMemberDetailPage from './pages/coding/CodingMemberDetailPage';
 import CodingProvidersPage from './pages/coding/CodingProvidersPage';
 import CodingLandingPage from './pages/coding/CodingLandingPage';
 import CodingProviderDetailPage from './pages/coding/CodingProviderDetailPage';
+import MasterAdminPage from './pages/admin/MasterAdminPage';
 // Section pages
 import Mission from './pages/about/Mission';
 import Values from './pages/about/Values';
@@ -41,7 +42,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
 
   const Inner = () => {
     const location = useLocation();
-    const hideNavbarOn = ['/portal_page/portalPage', '/RideBooking', '/dashboard', '/settings', '/coding'];
+    const hideNavbarOn = ['/portal_page/portalPage', '/RideBooking', '/dashboard', '/settings', '/coding', '/admin'];
     const hideNavbar = hideNavbarOn.some(p => location.pathname.startsWith(p));
     return (
       <>
@@ -79,6 +80,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/coding/members/:memberId" element={<CodingMemberDetailPage />} />
           <Route path="/coding/providers" element={<CodingProvidersPage />} />
           <Route path="/coding/providers/:providerId" element={<CodingProviderDetailPage />} />
+          <Route path="/admin/master" element={<MasterAdminPage />} />
         </Routes>
       </>
     );

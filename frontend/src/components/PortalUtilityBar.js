@@ -1,12 +1,12 @@
 // components/PortalUtilityBar.js - Shared top utility bar used across portal apps
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import '../pages/portal_page/portalPage.sfdc.css';
 
 const PortalUtilityBar = () => {
   const navigate = useNavigate();
-  const { user, logout } = useContext(AuthContext) || {};
+  const { user, logout, hasApplicationAccess } = useContext(AuthContext) || {};
   const [showWaffle, setShowWaffle] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const [showUser, setShowUser] = useState(false);
@@ -41,6 +41,26 @@ const PortalUtilityBar = () => {
     if (showSearch) window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [showSearch]);
+
+  const applicationTiles = useMemo(() => ([
+    { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: '/portal_page/portalPage' },
+    { key: 'coding', label: 'Coding Worklists', desc: 'Member reviews', icon: 'CD', color: '#0f172a', path: '/coding' },
+    { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: '/RideBooking' },
+    { key: 'dashboard', label: 'Dashboard', desc: 'Analytics view', icon: 'DB', color: '#a855f7', path: '/dashboard' },
+    { key: 'docs', label: 'Docs Library', desc: 'Knowledge base', icon: 'DL', color: '#6366f1', path: '/docs' },
+    { key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: '/settings' },
+    { key: 'admin_console', label: 'Master Admin', desc: 'Roles & access', icon: 'MA', color: '#dc2626', path: '/admin/master' },
+  ]), []);
+
+  const accessibleApps = useMemo(() => {
+    return applicationTiles.filter((app) => {
+      if (!hasApplicationAccess) return false;
+      if (app.key === 'admin_console') {
+        return hasApplicationAccess(app.key, 'admin');
+      }
+      return hasApplicationAccess(app.key);
+    });
+  }, [applicationTiles, hasApplicationAccess]);
 
   const initials = (user?.email || '?').slice(0, 1).toUpperCase();
 
@@ -90,41 +110,15 @@ const PortalUtilityBar = () => {
             <div className="sfdc-waffle" onClick={(e)=>e.stopPropagation()}>
               <div className="sfdc-dropdown__header">Pinned Apps</div>
               <div className="sfdc-waffle__grid">
-                <div className="sfdc-app" onClick={() => navigate('/portal_page/portalPage')}>
-                  <div className="sfdc-app__icon" style={{background:'#0176d3'}}>NP</div>
-                  <div>
-                    <div className="sfdc-app__name">Nexora Portal</div>
-                    <div className="sfdc-app__desc">Metrics & insights</div>
+                {accessibleApps.map((app) => (
+                  <div key={app.key} className="sfdc-app" onClick={() => navigate(app.path)}>
+                    <div className="sfdc-app__icon" style={{background: app.color}}>{app.icon}</div>
+                    <div>
+                      <div className="sfdc-app__name">{app.label}</div>
+                      <div className="sfdc-app__desc">{app.desc}</div>
+                    </div>
                   </div>
-                </div>
-                <div className="sfdc-app" onClick={() => navigate('/coding')}>
-                  <div className="sfdc-app__icon" style={{background:'#0f172a'}}>CD</div>
-                  <div>
-                    <div className="sfdc-app__name">Coding Worklists</div>
-                    <div className="sfdc-app__desc">Member reviews</div>
-                  </div>
-                </div>
-                <div className="sfdc-app" onClick={() => navigate('/RideBooking')}>
-                  <div className="sfdc-app__icon" style={{background:'#0ea5e9'}}>RB</div>
-                  <div>
-                    <div className="sfdc-app__name">Ride Booking</div>
-                    <div className="sfdc-app__desc">Transportation</div>
-                  </div>
-                </div>
-                <div className="sfdc-app" onClick={() => navigate('/dashboard')}>
-                  <div className="sfdc-app__icon" style={{background:'#a855f7'}}>DB</div>
-                  <div>
-                    <div className="sfdc-app__name">Dashboard</div>
-                    <div className="sfdc-app__desc">Analytics view</div>
-                  </div>
-                </div>
-                <div className="sfdc-app" onClick={() => navigate('/settings')}>
-                  <div className="sfdc-app__icon" style={{background:'#64748b'}}>ST</div>
-                  <div>
-                    <div className="sfdc-app__name">Settings</div>
-                    <div className="sfdc-app__desc">Preferences</div>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
