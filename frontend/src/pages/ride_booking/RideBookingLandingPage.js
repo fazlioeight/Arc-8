@@ -3,6 +3,7 @@ import { Alert, Button, Form, InputGroup, Spinner, Table } from 'react-bootstrap
 import { useNavigate } from 'react-router-dom';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
+import PortalHero from '../../components/PortalHero';
 import { getRecentRides } from '../../services/rideBookingService';
 import '../../styles/rideBooking.css';
 
@@ -115,24 +116,23 @@ const RideBookingLandingPage = () => {
   return (
     <div className="ride-booking">
       <PortalUtilityBar />
-      <div className="ride-booking__shell">
-        <div className="ride-booking__header">
-          <div>
-            <h1>Ride booking overview</h1>
-            <p className="text-muted mb-0">
-              Review the latest transportation activity and drill into ride details by status, partner, or member.
-            </p>
-          </div>
+      <PortalHero
+        align="left"
+        title="Ride booking overview"
+        subtitle="Review the latest transportation activity and drill into ride details."
+        actions={(
           <div className="d-flex flex-wrap gap-2">
-            <Button variant="outline-secondary" onClick={() => navigate('/RideBooking/book')}>
+            <Button variant="light" onClick={() => navigate('/RideBooking/book')}>
               Book a ride
             </Button>
-            <Button variant="outline-secondary" onClick={() => navigate('/RideBooking/partners')}>
+            <Button variant="outline-light" onClick={() => navigate('/RideBooking/partners')}>
               Manage partners
             </Button>
           </div>
-        </div>
+        )}
+      />
 
+      <div className="ride-booking__shell">
         <section className="ride-booking__history">
           <div className="ride-booking__history-header">
             <div>

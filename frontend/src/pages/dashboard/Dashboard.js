@@ -4,6 +4,7 @@ import "../portal_page/portalPage.sfdc.css";
 import { AuthContext } from "../../context/AuthContext";
 import D3BarChart from "../../components/D3BarChart";
 import PortalUtilityBar from "../../components/PortalUtilityBar";
+import PortalHero from '../../components/PortalHero';
 
 const Dashboard = () => {
   const [data, setData] = useState({
@@ -71,18 +72,16 @@ const Dashboard = () => {
   }
 
   const tenantName = user?.tenant || localStorage.getItem("companyName") || "Tenant";
+  const companyLabel = localStorage.getItem("companyName") || "Your Company";
 
   return (
     <div className="sfdc-portal">
       <PortalUtilityBar />
-      <section className="sfdc-hero">
-        <div className="sfdc-hero__content">
-          <h1 className="sfdc-hero__title">{tenantName}</h1>
-          <p className="sfdc-hero__subtitle">
-            {localStorage.getItem("companyName") || "Your Company"} Portal
-          </p>
-        </div>
-      </section>
+      <PortalHero
+        align="left"
+        title={tenantName}
+        subtitle={`${companyLabel} Portal`}
+      />
 
       <main className="sfdc-grid">
         <div className="sfdc-card fade-in" style={{ animationDelay: "40ms" }}>

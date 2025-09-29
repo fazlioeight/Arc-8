@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, Button, Card, Col, Form, ListGroup, Row, Spinner, Table } from 'react-bootstrap';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
+import PortalHero from '../../components/PortalHero';
 import { AuthContext } from '../../context/AuthContext';
 import {
   fetchCodingProviderDetail,
@@ -66,6 +67,25 @@ const CodingProvidersPage = () => {
     return (
       <div className="sfdc-portal coding-portal">
         <PortalUtilityBar />
+        <PortalHero
+          align="left"
+          title="Coding provider directory"
+          subtitle="Search contracted providers and review locations or contact details."
+          actions={(
+            <div className="d-flex flex-wrap gap-2">
+              <Button variant="outline-light" onClick={() => navigate('/coding')}>
+                Landing
+              </Button>
+              <Button variant="outline-light" onClick={() => navigate('/coding/members')}>
+                Members
+              </Button>
+              <Button variant="light" disabled>
+                Providers
+              </Button>
+            </div>
+          )}
+          wave={false}
+        />
         <div className="coding-content container py-5">
           <Alert variant="warning">You must be logged in to view provider information.</Alert>
         </div>
@@ -76,26 +96,26 @@ const CodingProvidersPage = () => {
   return (
     <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
+      <PortalHero
+        align="left"
+        title="Coding provider directory"
+        subtitle="Search contracted providers and review locations or contact details."
+        actions={(
+          <div className="d-flex flex-wrap gap-2">
+            <Button variant="outline-light" onClick={() => navigate('/coding')}>
+              Landing
+            </Button>
+            <Button variant="outline-light" onClick={() => navigate('/coding/members')}>
+              Members
+            </Button>
+            <Button variant="light" disabled>
+              Providers
+            </Button>
+          </div>
+        )}
+        wave={false}
+      />
       <div className="coding-content container py-4">
-        <Row className="align-items-center mb-3 g-3">
-          <Col>
-            <h1 className="h3 mb-1">Coding Provider Directory</h1>
-            <div className="text-muted">Search for contracted providers and view location details.</div>
-          </Col>
-          <Col md="auto">
-            <div className="d-flex flex-wrap gap-2">
-              <Button variant="outline-secondary" onClick={() => navigate('/coding')}>
-                Landing
-              </Button>
-              <Button variant="outline-primary" onClick={() => navigate('/coding/members')}>
-                Members
-              </Button>
-              <Button variant="primary" disabled>
-                Providers
-              </Button>
-            </div>
-          </Col>
-        </Row>
         <Form onSubmit={handleSubmit} className="mb-3">
           <Row className="g-2 align-items-end">
             <Col md={6}>

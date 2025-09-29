@@ -255,6 +255,34 @@
   max-width: 1120px;
   margin: 0 auto;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.sfdc-hero__text {
+  max-width: min(720px, 100%);
+}
+
+.sfdc-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.sfdc-hero--left .sfdc-hero__content {
+  text-align: left;
+  align-items: flex-start;
+}
+
+.sfdc-hero--left .sfdc-hero__actions {
+  justify-content: flex-start;
+}
+
+.sfdc-hero--flat::after {
+  display: none;
 }
 
 .sfdc-hero__title {

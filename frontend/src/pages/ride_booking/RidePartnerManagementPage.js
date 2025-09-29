@@ -3,6 +3,7 @@ import { Alert, Badge, Button, Card, Col, Form, Row, Table } from 'react-bootstr
 import { useNavigate } from 'react-router-dom';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
+import PortalHero from '../../components/PortalHero';
 import {
   addPartner,
   addPartnerSchedule,
@@ -168,265 +169,264 @@ const RidePartnerManagementPage = () => {
   return (
     <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
-      <div className="coding-content">
-        <section className="sfdc-hero">
-          <div className="sfdc-hero__content">
-            <h1 className="sfdc-hero__title">Ride Partner Calendars</h1>
-            <p className="sfdc-hero__subtitle">
-              Invite transportation partners to publish their open ride windows. Availability for today
-              automatically feeds the booking dropdown.
-            </p>
-            <div className="d-flex flex-wrap justify-content-center gap-2 mt-2">
-              <Button variant="light" onClick={() => navigate('/RideBooking')}>
-                View ride overview
-              </Button>
-              <Button variant="outline-light" onClick={() => navigate('/RideBooking/book')}>
-                Book a ride
-              </Button>
+      <PortalHero
+        title="Ride Partner Calendars"
+        subtitle="Invite transportation partners to publish their open ride windows. Availability for today automatically feeds the booking dropdown."
+        actions={[
+          {
+            label: 'View ride overview',
+            variant: 'light',
+            onClick: () => navigate('/RideBooking'),
+          },
+          {
+            label: 'Book a ride',
+            variant: 'outline-light',
+            onClick: () => navigate('/RideBooking/book'),
+          },
+        ]}
+      />
+
+      <main className="sfdc-grid" style={{ gridTemplateColumns: '1fr' }}>
+        <div className="sfdc-card sfdc-card--full">
+          <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
+            <div>
+              <h2 className="h5 mb-1">Register a partner</h2>
+              <div className="text-muted">Capture basic contact details to publish ride availability.</div>
             </div>
           </div>
-        </section>
-
-        <main className="sfdc-grid" style={{ gridTemplateColumns: '1fr' }}>
-          <div className="sfdc-card sfdc-card--full">
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
-              <div>
-                <h2 className="h5 mb-1">Register a partner</h2>
-                <div className="text-muted">Capture basic contact details to publish ride availability.</div>
-              </div>
+          {feedback && (
+            <Alert variant={feedback.type} onClose={() => setFeedback(null)} dismissible>
+              {feedback.message}
+            </Alert>
+          )}
+          <Form onSubmit={handleAddPartner} className="mb-4">
+            <Row className="g-3">
+              <Col md={4}>
+                <Form.Group controlId="companyName">
+                  <Form.Label>Company name</Form.Label>
+                  <Form.Control
+                    name="companyName"
+                    value={partnerForm.companyName}
+                    onChange={handlePartnerInputChange}
+                    placeholder="e.g., Riverside Mobility"
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group controlId="contactName">
+                  <Form.Label>Contact name</Form.Label>
+                  <Form.Control
+                    name="contactName"
+                    value={partnerForm.contactName}
+                    onChange={handlePartnerInputChange}
+                    placeholder="Primary coordinator"
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group controlId="contactEmail">
+                  <Form.Label>Contact email</Form.Label>
+                  <Form.Control
+                    type="email"
+                    name="contactEmail"
+                    value={partnerForm.contactEmail}
+                    onChange={handlePartnerInputChange}
+                    placeholder="contact@example.com"
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+            <div className="d-flex justify-content-end mt-3">
+              <Button type="submit">Add partner</Button>
             </div>
-            {feedback && (
-              <Alert variant={feedback.type} onClose={() => setFeedback(null)} dismissible>
-                {feedback.message}
-              </Alert>
-            )}
-            <Form onSubmit={handleAddPartner} className="mb-4">
-              <Row className="g-3">
-                <Col md={4}>
-                  <Form.Group controlId="companyName">
-                    <Form.Label>Company name</Form.Label>
-                    <Form.Control
-                      name="companyName"
-                      value={partnerForm.companyName}
-                      onChange={handlePartnerInputChange}
-                      placeholder="e.g., Riverside Mobility"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-                <Col md={4}>
-                  <Form.Group controlId="contactName">
-                    <Form.Label>Contact name</Form.Label>
-                    <Form.Control
-                      name="contactName"
-                      value={partnerForm.contactName}
-                      onChange={handlePartnerInputChange}
-                      placeholder="Primary coordinator"
-                    />
-                  </Form.Group>
-                </Col>
-                <Col md={4}>
-                  <Form.Group controlId="contactEmail">
-                    <Form.Label>Contact email</Form.Label>
-                    <Form.Control
-                      type="email"
-                      name="contactEmail"
-                      value={partnerForm.contactEmail}
-                      onChange={handlePartnerInputChange}
-                      placeholder="contact@example.com"
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-              <div className="d-flex justify-content-end mt-3">
-                <Button type="submit">Add partner</Button>
-              </div>
-            </Form>
+          </Form>
 
-            <h2 className="h6">Partner calendars</h2>
-            {partners.length === 0 ? (
-              <div className="text-muted">No partners registered yet.</div>
-            ) : (
-              <div className="d-flex flex-column gap-3">
-                {partners.map((partner) => {
-                  const form = scheduleStateFor(partner.id);
-                  const isOpenToday = partnersOpenToday.has(partner.id);
-                  return (
-                    <Card key={partner.id} className="shadow-sm">
-                      <Card.Body>
-                        <div className="d-flex flex-column flex-lg-row justify-content-between gap-3">
-                          <div>
-                            <Card.Title className="mb-1">
-                              {partner.companyName}
-                              {isOpenToday && (
-                                <Badge bg="success" className="ms-2">
-                                  Open today
-                                </Badge>
-                              )}
-                            </Card.Title>
-                            <div className="text-muted" style={{ fontSize: '0.9rem' }}>
-                              {partner.contactName || 'Not provided'}
-                              {partner.contactEmail && (
-                                <>
-                                  {' | '}
-                                  {partner.contactEmail}
-                                </>
-                              )}
-                            </div>
-                            <div className="text-muted" style={{ fontSize: '0.8rem' }}>
-                              Joined {new Date(partner.createdAt).toLocaleDateString()}
-                            </div>
+          <h2 className="h6">Partner calendars</h2>
+          {partners.length === 0 ? (
+            <div className="text-muted">No partners registered yet.</div>
+          ) : (
+            <div className="d-flex flex-column gap-3">
+              {partners.map((partner) => {
+                const form = scheduleStateFor(partner.id);
+                const isOpenToday = partnersOpenToday.has(partner.id);
+                return (
+                  <Card key={partner.id} className="shadow-sm">
+                    <Card.Body>
+                      <div className="d-flex flex-column flex-lg-row justify-content-between gap-3">
+                        <div>
+                          <Card.Title className="mb-1">
+                            {partner.companyName}
+                            {isOpenToday && (
+                              <Badge bg="success" className="ms-2">
+                                Open today
+                              </Badge>
+                            )}
+                          </Card.Title>
+                          <div className="text-muted" style={{ fontSize: '0.9rem' }}>
+                            {partner.contactName || 'Not provided'}
+                            {partner.contactEmail && (
+                              <>
+                                {' | '}
+                                {partner.contactEmail}
+                              </>
+                            )}
                           </div>
-                          <div style={{ minWidth: 260 }}>
-                            <Form onSubmit={(event) => handleAddSchedule(partner.id, event)}>
-                              <Row className="g-2">
-                                <Col md={6}>
-                                  <Form.Group controlId={`frequency-${partner.id}`}>
-                                    <Form.Label>Frequency</Form.Label>
-                                    <Form.Select
-                                      value={form.frequency}
-                                      onChange={(event) => handleFrequencyChange(partner.id, event.target.value)}
-                                    >
-                                      <option value="daily">Daily</option>
-                                      <option value="weekly">Weekly</option>
-                                      <option value="monthly">Monthly</option>
-                                    </Form.Select>
-                                  </Form.Group>
-                                </Col>
-                                <Col md={6}>
-                                  <Form.Group controlId={`openSlots-${partner.id}`}>
-                                    <Form.Label>Open rides</Form.Label>
-                                    <Form.Control
-                                      type="number"
-                                      min={1}
-                                      value={form.openSlots}
-                                      onChange={(event) => updateScheduleForm(partner.id, { openSlots: event.target.value })}
-                                      placeholder="e.g., 10"
-                                      required
-                                    />
-                                  </Form.Group>
-                                </Col>
-                                <Col md={6}>
-                                  <Form.Group controlId={`startDate-${partner.id}`}>
-                                    <Form.Label>Start date</Form.Label>
-                                    <Form.Control
-                                      type="date"
-                                      value={form.startDate}
-                                      onChange={(event) => updateScheduleForm(partner.id, { startDate: event.target.value })}
-                                      required
-                                    />
-                                  </Form.Group>
-                                </Col>
-                                <Col md={6}>
-                                  <Form.Group controlId={`endDate-${partner.id}`}>
-                                    <Form.Label>End date</Form.Label>
-                                    <Form.Control
-                                      type="date"
-                                      value={form.endDate}
-                                      onChange={(event) => updateScheduleForm(partner.id, { endDate: event.target.value })}
-                                      required
-                                    />
-                                  </Form.Group>
-                                </Col>
-                                {form.frequency === 'weekly' && (
-                                  <Col md={12}>
-                                    <Form.Group controlId={`daysOfWeek-${partner.id}`}>
-                                      <Form.Label>Days of week</Form.Label>
-                                      <Form.Select
-                                        multiple
-                                        value={form.daysOfWeek}
-                                        onChange={(event) => handleWeeklySelection(partner.id, event)}
-                                      >
-                                        {WEEKDAY_OPTIONS.map((option) => (
-                                          <option key={option.value} value={option.value}>
-                                            {option.label}
-                                          </option>
-                                        ))}
-                                      </Form.Select>
-                                      <Form.Text>Use Ctrl/Cmd click to select multiple days.</Form.Text>
-                                    </Form.Group>
-                                  </Col>
-                                )}
-                                {form.frequency === 'monthly' && (
-                                  <Col md={12}>
-                                    <Form.Group controlId={`daysOfMonth-${partner.id}`}>
-                                      <Form.Label>Days of month</Form.Label>
-                                      <Form.Select
-                                        multiple
-                                        value={form.daysOfMonth.map(String)}
-                                        onChange={(event) => handleMonthlySelection(partner.id, event)}
-                                      >
-                                        {monthOptions.map((day) => (
-                                          <option key={day} value={day}>
-                                            {day}
-                                          </option>
-                                        ))}
-                                      </Form.Select>
-                                      <Form.Text>Select all calendar days that recur for this schedule.</Form.Text>
-                                    </Form.Group>
-                                  </Col>
-                                )}
-                                <Col md={12}>
-                                  <Form.Group controlId={`notes-${partner.id}`}>
-                                    <Form.Label>Notes</Form.Label>
-                                    <Form.Control
-                                      as="textarea"
-                                      rows={2}
-                                      value={form.notes}
-                                      onChange={(event) => updateScheduleForm(partner.id, { notes: event.target.value })}
-                                      placeholder="Optional details (vehicles, regions, etc.)"
-                                    />
-                                  </Form.Group>
-                                </Col>
-                              </Row>
-                              <div className="d-flex justify-content-end mt-3">
-                                <Button type="submit" size="sm">
-                                  Add availability
-                                </Button>
-                              </div>
-                            </Form>
+                          <div className="text-muted" style={{ fontSize: '0.8rem' }}>
+                            Joined {new Date(partner.createdAt).toLocaleDateString()}
                           </div>
                         </div>
+                        <div style={{ minWidth: 260 }}>
+                          <Form onSubmit={(event) => handleAddSchedule(partner.id, event)}>
+                            <Row className="g-2">
+                              <Col md={6}>
+                                <Form.Group controlId={`frequency-${partner.id}`}>
+                                  <Form.Label>Frequency</Form.Label>
+                                  <Form.Select
+                                    value={form.frequency}
+                                    onChange={(event) => handleFrequencyChange(partner.id, event.target.value)}
+                                  >
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                  </Form.Select>
+                                </Form.Group>
+                              </Col>
+                              <Col md={6}>
+                                <Form.Group controlId={`openSlots-${partner.id}`}>
+                                  <Form.Label>Open rides</Form.Label>
+                                  <Form.Control
+                                    type="number"
+                                    min={1}
+                                    value={form.openSlots}
+                                    onChange={(event) => updateScheduleForm(partner.id, { openSlots: event.target.value })}
+                                    placeholder="e.g., 10"
+                                    required
+                                  />
+                                </Form.Group>
+                              </Col>
+                              <Col md={6}>
+                                <Form.Group controlId={`startDate-${partner.id}`}>
+                                  <Form.Label>Start date</Form.Label>
+                                  <Form.Control
+                                    type="date"
+                                    value={form.startDate}
+                                    onChange={(event) => updateScheduleForm(partner.id, { startDate: event.target.value })}
+                                    required
+                                  />
+                                </Form.Group>
+                              </Col>
+                              <Col md={6}>
+                                <Form.Group controlId={`endDate-${partner.id}`}>
+                                  <Form.Label>End date</Form.Label>
+                                  <Form.Control
+                                    type="date"
+                                    value={form.endDate}
+                                    onChange={(event) => updateScheduleForm(partner.id, { endDate: event.target.value })}
+                                    required
+                                  />
+                                </Form.Group>
+                              </Col>
+                              {form.frequency === 'weekly' && (
+                                <Col md={12}>
+                                  <Form.Group controlId={`daysOfWeek-${partner.id}`}>
+                                    <Form.Label>Days of week</Form.Label>
+                                    <Form.Select
+                                      multiple
+                                      value={form.daysOfWeek}
+                                      onChange={(event) => handleWeeklySelection(partner.id, event)}
+                                    >
+                                      {WEEKDAY_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </Form.Select>
+                                    <Form.Text>Use Ctrl/Cmd click to select multiple days.</Form.Text>
+                                  </Form.Group>
+                                </Col>
+                              )}
+                              {form.frequency === 'monthly' && (
+                                <Col md={12}>
+                                  <Form.Group controlId={`daysOfMonth-${partner.id}`}>
+                                    <Form.Label>Days of month</Form.Label>
+                                    <Form.Select
+                                      multiple
+                                      value={form.daysOfMonth.map(String)}
+                                      onChange={(event) => handleMonthlySelection(partner.id, event)}
+                                    >
+                                      {monthOptions.map((day) => (
+                                        <option key={day} value={day}>
+                                          {day}
+                                        </option>
+                                      ))}
+                                    </Form.Select>
+                                    <Form.Text>Select all calendar days that recur for this schedule.</Form.Text>
+                                  </Form.Group>
+                                </Col>
+                              )}
+                              <Col md={12}>
+                                <Form.Group controlId={`notes-${partner.id}`}>
+                                  <Form.Label>Notes</Form.Label>
+                                  <Form.Control
+                                    as="textarea"
+                                    rows={2}
+                                    value={form.notes}
+                                    onChange={(event) => updateScheduleForm(partner.id, { notes: event.target.value })}
+                                    placeholder="Optional details (vehicles, regions, etc.)"
+                                  />
+                                </Form.Group>
+                              </Col>
+                            </Row>
+                            <div className="d-flex justify-content-end mt-3">
+                              <Button type="submit" size="sm">
+                                Add availability
+                              </Button>
+                            </div>
+                          </Form>
+                        </div>
+                      </div>
 
-                        {(partner.schedules || []).length > 0 && (
-                          <div className="table-responsive mt-3">
-                            <Table bordered size="sm" className="mb-0">
-                              <thead>
-                                <tr>
-                                  <th>Frequency</th>
-                                  <th>Recurrence</th>
-                                  <th>Dates</th>
-                                  <th>Open rides</th>
-                                  <th>Notes</th>
+                      {(partner.schedules || []).length > 0 && (
+                        <div className="table-responsive mt-3">
+                          <Table bordered size="sm" className="mb-0">
+                            <thead>
+                              <tr>
+                                <th>Frequency</th>
+                                <th>Recurrence</th>
+                                <th>Dates</th>
+                                <th>Open rides</th>
+                                <th>Notes</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {partner.schedules.map((schedule) => (
+                                <tr key={schedule.id}>
+                                  <td className="text-capitalize">{schedule.frequency}</td>
+                                  <td>{formatRecurrence(schedule)}</td>
+                                  <td>
+                                    {new Date(schedule.startDate).toLocaleDateString()} - {new Date(schedule.endDate).toLocaleDateString()}
+                                  </td>
+                                  <td>{schedule.openSlots}</td>
+                                  <td>{schedule.notes || 'None'}</td>
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {partner.schedules.map((schedule) => (
-                                  <tr key={schedule.id}>
-                                    <td className="text-capitalize">{schedule.frequency}</td>
-                                    <td>{formatRecurrence(schedule)}</td>
-                                    <td>
-                                      {new Date(schedule.startDate).toLocaleDateString()} - {new Date(schedule.endDate).toLocaleDateString()}
-                                    </td>
-                                    <td>{schedule.openSlots}</td>
-                                    <td>{schedule.notes || 'None'}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </Table>
-                          </div>
-                        )}
-                      </Card.Body>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
+                              ))}
+                            </tbody>
+                          </Table>
+                        </div>
+                      )}
+                    </Card.Body>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 };
 
 export default RidePartnerManagementPage;
+
+

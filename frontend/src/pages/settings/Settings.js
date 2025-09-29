@@ -6,6 +6,7 @@ import "./settings.css";
 import DarkModeToggle from "../../components/DarkModeToggle";
 import ToggleSwitch from "../../components/ToggleSwitch";
 import PortalUtilityBar from "../../components/PortalUtilityBar";
+import PortalHero from '../../components/PortalHero';
 import { AuthContext } from "../../context/AuthContext";
 
 const Settings = ({ themePreference, setThemePreference }) => {
@@ -110,21 +111,22 @@ const Settings = ({ themePreference, setThemePreference }) => {
   return (
     <div className="li-settings">
       {isAuthenticated && <PortalUtilityBar />}
-      <header className="li-settings__header">
-        <div className="li-settings__headerbar">
-          <div>
-            <h1 className="sfdc-hero__title" style={{margin:0}}>Settings</h1>
-            <div className="sfdc-hero__subtitle">Manage your Nexora account</div>
-          </div>
+      <PortalHero
+        align="left"
+        title="Settings"
+        subtitle="Manage your Nexora account preferences."
+        actions={(
           <button
             className="sfdc-button_brand"
             onClick={() => navigate('/portal_page/portalPage')}
             aria-label="Go to Portal Home"
+            type="button"
           >
-            Home
+            Portal home
           </button>
-        </div>
-      </header>
+        )}
+        wave={false}
+      />
 
       <div className="li-settings__container">
         <nav className="li-settings__nav" aria-label="Settings sections">

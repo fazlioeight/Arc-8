@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Alert, Badge, Button, Card, Col, Form, ListGroup, Row, Spinner, Table } from 'react-bootstrap';
 
 import { AuthContext } from '../../context/AuthContext';
+import PortalHero from '../../components/PortalHero';
 import {
   createCodingNote,
   fetchCodingMemberDetail,

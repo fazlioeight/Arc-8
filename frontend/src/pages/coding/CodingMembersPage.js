@@ -1,8 +1,9 @@
-﻿import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
+import PortalHero from '../../components/PortalHero';
 import { AuthContext } from '../../context/AuthContext';
 import { useCommandPalette } from '../../context/CommandPaletteContext';
 import { SAMPLE_CODING_MEMBERS } from '../../utils/sampleData';
@@ -106,40 +107,34 @@ const CodingMembersPage = () => {
     });
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="sfdc-portal coding-portal">
-        <PortalUtilityBar />
-        <div className="coding-content container py-5">
-          <Alert variant="warning">You must be logged in to view coding members.</Alert>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
-      <div className="coding-content container py-4">
-        <Row className="align-items-center mb-3 g-3">
-          <Col>
-            <h1 className="h3 mb-0">Coding Member Worklists</h1>
-            <p className="text-muted mb-0">Search, filter, and open members assigned to your coding teams.</p>
-          </Col>
-          <Col md="auto">
-            <div className="d-flex flex-wrap gap-2">
-              <Button variant="outline-secondary" onClick={() => navigate('/coding')}>
-                Landing
-              </Button>
-              <Button variant="primary" disabled>
-                Members
-              </Button>
-              <Button variant="outline-primary" onClick={() => navigate('/coding/providers')}>
-                Providers
-              </Button>
-            </div>
-          </Col>
-        </Row>
+      <PortalHero
+        align="left"
+        title="Coding member worklists"
+        subtitle="Search, filter, and open members assigned to your coding teams."
+        actions={(
+          <div className="d-flex flex-wrap gap-2">
+            <Button variant="light" onClick={() => navigate('/coding')}>
+              Landing
+            </Button>
+            <Button variant="outline-light" disabled>
+              Members
+            </Button>
+            <Button variant="outline-light" onClick={() => navigate('/coding/providers')}>
+              Providers
+            </Button>
+          </div>
+        )}
+        wave={false}
+      />
+      {!isAuthenticated ? (
+        <div className="coding-content container py-5">
+          <Alert variant="warning">You must be logged in to view coding members.</Alert>
+        </div>
+      ) : (
+        <div className="coding-content container py-4">
         <Form onSubmit={handleSubmit} className="mb-3">
           <Row className="g-2 align-items-end">
             <Col md={5}>
@@ -247,10 +242,12 @@ const CodingMembersPage = () => {
             ))}
           </tbody>
         </Table>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default CodingMembersPage;
+
 
