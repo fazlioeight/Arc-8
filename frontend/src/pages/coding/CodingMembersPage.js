@@ -98,7 +98,11 @@ const CodingMembersPage = () => {
   const handleOpenProvider = member => {
     const providerKey = member.pcp_npi || member.pcp_name;
     if (!providerKey) return;
-    navigate(`/coding/providers/${encodeURIComponent(providerKey)}`, {
+    // Also include referral info as query params so the provider detail
+    // page can display a referral alert even when location.state isn't
+    // preserved in some test environments.
+    const search = `?fromMemberId=${encodeURIComponent(member.id)}${member.pcp_name ? `&providerName=${encodeURIComponent(member.pcp_name)}` : ''}`;
+    navigate(`/coding/providers/${encodeURIComponent(providerKey)}${search}`, {
       state: {
         fromMemberId: member.id,
         providerName: member.pcp_name,

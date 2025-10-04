@@ -6,7 +6,11 @@ import { AuthContext } from '../context/AuthContext';
 // Mock Navigate to render a visible marker without referencing outer scope
 jest.mock('react-router-dom', () => {
   const React = require('react');
+  // preserve the real module but override only Navigate so tests can
+  // still access hooks like useParams/useLocation when other tests run
+  const actual = jest.requireActual('react-router-dom');
   return {
+    ...actual,
     Navigate: () => React.createElement('div', null, 'NAVIGATE'),
   };
 }, { virtual: true });

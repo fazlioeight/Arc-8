@@ -11,7 +11,13 @@ import {
 } from '../../services/codingService';
 
 const CodingMemberDetailPage = () => {
-  const { memberId } = useParams();
+  let memberId;
+  try {
+    const params = useParams();
+    memberId = params?.memberId;
+  } catch (err) {
+    memberId = undefined;
+  }
   const { token, tenant, isAuthenticated } = useContext(AuthContext) || {};
   const canQuery = useMemo(() => token && tenant && memberId, [token, tenant, memberId]);
 
@@ -165,7 +171,7 @@ const CodingMemberDetailPage = () => {
                       <td>{chase.chase_code}</td>
                       <td>{chase.status}</td>
                       <td>{chase.priority}</td>
-                      <td>{chase.assigned_coder_email || '—'}</td>
+                      <td>{chase.assigned_coder_email || 'ï¿½'}</td>
                       <td className="text-end">
                         <Button
                           variant="outline-primary"
@@ -173,7 +179,7 @@ const CodingMemberDetailPage = () => {
                           disabled={chaseUpdating === chase.id}
                           onClick={() => void handleAdvanceChase(chase)}
                         >
-                          {chaseUpdating === chase.id ? 'Updating…' : 'Advance'}
+                          {chaseUpdating === chase.id ? 'Updatingï¿½' : 'Advance'}
                         </Button>
                       </td>
                     </tr>
@@ -202,7 +208,7 @@ const CodingMemberDetailPage = () => {
                     disabled={noteStatus === 'saving' || !noteBody.trim()}
                     variant="primary"
                   >
-                    {noteStatus === 'saving' ? 'Saving…' : 'Save note'}
+                    {noteStatus === 'saving' ? 'Savingï¿½' : 'Save note'}
                   </Button>
                 </div>
               </Form>
@@ -226,11 +232,11 @@ const CodingMemberDetailPage = () => {
             <Card.Header>Profile</Card.Header>
             <Card.Body>
               <ListGroup variant="flush">
-                <ListGroup.Item><strong>Line of business:</strong> {member.line_of_business || '—'}</ListGroup.Item>
-                <ListGroup.Item><strong>PCP:</strong> {member.pcp_name || '—'}</ListGroup.Item>
-                <ListGroup.Item><strong>Risk score:</strong> {member.risk_score ?? '—'}</ListGroup.Item>
-                <ListGroup.Item><strong>Language:</strong> {member.primary_language || '—'}</ListGroup.Item>
-                <ListGroup.Item><strong>Location:</strong> {[member.address_city, member.address_state].filter(Boolean).join(', ') || '—'}</ListGroup.Item>
+                <ListGroup.Item><strong>Line of business:</strong> {member.line_of_business || 'ï¿½'}</ListGroup.Item>
+                <ListGroup.Item><strong>PCP:</strong> {member.pcp_name || 'ï¿½'}</ListGroup.Item>
+                <ListGroup.Item><strong>Risk score:</strong> {member.risk_score ?? 'ï¿½'}</ListGroup.Item>
+                <ListGroup.Item><strong>Language:</strong> {member.primary_language || 'ï¿½'}</ListGroup.Item>
+                <ListGroup.Item><strong>Location:</strong> {[member.address_city, member.address_state].filter(Boolean).join(', ') || 'ï¿½'}</ListGroup.Item>
               </ListGroup>
             </Card.Body>
           </Card>

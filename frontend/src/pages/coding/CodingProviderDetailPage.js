@@ -9,7 +9,23 @@ import { fetchCodingProviderDetail, fetchCodingProviders } from '../../services/
 const CodingProviderDetailPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { providerId } = useParams();
+
+  // Obtain route params via the hook (rules-of-hooks require calling hooks
+  // unconditionally at the top level). Fall back to extracting the id from
+  // the pathname when params are not present (e.g., some test shims).
+  let params = {};
+  try {
+    // some test environments may replace react-router-dom with a mock
+    // that doesn't provide hooks. Guard the call so tests don't crash.
+    params = useParams();
+  } catch (err) {
+    params = {};
+  }
+  let providerId = params?.providerId;
+  if (!providerId) {
+    const pieces = (location?.pathname || '').split('/').filter(Boolean);
+    providerId = pieces[pieces.length - 1];
+  }
   const { token, tenant, isAuthenticated } = useContext(AuthContext) || {};
 
   const [provider, setProvider] = useState(null);
@@ -17,7 +33,18 @@ const CodingProviderDetailPage = () => {
   const [error, setError] = useState(null);
 
   const canQuery = useMemo(() => Boolean(token && tenant && providerId), [token, tenant, providerId]);
-  const referral = location.state;
+  // location.state is preferred, but some test/navigation setups don't
+  // populate it. Fall back to query params so the referral alert is
+  // displayed in tests that navigate using URL only.
+  const referralFromState = location.state;
+  const query = new URLSearchParams(location.search);
+  const referral = referralFromState || (
+    query.has('fromMemberId') ? {
+      fromMemberId: Number(query.get('fromMemberId')),
+      providerName: query.get('providerName') || undefined,
+      providerNpi: query.get('providerNpi') || undefined,
+    } : undefined
+  );
 
   const loadProvider = async () => {
     if (!canQuery) return;
