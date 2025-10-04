@@ -13,8 +13,6 @@
   --sfdc-brand-contrast: #ffffff;
 }
 
-.dark-mode { /* variables above read from global tokens */ }
-
 .sfdc-portal {
   background: var(--sfdc-bg);
   min-height: 100vh;
@@ -25,7 +23,10 @@
   position: sticky;
   top: 0;
   z-index: 10;
+  -webkit-backdrop-filter: saturate(1.2) blur(6px);
   backdrop-filter: saturate(1.2) blur(6px);
+  /* Fallback for older browsers */
+  background: var(--sfdc-card);
   background: color-mix(in oklab, var(--sfdc-card) 88%, transparent);
   border-bottom: 1px solid var(--sfdc-border);
 }
@@ -61,7 +62,12 @@
   display: inline-flex; align-items: center; gap: 8px; color: var(--sfdc-text);
   transition: background 120ms var(--easing-standard), transform 120ms var(--easing-standard);
 }
-.sfdc-iconbutton:hover { background: color-mix(in oklab, var(--sfdc-card) 85%, transparent); transform: translateY(-1px); }
+.sfdc-iconbutton:hover {
+  /* fallback for older browsers */
+  background: var(--sfdc-card);
+  background: color-mix(in oklab, var(--sfdc-card) 85%, transparent);
+  transform: translateY(-1px);
+}
 .sfdc-iconbutton:active { transform: translateY(0); }
 .sfdc-iconbutton svg { width: 16px; height: 16px; fill: currentColor; }
 
@@ -108,6 +114,8 @@
   border: 1px solid var(--sfdc-border);
   border-radius: 8px;
   padding: 6px 10px;
+  /* fallback for older browsers */
+  background: var(--sfdc-card);
   background: color-mix(in oklab, var(--sfdc-card) 94%, transparent);
   color: var(--sfdc-text);
   cursor: pointer;
@@ -201,9 +209,12 @@
 
 /* Dropdowns and menus */
 .sfdc-dropdown {
+  /* By default dropdowns align to the left edge of their container.
+     Use the modifier .sfdc-dropdown--right to explicitly pin to the right. */
   position: absolute;
   top: 44px;
-  right: 12px;
+  left: 12px;
+  right: auto;
   background: var(--sfdc-card);
   border: 1px solid var(--sfdc-border);
   border-radius: 10px;
@@ -213,9 +224,18 @@
   z-index: 20;
 }
 
+/* Right aligned dropdown modifier */
+.sfdc-dropdown--right {
+  right: 12px;
+  left: auto;
+}
+
 .sfdc-dropdown__header { font-weight: 700; color: var(--sfdc-text); padding: 6px 8px; }
 .sfdc-dropdown__item { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; color: var(--sfdc-text); }
-.sfdc-dropdown__item:hover { background: color-mix(in oklab, var(--sfdc-card) 85%, transparent); }
+.sfdc-dropdown__item:hover {
+  background: var(--sfdc-card);
+  background: color-mix(in oklab, var(--sfdc-card) 85%, transparent);
+}
 .sfdc-dropdown__hint { color: var(--sfdc-muted); font-size: .85rem; }
 
 /* App Launcher (waffle) */
@@ -224,7 +244,10 @@
 .sfdc-app {
   display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--sfdc-border); border-radius: 10px; cursor: pointer;
 }
-.sfdc-app:hover { background: color-mix(in oklab, var(--sfdc-card) 85%, transparent); }
+.sfdc-app:hover {
+  background: var(--sfdc-card);
+  background: color-mix(in oklab, var(--sfdc-card) 85%, transparent);
+}
 .sfdc-app__icon { width: 34px; height: 34px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; box-shadow: var(--sfdc-shadow); }
 .sfdc-app__name { color: var(--sfdc-text); font-weight: 600; }
 .sfdc-app__desc { color: var(--sfdc-muted); font-size: .85rem; }
@@ -245,6 +268,7 @@
   left: 0; right: 0; bottom: -1px; height: 110px;
   background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="1" d="M0,224L48,213.3C96,203,192,181,288,165.3C384,149,480,139,576,133.3C672,128,768,128,864,149.3C960,171,1056,213,1152,213.3C1248,213,1344,171,1392,149.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') center bottom/cover no-repeat;
   pointer-events: none;
+  z-index: 0;
 }
 
 .dark-mode .sfdc-hero::after {
@@ -261,6 +285,13 @@
   gap: 16px;
 }
 
+/* Center and constrain the main content that follows a hero so pages using PortalHero align visually */
+.sfdc-hero + * {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
 .sfdc-hero__text {
   max-width: min(720px, 100%);
 }
@@ -270,6 +301,8 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .sfdc-hero--left .sfdc-hero__content {
@@ -375,7 +408,19 @@
 }
 
 /* Search Overlay */
-.sfdc-overlay { position: fixed; inset: 0; background: color-mix(in oklab, var(--sfdc-bg) 70%, #000 30%); backdrop-filter: blur(4px); display: grid; place-items: start center; padding-top: 14vh; z-index: 50; }
+.sfdc-overlay {
+  position: fixed;
+  inset: 0;
+  /* fallback for older browsers */
+  background: rgba(0,0,0,0.4);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  background: color-mix(in oklab, var(--sfdc-bg) 70%, #000 30%);
+  display: grid;
+  place-items: start center;
+  padding-top: 14vh;
+  z-index: 50;
+}
 .sfdc-overlay__panel { width: min(880px, 92vw); background: var(--sfdc-card); border: 1px solid var(--sfdc-border); border-radius: 12px; box-shadow: var(--sfdc-shadow-lg); overflow: hidden; }
 .sfdc-overlay__header { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 12px; border-bottom: 1px solid var(--sfdc-border); }
 .sfdc-overlay__input { width: 100%; padding: 10px 12px; border: 1px solid var(--sfdc-border); border-radius: 8px; background: var(--sfdc-bg); color: var(--sfdc-text); font-size: 1rem; }
@@ -444,10 +489,13 @@
 }
 
 .portal-hero {
+  /* gradient fallback for older browsers */
+  background: linear-gradient(135deg, var(--sfdc-brand), var(--sfdc-brand-dark));
   background: linear-gradient(135deg, color-mix(in oklab, var(--sfdc-brand) 82%, #4f9df8 18%), var(--sfdc-brand-dark));
   color: var(--sfdc-brand-contrast);
   padding: 32px 20px;
-  border-bottom: 1px solid color-mix(in oklab, var(--sfdc-brand-contrast) 12%, transparent);
+  /* fallback border color */
+  border-bottom: 1px solid rgba(255,255,255,0.12);
   box-shadow: var(--sfdc-shadow-lg);
 }
 
@@ -504,9 +552,10 @@
   margin: 16px auto 0;
   padding: 12px 18px;
   border-radius: 12px;
-  border: 1px solid color-mix(in oklab, #f97316 32%, var(--sfdc-border));
-  background: color-mix(in oklab, #f97316 18%, var(--sfdc-card));
-  color: color-mix(in oklab, #9a3412 60%, var(--sfdc-text));
+  /* fallbacks for older browsers using approximations */
+  border: 1px solid var(--sfdc-border);
+  background: rgba(249,115,22,0.18);
+  color: #9a3412;
 }
 
 .portal-shell {

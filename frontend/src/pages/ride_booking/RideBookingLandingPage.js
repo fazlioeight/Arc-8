@@ -15,9 +15,9 @@ const STATUS_OPTIONS = [
 ];
 
 const formatDateTime = (iso) => {
-  if (!iso) return '—';
+  if (!iso) return 'ï¿½';
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return 'ï¿½';
   return date.toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -25,7 +25,7 @@ const formatDateTime = (iso) => {
 };
 
 const formatCurrency = (value) => {
-  if (value === undefined || value === null || Number.isNaN(Number(value))) return '—';
+  if (value === undefined || value === null || Number.isNaN(Number(value))) return 'ï¿½';
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(value);
 };
 
@@ -130,6 +130,7 @@ const RideBookingLandingPage = () => {
             </Button>
           </div>
         )}
+        wave={false}
       />
 
       <div className="ride-booking__shell">
@@ -138,7 +139,7 @@ const RideBookingLandingPage = () => {
             <div>
               <h2 className="h4 mb-1">Recent rides</h2>
               <div className="ride-booking__timestamp">
-                Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}
+                Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : 'ï¿½'}
               </div>
             </div>
             <Button variant="outline-secondary" size="sm" onClick={() => loadRides()} disabled={loading}>

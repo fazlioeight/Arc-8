@@ -1,24 +1,33 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Card, Col, Form, Row, Table } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Col,
+  Form,
+  Row,
+  Table,
+} from "react-bootstrap";
+import { useNavigate } from "react-router-dom";
 
-import PortalUtilityBar from '../../components/PortalUtilityBar';
-import PortalHero from '../../components/PortalHero';
+import PortalUtilityBar from "../../components/PortalUtilityBar";
+import PortalHero from "../../components/PortalHero";
 import {
   addPartner,
   addPartnerSchedule,
   getAvailablePartnersForDate,
   getPartners,
-} from '../../services/ridePartnerService';
+} from "../../services/ridePartnerService";
 
 const WEEKDAY_OPTIONS = [
-  { value: 'mon', label: 'Monday' },
-  { value: 'tue', label: 'Tuesday' },
-  { value: 'wed', label: 'Wednesday' },
-  { value: 'thu', label: 'Thursday' },
-  { value: 'fri', label: 'Friday' },
-  { value: 'sat', label: 'Saturday' },
-  { value: 'sun', label: 'Sunday' },
+  { value: "mon", label: "Monday" },
+  { value: "tue", label: "Tuesday" },
+  { value: "wed", label: "Wednesday" },
+  { value: "thu", label: "Thursday" },
+  { value: "fri", label: "Friday" },
+  { value: "sat", label: "Saturday" },
+  { value: "sun", label: "Sunday" },
 ];
 
 const DAY_LABEL = WEEKDAY_OPTIONS.reduce((acc, option) => {
@@ -26,20 +35,24 @@ const DAY_LABEL = WEEKDAY_OPTIONS.reduce((acc, option) => {
   return acc;
 }, {});
 
-const createScheduleForm = (frequency = 'daily') => ({
+const createScheduleForm = (frequency = "daily") => ({
   frequency,
-  startDate: '',
-  endDate: '',
-  openSlots: '',
+  startDate: "",
+  endDate: "",
+  openSlots: "",
   daysOfWeek: [],
   daysOfMonth: [],
-  notes: '',
+  notes: "",
 });
 
 const RidePartnerManagementPage = () => {
   const navigate = useNavigate();
   const [partners, setPartners] = useState([]);
-  const [partnerForm, setPartnerForm] = useState({ companyName: '', contactName: '', contactEmail: '' });
+  const [partnerForm, setPartnerForm] = useState({
+    companyName: "",
+    contactName: "",
+    contactEmail: "",
+  });
   const [scheduleForms, setScheduleForms] = useState({});
   const [feedback, setFeedback] = useState(null);
 
@@ -48,7 +61,10 @@ const RidePartnerManagementPage = () => {
     return new Set(open.map((partner) => partner.id));
   }, [partners]);
 
-  const monthOptions = useMemo(() => Array.from({ length: 31 }, (_, index) => index + 1), []);
+  const monthOptions = useMemo(
+    () => Array.from({ length: 31 }, (_, index) => index + 1),
+    []
+  );
 
   const refreshPartners = () => {
     const data = getPartners();
@@ -59,9 +75,10 @@ const RidePartnerManagementPage = () => {
     refreshPartners();
   }, []);
 
-  const scheduleStateFor = (partnerId) => scheduleForms[partnerId] || createScheduleForm();
+  const scheduleStateFor = (partnerId) =>
+    scheduleForms[partnerId] || createScheduleForm();
 
-  const resetScheduleForm = (partnerId, frequency = 'daily') => {
+  const resetScheduleForm = (partnerId, frequency = "daily") => {
     setScheduleForms((current) => ({
       ...current,
       [partnerId]: createScheduleForm(frequency),
@@ -71,9 +88,12 @@ const RidePartnerManagementPage = () => {
   const updateScheduleForm = (partnerId, changes) => {
     setScheduleForms((current) => {
       const existing = current[partnerId] || createScheduleForm();
-      const next = typeof changes === 'function' ? changes(existing) : { ...existing, ...changes };
+      const next =
+        typeof changes === "function"
+          ? changes(existing)
+          : { ...existing, ...changes };
       if (!next.frequency) {
-        next.frequency = existing.frequency || 'daily';
+        next.frequency = existing.frequency || "daily";
       }
       return {
         ...current,
@@ -91,11 +111,17 @@ const RidePartnerManagementPage = () => {
     event.preventDefault();
     try {
       const record = addPartner(partnerForm);
-      setFeedback({ type: 'success', message: `Added ${record.companyName} to ride partners.` });
-      setPartnerForm({ companyName: '', contactName: '', contactEmail: '' });
+      setFeedback({
+        type: "success",
+        message: `Added ${record.companyName} to ride partners.`,
+      });
+      setPartnerForm({ companyName: "", contactName: "", contactEmail: "" });
       refreshPartners();
     } catch (error) {
-      setFeedback({ type: 'danger', message: error.message || 'Unable to add ride partner.' });
+      setFeedback({
+        type: "danger",
+        message: error.message || "Unable to add ride partner.",
+      });
     }
   };
 
@@ -104,12 +130,16 @@ const RidePartnerManagementPage = () => {
   };
 
   const handleWeeklySelection = (partnerId, event) => {
-    const values = Array.from(event.target.selectedOptions || []).map((option) => option.value);
+    const values = Array.from(event.target.selectedOptions || []).map(
+      (option) => option.value
+    );
     updateScheduleForm(partnerId, { daysOfWeek: values });
   };
 
   const handleMonthlySelection = (partnerId, event) => {
-    const values = Array.from(event.target.selectedOptions || []).map((option) => Number(option.value));
+    const values = Array.from(event.target.selectedOptions || []).map(
+      (option) => Number(option.value)
+    );
     updateScheduleForm(partnerId, { daysOfMonth: values });
   };
 
@@ -119,50 +149,83 @@ const RidePartnerManagementPage = () => {
     const { frequency, startDate, endDate, openSlots } = form;
 
     if (!frequency) {
-      setFeedback({ type: 'danger', message: 'Select a schedule frequency.' });
+      setFeedback({ type: "danger", message: "Select a schedule frequency." });
       return;
     }
     if (!startDate || !endDate) {
-      setFeedback({ type: 'danger', message: 'Provide a start and end date for the schedule.' });
+      setFeedback({
+        type: "danger",
+        message: "Provide a start and end date for the schedule.",
+      });
       return;
     }
     if (new Date(startDate) > new Date(endDate)) {
-      setFeedback({ type: 'danger', message: 'Schedule start date must be before the end date.' });
+      setFeedback({
+        type: "danger",
+        message: "Schedule start date must be before the end date.",
+      });
       return;
     }
     if (!openSlots || Number.parseInt(openSlots, 10) <= 0) {
-      setFeedback({ type: 'danger', message: 'Enter the number of open rides available.' });
+      setFeedback({
+        type: "danger",
+        message: "Enter the number of open rides available.",
+      });
       return;
     }
-    if (frequency === 'weekly' && (!form.daysOfWeek || form.daysOfWeek.length === 0)) {
-      setFeedback({ type: 'danger', message: 'Select at least one day of the week.' });
+    if (
+      frequency === "weekly" &&
+      (!form.daysOfWeek || form.daysOfWeek.length === 0)
+    ) {
+      setFeedback({
+        type: "danger",
+        message: "Select at least one day of the week.",
+      });
       return;
     }
-    if (frequency === 'monthly' && (!form.daysOfMonth || form.daysOfMonth.length === 0)) {
-      setFeedback({ type: 'danger', message: 'Select at least one day of the month.' });
+    if (
+      frequency === "monthly" &&
+      (!form.daysOfMonth || form.daysOfMonth.length === 0)
+    ) {
+      setFeedback({
+        type: "danger",
+        message: "Select at least one day of the month.",
+      });
       return;
     }
 
     try {
       addPartnerSchedule(partnerId, form);
-      setFeedback({ type: 'success', message: 'Availability added to the partner calendar.' });
+      setFeedback({
+        type: "success",
+        message: "Availability added to the partner calendar.",
+      });
       refreshPartners();
       resetScheduleForm(partnerId, form.frequency);
     } catch (error) {
-      setFeedback({ type: 'danger', message: error.message || 'Unable to add schedule.' });
+      setFeedback({
+        type: "danger",
+        message: error.message || "Unable to add schedule.",
+      });
     }
   };
 
   const formatRecurrence = (schedule) => {
     switch (schedule.frequency) {
-      case 'daily':
-        return 'Every day';
-      case 'weekly':
-        return schedule.daysOfWeek?.map((code) => DAY_LABEL[code] || code).join(', ') || 'Weekly';
-      case 'monthly':
-        return schedule.daysOfMonth?.length ? `Days ${schedule.daysOfMonth.join(', ')}` : 'Monthly';
+      case "daily":
+        return "Every day";
+      case "weekly":
+        return (
+          schedule.daysOfWeek
+            ?.map((code) => DAY_LABEL[code] || code)
+            .join(", ") || "Weekly"
+        );
+      case "monthly":
+        return schedule.daysOfMonth?.length
+          ? `Days ${schedule.daysOfMonth.join(", ")}`
+          : "Monthly";
       default:
-        return 'None';
+        return "None";
     }
   };
 
@@ -173,29 +236,39 @@ const RidePartnerManagementPage = () => {
         title="Ride Partner Calendars"
         subtitle="Invite transportation partners to publish their open ride windows. Availability for today automatically feeds the booking dropdown."
         actions={[
-          {
-            label: 'View ride overview',
-            variant: 'light',
-            onClick: () => navigate('/RideBooking'),
-          },
-          {
-            label: 'Book a ride',
-            variant: 'outline-light',
-            onClick: () => navigate('/RideBooking/book'),
-          },
+          <Button
+            key="overview"
+            variant="light"
+            onClick={() => navigate("/RideBooking")}
+          >
+            View ride overview
+          </Button>,
+          <Button
+            key="book"
+            variant="outline-light"
+            onClick={() => navigate("/RideBooking/book")}
+          >
+            Book a ride
+          </Button>,
         ]}
       />
 
-      <main className="sfdc-grid" style={{ gridTemplateColumns: '1fr' }}>
+      <main className="sfdc-grid" style={{ gridTemplateColumns: "1fr" }}>
         <div className="sfdc-card sfdc-card--full">
           <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
             <div>
               <h2 className="h5 mb-1">Register a partner</h2>
-              <div className="text-muted">Capture basic contact details to publish ride availability.</div>
+              <div className="text-muted">
+                Capture basic contact details to publish ride availability.
+              </div>
             </div>
           </div>
           {feedback && (
-            <Alert variant={feedback.type} onClose={() => setFeedback(null)} dismissible>
+            <Alert
+              variant={feedback.type}
+              onClose={() => setFeedback(null)}
+              dismissible
+            >
               {feedback.message}
             </Alert>
           )}
@@ -263,28 +336,46 @@ const RidePartnerManagementPage = () => {
                               </Badge>
                             )}
                           </Card.Title>
-                          <div className="text-muted" style={{ fontSize: '0.9rem' }}>
-                            {partner.contactName || 'Not provided'}
+                          <div
+                            className="text-muted"
+                            style={{ fontSize: "0.9rem" }}
+                          >
+                            {partner.contactName || "Not provided"}
                             {partner.contactEmail && (
                               <>
-                                {' | '}
+                                {" | "}
                                 {partner.contactEmail}
                               </>
                             )}
                           </div>
-                          <div className="text-muted" style={{ fontSize: '0.8rem' }}>
-                            Joined {new Date(partner.createdAt).toLocaleDateString()}
+                          <div
+                            className="text-muted"
+                            style={{ fontSize: "0.8rem" }}
+                          >
+                            Joined{" "}
+                            {new Date(partner.createdAt).toLocaleDateString()}
                           </div>
                         </div>
                         <div style={{ minWidth: 260 }}>
-                          <Form onSubmit={(event) => handleAddSchedule(partner.id, event)}>
+                          <Form
+                            onSubmit={(event) =>
+                              handleAddSchedule(partner.id, event)
+                            }
+                          >
                             <Row className="g-2">
                               <Col md={6}>
-                                <Form.Group controlId={`frequency-${partner.id}`}>
+                                <Form.Group
+                                  controlId={`frequency-${partner.id}`}
+                                >
                                   <Form.Label>Frequency</Form.Label>
                                   <Form.Select
                                     value={form.frequency}
-                                    onChange={(event) => handleFrequencyChange(partner.id, event.target.value)}
+                                    onChange={(event) =>
+                                      handleFrequencyChange(
+                                        partner.id,
+                                        event.target.value
+                                      )
+                                    }
                                   >
                                     <option value="daily">Daily</option>
                                     <option value="weekly">Weekly</option>
@@ -293,25 +384,37 @@ const RidePartnerManagementPage = () => {
                                 </Form.Group>
                               </Col>
                               <Col md={6}>
-                                <Form.Group controlId={`openSlots-${partner.id}`}>
+                                <Form.Group
+                                  controlId={`openSlots-${partner.id}`}
+                                >
                                   <Form.Label>Open rides</Form.Label>
                                   <Form.Control
                                     type="number"
                                     min={1}
                                     value={form.openSlots}
-                                    onChange={(event) => updateScheduleForm(partner.id, { openSlots: event.target.value })}
+                                    onChange={(event) =>
+                                      updateScheduleForm(partner.id, {
+                                        openSlots: event.target.value,
+                                      })
+                                    }
                                     placeholder="e.g., 10"
                                     required
                                   />
                                 </Form.Group>
                               </Col>
                               <Col md={6}>
-                                <Form.Group controlId={`startDate-${partner.id}`}>
+                                <Form.Group
+                                  controlId={`startDate-${partner.id}`}
+                                >
                                   <Form.Label>Start date</Form.Label>
                                   <Form.Control
                                     type="date"
                                     value={form.startDate}
-                                    onChange={(event) => updateScheduleForm(partner.id, { startDate: event.target.value })}
+                                    onChange={(event) =>
+                                      updateScheduleForm(partner.id, {
+                                        startDate: event.target.value,
+                                      })
+                                    }
                                     required
                                   />
                                 </Form.Group>
@@ -322,38 +425,59 @@ const RidePartnerManagementPage = () => {
                                   <Form.Control
                                     type="date"
                                     value={form.endDate}
-                                    onChange={(event) => updateScheduleForm(partner.id, { endDate: event.target.value })}
+                                    onChange={(event) =>
+                                      updateScheduleForm(partner.id, {
+                                        endDate: event.target.value,
+                                      })
+                                    }
                                     required
                                   />
                                 </Form.Group>
                               </Col>
-                              {form.frequency === 'weekly' && (
+                              {form.frequency === "weekly" && (
                                 <Col md={12}>
-                                  <Form.Group controlId={`daysOfWeek-${partner.id}`}>
+                                  <Form.Group
+                                    controlId={`daysOfWeek-${partner.id}`}
+                                  >
                                     <Form.Label>Days of week</Form.Label>
                                     <Form.Select
                                       multiple
                                       value={form.daysOfWeek}
-                                      onChange={(event) => handleWeeklySelection(partner.id, event)}
+                                      onChange={(event) =>
+                                        handleWeeklySelection(partner.id, event)
+                                      }
                                     >
                                       {WEEKDAY_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>
+                                        <option
+                                          key={option.value}
+                                          value={option.value}
+                                        >
                                           {option.label}
                                         </option>
                                       ))}
                                     </Form.Select>
-                                    <Form.Text>Use Ctrl/Cmd click to select multiple days.</Form.Text>
+                                    <Form.Text>
+                                      Use Ctrl/Cmd click to select multiple
+                                      days.
+                                    </Form.Text>
                                   </Form.Group>
                                 </Col>
                               )}
-                              {form.frequency === 'monthly' && (
+                              {form.frequency === "monthly" && (
                                 <Col md={12}>
-                                  <Form.Group controlId={`daysOfMonth-${partner.id}`}>
+                                  <Form.Group
+                                    controlId={`daysOfMonth-${partner.id}`}
+                                  >
                                     <Form.Label>Days of month</Form.Label>
                                     <Form.Select
                                       multiple
                                       value={form.daysOfMonth.map(String)}
-                                      onChange={(event) => handleMonthlySelection(partner.id, event)}
+                                      onChange={(event) =>
+                                        handleMonthlySelection(
+                                          partner.id,
+                                          event
+                                        )
+                                      }
                                     >
                                       {monthOptions.map((day) => (
                                         <option key={day} value={day}>
@@ -361,7 +485,10 @@ const RidePartnerManagementPage = () => {
                                         </option>
                                       ))}
                                     </Form.Select>
-                                    <Form.Text>Select all calendar days that recur for this schedule.</Form.Text>
+                                    <Form.Text>
+                                      Select all calendar days that recur for
+                                      this schedule.
+                                    </Form.Text>
                                   </Form.Group>
                                 </Col>
                               )}
@@ -372,7 +499,11 @@ const RidePartnerManagementPage = () => {
                                     as="textarea"
                                     rows={2}
                                     value={form.notes}
-                                    onChange={(event) => updateScheduleForm(partner.id, { notes: event.target.value })}
+                                    onChange={(event) =>
+                                      updateScheduleForm(partner.id, {
+                                        notes: event.target.value,
+                                      })
+                                    }
                                     placeholder="Optional details (vehicles, regions, etc.)"
                                   />
                                 </Form.Group>
@@ -402,13 +533,21 @@ const RidePartnerManagementPage = () => {
                             <tbody>
                               {partner.schedules.map((schedule) => (
                                 <tr key={schedule.id}>
-                                  <td className="text-capitalize">{schedule.frequency}</td>
+                                  <td className="text-capitalize">
+                                    {schedule.frequency}
+                                  </td>
                                   <td>{formatRecurrence(schedule)}</td>
                                   <td>
-                                    {new Date(schedule.startDate).toLocaleDateString()} - {new Date(schedule.endDate).toLocaleDateString()}
+                                    {new Date(
+                                      schedule.startDate
+                                    ).toLocaleDateString()}{" "}
+                                    -{" "}
+                                    {new Date(
+                                      schedule.endDate
+                                    ).toLocaleDateString()}
                                   </td>
                                   <td>{schedule.openSlots}</td>
-                                  <td>{schedule.notes || 'None'}</td>
+                                  <td>{schedule.notes || "None"}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -428,5 +567,3 @@ const RidePartnerManagementPage = () => {
 };
 
 export default RidePartnerManagementPage;
-
-

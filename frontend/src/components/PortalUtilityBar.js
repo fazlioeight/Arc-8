@@ -238,9 +238,9 @@ const PortalUtilityBar = () => {
         </div>
 
         {showWaffle && (
-          <div className="sfdc-dropdown" onClick={(event) => event.stopPropagation()}>
+          <div className="sfdc-waffle" onClick={(event) => event.stopPropagation()}>
             <div className="sfdc-dropdown__header">Apps</div>
-            <div className="sfdc-dropdown__grid">
+            <div className="sfdc-waffle__grid">
               {accessibleApps.map((app) => (
                 <div key={app.key} className="sfdc-app" onClick={() => { closeAll(); navigate(app.path); }}>
                   <div className="sfdc-app__icon" style={{ background: app.color }}>{app.icon}</div>
@@ -280,7 +280,7 @@ const PortalUtilityBar = () => {
         )}
 
         {showNotif && (
-          <div className="sfdc-dropdown" onClick={(event) => event.stopPropagation()}>
+          <div className="sfdc-dropdown sfdc-dropdown--right" onClick={(event) => event.stopPropagation()}>
             <div className="sfdc-dropdown__header">Notifications</div>
             {jobAlerts.length === 0 && (
               <div className="sfdc-dropdown__empty">No alerts. You're all caught up!</div>
@@ -310,7 +310,7 @@ const PortalUtilityBar = () => {
         )}
 
         {showUser && (
-          <div className="sfdc-dropdown" onClick={(event) => event.stopPropagation()}>
+          <div className="sfdc-dropdown sfdc-dropdown--right" onClick={(event) => event.stopPropagation()}>
             <div className="sfdc-dropdown__item" onClick={() => { closeAll(); navigate('/settings'); }}>
               <div>Profile & preferences</div>
             </div>
