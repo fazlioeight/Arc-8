@@ -1,9 +1,12 @@
-﻿import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export const AuthContext = createContext();
 
 const STORAGE_KEY = 'authState';
 const DEFAULT_TIMEOUT = 15 * 60 * 1000;
+const PERSIST_DEBOUNCE_MS = 200;
+const TOUCH_THROTTLE_MS = 5000;
+const MAX_PERSISTED_AUDIT_EVENTS = 20;
 
 export const DEFAULT_TENANTS = [
   { key: 'demo', name: 'Demo Health Plan', region: 'National', timezone: 'America/Chicago' },
@@ -86,7 +89,16 @@ const appendAudit = (state, event) => {
   const history = Array.isArray(state.auditTrail) ? state.auditTrail : [];
   return {
     ...state,
-    auditTrail: [event, ...history].slice(0, 100),
+    auditTrail: [event, ...history].slice(0, 50),
+  };
+};
+
+const serializeAuthState = (state) => {
+  if (!state) return null;
+  const { auditTrail = [], ...rest } = state;
+  return {
+    ...rest,
+    auditTrail: auditTrail.slice(0, MAX_PERSISTED_AUDIT_EVENTS),
   };
 };
 
@@ -101,14 +113,43 @@ export const AuthProvider = ({ children }) => {
       return null;
     }
   });
+  const persistTimerRef = useRef(null);
+  const lastSerializedRef = useRef(null);
+  const lastTouchRef = useRef(0);
 
   useEffect(() => {
-    if (authState) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(authState));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
+    if (typeof window === 'undefined') {
+      return undefined;
     }
+    if (persistTimerRef.current) {
+      window.clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = null;
+    }
+    if (!authState) {
+      localStorage.removeItem(STORAGE_KEY);
+      lastSerializedRef.current = null;
+      return undefined;
+    }
+    const serialized = JSON.stringify(serializeAuthState(authState));
+    if (serialized === lastSerializedRef.current) {
+      return undefined;
+    }
+    persistTimerRef.current = window.setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, serialized);
+      lastSerializedRef.current = serialized;
+      persistTimerRef.current = null;
+    }, PERSIST_DEBOUNCE_MS);
+    return () => {
+      if (persistTimerRef.current) {
+        window.clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
+    };
   }, [authState]);
+
+  useEffect(() => {
+    lastTouchRef.current = authState?.session?.lastActiveAt || 0;
+  }, [authState?.session?.lastActiveAt]);
 
   useEffect(() => {
     if (!authState) {
@@ -268,38 +309,50 @@ export const AuthProvider = ({ children }) => {
 
   const touchSession = useCallback(() => {
     setAuthState((prev) => {
-      if (!prev) return prev;
-      if (prev.session?.locked) return prev;
+      if (!prev || prev.session?.locked) {
+        return prev;
+      }
+      const now = Date.now();
+      if (now - lastTouchRef.current < TOUCH_THROTTLE_MS) {
+        return prev;
+      }
+      lastTouchRef.current = now;
       if (!prev.session) {
         return {
           ...prev,
           session: {
-            lastActiveAt: Date.now(),
+            lastActiveAt: now,
             locked: false,
             lockedAt: null,
             inactivityTimeoutMs: DEFAULT_TIMEOUT,
           },
         };
       }
-      if (Date.now() - (prev.session.lastActiveAt || 0) < 1000) {
-        return prev;
-      }
       return {
         ...prev,
         session: {
           ...prev.session,
-          lastActiveAt: Date.now(),
+          lastActiveAt: now,
         },
       };
     });
   }, []);
 
   useEffect(() => {
-    if (!authState?.token) return undefined;
-    const events = ['click', 'keydown', 'mousemove', 'scroll', 'touchstart', 'focus'];
-    const handler = () => touchSession();
-    events.forEach((event) => window.addEventListener(event, handler));
-    return () => events.forEach((event) => window.removeEventListener(event, handler));
+    if (!authState?.token || typeof window === 'undefined') return undefined;
+    const activityHandler = () => touchSession();
+    const events = ['pointerdown', 'keydown'];
+    events.forEach((event) => window.addEventListener(event, activityHandler, { passive: true }));
+    const visibilityHandler = () => {
+      if (document.visibilityState === 'visible') {
+        touchSession();
+      }
+    };
+    document.addEventListener('visibilitychange', visibilityHandler);
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, activityHandler));
+      document.removeEventListener('visibilitychange', visibilityHandler);
+    };
   }, [authState?.token, touchSession]);
 
   useEffect(() => {

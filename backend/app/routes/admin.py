@@ -1,6 +1,5 @@
 ﻿from __future__ import annotations
 
-import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +18,7 @@ from ..schemas.admin import (
     ApplicationListResponse,
 )
 from ..utils.audit_logger import record_audit_event
-from ..utils.security import AuthenticatedUser, require_admin
+from ..utils.security import AuthenticatedUser, hash_password, require_admin
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -115,7 +114,7 @@ async def create_user(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists for this tenant")
 
     app_permissions = _validate_applications_payload(payload.applications)
-    password_hash = bcrypt.hashpw(payload.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    password_hash = await hash_password(payload.password)
 
     new_user = User(
         tenant_id=tenant.id,
@@ -164,7 +163,7 @@ async def update_user(
         changed = True
 
     if payload.password:
-        user.password_hash = bcrypt.hashpw(payload.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        user.password_hash = await hash_password(payload.password)
         changed = True
 
     if payload.applications is not None:

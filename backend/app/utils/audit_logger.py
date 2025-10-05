@@ -1,5 +1,6 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -27,10 +28,16 @@ async def record_audit_event(
         created_at=datetime.now(timezone.utc),
     )
     session.add(event)
-    await session.flush()
-    _audit_logger.info(json.dumps({
-        "tenant_id": tenant_id,
-        "actor": actor,
-        "event_type": event_type,
-        "payload": payload or {},
-    }))
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(
+        None,
+        _audit_logger.info,
+        json.dumps(
+            {
+                "tenant_id": tenant_id,
+                "actor": actor,
+                "event_type": event_type,
+                "payload": payload or {},
+            }
+        ),
+    )

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 
+import asyncio
+import bcrypt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
@@ -15,6 +17,27 @@ from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
 from ..dependencies.tenant import get_tenant_context
 from ..models.tables import User
+
+
+async def hash_password(password: str) -> str:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _hash_password_sync, password)
+
+
+async def verify_password(plain_password: str, password_hash: str) -> bool:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _verify_password_sync, plain_password, password_hash)
+
+
+def _hash_password_sync(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def _verify_password_sync(password: str, password_hash: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+    except ValueError:
+        return False
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 

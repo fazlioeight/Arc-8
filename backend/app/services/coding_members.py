@@ -1,17 +1,28 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Iterable, Optional, Sequence, Tuple
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .risk_prioritization import refresh_member_priority, refresh_priorities
+
+from ..models.tables import User
+
 from ..models.coding import (
+    CodingClaim,
+    CodingHealthAssessment,
+    CodingMao004Record,
     CodingMember,
     CodingMemberAttachment,
     CodingMemberChase,
     CodingMemberNote,
+    CodingMemberEligibility,
+    CodingMemberPriority,
     CodingProvider,
     CodingProviderLocation,
+    CodingSubmissionBatch,
 )
 
 DEFAULT_PAGE_SIZE = 25
@@ -289,3 +300,228 @@ async def ensure_seed_data(session: AsyncSession) -> None:
             body="Initial chart review completed.",
         )
     )
+
+
+async def load_assignment_metadata(
+    session: AsyncSession,
+    member_ids: Sequence[int],
+) -> dict[int, dict[str, list]]:
+    if not member_ids:
+        return {}
+    stmt = select(
+        CodingMemberChase.member_id,
+        CodingMemberChase.assigned_coder_id,
+        CodingMemberChase.assigned_coder_email,
+        CodingMemberChase.status,
+    ).where(CodingMemberChase.member_id.in_(member_ids))
+    result = await session.execute(stmt)
+    assignments: dict[int, tuple[set[int], set[str]]] = {}
+    for member_id, coder_id, coder_email, status in result:
+        if status and status.lower() == 'closed':
+            continue
+        coder_ids, coder_emails = assignments.setdefault(member_id, (set(), set()))
+        if coder_id is not None:
+            coder_ids.add(coder_id)
+        if coder_email:
+            normalized = coder_email.strip()
+            if normalized:
+                coder_emails.add(normalized)
+    return {
+        member_id: {
+            'assigned_coder_ids': sorted(ids),
+            'assigned_coder_emails': sorted(emails),
+        }
+        for member_id, (ids, emails) in assignments.items()
+    }
+
+
+async def get_member_eligibility(session: AsyncSession, member_id: int) -> CodingMemberEligibility | None:
+    stmt = select(CodingMemberEligibility).where(CodingMemberEligibility.member_id == member_id)
+    return await session.scalar(stmt)
+
+
+async def upsert_member_eligibility(session: AsyncSession, member: CodingMember, payload: dict) -> CodingMemberEligibility:
+    eligibility = await get_member_eligibility(session, member.id)
+    if eligibility is None:
+        eligibility = CodingMemberEligibility(member_id=member.id)
+        session.add(eligibility)
+    for key, value in payload.items():
+        if hasattr(eligibility, key) and value is not None:
+            setattr(eligibility, key, value)
+    eligibility.last_synced_at = datetime.utcnow()
+    return eligibility
+
+
+async def list_claims(session: AsyncSession, member_id: int) -> list[CodingClaim]:
+    stmt = select(CodingClaim).where(CodingClaim.member_id == member_id).order_by(CodingClaim.service_date.desc())
+    return list((await session.scalars(stmt)).all())
+
+
+async def list_mao_records(session: AsyncSession, member_id: int, submission_year: Optional[int] = None) -> list[CodingMao004Record]:
+    stmt = select(CodingMao004Record).where(CodingMao004Record.member_id == member_id)
+    if submission_year is not None:
+        stmt = stmt.where(CodingMao004Record.submission_year == submission_year)
+    stmt = stmt.order_by(CodingMao004Record.service_start.desc())
+    return list((await session.scalars(stmt)).all())
+
+
+async def list_health_assessments(session: AsyncSession, member_id: int) -> list[CodingHealthAssessment]:
+    stmt = select(CodingHealthAssessment).where(CodingHealthAssessment.member_id == member_id).order_by(
+        CodingHealthAssessment.assessment_date.desc()
+    )
+    return list((await session.scalars(stmt)).all())
+
+
+async def create_health_assessment(
+    session: AsyncSession,
+    *,
+    member: CodingMember,
+    payload: dict,
+) -> CodingHealthAssessment:
+    assessment = CodingHealthAssessment(member_id=member.id, **payload)
+    session.add(assessment)
+    await session.flush()
+    return assessment
+
+
+async def get_member_priority(
+    session: AsyncSession,
+    member: CodingMember,
+    submission_year: int,
+) -> CodingMemberPriority:
+    priority = await session.scalar(
+        select(CodingMemberPriority).where(CodingMemberPriority.member_id == member.id)
+    )
+    if priority:
+        return priority
+    return await refresh_member_priority(session=session, member=member, submission_year=submission_year)
+
+
+async def list_prioritized_members(
+    session: AsyncSession,
+    submission_year: int,
+    *,
+    search: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[CodingMemberPriority], int]:
+    filters = []
+    if search:
+        like = f"%{search.lower()}%"
+        filters.append(
+            or_(
+                func.lower(CodingMember.first_name).like(like),
+                func.lower(CodingMember.last_name).like(like),
+                func.lower(CodingMember.member_key).like(like),
+            )
+        )
+    member_stmt = select(CodingMember)
+    if filters:
+        member_stmt = member_stmt.where(*filters)
+
+    total_stmt = select(func.count()).select_from(CodingMember)
+    if filters:
+        total_stmt = total_stmt.where(*filters)
+
+    total = await session.scalar(total_stmt)
+    members = (await session.scalars(member_stmt.offset(offset).limit(limit))).all()
+    priorities = await refresh_priorities(session=session, members=members, submission_year=submission_year)
+    await session.flush()
+    return priorities, int(total or 0)
+
+
+async def list_open_assignments(session: AsyncSession) -> list[dict[str, object]]:
+    stmt = (
+        select(
+            CodingMemberChase.id.label("chase_id"),
+            CodingMember.id.label("member_id"),
+            CodingMember.member_key.label("member_key"),
+            CodingMember.first_name.label("first_name"),
+            CodingMember.last_name.label("last_name"),
+            CodingMemberChase.status.label("status"),
+            CodingMemberChase.priority.label("priority"),
+            CodingMemberChase.assigned_coder_email.label("assigned_coder_email"),
+            CodingMemberChase.hcc_code.label("hcc_code"),
+            CodingMemberChase.icd10_code.label("icd10_code"),
+            CodingMemberChase.updated_at.label("updated_at"),
+        )
+        .join(CodingMember, CodingMember.id == CodingMemberChase.member_id)
+        .where(CodingMemberChase.status != 'closed')
+        .order_by(CodingMemberChase.updated_at.desc())
+    )
+    rows = (await session.execute(stmt)).all()
+    items: list[dict[str, object]] = []
+    for row in rows:
+        member_name = None
+        first = row.first_name or ''
+        last = row.last_name or ''
+        combination = f"{first} {last}".strip()
+        if combination:
+            member_name = combination
+        items.append(
+            {
+                "chase_id": row.chase_id,
+                "member_id": row.member_id,
+                "member_key": row.member_key,
+                "member_name": member_name,
+                "status": row.status,
+                "priority": row.priority,
+                "assigned_coder_email": row.assigned_coder_email,
+                "hcc_code": row.hcc_code,
+                "icd10_code": row.icd10_code,
+                "updated_at": row.updated_at,
+            }
+        )
+    return items
+
+
+async def assign_chases_to_coder(
+    session: AsyncSession,
+    *,
+    coder_email: str,
+    coder_id: int | None = None,
+    chase_ids: Sequence[int],
+    member_ids: Sequence[int],
+) -> list[int]:
+    target_ids: set[int] = set(chase_ids or [])
+
+    if member_ids:
+        member_stmt = select(CodingMemberChase.id).where(
+            CodingMemberChase.member_id.in_(member_ids),
+            CodingMemberChase.status != 'closed',
+        )
+        member_rows = (await session.execute(member_stmt)).scalars().all()
+        target_ids.update(member_rows)
+
+    if not target_ids:
+        return []
+
+    chase_stmt = select(CodingMemberChase).where(CodingMemberChase.id.in_(target_ids))
+    chases = (await session.scalars(chase_stmt)).all()
+    for chase in chases:
+        chase.assigned_coder_email = coder_email
+        if coder_id is not None:
+            chase.assigned_coder_id = coder_id
+    await session.flush()
+    return [chase.id for chase in chases]
+
+
+async def list_coders_for_tenant(control_session: AsyncSession, tenant_id: int) -> list[dict[str, object]]:
+    stmt = (
+        select(User)
+        .where(User.tenant_id == tenant_id, User.is_active.is_(True))
+        .order_by(User.email.asc())
+    )
+    users = (await control_session.scalars(stmt)).all()
+    results: list[dict[str, object]] = []
+    for user in users:
+        applications = dict(user.app_permissions or {})
+        results.append(
+            {
+                "id": user.id,
+                "email": user.email,
+                "role": user.role or 'user',
+                "applications": applications,
+            }
+        )
+    return results

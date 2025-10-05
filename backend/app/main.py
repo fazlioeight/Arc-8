@@ -2,7 +2,6 @@
 
 from datetime import datetime, timezone
 
-import bcrypt
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -13,7 +12,7 @@ from .core.config import settings
 from .core.logging_config import setup_logging
 from .dependencies.tenant import get_tenant_context
 from .db.session import get_control_session
-from .db.tenant_manager import TenantContext
+from .db.tenant_manager import TenantContext, tenant_connection_manager
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.request_logging import RequestLoggingMiddleware
 from .middleware.tenant import TenantMiddleware
@@ -25,10 +24,11 @@ from .routes import member_cost as member_cost_router
 from .routes import member_risk as member_risk_router
 from .routes import utilization as utilization_router
 from .utils.audit_logger import record_audit_event
-from .utils.bootstrap import ensure_control_bootstrap
-from .utils.security import AuthenticatedUser, create_access_token, get_current_user
+from .utils.security import AuthenticatedUser, create_access_token, get_current_user, verify_password
 
 setup_logging()
+
+
 
 app = FastAPI(title="Nexora Analytics API", version="2.0.0")
 
@@ -50,10 +50,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.on_event("startup")
-async def startup_bootstrap() -> None:
-    await ensure_control_bootstrap()
+@app.on_event("shutdown")
+async def shutdown_connections() -> None:
+    await tenant_connection_manager.close_all()
 
 
 class LoginRequest(BaseModel):
@@ -94,7 +93,7 @@ async def login(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    if not bcrypt.checkpw(credentials.password.encode(), user.password_hash.encode()):
+    if not await verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     user.last_login_at = datetime.now(timezone.utc)

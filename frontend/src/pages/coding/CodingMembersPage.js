@@ -1,13 +1,12 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Badge, Button, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
+import { Alert, Badge, Button, Card, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
 import PortalHero from '../../components/PortalHero';
 import { AuthContext } from '../../context/AuthContext';
 import { useCommandPalette } from '../../context/CommandPaletteContext';
-import { SAMPLE_CODING_MEMBERS } from '../../utils/sampleData';
-import { fetchCodingMembers } from '../../services/codingService';
+import { fetchCodingMembers, fetchPrioritizedMembers } from '../../services/codingService';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -27,6 +26,8 @@ const CodingMembersPage = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [priorityQueue, setPriorityQueue] = useState([]);
+  const [priorityLoading, setPriorityLoading] = useState(false);
 
   const [searchValue, setSearchValue] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
@@ -34,13 +35,38 @@ const CodingMembersPage = () => {
 
   const canQuery = useMemo(() => token && tenant, [token, tenant]);
 
-  const loadSampleMembers = useCallback(() => {
-    setMembers(SAMPLE_CODING_MEMBERS);
-    setTotal(SAMPLE_CODING_MEMBERS.length);
+  const loadSampleMembers = useCallback(async () => {
+    setLoading(true);
     setError(null);
-    setLoading(false);
-    recordAuditEvent?.('coding.load_sample_members');
-  }, [recordAuditEvent]);
+    try {
+      const response = await fetchCodingMembers('sample-command', tenant || 'demo', {
+        search: searchValue,
+        status: statusFilter ? [statusFilter] : [],
+        lob: lobFilter ? [lobFilter] : [],
+        page: 1,
+      });
+      setMembers(response.items || []);
+      setTotal(response.total || 0);
+      recordAuditEvent?.('coding.load_sample_members');
+    } catch (err) {
+      setError(err.message || 'Unable to load sample members');
+    } finally {
+      setLoading(false);
+    }
+  }, [tenant, searchValue, statusFilter, lobFilter, recordAuditEvent]);
+
+  const loadPrioritizedMembers = useCallback(async () => {
+    if (!canQuery) return;
+    try {
+      setPriorityLoading(true);
+      const response = await fetchPrioritizedMembers(token, tenant, { limit: 10 });
+      setPriorityQueue(response?.items || []);
+    } catch (err) {
+      // silently ignore priority fetch errors for now
+    } finally {
+      setPriorityLoading(false);
+    }
+  }, [canQuery, tenant, token]);
 
   useEffect(() => {
     if (!isAuthenticated || !canQuery) return;
@@ -49,12 +75,17 @@ const CodingMembersPage = () => {
   }, [isAuthenticated, canQuery]);
 
   useEffect(() => {
+    if (!isAuthenticated || !canQuery) return;
+    void loadPrioritizedMembers();
+  }, [isAuthenticated, canQuery, loadPrioritizedMembers]);
+
+  useEffect(() => {
     registerCommands([
       {
         id: 'coding-members-load-sample',
         label: 'Load sample coding members',
         category: 'Coding',
-        action: loadSampleMembers,
+        action: () => { void loadSampleMembers(); },
       },
       {
         id: 'coding-members-clear-filters',
@@ -179,6 +210,45 @@ const CodingMembersPage = () => {
           </Row>
         </Form>
         {error && <Alert variant="danger">{error}</Alert>}
+        <Card className="mb-4">
+          <Card.Header>Top priority members</Card.Header>
+          <Card.Body className="p-0">
+            <Table responsive hover className="mb-0">
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Tier</th>
+                  <th>Score</th>
+                  <th>Next action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {priorityLoading && (
+                  <tr>
+                    <td colSpan={4} className="text-center text-muted py-3">Loading priorities...</td>
+                  </tr>
+                )}
+                {!priorityLoading && priorityQueue.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="text-center text-muted py-3">No prioritized members yet.</td>
+                  </tr>
+                )}
+                {priorityQueue.map(item => (
+                  <tr
+                    key={item.member_id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => navigate(`/coding/members/${item.member_id}`)}
+                  >
+                    <td>{item.member_key}</td>
+                    <td>{item.priority_tier}</td>
+                    <td>{item.priority_score.toFixed ? item.priority_score.toFixed(1) : item.priority_score}</td>
+                    <td>{item.next_action || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </Card.Body>
+        </Card>
         <div className="d-flex justify-content-between align-items-center mb-2">
           <div className="text-muted">{total} member(s) found</div>
           <Button variant="outline-secondary" size="sm" onClick={() => void loadMembers()} disabled={loading}>

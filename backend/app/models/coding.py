@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Optional
+from typing import Any, Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .tables import TenantDataBase
@@ -36,6 +36,21 @@ class CodingMember(TenantDataBase):
         back_populates="member", cascade="all, delete-orphan"
     )
     attachments: Mapped[list["CodingMemberAttachment"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
+    eligibility: Mapped[Optional["CodingMemberEligibility"]] = relationship(
+        back_populates="member", uselist=False, cascade="all, delete-orphan"
+    )
+    claims: Mapped[list["CodingClaim"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
+    mao_records: Mapped[list["CodingMao004Record"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
+    health_assessments: Mapped[list["CodingHealthAssessment"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
+    priorities: Mapped[list["CodingMemberPriority"]] = relationship(
         back_populates="member", cascade="all, delete-orphan"
     )
 
@@ -116,3 +131,106 @@ class CodingProviderLocation(TenantDataBase):
     postal_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
     provider: Mapped[CodingProvider] = relationship(back_populates="location")
+
+
+class CodingMemberEligibility(TenantDataBase):
+    __tablename__ = "coding_member_eligibility"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("coding_members.id", ondelete="CASCADE"), unique=True, index=True)
+    plan_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    plan_end: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    medicare_effective_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    joined_at: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    is_new_to_medicare: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_dual_eligible: Mapped[bool] = mapped_column(Boolean, default=False)
+    risk_tier: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    member: Mapped[CodingMember] = relationship(back_populates="eligibility")
+
+
+class CodingClaim(TenantDataBase):
+    __tablename__ = "coding_claims"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("coding_members.id", ondelete="CASCADE"), index=True)
+    provider_id: Mapped[Optional[int]] = mapped_column(ForeignKey("coding_providers.id", ondelete="SET NULL"), nullable=True)
+    claim_number: Mapped[str] = mapped_column(String(64), index=True)
+    claim_type: Mapped[str] = mapped_column(String(32), default="professional")
+    service_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    diagnosis_codes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    procedure_codes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    hcc_codes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    total_paid: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    chart_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    member: Mapped[CodingMember] = relationship(back_populates="claims")
+    provider: Mapped[Optional[CodingProvider]] = relationship("CodingProvider")
+
+
+class CodingMao004Record(TenantDataBase):
+    __tablename__ = "coding_mao004_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("coding_members.id", ondelete="CASCADE"), index=True)
+    submission_year: Mapped[int] = mapped_column(Integer, index=True)
+    hcc_code: Mapped[str] = mapped_column(String(12))
+    icd10_code: Mapped[Optional[str]] = mapped_column(String(12), nullable=True)
+    service_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    service_end: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    source_claim_number: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="open")
+    last_received_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    member: Mapped[CodingMember] = relationship(back_populates="mao_records")
+
+
+class CodingHealthAssessment(TenantDataBase):
+    __tablename__ = "coding_health_assessments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("coding_members.id", ondelete="CASCADE"), index=True)
+    assessment_date: Mapped[date] = mapped_column(Date)
+    assessment_type: Mapped[str] = mapped_column(String(64))
+    provider_id: Mapped[Optional[int]] = mapped_column(ForeignKey("coding_providers.id", ondelete="SET NULL"), nullable=True)
+    icd10_codes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    hcc_codes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    completion_status: Mapped[str] = mapped_column(String(32), default="pending_submission")
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    member: Mapped[CodingMember] = relationship(back_populates="health_assessments")
+    provider: Mapped[Optional[CodingProvider]] = relationship("CodingProvider")
+
+
+class CodingMemberPriority(TenantDataBase):
+    __tablename__ = "coding_member_priorities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("coding_members.id", ondelete="CASCADE"), unique=True)
+    priority_score: Mapped[float] = mapped_column(Float)
+    priority_tier: Mapped[str] = mapped_column(String(16))
+    hcc_opportunity_count: Mapped[int] = mapped_column(Integer, default=0)
+    next_action: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    next_action_due: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    member: Mapped[CodingMember] = relationship(back_populates="priorities")
+
+
+class CodingSubmissionBatch(TenantDataBase):
+    __tablename__ = "coding_submission_batches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    submission_year: Mapped[int] = mapped_column(Integer, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_by: Mapped[str] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), default="draft")
+    record_count: Mapped[int] = mapped_column(Integer, default=0)
+    payload_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+

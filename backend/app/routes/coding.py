@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,26 +8,41 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies.tenant import get_tenant_context, get_tenant_session
 from ..db.tenant_manager import TenantContext
+from ..db.session import get_control_session
 from ..schemas.coding import (
     CodingAttachment,
     CodingAttachmentCreate,
     CodingChase,
     CodingChaseCreate,
     CodingChaseUpdate,
+    CodingClaimSummary,
+    CodingHealthAssessmentDetail,
+    CodingMaoRecord,
     CodingMemberCreate,
     CodingMemberDetail,
     CodingMemberDetailResponse,
+    CodingMemberEligibility,
     CodingMemberSearchResponse,
     CodingMemberSummary,
+    CodingMemberPriorityView,
+    CodingMemberGapResponse,
+    CodingPrioritizedResponse,
     CodingNote,
     CodingNoteCreate,
     CodingProviderDetail,
     CodingProviderSearchResponse,
     CodingProviderSummary,
+    CoderSummary,
+    CodingAssignmentItem,
+    CodingAssignmentOverview,
+    CodingAssignmentRequest,
+    HealthAssessmentCreate,
+    SubmissionGenerateRequest,
+    SubmissionGenerateResponse,
 )
-from ..services import coding_members
+from ..services import coding_members, mao_analysis, submission_builder
 from ..utils.audit_logger import record_audit_event
-from ..utils.security import AuthenticatedUser, get_current_user
+from ..utils.security import AuthenticatedUser, get_current_user, require_admin
 
 router = APIRouter(prefix="/api/coding", tags=["coding"])
 
@@ -152,6 +168,127 @@ def _provider_to_detail(provider) -> CodingProviderDetail:
     return CodingProviderDetail(**data)
 
 
+def _eligibility_to_schema(eligibility) -> CodingMemberEligibility | None:
+    if not eligibility:
+        return None
+    return CodingMemberEligibility(
+        plan_start=eligibility.plan_start,
+        plan_end=eligibility.plan_end,
+        medicare_effective_date=eligibility.medicare_effective_date,
+        joined_at=eligibility.joined_at,
+        is_new_to_medicare=eligibility.is_new_to_medicare,
+        is_dual_eligible=eligibility.is_dual_eligible,
+        risk_tier=eligibility.risk_tier,
+        last_synced_at=eligibility.last_synced_at,
+    )
+
+
+def _claim_to_schema(claim) -> CodingClaimSummary:
+    return CodingClaimSummary(
+        id=claim.id,
+        claim_number=claim.claim_number,
+        claim_type=claim.claim_type,
+        service_date=claim.service_date,
+        provider_id=claim.provider_id,
+        diagnosis_codes=dict(claim.diagnosis_codes or {}),
+        hcc_codes=dict(claim.hcc_codes or {}),
+        total_paid=claim.total_paid,
+        chart_required=claim.chart_required,
+    )
+
+
+def _mao_record_to_schema(record) -> CodingMaoRecord:
+    return CodingMaoRecord(
+        id=record.id,
+        submission_year=record.submission_year,
+        hcc_code=record.hcc_code,
+        icd10_code=record.icd10_code,
+        service_start=record.service_start,
+        service_end=record.service_end,
+        status=record.status,
+    )
+
+
+def _assessment_to_schema(assessment) -> CodingHealthAssessmentDetail:
+    return CodingHealthAssessmentDetail(
+        id=assessment.id,
+        assessment_date=assessment.assessment_date,
+        assessment_type=assessment.assessment_type,
+        provider_id=assessment.provider_id,
+        icd10_codes=list(assessment.icd10_codes or []),
+        hcc_codes=list(assessment.hcc_codes or []),
+        completion_status=assessment.completion_status,
+        notes=assessment.notes,
+    )
+
+
+def _priority_to_view(member, priority) -> CodingMemberPriorityView:
+    return CodingMemberPriorityView(
+        member_id=member.id,
+        member_key=member.member_key,
+        priority_score=priority.priority_score,
+        priority_tier=priority.priority_tier,
+        hcc_opportunity_count=priority.hcc_opportunity_count,
+        next_action=priority.next_action,
+        next_action_due=priority.next_action_due,
+        justification=priority.justification,
+    )
+
+
+def _coder_to_summary(coder: dict) -> CoderSummary:
+    return CoderSummary(
+        id=coder.get('id'),
+        email=coder.get('email'),
+        role=coder.get('role') or 'user',
+        applications=dict(coder.get('applications') or {}),
+    )
+
+
+def _assignment_to_item(data: dict) -> CodingAssignmentItem:
+    return CodingAssignmentItem(
+        chase_id=data.get('chase_id'),
+        member_id=data.get('member_id'),
+        member_key=data.get('member_key'),
+        member_name=data.get('member_name'),
+        status=data.get('status'),
+        priority=data.get('priority'),
+        assigned_coder_email=data.get('assigned_coder_email'),
+        hcc_code=data.get('hcc_code'),
+        icd10_code=data.get('icd10_code'),
+        updated_at=data.get('updated_at'),
+    )
+
+
+@router.get("/members/prioritized", response_model=CodingPrioritizedResponse)
+async def list_prioritized_members(
+    submission_year: int = Query(default=datetime.utcnow().year),
+    search: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    priorities, total = await coding_members.list_prioritized_members(
+        session, submission_year=submission_year, search=search, limit=limit, offset=offset
+    )
+    items: list[CodingMemberPriorityView] = []
+    for priority in priorities:
+        member = priority.member or await coding_members.get_member(session, priority.member_id)
+        if member is None:
+            continue
+        items.append(_priority_to_view(member, priority))
+    await record_audit_event(
+        session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="coding.members.prioritized",
+        payload={"count": len(items), "submission_year": submission_year},
+    )
+    await session.commit()
+    return CodingPrioritizedResponse(items=items, total=total)
+
+
 @router.get("/members", response_model=CodingMemberSearchResponse)
 async def list_coding_members(
     tenant: TenantContext = Depends(get_tenant_context),
@@ -174,14 +311,7 @@ async def list_coding_members(
     assignments_map: Dict[int, Dict[str, list]] = {}
     if members:
         member_ids = [member.id for member in members]
-        chases = await coding_members.list_chases_for_members(session, member_ids=member_ids)
-        grouped: Dict[int, list] = {}
-        for chase in chases:
-            grouped.setdefault(chase.member_id, []).append(chase)
-        assignments_map = {
-            member_id: _extract_assignment_metadata(grouped.get(member_id, []))
-            for member_id in member_ids
-        }
+        assignments_map = await coding_members.load_assignment_metadata(session, member_ids)
     items = [_member_to_summary(member, assignments_map.get(member.id)) for member in members]
     await record_audit_event(
         session,
@@ -219,6 +349,7 @@ async def create_coding_member(
 @router.get("/members/{member_id}", response_model=CodingMemberDetailResponse)
 async def get_coding_member(
     member_id: int,
+    submission_year: int = Query(default=datetime.utcnow().year),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
@@ -230,6 +361,12 @@ async def get_coding_member(
     notes = await coding_members.list_notes(session, member_id)
     attachments = await coding_members.list_attachments(session, member_id)
     assignment_snapshot = _extract_assignment_metadata(chases)
+    eligibility = await coding_members.get_member_eligibility(session, member.id)
+    claims = await coding_members.list_claims(session, member.id)
+    mao_records = await coding_members.list_mao_records(session, member.id, submission_year=submission_year)
+    assessments = await coding_members.list_health_assessments(session, member.id)
+    priority = await coding_members.get_member_priority(session, member, submission_year=submission_year)
+
     await record_audit_event(
         session,
         tenant_id=tenant.id,
@@ -240,10 +377,40 @@ async def get_coding_member(
     await session.commit()
     return CodingMemberDetailResponse(
         member=_member_to_detail(member, assignment_snapshot),
+        eligibility=_eligibility_to_schema(eligibility),
         chases=[_chase_to_schema(chase) for chase in chases],
         notes=[_note_to_schema(note) for note in notes],
         attachments=[_attachment_to_schema(attachment) for attachment in attachments],
+        claims=[_claim_to_schema(claim) for claim in claims],
+        mao_records=[_mao_record_to_schema(record) for record in mao_records],
+        health_assessments=[_assessment_to_schema(assessment) for assessment in assessments],
+        priority=_priority_to_view(member, priority) if priority else None,
     )
+
+
+@router.get("/members/{member_id}/gaps", response_model=CodingMemberGapResponse)
+async def get_member_gap_analysis(
+    member_id: int,
+    submission_year: int = Query(default=datetime.utcnow().year),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    try:
+        result = await mao_analysis.get_member_gap_analysis(
+            session, member_id=member_id, submission_year=submission_year
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await record_audit_event(
+        session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="coding.members.gaps",
+        payload={"member_id": member_id, "submission_year": submission_year},
+    )
+    await session.commit()
+    return CodingMemberGapResponse(**result)
 
 
 @router.post(
@@ -299,6 +466,37 @@ async def update_member_chase(
 
 
 @router.post(
+    "/members/{member_id}/assessments",
+    response_model=CodingHealthAssessmentDetail,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_health_assessment(
+    member_id: int,
+    payload: HealthAssessmentCreate,
+    submission_year: int = Query(default=datetime.utcnow().year),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    member = await coding_members.get_member(session, member_id)
+    if not member:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    assessment = await coding_members.create_health_assessment(
+        session, member=member, payload=payload.model_dump()
+    )
+    await coding_members.get_member_priority(session, member, submission_year=submission_year)
+    await record_audit_event(
+        session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="coding.assessments.create",
+        payload={"member_id": member.id, "assessment_id": assessment.id},
+    )
+    await session.commit()
+    return _assessment_to_schema(assessment)
+
+
+@router.post(
     "/members/{member_id}/notes",
     response_model=CodingNote,
     status_code=status.HTTP_201_CREATED,
@@ -327,6 +525,98 @@ async def create_member_note(
     )
     await session.commit()
     return _note_to_schema(note)
+
+
+@router.get("/admin/assignments", response_model=CodingAssignmentOverview)
+async def get_admin_assignments(
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(require_admin),
+):
+    items_raw = await coding_members.list_open_assignments(session)
+    coders_raw = await coding_members.list_coders_for_tenant(control_session, tenant.id)
+    overview = CodingAssignmentOverview(
+        coders=[_coder_to_summary(coder) for coder in coders_raw],
+        items=[_assignment_to_item(item) for item in items_raw],
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="coding.assignments.view",
+        payload={"items": len(overview.items)},
+    )
+    await control_session.commit()
+    return overview
+
+
+@router.post("/admin/assignments", response_model=CodingAssignmentOverview)
+async def assign_admin_work(
+    payload: CodingAssignmentRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(require_admin),
+):
+    coders_raw = await coding_members.list_coders_for_tenant(control_session, tenant.id)
+    coder_lookup = {coder["email"].lower(): coder for coder in coders_raw}
+    target_coder = coder_lookup.get(payload.coder_email.lower()) if payload.coder_email else None
+    if target_coder is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coder not found")
+
+    updated_chases = await coding_members.assign_chases_to_coder(
+        session,
+        coder_email=payload.coder_email,
+        coder_id=target_coder.get('id'),
+        chase_ids=payload.chase_ids,
+        member_ids=payload.member_ids,
+    )
+    await session.commit()
+
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="coding.assignments.update",
+        payload={
+            "coder": payload.coder_email,
+            "chase_ids": list(updated_chases),
+            "member_ids": payload.member_ids,
+        },
+    )
+    await control_session.commit()
+
+    items_raw = await coding_members.list_open_assignments(session)
+    overview = CodingAssignmentOverview(
+        coders=[_coder_to_summary(coder) for coder in coders_raw],
+        items=[_assignment_to_item(item) for item in items_raw],
+    )
+    return overview
+
+
+@router.post("/submissions/export", response_model=SubmissionGenerateResponse)
+async def generate_submission_export(
+    request: SubmissionGenerateRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    result = await submission_builder.generate_submission_file(
+        session,
+        submission_year=request.submission_year,
+        creator_email=current_user.email,
+        member_ids=request.member_ids,
+    )
+    await record_audit_event(
+        session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="coding.submissions.generate",
+        payload={"submission_year": request.submission_year, "record_count": result["record_count"]},
+    )
+    await session.commit()
+    return SubmissionGenerateResponse(**result)
 
 
 @router.post(

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     TENANT_DATABASE_URL_TEMPLATE: Optional[str] = None
     DEFAULT_TENANT_DATABASE_URL: Optional[str] = "sqlite+aiosqlite:///./tenants/{tenant_key}.db"
     TENANT_DATABASE_SCHEMA_TEMPLATE: Optional[str] = None
+    TENANT_CONNECTION_CACHE_SIZE: int = 32
 
     REDIS_URL: Optional[str] = None
     RATE_LIMIT_MAX_PER_MINUTE: int = 600
@@ -76,6 +77,22 @@ class Settings(BaseSettings):
         if env == "production" and v.startswith("CHANGE_ME"):
             raise ValueError("SECRET_KEY must be rotated for production")
         return v
+
+
+    @field_validator("TENANT_CONNECTION_CACHE_SIZE", mode="after")
+    @classmethod
+    def validate_tenant_connection_cache_size(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("TENANT_CONNECTION_CACHE_SIZE must be greater than zero")
+        return value
+
+    @field_validator("CONTROL_DATABASE_URL", "DEFAULT_TENANT_DATABASE_URL", mode="after")
+    @classmethod
+    def validate_database_urls(cls, value: Optional[str], info: ValidationInfo) -> Optional[str]:
+        env = (info.data.get("ENVIRONMENT") if info and info.data else "development").lower()
+        if value and value.startswith("sqlite") and env == "production":
+            raise ValueError("SQLite storage is not supported for production workloads; configure a managed database")
+        return value
 
     @field_validator("ALLOWED_TENANT_HOSTS", mode="before")
     @classmethod

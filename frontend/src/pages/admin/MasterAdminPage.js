@@ -1,4 +1,4 @@
-﻿import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalUtilityBar from "../../components/PortalUtilityBar";
 import { AuthContext } from "../../context/AuthContext";
@@ -330,6 +330,9 @@ const MasterAdminPage = () => {
             </p>
           </div>
           <div className="master-admin__actions">
+            <button className="sfdc-button_neutral" onClick={() => navigate('/admin/coding-assignments')}>
+              Coding assignments
+            </button>
             <button className="sfdc-button_neutral" onClick={resetFormForCreate} disabled={saving}>
               + New User
             </button>
