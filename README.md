@@ -20,24 +20,24 @@ Nexora Platform is a healthcare analytics solution for payer groups, now hardene
 
 ```
 nexora-platform/
-Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ backend/
-Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app/
-Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ core/                # settings, logging, redis helpers
-Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ db/                  # async control + tenant session managers
-Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ dependencies/        # FastAPI dependencies (tenant context, sessions)
-Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ middleware/          # tenant resolver, rate limiting, request logging
-Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ models/              # control-plane + tenant-plane SQLAlchemy models
-Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ routes/              # FastAPI routers (analytics, member endpoints)
-Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ services/            # analytics, tenant registry, provisioning helpers
-Ã¢â€â€š   Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ utils/               # security helpers, audit logging
-Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ scripts/seed_demo.py     # Async control/tenant seeding for demo data
-Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ alembic/                 # Control plane migrations
-Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ tests/                   # pytest + httpx async tests for tenant isolation
-Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ frontend/
-    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ src/context/AuthContext.js          # stores token + tenant context
-    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ src/pages/Login.js                  # multi-tenant aware login flow
-    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ src/services/memberCostService.js   # tenant-authenticated API calls
-    Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ src/__tests__/                      # Jest tests
+  backend/
+    app/
+      core/                # settings, logging, redis helpers
+      db/                  # async control + tenant session managers
+      dependencies/        # FastAPI dependencies (tenant context, sessions)
+      middleware/          # tenant resolver, rate limiting, request logging
+      models/              # control-plane + tenant-plane SQLAlchemy models
+      routes/              # FastAPI routers (analytics, member endpoints)
+      services/            # analytics, tenant registry, provisioning helpers
+      utils/               # security helpers, audit logging
+    scripts/seed_demo.py   # Async control/tenant seeding for demo data
+    alembic/               # Control plane migrations
+    tests/                 # pytest + httpx async tests for tenant isolation
+  frontend/
+    src/context/AuthContext.js        # stores token + tenant context
+    src/pages/Login.js                # multi-tenant aware login flow
+    src/services/memberCostService.js # tenant-authenticated API calls
+    src/__tests__/                    # Jest tests
 ```
 
 ## Backend Setup
@@ -112,12 +112,13 @@ Use `app/services/provisioning.py::provision_tenant` inside an async control-pla
 
 > All endpoints expect `X-Tenant-Key` and a valid JWT unless noted.
 
-- `POST /api/login` Ã¢â€ â€™ `{ token, email, tenant, role }`
-- `GET /api/tenant/self` Ã¢â€ â€™ tenant metadata, feature flags, current user context
+- `POST /api/login` -> returns `{ token, email, tenant, role }`
+- `GET /api/tenant/self` -> tenant metadata, feature flags, current user context
 - `GET /api/analytics/summary`
 - `GET /member/{member_id}/costs`
 - `GET /member/{member_id}/risk`
 - `GET /overutilization/?threshold=`
+
 
 Unauthorized or cross-tenant attempts return `401/403`. Excessive calls return `429` with rate-limit headers.
 
