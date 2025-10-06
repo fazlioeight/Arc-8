@@ -1,4 +1,4 @@
-﻿# Nexora Platform
+# Nexora Platform
 
 Nexora Platform is a healthcare analytics solution for payer groups, now hardened for HIPAA-compliant, multi-tenant SaaS operation. The system is split between a control plane (FastAPI + PostgreSQL/SQLite) that manages tenants, users, and audit trails, and isolated tenant data planes where PHI lives in per-tenant schemas or databases. A React SPA consumes the public APIs, and optional Streamlit dashboards can be layered on top of the API for ad-hoc analytics.
 
@@ -20,24 +20,24 @@ Nexora Platform is a healthcare analytics solution for payer groups, now hardene
 
 ```
 nexora-platform/
-├── backend/
-│   ├── app/
-│   │   ├── core/                # settings, logging, redis helpers
-│   │   ├── db/                  # async control + tenant session managers
-│   │   ├── dependencies/        # FastAPI dependencies (tenant context, sessions)
-│   │   ├── middleware/          # tenant resolver, rate limiting, request logging
-│   │   ├── models/              # control-plane + tenant-plane SQLAlchemy models
-│   │   ├── routes/              # FastAPI routers (analytics, member endpoints)
-│   │   ├── services/            # analytics, tenant registry, provisioning helpers
-│   │   └── utils/               # security helpers, audit logging
-│   ├── scripts/seed_demo.py     # Async control/tenant seeding for demo data
-│   ├── alembic/                 # Control plane migrations
-│   └── tests/                   # pytest + httpx async tests for tenant isolation
-└── frontend/
-    ├── src/context/AuthContext.js          # stores token + tenant context
-    ├── src/pages/Login.js                  # multi-tenant aware login flow
-    ├── src/services/memberCostService.js   # tenant-authenticated API calls
-    └── src/__tests__/                      # Jest tests
+Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ backend/
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ app/
+Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ core/                # settings, logging, redis helpers
+Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ db/                  # async control + tenant session managers
+Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ dependencies/        # FastAPI dependencies (tenant context, sessions)
+Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ middleware/          # tenant resolver, rate limiting, request logging
+Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ models/              # control-plane + tenant-plane SQLAlchemy models
+Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ routes/              # FastAPI routers (analytics, member endpoints)
+Ã¢â€â€š   Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ services/            # analytics, tenant registry, provisioning helpers
+Ã¢â€â€š   Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ utils/               # security helpers, audit logging
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ scripts/seed_demo.py     # Async control/tenant seeding for demo data
+Ã¢â€â€š   Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ alembic/                 # Control plane migrations
+Ã¢â€â€š   Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ tests/                   # pytest + httpx async tests for tenant isolation
+Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ frontend/
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ src/context/AuthContext.js          # stores token + tenant context
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ src/pages/Login.js                  # multi-tenant aware login flow
+    Ã¢â€Å“Ã¢â€â‚¬Ã¢â€â‚¬ src/services/memberCostService.js   # tenant-authenticated API calls
+    Ã¢â€â€Ã¢â€â‚¬Ã¢â€â‚¬ src/__tests__/                      # Jest tests
 ```
 
 ## Backend Setup
@@ -96,6 +96,13 @@ Use `app/services/provisioning.py::provision_tenant` inside an async control-pla
 2. Configure `REACT_APP_API_BASE` (defaults to `http://localhost:8000`).
 3. The login view now sends `X-Tenant-Key` and persists `{ token, tenant, role }` in `AuthContext`. Service calls use those values when hitting backend APIs.
 
+### Import & Job Monitoring
+
+- Launch the importer at `/jobs/import-data` to upload members, providers, claims, MAO-004, or chart manifest files.
+- Each dataset card supports drag-and-drop or file browser uploads for `.txt`, `.csv`, and `.xlsx` sources and surfaces the first 900 characters of text files so you can verify formatting (spreadsheets note that previews are unavailable).
+- Queueing an import adds it to the on-page activity table and records audit events; progress is simulated locally until a backend pipeline is connected.
+- Use the `View Job Status Center` button (or directly visit `/jobs/status-center`) to review import progress, download logs, retry jobs, and take advantage of the new `Go to Import Data` shortcut back to the uploader.
+
 ## Testing
 
 - **Backend**: `cd backend && pytest` (uses async httpx client, bootstraps control + tenant test databases under `backend/tests/`).
@@ -105,8 +112,8 @@ Use `app/services/provisioning.py::provision_tenant` inside an async control-pla
 
 > All endpoints expect `X-Tenant-Key` and a valid JWT unless noted.
 
-- `POST /api/login` → `{ token, email, tenant, role }`
-- `GET /api/tenant/self` → tenant metadata, feature flags, current user context
+- `POST /api/login` Ã¢â€ â€™ `{ token, email, tenant, role }`
+- `GET /api/tenant/self` Ã¢â€ â€™ tenant metadata, feature flags, current user context
 - `GET /api/analytics/summary`
 - `GET /member/{member_id}/costs`
 - `GET /member/{member_id}/risk`
