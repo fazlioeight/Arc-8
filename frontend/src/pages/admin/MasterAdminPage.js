@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalUtilityBar from "../../components/PortalUtilityBar";
 import { AuthContext } from "../../context/AuthContext";
@@ -7,6 +7,7 @@ import {
   fetchAdminApplications,
   fetchAdminUsers,
   updateAdminUser,
+  updatePurchasedApplications,
 } from "../../services/adminService";
 import "../../index.css";
 import "../portal_page/portalPage.sfdc.css";
@@ -21,6 +22,8 @@ const buildApplicationState = (apps, userApps = {}) => {
       base[app.key] = userApps[app.key] || "user";
     } else if (app.key === "admin_console") {
       base[app.key] = userApps[app.key] || "none";
+    } else if (app.core) {
+      base[app.key] = userApps[app.key] || "user";
     } else {
       base[app.key] = userApps[app.key] || "none";
     }
@@ -44,18 +47,31 @@ const summarizeApplications = (appDefinitions, appPermissions) => {
   appDefinitions.forEach((app) => {
     const level = appPermissions[app.key];
     if (level) {
-      summary.push(`${app.label}: ${level === "admin" ? "Admin" : "User"}`);
+      const friendly = level === 'admin' ? 'Admin' : level === 'manager' ? 'Manager' : 'User';
+      summary.push(`${app.label}: ${friendly}`);
     }
   });
   return summary.length ? summary.join(", ") : "No access";
+};
+
+const formatGlobalRole = (value) => {
+  if (value === 'platform_admin') return 'Platform admin';
+  if (value === 'admin') return 'Admin';
+  return 'User';
 };
 
 const MasterAdminPage = () => {
   const navigate = useNavigate();
   const { token, tenant, role, user } = useContext(AuthContext) || {};
   const [loading, setLoading] = useState(true);
+  const isPlatformAdmin = role === 'platform_admin';
+  const isTenantAdmin = role === 'admin';
+  const isAdmin = isPlatformAdmin || isTenantAdmin;
   const [saving, setSaving] = useState(false);
   const [apps, setApps] = useState([]);
+  const [purchaseSelections, setPurchaseSelections] = useState(() => new Set());
+  const [purchaseDirty, setPurchaseDirty] = useState(false);
+  const [savingPurchases, setSavingPurchases] = useState(false);
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [form, setForm] = useState({ email: "", password: "", role: "user", is_active: true, applications: {} });
@@ -65,17 +81,15 @@ const MasterAdminPage = () => {
   const [sampleMode, setSampleMode] = useState(false);
   const [search, setSearch] = useState("");
 
-  const isAdmin = role === "admin";
-
   useEffect(() => {
     if (!token) {
       navigate("/login");
       return;
     }
-    if (token && role && role !== "admin") {
+    if (token && role && !isAdmin) {
       navigate("/portal_page/portalPage");
     }
-  }, [token, role, navigate]);
+  }, [token, role, isAdmin, navigate]);
 
   useEffect(() => {
     let isActive = true;
@@ -92,6 +106,8 @@ const MasterAdminPage = () => {
         const sortedApps = [...(appsResponse.applications || [])].sort((a, b) => a.label.localeCompare(b.label));
         const sortedUsers = [...(usersResponse.users || [])].sort((a, b) => a.email.localeCompare(b.email));
         setApps(sortedApps);
+        setPurchaseSelections(new Set(sortedApps.filter((app) => app.core || app.purchased).map((app) => app.key)));
+        setPurchaseDirty(false);
         setUsers(sortedUsers);
         const sampleActive = Boolean(appsResponse.__sample || usersResponse.__sample);
         setSampleMode(sampleActive);
@@ -138,7 +154,99 @@ const MasterAdminPage = () => {
     return () => clearTimeout(id);
   }, [statusMessage]);
 
-  const filteredUsers = useMemo(() => {
+  const handlePurchaseToggle = useCallback((appKey, enabled) => {
+    if (!appKey || !isPlatformAdmin) return;
+    setPurchaseSelections((prev) => {
+      const next = new Set(prev);
+      if (enabled) {
+        next.add(appKey);
+      } else {
+        next.delete(appKey);
+      }
+      return next;
+    });
+    if (!enabled) {
+      setForm((prev) => ({
+        ...prev,
+        applications: {
+          ...prev.applications,
+          [appKey]: 'none',
+        },
+      }));
+    }
+    setPurchaseDirty(true);
+    setStatusMessage('');
+  }, [isPlatformAdmin, setForm]);
+
+  const handleSavePurchases = useCallback(async () => {
+    if (!isPlatformAdmin || !token || !tenant) return;
+    setSavingPurchases(true);
+    setError('');
+    try {
+      const optionalSelections = apps
+        .filter((app) => !app.core && purchaseSelections.has(app.key))
+        .map((app) => app.key);
+
+      let updatedApps;
+      if (sampleMode) {
+        updatedApps = apps
+          .map((app) => ({
+            ...app,
+            purchased: app.core ? true : purchaseSelections.has(app.key),
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label));
+        setStatusMessage('Updated purchased applications (sample)');
+      } else {
+        const response = await updatePurchasedApplications({
+          token,
+          tenant,
+          purchased: optionalSelections,
+        });
+        updatedApps = [...(response.applications || [])].sort((a, b) => a.label.localeCompare(b.label));
+        setStatusMessage('Application purchases updated');
+      }
+
+      setApps(updatedApps);
+      const allowedKeys = new Set(updatedApps.filter((app) => app.core || app.purchased).map((app) => app.key));
+      setPurchaseSelections(new Set(allowedKeys));
+      setPurchaseDirty(false);
+
+      const nextUsers = users.map((record) => ({
+        ...record,
+        applications: Object.fromEntries(
+          Object.entries(record.applications || {}).filter(([key]) => allowedKeys.has(key))
+        ),
+      }));
+      setUsers(nextUsers);
+
+      if (selectedUserId) {
+        const targetUser = nextUsers.find((item) => item.id === selectedUserId);
+        if (targetUser) {
+          setForm((prev) => ({
+            ...prev,
+            applications: buildApplicationState(updatedApps, targetUser.applications),
+          }));
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            applications: buildApplicationState(updatedApps, {}),
+          }));
+        }
+      } else {
+        setForm((prev) => ({
+          ...prev,
+          applications: buildApplicationState(updatedApps, {}),
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to update purchases');
+    } finally {
+      setSavingPurchases(false);
+    }
+  }, [apps, purchaseSelections, sampleMode, selectedUserId, token, tenant, users, isPlatformAdmin]);
+
+const filteredUsers = useMemo(() => {
     if (!search) return users;
     const term = search.toLowerCase();
     return users.filter((u) => u.email.toLowerCase().includes(term));
@@ -330,9 +438,6 @@ const MasterAdminPage = () => {
             </p>
           </div>
           <div className="master-admin__actions">
-            <button className="sfdc-button_neutral" onClick={() => navigate('/admin/coding-assignments')}>
-              Coding assignments
-            </button>
             <button className="sfdc-button_neutral" onClick={resetFormForCreate} disabled={saving}>
               + New User
             </button>
@@ -376,7 +481,7 @@ const MasterAdminPage = () => {
                     onClick={() => handleSelectUser(record)}
                   >
                     <span>{record.email}</span>
-                    <span className={`badge badge--${record.role}`}>{record.role}</span>
+                    <span className={`badge badge--${record.role}`}>{formatGlobalRole(record.role)}</span>
                     <span className={`badge badge--${record.is_active ? 'active' : 'inactive'}`}>
                       {record.is_active ? 'Active' : 'Inactive'}
                     </span>
@@ -390,6 +495,66 @@ const MasterAdminPage = () => {
             </section>
 
             <section className="master-admin__form">
+              {isPlatformAdmin ? (
+                <div className="master-admin__section">
+                  <h2>Application Catalog</h2>
+                  <p className="master-admin__hint">Enable optional applications for this tenant. Core applications are always included.</p>
+                  <div className="master-admin__appsGrid master-admin__appsGrid--purchases">
+                    {apps.map((app) => {
+                      const isSelected = purchaseSelections.has(app.key);
+                      return (
+                        <div key={app.key} className="master-admin__appCard">
+                          <div className="master-admin__appTitle">{app.label}</div>
+                          {app.description && <div className="master-admin__appDesc">{app.description}</div>}
+                          <div className="master-admin__purchaseRow">
+                            {app.core ? (
+                              <span className="master-admin__badge master-admin__badge--core">Included</span>
+                            ) : (
+                              <label className="master-admin__checkbox master-admin__checkbox--purchase">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => handlePurchaseToggle(app.key, e.target.checked)}
+                                />
+                                <span>Purchased</span>
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="master-admin__actionsRow">
+                    <button
+                      type="button"
+                      className="sfdc-button_brand"
+                      onClick={handleSavePurchases}
+                      disabled={savingPurchases || !purchaseDirty}
+                    >
+                      {savingPurchases ? 'Saving...' : 'Save application purchases'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="master-admin__section">
+                  <h2>Application Catalog</h2>
+                  <p className="master-admin__hint">Contact Nexora to add or remove applications from your subscription.</p>
+                  <div className="master-admin__appsGrid master-admin__appsGrid--purchases">
+                    {apps.map((app) => {
+                      const isPurchased = purchaseSelections.has(app.key);
+                      const badgeClass = `master-admin__badge ${app.core ? 'master-admin__badge--core' : isPurchased ? 'master-admin__badge--purchased' : 'master-admin__badge--unpurchased'}`;
+                      const badgeLabel = app.core ? 'Included' : isPurchased ? 'Purchased' : 'Not purchased';
+                      return (
+                        <div key={app.key} className="master-admin__appCard">
+                          <div className="master-admin__appTitle">{app.label}</div>
+                          {app.description && <div className="master-admin__appDesc">{app.description}</div>}
+                          <div className={badgeClass}>{badgeLabel}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <form onSubmit={handleSubmit}>
                 <div className="master-admin__formHeader">
                   <h2>{mode === 'create' ? 'Create New User' : `Edit ${form.email}`}</h2>
@@ -425,6 +590,7 @@ const MasterAdminPage = () => {
                   <select value={form.role} onChange={(e) => handleFieldChange('role', e.target.value)}>
                     <option value="user">Non admin user</option>
                     <option value="admin">Administration</option>
+                    {isPlatformAdmin && <option value="platform_admin">Platform administration</option>}
                   </select>
                 </label>
 
@@ -444,6 +610,7 @@ const MasterAdminPage = () => {
                     {apps.map((app) => {
                       const value = form.applications?.[app.key] || (app.key === 'portal' ? 'user' : 'none');
                       const isAdminOnly = app.key === 'admin_console';
+                      const isPurchased = app.core || purchaseSelections.has(app.key);
                       return (
                         <div key={app.key} className="master-admin__appCard">
                           <div className="master-admin__appTitle">{app.label}</div>
@@ -458,6 +625,7 @@ const MasterAdminPage = () => {
                                     value="user"
                                     checked={value === 'user'}
                                     onChange={() => handleApplicationChange(app.key, 'user')}
+                                    disabled={!isPurchased}
                                   />
                                   Non admin user
                                 </label>
@@ -468,6 +636,7 @@ const MasterAdminPage = () => {
                                     value="admin"
                                     checked={value === 'admin'}
                                     onChange={() => handleApplicationChange(app.key, 'admin')}
+                                    disabled={!isPurchased}
                                   />
                                   Administration
                                 </label>
@@ -493,6 +662,7 @@ const MasterAdminPage = () => {
                                       value="user"
                                       checked={value === 'user'}
                                       onChange={() => handleApplicationChange(app.key, 'user')}
+                                      disabled={!isPurchased}
                                     />
                                     Non admin user
                                   </label>
@@ -504,9 +674,13 @@ const MasterAdminPage = () => {
                                     value="admin"
                                     checked={value === 'admin'}
                                     onChange={() => handleApplicationChange(app.key, 'admin')}
+                                    disabled={!isPurchased}
                                   />
                                   Administration
                                 </label>
+                                {!isPurchased && (
+                                  <div className="master-admin__hint master-admin__hint--inline">Purchase this application to assign access.</div>
+                                )}
                               </>
                             )}
                           </div>

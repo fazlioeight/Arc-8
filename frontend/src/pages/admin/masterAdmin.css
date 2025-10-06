@@ -309,3 +309,56 @@
 }
 
 
+
+
+.master-admin__appsGrid--purchases {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.master-admin__purchaseRow {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.master-admin__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(1, 118, 211, 0.14);
+  color: #0a58ca;
+}
+
+.master-admin__badge--core {
+  background: rgba(16, 185, 129, 0.18);
+  color: #047857;
+}
+
+.master-admin__checkbox--purchase {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.badge--platform_admin {
+  background: rgba(14, 165, 233, 0.16);
+  color: #0c4a6e;
+}
+
+.master-admin__badge--purchased {
+  background: rgba(34, 197, 94, 0.16);
+  color: #047857;
+}
+
+.master-admin__badge--unpurchased {
+  background: rgba(248, 113, 113, 0.18);
+  color: #b91c1c;
+}

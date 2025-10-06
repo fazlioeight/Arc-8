@@ -3,13 +3,15 @@
 export const SAMPLE_SESSION = {
   email: 'chief.admin@nexora.ai',
   name: 'Chief Admin',
-  role: 'admin',
+  role: 'platform_admin',
   tenant: 'demo',
   tenants: DEFAULT_TENANTS,
   applications: {
     ...DEFAULT_APPLICATIONS,
     ride_booking: 'admin',
   },
+  purchased_applications: ['portal', 'dashboard', 'coding', 'ride_booking', 'docs', 'settings', 'job_center', 'admin_console'],
+  available_applications: ['portal', 'dashboard', 'coding', 'ride_booking', 'docs', 'settings', 'job_center', 'admin_console'],
   token: 'sample-demo-token',
 };
 
@@ -167,20 +169,21 @@ export const SAMPLE_TENANT_COMMENTS = {
 };
 
 export const SAMPLE_ADMIN_APPLICATIONS = [
-  { key: 'portal', label: 'Portal Overview', description: 'Tenant home with key KPIs and announcements.' },
-  { key: 'dashboard', label: 'Analytics Dashboard', description: 'Deep dives into BUR, RAF, and quality metrics.' },
-  { key: 'coding', label: 'Coding Worklists', description: 'Manage chart reviews and coder assignments.' },
-  { key: 'ride_booking', label: 'Ride Booking', description: 'Coordinate member transportation and partner dispatch.' },
-  { key: 'job_center', label: 'Job Center', description: 'Monitor imports, exports, and model runs.' },
-  { key: 'docs', label: 'Docs Library', description: 'Internal documentation and SOPs.' },
-  { key: 'admin_console', label: 'Master Admin', description: 'Manage users, roles, and tenant branding.' },
+  { key: 'portal', label: 'Portal Overview', description: 'Tenant home with key KPIs and announcements.', core: true, purchased: true },
+  { key: 'dashboard', label: 'Analytics Dashboard', description: 'Deep dives into BUR, RAF, and quality metrics.', core: false, purchased: true },
+  { key: 'coding', label: 'Coding Worklists', description: 'Manage chart reviews and coder assignments.', core: false, purchased: true },
+  { key: 'ride_booking', label: 'Ride Booking', description: 'Coordinate member transportation and partner dispatch.', core: false, purchased: true },
+  { key: 'job_center', label: 'Job Center', description: 'Monitor imports, exports, and model runs.', core: false, purchased: true },
+  { key: 'docs', label: 'Docs Library', description: 'Internal documentation and SOPs.', core: false, purchased: true },
+  { key: 'admin_console', label: 'Master Admin', description: 'Manage users, roles, and tenant branding.', core: true, purchased: true },
+  { key: 'settings', label: 'Settings', description: 'Configure preferences and integrations.', core: true, purchased: true },
 ];
 
 export const SAMPLE_ADMIN_USERS = [
   {
     id: 'sample-admin-root',
     email: 'alex.admin@nexora.ai',
-    role: 'admin',
+    role: 'platform_admin',
     is_active: true,
     applications: {
       portal: 'admin',

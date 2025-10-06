@@ -29,7 +29,17 @@ const handleResponse = async (response) => {
   return data;
 };
 
-const sampleApplicationsResponse = () => ({ applications: SAMPLE_ADMIN_APPLICATIONS, __sample: true });
+let samplePurchaseState = new Set(
+  SAMPLE_ADMIN_APPLICATIONS.filter((app) => app.purchased || app.core).map((app) => app.key)
+);
+
+const buildSampleAdminApps = () =>
+  SAMPLE_ADMIN_APPLICATIONS.map((app) => ({
+    ...app,
+    purchased: app.core ? true : samplePurchaseState.has(app.key),
+  }));
+
+const sampleApplicationsResponse = () => ({ applications: buildSampleAdminApps(), __sample: true });
 const sampleUsersResponse = () => ({ users: SAMPLE_ADMIN_USERS, __sample: true });
 
 const buildSampleApplications = (__fullApplications, overrides = {}) => {
@@ -96,6 +106,20 @@ export const updateAdminUser = async ({ token, tenant, userId, payload = {} }) =
     method: 'PATCH',
     headers: buildHeaders(token, tenant),
     body: JSON.stringify(apiPayload),
+  });
+  return handleResponse(response);
+};
+
+export const updatePurchasedApplications = async ({ token, tenant, purchased = [] }) => {
+  if (shouldUseSample(token)) {
+    const coreKeys = SAMPLE_ADMIN_APPLICATIONS.filter((app) => app.core).map((app) => app.key);
+    samplePurchaseState = new Set([...purchased, ...coreKeys]);
+    return { applications: buildSampleAdminApps(), __sample: true };
+  }
+  const response = await fetch(`${API_BASE}/api/admin/applications`, {
+    method: 'PATCH',
+    headers: buildHeaders(token, tenant),
+    body: JSON.stringify({ purchased }),
   });
   return handleResponse(response);
 };

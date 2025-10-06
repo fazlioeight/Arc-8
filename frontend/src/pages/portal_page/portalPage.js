@@ -82,9 +82,21 @@ const formatRelativeTime = (value) => {
   }
 };
 
+const formatRoleLabel = (value) => {
+  if (!value) return 'User';
+  switch (value) {
+    case 'admin':
+      return 'Admin';
+    case 'platform_admin':
+      return 'Platform admin';
+    default:
+      return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
+  }
+};
+
 const PortalPage = () => {
   const navigate = useNavigate();
-  const { user, applications: accessMap = {} } = useContext(AuthContext) || {};
+  const { user, applications: accessMap = {}, availableApplications = [], purchasedApplications = [] } = useContext(AuthContext) || {};
   const [overview, setOverview] = useState({
     loading: true,
     error: null,
@@ -157,13 +169,23 @@ const PortalPage = () => {
     []
   );
 
+  const filteredCatalog = useMemo(() => {
+    const sourceKeys = (availableApplications && availableApplications.length)
+      ? availableApplications
+      : (purchasedApplications && purchasedApplications.length)
+        ? purchasedApplications
+        : appCatalog.map((app) => app.key);
+    const enabledKeys = new Set(sourceKeys);
+    return appCatalog.filter((app) => enabledKeys.has(app.key));
+  }, [appCatalog, availableApplications, purchasedApplications]);
+
   const hasAccessInfo = useMemo(
     () => Object.keys(accessMap || {}).length > 0,
     [accessMap]
   );
 
   const resolvedApps = useMemo(() => {
-    return appCatalog.map((app) => {
+    return filteredCatalog.map((app) => {
       const level = accessMap?.[app.key];
       const allowed = hasAccessInfo
         ? app.key === "portal"
@@ -174,7 +196,7 @@ const PortalPage = () => {
         : true;
       return { ...app, level, allowed };
     });
-  }, [appCatalog, accessMap, hasAccessInfo]);
+  }, [filteredCatalog, accessMap, hasAccessInfo]);
 
   useEffect(() => {
     let isMounted = true;
@@ -287,7 +309,7 @@ const PortalPage = () => {
               <dl className="portal-profile__details">
                 <div>
                   <dt>Role</dt>
-                  <dd>{overview.profile?.role || "User"}</dd>
+                  <dd>{formatRoleLabel(overview.profile?.role)}</dd>
                 </div>
                 <div>
                   <dt>Last login</dt>

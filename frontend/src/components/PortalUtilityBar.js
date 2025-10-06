@@ -12,6 +12,8 @@ const PortalUtilityBar = () => {
     user,
     logout,
     hasApplicationAccess,
+    availableApplications = [],
+    purchasedApplications = [],
     availableTenants = [],
     tenant,
     tenantInfo,
@@ -64,11 +66,17 @@ const PortalUtilityBar = () => {
 
   const accessibleApps = useMemo(() => {
     if (!hasApplicationAccess) return [];
+    const enabledKeys = new Set(
+      (availableApplications && availableApplications.length)
+        ? availableApplications
+        : applicationTiles.map((app) => app.key)
+    );
     return applicationTiles.filter((app) => {
+      if (!enabledKeys.has(app.key)) return false;
       const level = app.requiredLevel || 'user';
       return hasApplicationAccess(app.key, level);
     });
-  }, [applicationTiles, hasApplicationAccess]);
+  }, [applicationTiles, availableApplications, hasApplicationAccess]);
 
   const recentEvents = useMemo(() => (auditTrail || []).slice(0, 4), [auditTrail]);
 

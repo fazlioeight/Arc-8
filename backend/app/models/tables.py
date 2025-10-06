@@ -43,6 +43,7 @@ class Tenant(ControlBase):
     db_schema: Mapped[str | None] = mapped_column(String(128), nullable=True)
     billing_plan: Mapped[str] = mapped_column(String(64), default="standard", nullable=False)
     feature_flags: Mapped[Dict[str, bool]] = mapped_column(JSON, default=dict)
+    purchased_applications: Mapped[Dict[str, bool]] = mapped_column(JSON, default=dict)
     sso_metadata: Mapped[str | None] = mapped_column(Text, nullable=True)
     phi_data_classification: Mapped[str] = mapped_column(String(64), default="restricted", nullable=False)
     data_residency: Mapped[str | None] = mapped_column(String(64), nullable=True)

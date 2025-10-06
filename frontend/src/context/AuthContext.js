@@ -25,6 +25,17 @@ export const DEFAULT_APPLICATIONS = {
   admin_console: 'admin',
 };
 
+const toKeyList = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .filter(([, enabled]) => Boolean(enabled))
+      .map(([key]) => key);
+  }
+  return [];
+};
+
 const resolveTenantInfo = (tenants = [], key) => tenants.find((t) => t.key === key) || (key ? { key, name: key } : null);
 
 const normalizeState = (raw) => {
@@ -40,6 +51,21 @@ const normalizeState = (raw) => {
   const applications = raw.applications && Object.keys(raw.applications).length
     ? raw.applications
     : DEFAULT_APPLICATIONS;
+  const applicationKeys = Object.keys(applications);
+  let availableApplications = toKeyList(raw.available_applications ?? raw.availableApplications);
+  if (!availableApplications.length) {
+    availableApplications = applicationKeys;
+  } else {
+    availableApplications = Array.from(new Set(availableApplications.filter((key) => applicationKeys.includes(key))));
+  }
+  let purchasedApplications = toKeyList(raw.purchased_applications ?? raw.purchasedApplications);
+  if (!purchasedApplications.length) {
+    purchasedApplications = availableApplications.filter((key) =>
+      key === 'admin_console' ? Boolean(applications[key]) : Boolean(applications[key] || DEFAULT_APPLICATIONS[key])
+    );
+  } else {
+    purchasedApplications = Array.from(new Set(purchasedApplications.filter((key) => availableApplications.includes(key))));
+  }
   const baseSession = raw.session || {};
   const session = {
     lastActiveAt: baseSession.lastActiveAt || now,
@@ -71,6 +97,8 @@ const normalizeState = (raw) => {
     tenantInfo,
     availableTenants,
     applications,
+    availableApplications,
+    purchasedApplications,
     auditTrail: Array.isArray(raw.auditTrail) ? raw.auditTrail : [],
     impersonation,
     session,
@@ -164,9 +192,19 @@ export const AuthProvider = ({ children }) => {
     }
   }, [authState?.tenantInfo, authState?.impersonation]);
 
+  const coreApps = useMemo(() => new Set(['portal', 'settings', 'admin_console']), []);
+
   const hasApplicationAccess = useCallback((appKey, requiredLevel = 'user') => {
     if (!authState) return false;
     const apps = authState.impersonation?.applications || authState.applications || {};
+    const available = authState.impersonation?.availableApplications || authState.availableApplications || [];
+    const purchased = authState.impersonation?.purchasedApplications || authState.purchasedApplications || [];
+    if (Array.isArray(available) && available.length && !available.includes(appKey) && !coreApps.has(appKey)) {
+      return false;
+    }
+    if (Array.isArray(purchased) && purchased.length && !purchased.includes(appKey) && !coreApps.has(appKey)) {
+      return false;
+    }
     const level = apps[appKey];
     if (!level) return false;
     if (requiredLevel === 'admin') {
@@ -401,6 +439,8 @@ export const AuthProvider = ({ children }) => {
   }, [authState?.token, authState?.session?.lastActiveAt, authState?.session?.inactivityTimeoutMs]);
 
   const effectiveApplications = authState?.impersonation?.applications || authState?.applications || {};
+  const effectiveAvailableApplications = authState?.impersonation?.availableApplications || authState?.availableApplications || [];
+  const effectivePurchasedApplications = authState?.impersonation?.purchasedApplications || authState?.purchasedApplications || effectiveAvailableApplications;
   const effectiveTenant = authState?.impersonation?.tenant || authState?.tenant;
   const effectiveTenantInfo = authState?.impersonation?.tenantInfo || authState?.tenantInfo;
   const effectiveRole = authState?.impersonation?.role || authState?.role;
@@ -415,6 +455,10 @@ export const AuthProvider = ({ children }) => {
           tenantInfo: effectiveTenantInfo,
           role: effectiveRole,
           applications: effectiveApplications,
+    availableApplications: effectiveAvailableApplications,
+    purchasedApplications: effectivePurchasedApplications,
+          availableApplications: effectiveAvailableApplications,
+          purchasedApplications: effectivePurchasedApplications,
         }
       : null,
     primaryUser: authState,
@@ -423,6 +467,8 @@ export const AuthProvider = ({ children }) => {
     tenantInfo: effectiveTenantInfo,
     role: effectiveRole,
     applications: effectiveApplications,
+    availableApplications: effectiveAvailableApplications,
+    purchasedApplications: effectivePurchasedApplications,
     availableTenants: authState?.availableTenants || DEFAULT_TENANTS,
     impersonation: authState?.impersonation,
     isImpersonating: Boolean(authState?.impersonation),
@@ -442,6 +488,8 @@ export const AuthProvider = ({ children }) => {
   }), [
     authState,
     effectiveApplications,
+    effectiveAvailableApplications,
+    effectivePurchasedApplications,
     effectiveEmail,
     effectiveRole,
     effectiveTenant,
@@ -463,3 +511,10 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
+
+
+
+
+
+
+

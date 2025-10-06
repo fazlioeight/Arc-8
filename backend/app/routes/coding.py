@@ -42,9 +42,13 @@ from ..schemas.coding import (
 )
 from ..services import coding_members, mao_analysis, submission_builder
 from ..utils.audit_logger import record_audit_event
-from ..utils.security import AuthenticatedUser, get_current_user, require_admin
+from ..utils.security import AuthenticatedUser, get_current_user, require_admin, require_application
 
-router = APIRouter(prefix="/api/coding", tags=["coding"])
+router = APIRouter(
+    prefix="/api/coding",
+    tags=["coding"],
+    dependencies=[Depends(require_application("coding"))],
+)
 
 
 def _member_to_summary(member, assignment: Optional[Dict[str, list]] = None) -> CodingMemberSummary:

@@ -24,7 +24,14 @@ from .routes import member_cost as member_cost_router
 from .routes import member_risk as member_risk_router
 from .routes import utilization as utilization_router
 from .utils.audit_logger import record_audit_event
-from .utils.security import AuthenticatedUser, create_access_token, get_current_user, verify_password
+from .utils.security import (
+    AuthenticatedUser,
+    create_access_token,
+    filter_application_permissions,
+    get_current_user,
+    tenant_application_keys,
+    verify_password,
+)
 
 setup_logging()
 
@@ -76,9 +83,21 @@ async def login(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant mismatch")
 
     if settings.ALLOW_DUMMY_LOGIN and credentials.email == "admin@admin.com" and credentials.password == "admin":
-        applications = {key: "admin" for key in settings.PORTAL_APPLICATIONS}
-        token = create_access_token({"sub": credentials.email, "tid": tenant.key, "role": "admin", "scp": list(applications.keys())})
-        return {"token": token, "email": credentials.email, "tenant": tenant.key, "role": "admin", "applications": applications}
+        available_app_keys = tenant_application_keys(tenant)
+        applications = {key: "admin" for key in available_app_keys}
+        purchased_applications = sorted(
+            key for key, enabled in (tenant.purchased_applications or {}).items() if enabled
+        )
+        token = create_access_token({"sub": credentials.email, "tid": tenant.key, "role": "admin", "scp": sorted(applications.keys())})
+        return {
+            "token": token,
+            "email": credentials.email,
+            "tenant": tenant.key,
+            "role": "admin",
+            "applications": applications,
+            "purchased_applications": purchased_applications,
+            "available_applications": sorted(available_app_keys),
+        }
 
     user_stmt = (
         select(User)
@@ -106,11 +125,22 @@ async def login(
     )
     await session.commit()
 
-    applications = dict(user.app_permissions or {})
-    if "portal" in settings.PORTAL_APPLICATIONS and "portal" not in applications:
-        applications["portal"] = "user"
-    token = create_access_token({"sub": credentials.email, "tid": tenant.key, "uid": user.id, "role": user.role or "user", "scp": list(applications.keys())})
-    return {"token": token, "email": credentials.email, "tenant": tenant.key, "role": user.role or "user", "applications": applications}
+    raw_permissions = dict(user.app_permissions or {})
+    applications = filter_application_permissions(raw_permissions, tenant)
+    available_app_keys = tenant_application_keys(tenant)
+    purchased_applications = sorted(
+        key for key, enabled in (tenant.purchased_applications or {}).items() if enabled
+    )
+    token = create_access_token({"sub": credentials.email, "tid": tenant.key, "uid": user.id, "role": user.role or "user", "scp": sorted(applications.keys())})
+    return {
+        "token": token,
+        "email": credentials.email,
+        "tenant": tenant.key,
+        "role": user.role or "user",
+        "applications": applications,
+        "purchased_applications": purchased_applications,
+        "available_applications": sorted(available_app_keys),
+    }
 
 
 @app.get("/api/tenant/self")
@@ -118,11 +148,17 @@ async def tenant_self(
     tenant: TenantContext = Depends(get_tenant_context),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
+    purchased_applications = sorted(
+        key for key, enabled in (tenant.purchased_applications or {}).items() if enabled
+    )
+    available_applications = sorted(tenant_application_keys(tenant))
     return {
         "tenant": tenant.key,
         "tenant_id": tenant.id,
         "billing_plan": tenant.billing_plan,
         "feature_flags": tenant.feature_flags,
+        "purchased_applications": purchased_applications,
+        "available_applications": available_applications,
         "user": {"email": current_user.email, "role": current_user.role, "applications": current_user.app_permissions},
     }
 

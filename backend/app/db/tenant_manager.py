@@ -21,10 +21,15 @@ class TenantContext:
     db_schema: Optional[str] = None
     billing_plan: Optional[str] = None
     feature_flags: Dict[str, bool] = field(default_factory=dict)
+    purchased_applications: Dict[str, bool] = field(default_factory=dict)
     request_host: Optional[str] = None
 
     def feature_enabled(self, flag: str) -> bool:
         return self.feature_flags.get(flag, False)
+
+    def application_enabled(self, app_key: str) -> bool:
+        data = self.purchased_applications or {}
+        return bool(data.get(app_key) or app_key in {"portal", "admin_console", "settings"})
 
 
 class TenantConnectionManager:

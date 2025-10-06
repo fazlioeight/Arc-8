@@ -78,6 +78,9 @@ const CodingLandingPage = () => {
             <Button variant="outline-light" onClick={() => navigate('/coding/providers')}>
               Providers
             </Button>
+            <Button variant="outline-light" onClick={() => navigate('/admin/coding-assignments')}>
+              Coding assignments
+            </Button>
           </div>
         )}
         wave={false}

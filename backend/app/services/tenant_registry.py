@@ -43,6 +43,7 @@ class TenantRegistry:
             "db_schema": context.db_schema,
             "billing_plan": context.billing_plan,
             "feature_flags": context.feature_flags,
+            "purchased_applications": context.purchased_applications,
         }
 
     def _deserialize(self, payload: Dict[str, Any], host: Optional[str]) -> TenantContext:
@@ -54,6 +55,7 @@ class TenantRegistry:
             db_schema=payload.get("db_schema"),
             billing_plan=payload.get("billing_plan"),
             feature_flags=payload.get("feature_flags") or {},
+            purchased_applications=payload.get("purchased_applications") or {},
             request_host=host,
         )
 
@@ -70,6 +72,7 @@ class TenantRegistry:
             "db_schema": schema,
             "billing_plan": tenant.billing_plan,
             "feature_flags": feature_flags,
+            "purchased_applications": tenant.purchased_applications or {},
         }
 
     def _get_local(self, key: str, now: datetime) -> Optional[Dict[str, Any]]:

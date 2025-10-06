@@ -25,6 +25,7 @@ const CommandPalette = ({ onThemeToggle }) => {
     isAuthenticated,
     tenantInfo,
     availableTenants = [],
+    availableApplications = [],
     tenant,
     setTenant,
     role,
@@ -36,6 +37,12 @@ const CommandPalette = ({ onThemeToggle }) => {
   } = auth;
 
   const baseCommands = useMemo(() => {
+    const enabledSet = new Set(
+      (availableApplications && availableApplications.length)
+        ? availableApplications
+        : ['portal', 'settings', 'admin_console', 'dashboard', 'coding', 'ride_booking', 'docs', 'job_center']
+    );
+    const isEnabled = (key) => enabledSet.has(key) || key === 'portal';
     const commands = [];
     const append = (command) => {
       if (command.disabled) return;
@@ -57,7 +64,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       keywords: 'metrics analytics raf',
       shortcut: 'G D',
       action: () => navigate('/dashboard'),
-      disabled: !isAuthenticated || !hasApplicationAccess?.('dashboard'),
+      disabled: !isAuthenticated || !isEnabled('dashboard') || !hasApplicationAccess?.('dashboard'),
     });
     append({
       id: 'nav-coding',
@@ -65,7 +72,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Navigation',
       keywords: 'coding charts members worklist',
       action: () => navigate('/coding'),
-      disabled: !isAuthenticated || !hasApplicationAccess?.('coding'),
+      disabled: !isAuthenticated || !isEnabled('coding') || !hasApplicationAccess?.('coding'),
     });
     append({
       id: 'nav-ride-booking',
@@ -73,7 +80,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Navigation',
       keywords: 'transport rides partners scheduling',
       action: () => navigate('/RideBooking'),
-      disabled: !isAuthenticated || !hasApplicationAccess?.('ride_booking'),
+      disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking'),
     });
     append({
       id: 'nav-docs',
@@ -83,6 +90,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       shortcut: 'G ?'
 ,
       action: () => navigate('/docs'),
+      disabled: !isEnabled('docs') || !hasApplicationAccess?.('docs'),
     });
     append({
       id: 'nav-settings',
@@ -90,7 +98,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Workspace',
       keywords: 'profile preferences theme',
       action: () => navigate('/settings'),
-      disabled: !isAuthenticated,
+      disabled: !isAuthenticated || !isEnabled('settings') || !hasApplicationAccess?.('settings'),
     });
     append({
       id: 'nav-job-center',
@@ -98,7 +106,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Navigation',
       keywords: 'jobs imports queue status logs',
       action: () => navigate('/jobs/status-center'),
-      disabled: !isAuthenticated || !hasApplicationAccess?.('job_center'),
+      disabled: !isAuthenticated || !isEnabled('job_center') || !hasApplicationAccess?.('job_center'),
     });
 
     availableTenants.forEach((tenantOption) => {
@@ -124,7 +132,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       });
     }
 
-    if (role === 'admin' || hasApplicationAccess?.('admin_console', 'admin')) {
+    if (((role === 'admin' || role === 'platform_admin') || hasApplicationAccess?.('admin_console', 'admin')) && isEnabled('admin_console')) {
       append({
         id: 'nav-admin-console',
         label: 'Open Master Admin Console',
@@ -148,6 +156,7 @@ const CommandPalette = ({ onThemeToggle }) => {
     return commands;
   }, [
     availableTenants,
+    availableApplications,
     dynamicCommands,
     endImpersonation,
     hasApplicationAccess,
