@@ -1,4 +1,5 @@
-﻿import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
 import PortalUtilityBar from '../../components/PortalUtilityBar';
 import { AuthContext } from '../../context/AuthContext';
@@ -23,6 +24,8 @@ const STATUS_COLORS = {
 
 const JobStatusCenter = () => {
   const { tenant, availableTenants = [], recordAuditEvent } = useContext(AuthContext) || {};
+  
+  const navigate = useNavigate();
   const { registerCommands } = useCommandPalette();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +109,12 @@ const JobStatusCenter = () => {
           setSearchTerm('');
         },
       },
+      {
+        id: 'job-center-import-data',
+        label: 'Go to Import Data',
+        category: 'Job Center',
+        action: () => navigate('/jobs/import-data'),
+      },
       selectedJobId
         ? {
             id: 'job-center-download-logs',
@@ -116,7 +125,7 @@ const JobStatusCenter = () => {
         : null,
     ].filter(Boolean));
     return () => registerCommands([]);
-  }, [registerCommands, selectedJobId, handleDownload]);
+  }, [registerCommands, selectedJobId, handleDownload, navigate]);
 
   const filteredJobs = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -185,11 +194,14 @@ const JobStatusCenter = () => {
           </p>
         </div>
         <div className="job-center__actions">
+          <Button variant="outline-primary" onClick={() => navigate('/jobs/import-data')}>
+            Go to Import Data
+          </Button>
           <Button variant="outline-secondary" onClick={handleRefresh} disabled={loading}>
             {loading ? <Spinner size="sm" animation="border" /> : 'Manual refresh'}
           </Button>
           <span className="job-center__timestamp">
-            Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}
+            Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : '-'}
           </span>
         </div>
       </div>
@@ -286,7 +298,7 @@ const JobStatusCenter = () => {
           <tbody>
             {loading && (
               <tr className="job-center__skeleton-row">
-                <td colSpan={8} className="job-center__skeleton">Loading jobs…</td>
+                <td colSpan={8} className="job-center__skeleton">Loading jobs�</td>
               </tr>
             )}
             {!loading && paginatedJobs.length === 0 && (
@@ -335,7 +347,7 @@ const JobStatusCenter = () => {
                   <span className="small text-muted">{job.progress}%</span>
                 </td>
                 <td>{job.tenant}</td>
-                <td>{job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : '—'}</td>
+                <td>{job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : '�'}</td>
                 <td>{job.initiatedBy}</td>
                 <td className="text-end">
                   <div className="d-flex justify-content-end gap-2">
@@ -435,7 +447,7 @@ const JobStatusCenter = () => {
         ) : (
           <div className="job-center__detail-empty">
             <h2>Select a job to view details</h2>
-            <p>Jobs show progress, audit history, and downloadable logs. Use the command palette (⌘K) to jump to filters quickly.</p>
+            <p>Jobs show progress, audit history, and downloadable logs. Use the command palette (?K) to jump to filters quickly.</p>
           </div>
         )}
       </section>
@@ -444,3 +456,13 @@ const JobStatusCenter = () => {
 };
 
 export default JobStatusCenter;
+
+
+
+
+
+
+
+
+
+

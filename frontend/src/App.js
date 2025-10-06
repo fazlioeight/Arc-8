@@ -30,6 +30,7 @@ const CodingProviderDetailPage = lazy(() => import('./pages/coding/CodingProvide
 const MasterAdminPage = lazy(() => import('./pages/admin/MasterAdminPage'));
 const CodingAssignmentsPage = lazy(() => import('./pages/admin/CodingAssignmentsPage'));
 const JobStatusCenter = lazy(() => import('./pages/jobs/JobStatusCenter'));
+const ImportDataPage = lazy(() => import('./pages/jobs/ImportDataPage'));
 const Mission = lazy(() => import('./pages/about/Mission'));
 const Values = lazy(() => import('./pages/about/Values'));
 const Team = lazy(() => import('./pages/about/Team'));
@@ -110,6 +111,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
           )} />
           <Route path="/admin/master" element={<MasterAdminPage />} />
         <Route path="/admin/coding-assignments" element={<CodingAssignmentsPage />} />
+          <Route path="/jobs/import-data" element={<ImportDataPage />} />
           <Route path="/jobs/status-center" element={<JobStatusCenter />} />
         </Routes>
       </Suspense>
