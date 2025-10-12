@@ -13,6 +13,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import CommandPalette from './components/CommandPalette';
 import SessionLockOverlay from './components/SessionLockOverlay';
 import GuidedTourOverlay from './components/GuidedTourOverlay';
+
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
 const Products = lazy(() => import('./pages/Products'));
@@ -40,6 +41,20 @@ const CodingProviderEducationPage = lazy(() => import('./pages/coding/CodingProv
 const CodingGroupDashboardPage = lazy(() => import('./pages/coding/CodingGroupDashboardPage'));
 const CodingMemberDetailsPage = lazy(() => import('./pages/coding/CodingMemberDetailsPage'));
 const CodingProviderManagementPage = lazy(() => import('./pages/coding/CodingProviderManagementPage'));
+const CodingMemberLayout = lazy(() => import('./pages/coding/member/pages/CodingMemberLayout'));
+const OverviewPage = lazy(() => import('./pages/coding/member/pages/OverviewPage'));
+const ProblemsHCCPage = lazy(() => import('./pages/coding/member/pages/ProblemsHCCPage'));
+const MedicationsPage = lazy(() => import('./pages/coding/member/pages/MedicationsPage'));
+const EncountersPage = lazy(() => import('./pages/coding/member/pages/EncountersPage'));
+const LabsImagingPage = lazy(() => import('./pages/coding/member/pages/LabsImagingPage'));
+const NotesPage = lazy(() => import('./pages/coding/member/pages/NotesPage'));
+const CareGapsPage = lazy(() => import('./pages/coding/member/pages/CareGapsPage'));
+const TasksMessagesPage = lazy(() => import('./pages/coding/member/pages/TasksMessagesPage'));
+const EligibilityCoveragePage = lazy(() => import('./pages/coding/member/pages/EligibilityCoveragePage'));
+const DocumentsPage = lazy(() => import('./pages/coding/member/pages/DocumentsPage'));
+const AuditLogPage = lazy(() => import('./pages/coding/member/pages/AuditLogPage'));
+const SharingPage = lazy(() => import('./pages/coding/member/pages/SharingPage'));
+const SettingsPage = lazy(() => import('./pages/coding/member/pages/SettingsPage'));
 const JobStatusCenter = lazy(() => import('./pages/jobs/JobStatusCenter'));
 const ImportDataPage = lazy(() => import('./pages/jobs/ImportDataPage'));
 const Mission = lazy(() => import('./pages/about/Mission'));
@@ -150,6 +165,24 @@ const Shell = ({ themePreference, setThemePreference }) => {
               <CodingMemberDetailsPage />
             </ErrorBoundary>
           )} />
+          <Route path="/coding/member/:memberId" element={<CodingMemberLayout />}>
+            {/* Chart pages */}
+            <Route index element={<OverviewPage />} />
+            <Route path="problems" element={<ProblemsHCCPage />} />
+            <Route path="medications" element={<MedicationsPage />} />
+            <Route path="encounters" element={<EncountersPage />} />
+            <Route path="labs-imaging" element={<LabsImagingPage />} />
+            <Route path="notes" element={<NotesPage />} />
+            <Route path="care-gaps" element={<CareGapsPage />} />
+            <Route path="tasks-messages" element={<TasksMessagesPage />} />
+            <Route path="eligibility-coverage" element={<EligibilityCoveragePage />} />
+            <Route path="documents" element={<DocumentsPage />} />
+
+            {/* Utilities */}
+            <Route path="audit-log" element={<AuditLogPage />} />
+            <Route path="sharing" element={<SharingPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
           <Route path="/coding/provider-management" element={(
             <ErrorBoundary title="Provider management unavailable">
               <CodingProviderManagementPage />
