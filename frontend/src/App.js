@@ -2,12 +2,17 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
+import { UserPreferencesProvider } from './context/UserPreferencesContext';
+import { GuidedTourProvider } from './context/GuidedTourContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles/commandPalette.css';
 import Navbar from './components/Navbar';
+import AppBreadcrumbs from './components/AppBreadcrumbs';
 import ErrorBoundary from './components/ErrorBoundary';
 import CommandPalette from './components/CommandPalette';
 import SessionLockOverlay from './components/SessionLockOverlay';
+import GuidedTourOverlay from './components/GuidedTourOverlay';
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
 const Products = lazy(() => import('./pages/Products'));
@@ -29,6 +34,12 @@ const CodingLandingPage = lazy(() => import('./pages/coding/CodingLandingPage'))
 const CodingProviderDetailPage = lazy(() => import('./pages/coding/CodingProviderDetailPage'));
 const MasterAdminPage = lazy(() => import('./pages/admin/MasterAdminPage'));
 const CodingAssignmentsPage = lazy(() => import('./pages/admin/CodingAssignmentsPage'));
+const CodingCoderPlatformPage = lazy(() => import('./pages/coding/CodingCoderPlatformPage'));
+const CodingReviewDashboardPage = lazy(() => import('./pages/coding/CodingReviewDashboardPage'));
+const CodingProviderEducationPage = lazy(() => import('./pages/coding/CodingProviderEducationPage'));
+const CodingGroupDashboardPage = lazy(() => import('./pages/coding/CodingGroupDashboardPage'));
+const CodingMemberDetailsPage = lazy(() => import('./pages/coding/CodingMemberDetailsPage'));
+const CodingProviderManagementPage = lazy(() => import('./pages/coding/CodingProviderManagementPage'));
 const JobStatusCenter = lazy(() => import('./pages/jobs/JobStatusCenter'));
 const ImportDataPage = lazy(() => import('./pages/jobs/ImportDataPage'));
 const Mission = lazy(() => import('./pages/about/Mission'));
@@ -54,7 +65,12 @@ const Shell = ({ themePreference, setThemePreference }) => {
 
   return (
     <>
-      {!hideNavbar && <Navbar />}
+      {!hideNavbar && (
+        <>
+          <Navbar />
+          <AppBreadcrumbs />
+        </>
+      )}
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -107,6 +123,36 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/coding/providers/:providerId" element={(
             <ErrorBoundary title="Provider details unavailable">
               <CodingProviderDetailPage />
+            </ErrorBoundary>
+          )} />
+          <Route path="/coding/platform" element={(
+            <ErrorBoundary title="Coder platform unavailable" description="We couldn't load the coder platform workspace. Try refreshing the page.">
+              <CodingCoderPlatformPage />
+            </ErrorBoundary>
+          )} />
+          <Route path="/coding/review-dashboard" element={(
+            <ErrorBoundary title="Review dashboard unavailable" description="An error occurred while loading review metrics.">
+              <CodingReviewDashboardPage />
+            </ErrorBoundary>
+          )} />
+          <Route path="/coding/provider-education" element={(
+            <ErrorBoundary title="Provider education dashboard unavailable">
+              <CodingProviderEducationPage />
+            </ErrorBoundary>
+          )} />
+          <Route path="/coding/group-dashboard" element={(
+            <ErrorBoundary title="Group dashboard unavailable">
+              <CodingGroupDashboardPage />
+            </ErrorBoundary>
+          )} />
+          <Route path="/coding/member-details" element={(
+            <ErrorBoundary title="Member details unavailable">
+              <CodingMemberDetailsPage />
+            </ErrorBoundary>
+          )} />
+          <Route path="/coding/provider-management" element={(
+            <ErrorBoundary title="Provider management unavailable">
+              <CodingProviderManagementPage />
             </ErrorBoundary>
           )} />
           <Route path="/admin/master" element={<MasterAdminPage />} />
@@ -173,13 +219,20 @@ function App() {
 
   return (
     <AuthProvider>
-      <CommandPaletteProvider>
-        <Router>
-          <Shell themePreference={themePreference} setThemePreference={setThemePreference} />
-          <CommandPalette onThemeToggle={handleThemeToggle} />
-          <SessionLockOverlay />
-        </Router>
-      </CommandPaletteProvider>
+      <UserPreferencesProvider>
+        <CommandPaletteProvider>
+          <GuidedTourProvider>
+            <NotificationsProvider>
+              <Router>
+                <Shell themePreference={themePreference} setThemePreference={setThemePreference} />
+                <CommandPalette onThemeToggle={handleThemeToggle} />
+                <GuidedTourOverlay />
+                <SessionLockOverlay />
+              </Router>
+            </NotificationsProvider>
+          </GuidedTourProvider>
+        </CommandPaletteProvider>
+      </UserPreferencesProvider>
     </AuthProvider>
   );
 }

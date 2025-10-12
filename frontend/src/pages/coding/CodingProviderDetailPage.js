@@ -5,6 +5,8 @@ import { Alert, Badge, Button, Card, Col, ListGroup, Row, Spinner } from 'react-
 import PortalUtilityBar from '../../components/PortalUtilityBar';
 import { AuthContext } from '../../context/AuthContext';
 import { fetchCodingProviderDetail, fetchCodingProviders } from '../../services/codingService';
+import CodingPortalHeader from './CodingPortalHeader';
+import BackLink from '../../components/BackLink';
 
 const CodingProviderDetailPage = () => {
   const navigate = useNavigate();
@@ -83,10 +85,18 @@ const CodingProviderDetailPage = () => {
     // eslint-disable-next-line
   }, [isAuthenticated, canQuery]);
 
+  const header = (
+    <CodingPortalHeader
+      title="Provider workspace"
+      subtitle="Review coding partner profiles, locations, and contact information."
+    />
+  );
+
   if (!isAuthenticated) {
     return (
       <div className="sfdc-portal coding-portal">
         <PortalUtilityBar />
+        {header}
         <div className="coding-content container py-5">
           <Alert variant="warning">You must be logged in to view provider information.</Alert>
         </div>
@@ -97,7 +107,11 @@ const CodingProviderDetailPage = () => {
   return (
     <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
+      {header}
       <div className="coding-content container py-4">
+        <div className="mb-3">
+          <BackLink fallback="/coding/providers">Back to care team directory</BackLink>
+        </div>
         <Row className="align-items-center mb-3 g-3">
           <Col>
             <h1 className="h3 mb-1">Provider Details</h1>
@@ -106,17 +120,9 @@ const CodingProviderDetailPage = () => {
             </div>
           </Col>
           <Col md="auto">
-            <div className="d-flex flex-wrap gap-2">
-              <Button variant="outline-secondary" onClick={() => navigate('/coding')}>
-                Landing
-              </Button>
-              <Button variant="outline-primary" onClick={() => navigate('/coding/members')}>
-                Members
-              </Button>
-              <Button variant="primary" disabled>
-                Providers
-              </Button>
-            </div>
+            <Button variant="outline-secondary" onClick={() => navigate('/coding/providers')}>
+              Back to provider list
+            </Button>
           </Col>
         </Row>
         <div className="d-flex gap-2 mb-3">

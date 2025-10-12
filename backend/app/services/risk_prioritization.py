@@ -11,6 +11,7 @@ from ..models.coding import (
     CodingHealthAssessment,
     CodingMao004Record,
     CodingMember,
+    CodingMemberChase,
     CodingMemberPriority,
 )
 
@@ -49,7 +50,9 @@ async def calculate_priority_score(
     """Derive risk score, tier, and next action guidance for a member."""
 
     as_of_dt = datetime.combine(as_of, datetime.min.time()) if isinstance(as_of, date) else datetime.utcnow()
-    open_chases = [chase for chase in member.chases if chase.status.lower() != "closed"]
+    chase_stmt = select(CodingMemberChase).where(CodingMemberChase.member_id == member.id)
+    chases = (await session.scalars(chase_stmt)).all()
+    open_chases = [chase for chase in chases if (chase.status or "").lower() != "closed"]
     open_score = len(open_chases) * 3
 
     mao_stmt = select(CodingMao004Record).where(

@@ -35,6 +35,8 @@ const initializeSampleStore = () => ({
   priorities: new Map(),
   coders: null,
   assignments: null,
+  providerCatalog: new Map(),
+  providerOverrides: new Map(),
   lastAccessed: Date.now(),
 });
 
@@ -226,6 +228,11 @@ const ensureSamplePriority = (store, member) => {
       next_action_due: new Date().toISOString().slice(0, 10),
       justification: 'Sandbox prioritization result',
     };
+    store.priorities.set(member.id, priority);
+  }
+  return deepClone(priority);
+};
+
 const ensureSampleCoders = (store) => {
   if (!store.coders) {
     store.coders = [
@@ -256,10 +263,99 @@ const ensureSampleAssignments = (store) => {
   return store.assignments.map((item) => deepClone(item));
 };
 
-
-    store.priorities.set(member.id, priority);
+const getSampleProviderCatalog = (store) => {
+  if (!store.providerCatalog) {
+    store.providerCatalog = new Map();
   }
-  return deepClone(priority);
+  return store.providerCatalog;
+};
+
+const getSampleProviderId = (store, key) => {
+  const catalog = getSampleProviderCatalog(store);
+  const normalizedKey = (key || 'provider-unknown').toLowerCase();
+  let id = catalog.get(normalizedKey);
+  if (!id) {
+    id = catalog.size + 1;
+    catalog.set(normalizedKey, id);
+  }
+  return id;
+};
+
+const buildSampleProviderEntries = (store) => {
+  const members = getSampleMembersArray(store);
+  const assignments = ensureSampleAssignments(store);
+  const memberToProvider = new Map();
+  const providers = new Map();
+
+  members.forEach((member, index) => {
+    const providerKey = member.pcp_npi || member.pcp_name || member.member_key;
+    const providerId = getSampleProviderId(store, providerKey);
+    let entry = providers.get(providerId);
+    if (!entry) {
+      entry = {
+        provider_id: providerId,
+        name: member.pcp_name || `Provider ${providerId}`,
+        npi: member.pcp_npi || null,
+        tax_id: `TAX-${String(providerId).padStart(4, '0')}`,
+        member_count: 0,
+        risk_total: 0,
+        risk_count: 0,
+        open_chases: 0,
+        mao_records: 0,
+        last_contacted_at: null,
+        last_updated_at: null,
+      };
+      providers.set(providerId, entry);
+    }
+    entry.member_count += 1;
+    if (member.risk_score) {
+      entry.risk_total += Number(member.risk_score);
+      entry.risk_count += 1;
+    }
+    entry.mao_records += index % 2;
+    entry.last_contacted_at = new Date(Date.now() - index * 86400000).toISOString();
+    memberToProvider.set(member.id, entry);
+  });
+
+  assignments.forEach((assignment, index) => {
+    const entry = memberToProvider.get(assignment.member_id);
+    if (!entry) return;
+    if ((assignment.status || '').toLowerCase() !== 'closed') {
+      entry.open_chases += 1;
+    }
+    entry.last_updated_at = assignment.updated_at || new Date(Date.now() - index * 3600000).toISOString();
+  });
+
+  const overrides = store.providerOverrides || new Map();
+  const states = ['CA', 'TX', 'NY', 'FL', 'IL'];
+
+  return Array.from(providers.values()).map((entry) => {
+    const override = overrides.get(String(entry.provider_id)) || {};
+    const phone = override.phone || `555-01${String(entry.provider_id).padStart(2, '0')}`;
+    const email = override.email || `provider${entry.provider_id}@nexora.test`;
+    const addressLine1 = override.address_line1 || `${100 + entry.provider_id} Market Street`;
+    const city = override.city || 'San Francisco';
+    const state = override.state || states[entry.provider_id % states.length];
+    const postalCode = override.postal_code || `94${String(100 + entry.provider_id).padStart(3, '0')}`;
+    return {
+      provider_id: entry.provider_id,
+      name: override.name || entry.name,
+      npi: entry.npi,
+      tax_id: override.tax_id || entry.tax_id,
+      member_count: entry.member_count,
+      open_chases: entry.open_chases,
+      mao_records: entry.mao_records,
+      last_contacted_at: entry.last_contacted_at,
+      last_updated_at: entry.last_updated_at,
+      average_risk: entry.risk_count ? entry.risk_total / entry.risk_count : 0,
+      phone,
+      email,
+      address_line1: addressLine1,
+      city,
+      state,
+      postal_code: postalCode,
+    };
+  });
 };
 
 const getSampleAssessmentsArray = (store, memberId) => ensureSampleAssessments(store, { id: memberId });
@@ -641,6 +737,367 @@ export const fetchCodingProviderDetail = async (token, tenant, providerId) => {
 
   const res = await fetch(`${API_BASE}/api/coding/providers/${providerId}`, {
     headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+const normalizeArray = (values = []) => {
+  if (!Array.isArray(values)) return [];
+  return values.map((value) => String(value || '').toLowerCase()).filter(Boolean);
+};
+
+const toDateOnly = (isoString) => {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const buildSampleAssignmentTimeline = (assignments) => {
+  return assignments.map((assignment) => {
+    const baseIndex = assignments.indexOf(assignment);
+    const serviceStart = new Date(Date.now() - (baseIndex + 1) * 86400000);
+    const serviceEnd = new Date(serviceStart.getTime() + 2 * 86400000);
+    const dueDate = new Date(Date.now() + ((baseIndex % 5) - 2) * 86400000);
+    return {
+      ...assignment,
+      service_date_from: serviceStart.toISOString().slice(0, 10),
+      service_date_to: serviceEnd.toISOString().slice(0, 10),
+      due_date: dueDate.toISOString().slice(0, 10),
+    };
+  });
+};
+
+export const fetchCoderPlatformWorklist = async (
+  token,
+  tenant,
+  { status = [], priority = [], assigned, search, page = 1, pageSize = 25 } = {}
+) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const assignments = buildSampleAssignmentTimeline(ensureSampleAssignments(store));
+    const statusFilter = normalizeArray(status);
+    const priorityFilter = normalizeArray(priority);
+    const term = search?.trim().toLowerCase();
+    const assignedEmail = assigned ? String(assigned).toLowerCase() : null;
+
+    const filtered = assignments.filter((assignment) => {
+      if (statusFilter.length && !statusFilter.includes((assignment.status || '').toLowerCase())) {
+        return false;
+      }
+      if (priorityFilter.length && !priorityFilter.includes((assignment.priority || '').toLowerCase())) {
+        return false;
+      }
+      if (assignedEmail) {
+        const assignee = (assignment.assigned_coder_email || '').toLowerCase();
+        if (assignee !== assignedEmail) return false;
+      }
+      if (term) {
+        const haystack = `${assignment.member_name || ''} ${assignment.member_key || ''}`.toLowerCase();
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
+    });
+
+    const statusCounts = filtered.reduce((acc, item) => {
+      const key = item.status || 'unknown';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const priorityCounts = filtered.reduce((acc, item) => {
+      const key = item.priority || 'unspecified';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const soon = new Date(today);
+    soon.setDate(soon.getDate() + 7);
+
+    const dueSoon = filtered.filter((item) => {
+      const due = toDateOnly(item.due_date);
+      return due && due >= today && due <= soon;
+    }).length;
+
+    const overdue = filtered.filter((item) => {
+      const due = toDateOnly(item.due_date);
+      return due && due < today && (item.status || '').toLowerCase() !== 'closed';
+    }).length;
+
+    const pageItems = paginate(filtered, page, pageSize);
+
+    return {
+      items: pageItems,
+      total: filtered.length,
+      summary: {
+        status_counts: statusCounts,
+        priority_counts: priorityCounts,
+        due_soon: dueSoon,
+        overdue,
+      },
+      page,
+      page_size: pageSize,
+      __sample: true,
+    };
+  }
+
+  const query = toQuery({ status, priority, assigned, search, page, page_size: pageSize });
+  const res = await fetch(`${API_BASE}/api/coding/worklist${query}`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const fetchCoderReviewDashboard = async (
+  token,
+  tenant,
+  { mineOnly = false, limit = 40, currentUserEmail } = {}
+) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const assignments = buildSampleAssignmentTimeline(ensureSampleAssignments(store));
+    const openAssignments = assignments.filter((assignment) => (assignment.status || '').toLowerCase() !== 'closed');
+    const normalizedEmail = currentUserEmail ? currentUserEmail.toLowerCase() : null;
+    const assignedToMe = normalizedEmail
+      ? openAssignments.filter((item) => (item.assigned_coder_email || '').toLowerCase() === normalizedEmail)
+      : [];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueToday = openAssignments.filter((item) => {
+      const due = toDateOnly(item.due_date);
+      return due && due.getTime() === today.getTime();
+    }).length;
+    const overdue = openAssignments.filter((item) => {
+      const due = toDateOnly(item.due_date);
+      return due && due < today;
+    }).length;
+    const inReview = openAssignments.filter((item) => (item.status || '').toLowerCase() === 'in_review').length;
+
+    const queueSource = mineOnly && normalizedEmail ? assignedToMe : openAssignments;
+    const nextActions = ['review_chart', 'follow_up_call', 'submit_assessment'];
+    const queue = queueSource.slice(0, limit).map((item, index) => ({
+      ...item,
+      note_count: (index % 3) + 1,
+      last_note_at: new Date(Date.now() - index * 5400000).toISOString(),
+      next_action: nextActions[index % nextActions.length],
+    }));
+
+    return {
+      metrics: [
+        { label: 'Open chases', value: openAssignments.length, hint: 'Status not closed.' },
+        { label: 'Assigned to you', value: assignedToMe.length, hint: 'Chases currently on your queue.' },
+        { label: 'Due today', value: dueToday, hint: 'Due within the next 24 hours.' },
+        { label: 'Overdue', value: overdue, hint: 'Past due date and still open.' },
+        { label: 'In review', value: inReview, hint: 'Currently marked as in review.' },
+      ],
+      queue,
+      __sample: true,
+    };
+  }
+
+  const query = toQuery({ mine_only: mineOnly ? 1 : undefined, limit });
+  const res = await fetch(`${API_BASE}/api/coding/review/dashboard${query}`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const fetchProviderEducationDashboard = async (token, tenant, { search } = {}) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    let providers = buildSampleProviderEntries(store).map((provider) => {
+      const openGaps = provider.open_chases;
+      let educationStatus = 'completed';
+      if (openGaps > 5) educationStatus = 'at_risk';
+      else if (openGaps > 0) educationStatus = 'in_progress';
+      return {
+        provider_id: provider.provider_id,
+        name: provider.name,
+        npi: provider.npi,
+        tax_id: provider.tax_id,
+        member_count: provider.member_count,
+        open_gaps: openGaps,
+        mao_records: provider.mao_records,
+        last_contacted_at: provider.last_contacted_at,
+        education_status: educationStatus,
+      };
+    });
+
+    if (search) {
+      const term = search.trim().toLowerCase();
+      providers = providers.filter((provider) => {
+        const haystack = `${provider.name || ''} ${provider.npi || ''} ${provider.tax_id || ''}`.toLowerCase();
+        return haystack.includes(term);
+      });
+    }
+
+    providers.sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+      items: providers,
+      total: providers.length,
+      __sample: true,
+    };
+  }
+
+  const query = toQuery({ search });
+  const res = await fetch(`${API_BASE}/api/coding/providers/education${query}`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const fetchGroupDashboard = async (token, tenant, { search } = {}) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const providers = buildSampleProviderEntries(store);
+    const groups = new Map();
+
+    providers.forEach((provider) => {
+      const key = provider.tax_id || 'UNASSIGNED';
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          group_key: key,
+          group_name: key.startsWith('TAX-') ? `Group ${key.slice(-2)}` : key,
+          tax_id: provider.tax_id,
+          provider_count: 0,
+          member_count: 0,
+          open_gaps: 0,
+          risk_total: 0,
+          risk_count: 0,
+          pending_education: 0,
+        };
+        groups.set(key, group);
+      }
+      group.provider_count += 1;
+      group.member_count += provider.member_count;
+      group.open_gaps += provider.open_chases;
+      group.risk_total += provider.average_risk;
+      group.risk_count += 1;
+      if (provider.open_chases > 0) {
+        group.pending_education += 1;
+      }
+    });
+
+    let items = Array.from(groups.values()).map((group) => ({
+      group_key: group.group_key,
+      group_name: group.group_name,
+      tax_id: group.tax_id,
+      provider_count: group.provider_count,
+      member_count: group.member_count,
+      open_gaps: group.open_gaps,
+      average_risk_score: group.risk_count ? Number((group.risk_total / group.risk_count).toFixed(2)) : 0,
+      pending_education: group.pending_education,
+    }));
+
+    if (search) {
+      const term = search.trim().toLowerCase();
+      items = items.filter((item) => {
+        const haystack = `${item.group_name || ''} ${item.tax_id || ''}`.toLowerCase();
+        return haystack.includes(term);
+      });
+    }
+
+    items.sort((a, b) => a.group_name.localeCompare(b.group_name));
+
+    return {
+      items,
+      total: items.length,
+      __sample: true,
+    };
+  }
+
+  const query = toQuery({ search });
+  const res = await fetch(`${API_BASE}/api/coding/groups/overview${query}`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const fetchProviderManagement = async (token, tenant, { search } = {}) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    let providers = buildSampleProviderEntries(store).map((provider) => ({
+      provider_id: provider.provider_id,
+      name: provider.name,
+      npi: provider.npi,
+      tax_id: provider.tax_id,
+      phone: provider.phone,
+      email: provider.email,
+      address_line1: provider.address_line1,
+      city: provider.city,
+      state: provider.state,
+      postal_code: provider.postal_code,
+      member_count: provider.member_count,
+      open_chases: provider.open_chases,
+      last_updated_at: provider.last_updated_at,
+    }));
+
+    if (search) {
+      const term = search.trim().toLowerCase();
+      providers = providers.filter((provider) => {
+        const haystack = `${provider.name || ''} ${provider.npi || ''} ${provider.tax_id || ''}`.toLowerCase();
+        return haystack.includes(term);
+      });
+    }
+
+    providers.sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+      items: providers,
+      total: providers.length,
+      __sample: true,
+    };
+  }
+
+  const query = toQuery({ search });
+  const res = await fetch(`${API_BASE}/api/coding/providers/management${query}`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const updateProviderManagement = async (token, tenant, providerId, payload) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const overrides = store.providerOverrides || new Map();
+    const key = String(providerId);
+    const existing = overrides.get(key) || {};
+    const updated = { ...existing, ...payload };
+    overrides.set(key, updated);
+    store.providerOverrides = overrides;
+
+    const providers = buildSampleProviderEntries(store);
+    const provider = providers.find((item) => item.provider_id === providerId);
+    if (!provider) {
+      throw new Error('Provider not found');
+    }
+
+    return {
+      id: provider.provider_id,
+      name: provider.name,
+      npi: provider.npi,
+      tax_id: provider.tax_id,
+      phone: provider.phone,
+      email: provider.email,
+      location: {
+        address_line1: provider.address_line1,
+        city: provider.city,
+        state: provider.state,
+        postal_code: provider.postal_code,
+      },
+      __sample: true,
+    };
+  }
+
+  const res = await fetch(`${API_BASE}/api/coding/providers/${providerId}`, {
+    method: 'PATCH',
+    headers: buildHeaders(token, tenant),
+    body: JSON.stringify(payload),
   });
   return handleResponse(res);
 };

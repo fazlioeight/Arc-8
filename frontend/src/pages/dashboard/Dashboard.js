@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import "../../index.css";
 import "../portal_page/portalPage.sfdc.css";
 import { AuthContext } from "../../context/AuthContext";
 import D3BarChart from "../../components/D3BarChart";
 import PortalUtilityBar from "../../components/PortalUtilityBar";
 import PortalHero from '../../components/PortalHero';
+import Icon from "../../components/ui/Icon";
+import InfoTooltip from "../../components/ui/InfoTooltip";
+import Skeleton, { SkeletonGroup } from "../../components/ui/Skeleton";
 
 const Dashboard = () => {
   const [data, setData] = useState({
@@ -63,16 +66,96 @@ const Dashboard = () => {
     */
   }, []);
 
+  const tenantName = user?.tenant || localStorage.getItem("companyName") || "Tenant";
+  const companyLabel = localStorage.getItem("companyName") || "Your Company";
+
+  const metricCards = useMemo(() => [
+    {
+      key: "bur",
+      title: "BUR",
+      formattedValue: data.bur.toLocaleString(),
+      hint: "Business Utilization Report",
+      tooltip: "Tracks total cost utilization across all active contracts.",
+      icon: "spark",
+    },
+    {
+      key: "raf",
+      title: "RAF",
+      formattedValue: data.raf.toFixed(2),
+      hint: "Risk Adjustment Factor",
+      tooltip: "Blended RAF score across current risk models.",
+      icon: "info",
+    },
+    {
+      key: "memberCount",
+      title: "Member count",
+      formattedValue: data.memberCount.toLocaleString(),
+      hint: "Total active members",
+      tooltip: "Aggregated active members synced in the last 24 hours.",
+      icon: "clock",
+    },
+    {
+      key: "gaps",
+      title: "Open gaps",
+      formattedValue: data.gaps.toLocaleString(),
+      hint: "Care or compliance gaps",
+      tooltip: "Members with at least one open compliance or quality gap.",
+      icon: "warning",
+    },
+  ], [data.bur, data.raf, data.memberCount, data.gaps]);
+
   if (data.loading) {
-    return <div className="loading">Loading Nexora Analytics Portal...</div>;
+    return (
+      <div className="sfdc-portal">
+        <PortalUtilityBar />
+        <PortalHero
+          align="left"
+          title={tenantName}
+          subtitle={`${companyLabel} Portal`}
+        />
+        <div className="ds-container" style={{ paddingBlock: "var(--space-xl)" }}>
+          <div className="ds-grid ds-grid--balanced">
+            {metricCards.map((metric) => (
+              <div key={metric.key} className="ds-card ds-card--compact ds-card--interactive">
+                <Skeleton variant="pill" width="40%" />
+                <Skeleton variant="title" width="60%" />
+                <SkeletonGroup lines={3} />
+              </div>
+            ))}
+          </div>
+          <div className="ds-card ds-card--compact" style={{ marginTop: "var(--space-xl)" }}>
+            <Skeleton variant="pill" width="25%" />
+            <Skeleton height="260px" style={{ marginTop: "var(--space-sm)" }} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (data.error) {
-    return <div className="error">Error: {data.error}</div>;
+    return (
+      <div className="sfdc-portal">
+        <PortalUtilityBar />
+        <PortalHero
+          align="left"
+          title={tenantName}
+          subtitle={`${companyLabel} Portal`}
+        />
+        <div className="ds-container" style={{ paddingBlock: "var(--space-xl)" }}>
+          <div className="ds-card ds-card--compact">
+            <div className="ds-card__header">
+              <div>
+                <div className="ds-card__title">We hit a snag loading metrics</div>
+                <div className="ds-card__meta">Error details are below. Retry shortly or refresh the page.</div>
+              </div>
+              <InfoTooltip content="These metrics fetch live once the API integration is configured." placement="top" />
+            </div>
+            <pre className="ds-card__meta" style={{ whiteSpace: "pre-wrap" }}>Error: {data.error}</pre>
+          </div>
+        </div>
+      </div>
+    );
   }
-
-  const tenantName = user?.tenant || localStorage.getItem("companyName") || "Tenant";
-  const companyLabel = localStorage.getItem("companyName") || "Your Company";
 
   return (
     <div className="sfdc-portal">
@@ -84,32 +167,36 @@ const Dashboard = () => {
       />
 
       <main className="sfdc-grid">
-        <div className="sfdc-card fade-in" style={{ animationDelay: "40ms" }}>
-          <div className="sfdc-card__title">BUR</div>
-          <div className="sfdc-card__value">{data.bur.toLocaleString()}</div>
-          <div className="sfdc-card__hint">Business Utilization Report</div>
-        </div>
+        {metricCards.map((metric, index) => (
+          <div
+            key={metric.key}
+            className="sfdc-card ds-card ds-card--compact ds-card--interactive fade-in"
+            style={{ animationDelay: `${40 + index * 40}ms` }}
+          >
+            <div className="ds-card__header">
+              <div className="ds-inline">
+                <span className="ds-icon-mask">
+                  <Icon name={metric.icon} size={18} aria-hidden="true" />
+                </span>
+                <div>
+                  <div className="ds-card__title">{metric.title}</div>
+                  <div className="ds-card__meta">{metric.hint}</div>
+                </div>
+              </div>
+              <InfoTooltip content={metric.tooltip} placement="top" />
+            </div>
+            <div className="ds-heading-xl">{metric.formattedValue}</div>
+          </div>
+        ))}
 
-        <div className="sfdc-card fade-in" style={{ animationDelay: "80ms" }}>
-          <div className="sfdc-card__title">RAF</div>
-          <div className="sfdc-card__value">{data.raf.toFixed(2)}</div>
-          <div className="sfdc-card__hint">Risk Adjustment Factor</div>
-        </div>
-
-        <div className="sfdc-card fade-in" style={{ animationDelay: "120ms" }}>
-          <div className="sfdc-card__title">Member Count</div>
-          <div className="sfdc-card__value">{data.memberCount.toLocaleString()}</div>
-          <div className="sfdc-card__hint">Total Active Members</div>
-        </div>
-
-        <div className="sfdc-card fade-in" style={{ animationDelay: "160ms" }}>
-          <div className="sfdc-card__title">Gaps</div>
-          <div className="sfdc-card__value">{data.gaps.toLocaleString()}</div>
-          <div className="sfdc-card__hint">Care or Compliance Gaps</div>
-        </div>
-
-        <div className="sfdc-card sfdc-card--full slide-up" style={{ animationDelay: "200ms" }}>
-          <div className="sfdc-card__title">Metrics Overview</div>
+        <div className="sfdc-card sfdc-card--full ds-card ds-card--compact slide-up" style={{ animationDelay: "200ms" }}>
+          <div className="ds-card__header">
+            <div>
+              <div className="ds-card__title">Metrics overview</div>
+              <div className="ds-card__meta">Snapshot of key signals this week.</div>
+            </div>
+            <InfoTooltip content="Sample chart data until live metrics are wired up." placement="top" />
+          </div>
           <div className="sfdc-card__body">
             <D3BarChart
               height={260}

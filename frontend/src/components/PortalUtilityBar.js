@@ -1,13 +1,28 @@
 ﻿// components/PortalUtilityBar.js - Shared top utility bar used across portal apps
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useCommandPalette } from '../context/CommandPaletteContext';
+import { useUserPreferences } from '../context/UserPreferencesContext';
 import { SAMPLE_TENANT_COMMENTS } from '../utils/sampleData';
 import '../pages/portal_page/portalPage.sfdc.css';
+import Icon from './ui/Icon';
+
+const ROUTE_LABELS = {
+  '/': 'Home',
+  '/dashboard': 'Analytics Dashboard',
+  '/coding': 'Coding Worklists',
+  '/jobs/status-center': 'Operations Center',
+  '/jobs/import-data': 'Data Imports',
+  '/RideBooking': 'Ride Coordination',
+  '/docs': 'Documentation',
+  '/portal_page/portalPage': 'Portal Home',
+  '/settings': 'Settings',
+};
 
 const PortalUtilityBar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     user,
     logout,
@@ -25,6 +40,12 @@ const PortalUtilityBar = () => {
     recordAuditEvent,
   } = useContext(AuthContext) || {};
   const { openPalette } = useCommandPalette();
+  const {
+    favorites,
+    toggleFavorite,
+    isFavorite,
+    isNavItemEnabled,
+  } = useUserPreferences();
 
   const [showWaffle, setShowWaffle] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
@@ -74,9 +95,11 @@ const PortalUtilityBar = () => {
     return applicationTiles.filter((app) => {
       if (!enabledKeys.has(app.key)) return false;
       const level = app.requiredLevel || 'user';
-      return hasApplicationAccess(app.key, level);
+      if (!hasApplicationAccess(app.key, level)) return false;
+      if (app.key !== 'portal' && !isNavItemEnabled(app.key)) return false;
+      return true;
     });
-  }, [applicationTiles, availableApplications, hasApplicationAccess]);
+  }, [applicationTiles, availableApplications, hasApplicationAccess, isNavItemEnabled]);
 
   const recentEvents = useMemo(() => (auditTrail || []).slice(0, 4), [auditTrail]);
 
@@ -119,6 +142,23 @@ const PortalUtilityBar = () => {
   };
 
   const initials = (user?.email || '?').slice(0, 1).toUpperCase();
+  const currentPath = location.pathname;
+  const resolvedFavoriteLabel = useMemo(() => {
+    if (ROUTE_LABELS[currentPath]) return ROUTE_LABELS[currentPath];
+    const matchingTile = applicationTiles.find((app) => currentPath.startsWith(app.path));
+    if (matchingTile) return matchingTile.label;
+    return document.title || currentPath;
+  }, [currentPath, applicationTiles]);
+  const isCurrentFavorite = isFavorite(currentPath);
+  const handleFavoriteToggle = () => {
+    const nextPinned = !isCurrentFavorite;
+    toggleFavorite({ path: currentPath, label: resolvedFavoriteLabel });
+    recordAuditEvent?.('navigation.favorite.toggle', {
+      path: currentPath,
+      label: resolvedFavoriteLabel,
+      pinned: nextPinned,
+    });
+  };
 
   return (
     <>
@@ -126,7 +166,7 @@ const PortalUtilityBar = () => {
         <div className="portal-impersonation" role="status">
           <div>
             Acting as <strong>{impersonation?.name || impersonation?.email}</strong>
-            <span> — all actions are recorded.</span>
+            <span> ? all actions are recorded.</span>
           </div>
           <button
             type="button"
@@ -179,7 +219,19 @@ const PortalUtilityBar = () => {
               }}
             >
               <svg viewBox="0 0 24 24"><path d="M5 4h14a1 1 0 011 1v3H4V5a1 1 0 011-1zm-1 7h16a1 1 0 011 1v7H3v-7a1 1 0 011-1zm4 2v2h2v-2H8zm4 0v2h2v-2h-2z"/></svg>
-              <span className="sfdc-badge">⌘K</span>
+              <span className="sfdc-badge">Ctrl+K</span>
+            </button>
+            <button
+              className={`sfdc-iconbutton favorite-toggle${isCurrentFavorite ? ' is-active' : ''}`}
+              aria-pressed={isCurrentFavorite}
+              type="button"
+              title={isCurrentFavorite ? 'Unpin from favorites' : 'Pin this page'}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleFavoriteToggle();
+              }}
+            >
+              <Icon name={isCurrentFavorite ? 'starFilled' : 'star'} size={16} aria-hidden="true" />
             </button>
             <button
               className="sfdc-tenantbutton"
@@ -274,7 +326,7 @@ const PortalUtilityBar = () => {
                   onClick={() => handleTenantSelect(option.key)}
                 >
                   <div className="sfdc-tenantoption__title">{option.name}</div>
-                  <div className="sfdc-tenantoption__meta">{option.region || 'Unknown region'} • {option.timezone || 'Timezone TBD'}</div>
+                  <div className="sfdc-tenantoption__meta">{option.region || 'Unknown region'} ? {option.timezone || 'Timezone TBD'}</div>
                   {SAMPLE_TENANT_COMMENTS[option.key] && (
                     <div className="sfdc-tenantoption__hint">{SAMPLE_TENANT_COMMENTS[option.key]}</div>
                   )}
@@ -324,7 +376,7 @@ const PortalUtilityBar = () => {
             </div>
             <div className="sfdc-dropdown__item" onClick={() => { closeAll(); handleCommandPalette(); }}>
               <div>Open command palette</div>
-              <div className="sfdc-dropdown__hint">⌘K</div>
+              <div className="sfdc-dropdown__hint">?K</div>
             </div>
             <div className="sfdc-dropdown__item" onClick={() => { closeAll(); logout?.(); navigate('/login'); }}>
               <div>Logout</div>
@@ -337,3 +389,9 @@ const PortalUtilityBar = () => {
 };
 
 export default PortalUtilityBar;
+
+
+
+
+
+

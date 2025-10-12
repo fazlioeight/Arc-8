@@ -94,6 +94,7 @@ async def _bootstrap_async():
             db_connection_uri=TEST_TENANT_DB_TEMPLATE.format(tenant_key=TEST_TENANT_KEY),
             billing_plan="standard",
             phi_data_classification="restricted",
+            purchased_applications={"coding": True, "dashboard": True, "docs": True},
         )
         session.add(tenant)
         await session.flush()
@@ -102,6 +103,7 @@ async def _bootstrap_async():
             email="user@example.com",
             password_hash=bcrypt.hashpw(b"password", bcrypt.gensalt()).decode(),
             role="analyst",
+            app_permissions={"coding": "user", "dashboard": "user"},
         )
         session.add(user)
         await session.commit()

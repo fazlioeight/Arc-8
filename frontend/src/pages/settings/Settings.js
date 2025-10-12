@@ -8,11 +8,38 @@ import ToggleSwitch from "../../components/ToggleSwitch";
 import PortalUtilityBar from "../../components/PortalUtilityBar";
 import PortalHero from '../../components/PortalHero';
 import { AuthContext } from "../../context/AuthContext";
+import { useUserPreferences } from '../../context/UserPreferencesContext';
+
+const NAV_ITEMS = [
+  { key: 'home', label: 'Home & Landing' },
+  { key: 'analytics', label: 'Analytics Dashboard' },
+  { key: 'coding', label: 'Coding Workbench' },
+  { key: 'care', label: 'Care Operations menu' },
+  { key: 'rideBooking', label: 'Ride coordination' },
+  { key: 'jobCenter', label: 'Operations Center' },
+  { key: 'importData', label: 'Data imports' },
+  { key: 'resources', label: 'Docs library' },
+  { key: 'admin', label: 'Administration menu' },
+  { key: 'adminConsole', label: 'Master admin console' },
+  { key: 'assignments', label: 'Work distribution' },
+  { key: 'settings', label: 'Settings access' },
+  { key: 'pricing', label: 'Pricing' },
+  { key: 'contact', label: 'Contact' },
+  { key: 'login', label: 'Login link' },
+];
 
 const Settings = ({ themePreference, setThemePreference }) => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useContext(AuthContext) || {};
+  const { isAuthenticated, role } = useContext(AuthContext) || {};
+  const { roleMenus, setNavVisibility } = useUserPreferences();
   const [active, setActive] = useState("general");
+  const [menuRole, setMenuRole] = useState(() => role || 'admin');
+
+  useEffect(() => {
+    if (role) {
+      setMenuRole(role);
+    }
+  }, [role]);
 
   const [prefs, setPrefs] = useState(() => {
     const saved = localStorage.getItem("liSettings");
@@ -138,6 +165,7 @@ const Settings = ({ themePreference, setThemePreference }) => {
             { id: "notifications", label: "Notifications" },
             { id: "beta", label: "Beta features" },
             { id: "about", label: "About" },
+            ...(role === 'admin' ? [{ id: 'navigation', label: 'Navigation' }] : []),
           ].map((s) => (
             <div
               key={s.id}
@@ -312,6 +340,44 @@ const Settings = ({ themePreference, setThemePreference }) => {
                   checked={prefs.emailResearch}
                   onChange={(v) => updatePref("emailResearch", v)}
                 />
+              </div>
+            </div>
+          )}
+
+          {active === "navigation" && role === 'admin' && (
+            <div className="li-card">
+              <div className="li-card__title">Navigation by role</div>
+              <div className="li-card__desc">Choose which menus appear for each role to keep teams focused.</div>
+              <div className="li-card__row" style={{ alignItems: 'center', gap: '12px' }}>
+                <label className="li-toggle__title" htmlFor="nav-role-picker">Role</label>
+                <select
+                  id="nav-role-picker"
+                  className="li-select"
+                  value={menuRole}
+                  onChange={(event) => setMenuRole(event.target.value)}
+                >
+                  {Object.keys(roleMenus || {}).map((roleKey) => (
+                    <option key={roleKey} value={roleKey}>
+                      {roleKey.charAt(0).toUpperCase() + roleKey.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="li-card__hint">Changes apply immediately for users the next time they navigate.</div>
+              <div style={{ display: 'grid', gap: '12px', marginTop: '12px' }}>
+                {NAV_ITEMS.map((item) => {
+                  const menuConfig = roleMenus?.[menuRole] || {};
+                  const checked = menuConfig[item.key] !== undefined ? menuConfig[item.key] : true;
+                  return (
+                    <ToggleSwitch
+                      key={item.key}
+                      id={`nav-${menuRole}-${item.key}`}
+                      label={item.label}
+                      checked={checked}
+                      onChange={(value) => setNavVisibility(menuRole, item.key, value)}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}

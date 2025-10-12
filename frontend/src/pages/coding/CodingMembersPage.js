@@ -1,12 +1,12 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Card, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
-import PortalHero from '../../components/PortalHero';
 import { AuthContext } from '../../context/AuthContext';
 import { useCommandPalette } from '../../context/CommandPaletteContext';
 import { fetchCodingMembers, fetchPrioritizedMembers } from '../../services/codingService';
+import CodingPortalHeader from './CodingPortalHeader';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -20,6 +20,7 @@ const LOB_OPTIONS = ['Commercial', 'Medicare Advantage', 'DSNP', 'Exchange'];
 const CodingMembersPage = () => {
   const { registerCommands } = useCommandPalette();
   const navigate = useNavigate();
+  const location = useLocation();
   const { token, tenant, isAuthenticated, recordAuditEvent } = useContext(AuthContext) || {};
 
   const [members, setMembers] = useState([]);
@@ -135,6 +136,8 @@ const CodingMembersPage = () => {
     const search = `?fromMemberId=${encodeURIComponent(member.id)}${member.pcp_name ? `&providerName=${encodeURIComponent(member.pcp_name)}` : ''}`;
     navigate(`/coding/providers/${encodeURIComponent(providerKey)}${search}`, {
       state: {
+        from: `${location.pathname}${location.search}`,
+        breadcrumb: member.pcp_name || member.pcp_npi,
         fromMemberId: member.id,
         providerName: member.pcp_name,
         providerNpi: member.pcp_npi,
@@ -145,24 +148,9 @@ const CodingMembersPage = () => {
   return (
     <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
-      <PortalHero
-        align="left"
+      <CodingPortalHeader
         title="Coding member worklists"
         subtitle="Search, filter, and open members assigned to your coding teams."
-        actions={(
-          <div className="d-flex flex-wrap gap-2">
-            <Button variant="light" onClick={() => navigate('/coding')}>
-              Landing
-            </Button>
-            <Button variant="outline-light" disabled>
-              Members
-            </Button>
-            <Button variant="outline-light" onClick={() => navigate('/coding/providers')}>
-              Providers
-            </Button>
-          </div>
-        )}
-        wave={false}
       />
       {!isAuthenticated ? (
         <div className="coding-content container py-5">
@@ -237,7 +225,12 @@ const CodingMembersPage = () => {
                   <tr
                     key={item.member_id}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/coding/members/${item.member_id}`)}
+                    onClick={() => navigate(`/coding/members/${item.member_id}`, {
+                      state: {
+                        from: `${location.pathname}${location.search}`,
+                        breadcrumb: item.member_key,
+                      },
+                    })}
                   >
                     <td>{item.member_key}</td>
                     <td>{item.priority_tier}</td>
@@ -308,7 +301,15 @@ const CodingMembersPage = () => {
                   )}
                 </td>
                 <td className="text-end">
-                  <Button variant="link" onClick={() => navigate(`/coding/members/${member.id}`)}>
+                  <Button
+                    variant="link"
+                    onClick={() => navigate(`/coding/members/${member.id}`, {
+                      state: {
+                        from: `${location.pathname}${location.search}`,
+                        breadcrumb: [member.first_name, member.last_name].filter(Boolean).join(' ') || member.member_key,
+                      },
+                    })}
+                  >
                     Open
                   </Button>
                 </td>

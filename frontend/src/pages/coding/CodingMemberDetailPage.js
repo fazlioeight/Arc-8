@@ -12,6 +12,8 @@ import {
   generateSubmissionExport,
   updateCodingChase,
 } from '../../services/codingService';
+import CodingPortalHeader from './CodingPortalHeader';
+import BackLink from '../../components/BackLink';
 
 const CodingMemberDetailPage = () => {
   let memberId;
@@ -86,6 +88,13 @@ const CodingMemberDetailPage = () => {
   const claims = detail?.claims || [];
   const maoRecords = detail?.mao_records || [];
   const assessments = detail?.health_assessments || [];
+
+  const header = (
+    <CodingPortalHeader
+      title="Member chart workspace"
+      subtitle="Review eligibility, chases, notes, and submission readiness."
+    />
+  );
 
   const handleAdvanceChase = async chase => {
     try {
@@ -176,44 +185,48 @@ const CodingMemberDetailPage = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="sfdc-portal coding-portal">
-        <PortalUtilityBar />
-        <div className="coding-content container py-5">
-          <Alert variant="warning">You must be logged in to view member details.</Alert>
-        </div>
+    <div className="sfdc-portal coding-portal">
+      <PortalUtilityBar />
+      {header}
+      <div className="coding-content container py-5">
+        <Alert variant="warning">You must be logged in to view member details.</Alert>
+      </div>
       </div>
     );
   }
 
   if (loading && !detail) {
     return (
-      <div className="sfdc-portal coding-portal">
-        <PortalUtilityBar />
-        <div className="coding-content container py-5 text-center">
-          <Spinner animation="border" />
-        </div>
+    <div className="sfdc-portal coding-portal">
+      <PortalUtilityBar />
+      {header}
+      <div className="coding-content container py-5 text-center">
+        <Spinner animation="border" />
+      </div>
       </div>
     );
   }
 
   if (error && !detail) {
     return (
-      <div className="sfdc-portal coding-portal">
-        <PortalUtilityBar />
-        <div className="coding-content container py-5">
-          <Alert variant="danger">{error}</Alert>
-        </div>
+    <div className="sfdc-portal coding-portal">
+      <PortalUtilityBar />
+      {header}
+      <div className="coding-content container py-5">
+        <Alert variant="danger">{error}</Alert>
+      </div>
       </div>
     );
   }
 
   if (!member) {
     return (
-      <div className="sfdc-portal coding-portal">
-        <PortalUtilityBar />
-        <div className="coding-content container py-5">
-          <Alert variant="warning">Member not found.</Alert>
-        </div>
+    <div className="sfdc-portal coding-portal">
+      <PortalUtilityBar />
+      {header}
+      <div className="coding-content container py-5">
+        <Alert variant="warning">Member not found.</Alert>
+      </div>
       </div>
     );
   }
@@ -223,7 +236,11 @@ const CodingMemberDetailPage = () => {
   return (
     <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
+      {header}
       <div className="coding-content container py-4">
+        <div className="mb-3">
+          <BackLink fallback="/coding/members">Back to members</BackLink>
+        </div>
         <Row className="mb-4">
           <Col md={8}>
             <h1 className="h3 mb-1">{fullName}</h1>

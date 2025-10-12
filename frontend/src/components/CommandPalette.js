@@ -2,8 +2,11 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useCommandPalette } from '../context/CommandPaletteContext';
+import { useGuidedTour } from '../context/GuidedTourContext';
+import { useUserPreferences } from '../context/UserPreferencesContext';
+import { SAMPLE_CODING_MEMBERS, SAMPLE_ADMIN_APPLICATIONS } from '../utils/sampleData';
 
-const CATEGORY_ORDER = ['Navigation', 'Tenant', 'Workspace', 'Data', 'Actions', 'Admin', 'Support'];
+const CATEGORY_ORDER = ['Favorites', 'Records', 'Providers', 'Knowledge', 'Navigation', 'Workspace', 'Tenant', 'Data', 'Actions', 'Admin', 'Support'];
 
 const CommandPalette = ({ onThemeToggle }) => {
   const navigate = useNavigate();
@@ -19,6 +22,9 @@ const CommandPalette = ({ onThemeToggle }) => {
     setQuery,
     dynamicCommands,
   } = useCommandPalette();
+  const [searchCommands, setSearchCommands] = useState([]);
+  const { startTour } = useGuidedTour();
+  const { isNavItemEnabled, favorites, toggleFavorite, isFavorite } = useUserPreferences();
 
   const auth = useContext(AuthContext) || {};
   const {
@@ -35,6 +41,28 @@ const CommandPalette = ({ onThemeToggle }) => {
     endImpersonation,
     recordAuditEvent,
   } = auth;
+  const currentPath = useMemo(
+    () => `${location.pathname}${location.search}`,
+    [location.pathname, location.search],
+  );
+  const currentFavoriteLabel = useMemo(() => {
+    if (document?.title) return document.title;
+    return location.pathname || 'Current page';
+  }, [location.pathname]);
+  const currentPagePinned = isFavorite(currentPath);
+  const sampleProviders = useMemo(() => {
+    const map = new Map();
+    SAMPLE_CODING_MEMBERS.forEach((member) => {
+      if (!member.pcp_name) return;
+      const key = (member.pcp_npi || member.pcp_name || '').toLowerCase();
+      if (!key || map.has(key)) return;
+      map.set(key, {
+        name: member.pcp_name,
+        npi: member.pcp_npi,
+      });
+    });
+    return Array.from(map.values());
+  }, []);
 
   const baseCommands = useMemo(() => {
     const enabledSet = new Set(
@@ -56,6 +84,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       keywords: 'home overview landing',
       shortcut: 'G H',
       action: () => navigate('/portal_page/portalPage'),
+      disabled: !isNavItemEnabled('home'),
     });
     append({
       id: 'nav-dashboard',
@@ -64,7 +93,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       keywords: 'metrics analytics raf',
       shortcut: 'G D',
       action: () => navigate('/dashboard'),
-      disabled: !isAuthenticated || !isEnabled('dashboard') || !hasApplicationAccess?.('dashboard'),
+      disabled: !isAuthenticated || !isEnabled('dashboard') || !hasApplicationAccess?.('dashboard') || !isNavItemEnabled('analytics'),
     });
     append({
       id: 'nav-coding',
@@ -72,7 +101,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Navigation',
       keywords: 'coding charts members worklist',
       action: () => navigate('/coding'),
-      disabled: !isAuthenticated || !isEnabled('coding') || !hasApplicationAccess?.('coding'),
+      disabled: !isAuthenticated || !isEnabled('coding') || !hasApplicationAccess?.('coding') || !isNavItemEnabled('coding'),
     });
     append({
       id: 'nav-ride-booking',
@@ -80,7 +109,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Navigation',
       keywords: 'transport rides partners scheduling',
       action: () => navigate('/RideBooking'),
-      disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking'),
+      disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking') || !isNavItemEnabled('rideBooking'),
     });
     append({
       id: 'nav-docs',
@@ -90,7 +119,30 @@ const CommandPalette = ({ onThemeToggle }) => {
       shortcut: 'G ?'
 ,
       action: () => navigate('/docs'),
-      disabled: !isEnabled('docs') || !hasApplicationAccess?.('docs'),
+      disabled: !isEnabled('docs') || !hasApplicationAccess?.('docs') || !isNavItemEnabled('resources'),
+    });
+    append({
+      id: 'support-guided-tour',
+      label: 'Take the guided tour',
+      category: 'Support',
+      keywords: 'help onboarding walkthrough tour introduction',
+      action: () => startTour({ force: true, step: 0 }),
+    });
+    append({
+      id: 'favorite-toggle-current',
+      label: currentPagePinned ? 'Unpin this page from favorites' : 'Pin this page to favorites',
+      category: 'Favorites',
+      keywords: 'favorite pin unpin bookmark',
+      action: () => toggleFavorite({ path: currentPath, label: currentFavoriteLabel }),
+    });
+    favorites.forEach((fav) => {
+      append({
+        id: `favorite-${fav.path}`,
+        label: `Open ${fav.label}`,
+        category: 'Favorites',
+        keywords: `${fav.label} favorite pinned`,
+        action: () => navigate(fav.path),
+      });
     });
     append({
       id: 'nav-settings',
@@ -98,7 +150,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Workspace',
       keywords: 'profile preferences theme',
       action: () => navigate('/settings'),
-      disabled: !isAuthenticated || !isEnabled('settings') || !hasApplicationAccess?.('settings'),
+      disabled: !isAuthenticated || !isEnabled('settings') || !hasApplicationAccess?.('settings') || !isNavItemEnabled('settings'),
     });
     append({
       id: 'nav-job-center',
@@ -152,12 +204,10 @@ const CommandPalette = ({ onThemeToggle }) => {
       });
     }
 
-    commands.push(...dynamicCommands);
     return commands;
   }, [
     availableTenants,
     availableApplications,
-    dynamicCommands,
     endImpersonation,
     hasApplicationAccess,
     isAuthenticated,
@@ -168,19 +218,110 @@ const CommandPalette = ({ onThemeToggle }) => {
     setTenant,
     tenant,
     impersonation,
+    startTour,
+    isNavItemEnabled,
+    favorites,
+    toggleFavorite,
+    currentFavoriteLabel,
+    currentPagePinned,
+    location.pathname,
   ]);
+
+  useEffect(() => {
+    const term = query.trim().toLowerCase();
+    if (!isOpen || term.length < 2) {
+      setSearchCommands([]);
+      return;
+    }
+    const commands = [];
+    SAMPLE_CODING_MEMBERS.filter((member) => {
+      const haystack = [
+        member.first_name,
+        member.last_name,
+        member.member_key,
+        member.pcp_name,
+        member.pcp_npi,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(term);
+    }).slice(0, 5).forEach((member) => {
+      const memberName = [member.first_name, member.last_name]
+        .filter(Boolean)
+        .join(' ');
+      const displayName = memberName || member.member_key;
+      commands.push({
+        id: `search-member-${member.id}`,
+        label: `Member • ${displayName}`,
+        category: 'Records',
+        keywords: `${member.member_key} ${memberName} ${member.pcp_name || ''}`,
+        action: () => navigate(`/coding/members/${member.id}`, {
+          state: {
+            from: currentPath,
+            breadcrumb: displayName,
+          },
+        }),
+      });
+    });
+
+    sampleProviders.filter((provider) => {
+      const haystack = [provider.name, provider.npi].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(term);
+    }).slice(0, 4).forEach((provider) => {
+      const identifier = provider.npi || provider.name;
+      commands.push({
+        id: `search-provider-${identifier}`,
+        label: `Care Team • ${provider.name}`,
+        category: 'Providers',
+        keywords: `${provider.name} ${provider.npi || ''}`,
+        action: () => navigate(`/coding/providers/${encodeURIComponent(identifier)}`, {
+          state: {
+            from: currentPath,
+            breadcrumb: provider.name,
+          },
+        }),
+      });
+    });
+
+    SAMPLE_ADMIN_APPLICATIONS.filter((resource) => {
+      const haystack = `${resource.label} ${resource.description || ''}`.toLowerCase();
+      return haystack.includes(term);
+    }).slice(0, 4).forEach((resource) => {
+      commands.push({
+        id: `search-doc-${resource.key}`,
+        label: `Resource • ${resource.label}`,
+        category: 'Knowledge',
+        keywords: `${resource.label} ${resource.description || ''}`,
+        action: () => navigate('/docs', {
+          state: {
+            breadcrumb: resource.label,
+          },
+        }),
+      });
+    });
+
+    setSearchCommands(commands);
+  }, [currentPath, isOpen, navigate, query, sampleProviders]);
+
+  const combinedCommands = useMemo(() => {
+    if (searchCommands.length) {
+      return [...searchCommands, ...dynamicCommands, ...baseCommands];
+    }
+    return [...dynamicCommands, ...baseCommands];
+  }, [searchCommands, dynamicCommands, baseCommands]);
 
   const filteredCommands = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return baseCommands;
-    return baseCommands.filter((command) => {
+    if (!term) return combinedCommands;
+    return combinedCommands.filter((command) => {
       const haystack = [command.label, command.keywords, command.category]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
       return haystack.includes(term);
     });
-  }, [baseCommands, query]);
+  }, [combinedCommands, query]);
 
   const groupedCommands = useMemo(() => {
     const groups = new Map();
@@ -288,7 +429,7 @@ const CommandPalette = ({ onThemeToggle }) => {
             className="command-palette__input"
             aria-label="Command search"
           />
-          <div className="command-palette__hint">⌘K</div>
+          <div className="command-palette__hint">Ctrl+K</div>
         </header>
         <div className="command-palette__body">
           {flatCommands.length === 0 && (
@@ -341,3 +482,5 @@ const CommandPalette = ({ onThemeToggle }) => {
 };
 
 export default CommandPalette;
+
+

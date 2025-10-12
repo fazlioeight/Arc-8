@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, Badge, Button, Spinner, Table } from 'react-bootstrap';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
-import PortalHero from '../../components/PortalHero';
 import { AuthContext } from '../../context/AuthContext';
 import { fetchCodingMembers } from '../../services/codingService';
+import CodingPortalHeader from './CodingPortalHeader';
 
 const STATUS_BADGES = {
   closed: 'secondary',
@@ -66,24 +66,9 @@ const CodingLandingPage = () => {
   return (
     <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
-      <PortalHero
-        align="left"
+      <CodingPortalHeader
         title="Coding worklists"
         subtitle={user?.email ? `Welcome back, ${user.email}. Here is your current queue.` : 'Sign in to manage your coding assignments.'}
-        actions={(
-          <div className="d-flex flex-wrap gap-2">
-            <Button variant="light" onClick={() => navigate('/coding/members')}>
-              Members
-            </Button>
-            <Button variant="outline-light" onClick={() => navigate('/coding/providers')}>
-              Providers
-            </Button>
-            <Button variant="outline-light" onClick={() => navigate('/admin/coding-assignments')}>
-              Coding assignments
-            </Button>
-          </div>
-        )}
-        wave={false}
       />
 
       <div className="coding-content">
