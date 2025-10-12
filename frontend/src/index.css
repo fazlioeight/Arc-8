@@ -37,7 +37,7 @@ html:focus-within { scroll-behavior: smooth; }
   --text: var(--lm-text);
   --text-muted: var(--lm-text-muted);
   --border: var(--lm-border);
-  --shadow: var(--lm-shadow);
+  --shadow: var(--shadow-sm);
   --accent: var(--lm-accent);
   --input-bg: var(--lm-bg-light);
 
@@ -67,6 +67,63 @@ html:focus-within { scroll-behavior: smooth; }
   --dur-fast: 120ms;
   --dur-med: 200ms;
   --dur-slow: 320ms;
+
+  /* Layout & spacing scale */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4.5rem;
+  --content-max-width: 1120px;
+
+  /* Radius & borders */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+  --border-width: 1px;
+
+  /* Elevation system */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 24px 48px rgba(15, 23, 42, 0.18);
+
+  /* Typography helpers */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: clamp(2.25rem, 2rem + 1vw, 3rem);
+  --line-height-tight: 1.25;
+  --line-height-regular: 1.5;
+
+  /* Interaction */
+  --transition-quick: 140ms var(--easing-standard);
+  --transition-base: 200ms var(--easing-standard);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 30%, transparent);
+  --focus-ring-strong: 0 0 0 4px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+
+  /* Semantic states */
+  --state-positive: #16a34a;
+  --state-warning: #f59e0b;
+  --state-critical: #dc2626;
+
+  /* Utility gradients */
+  --sheen-gradient: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--bg-light) 92%, #ffffff 8%) 40%,
+    color-mix(in srgb, var(--bg-light) 65%, #ffffff 35%) 50%,
+    transparent 100%
+  );
 }
 
 .dark-mode {
@@ -78,8 +135,12 @@ html:focus-within { scroll-behavior: smooth; }
   --text-muted: #a8b3bd;
   --border: var(--dm-border);
   --shadow: var(--dm-shadow);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.45);
+  --shadow-md: 0 16px 36px rgba(0,0,0,0.45);
+  --shadow-lg: 0 28px 56px rgba(0,0,0,0.58);
   --accent: var(--dm-accent);
   --input-bg: var(--dm-input);
+  --focus-ring: 0 0 0 3px rgba(112, 181, 249, 0.45);
 
   color-scheme: dark;
   background-color: var(--bg) !important;
@@ -247,13 +308,25 @@ html:focus-within { scroll-behavior: smooth; }
 }
 
 /* Global typography scale */
-body { font-family: var(--font-sans); line-height: 1.6; }
+body {
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  text-rendering: optimizeLegibility;
+}
 h1 { font-size: clamp(1.8rem, 1.2rem + 2.2vw, 2.5rem); }
 h2 { font-size: clamp(1.5rem, 1rem + 1.5vw, 2rem); }
 h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
 
 /* Improve focus visibility */
-:focus-visible { outline: 2px solid #8ab4f8; outline-offset: 2px; }
+:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
 
 /* Form accent color */
 :root { accent-color: #0a66c2; }
@@ -344,5 +417,25 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
 
 .coding-empty p {
   margin-bottom: 0;
+}
+
+.global-breadcrumbs {
+  font-size: 0.875rem;
+}
+
+.global-breadcrumbs .breadcrumb {
+  margin-bottom: 0;
+}
+
+.back-link {
+  color: #0d6efd;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.back-link:hover,
+.back-link:focus {
+  color: #0a58ca;
+  text-decoration: underline;
 }
 
