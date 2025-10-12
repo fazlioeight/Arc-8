@@ -40,7 +40,7 @@ const CodingMembersPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchCodingMembers('sample-command', tenant || 'demo', {
+      const response = await fetchCodingMembers('sample-command', tenant || 'prominencehealth', {
         search: searchValue,
         status: statusFilter ? [statusFilter] : [],
         lob: lobFilter ? [lobFilter] : [],

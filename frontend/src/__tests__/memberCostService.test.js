@@ -4,7 +4,7 @@ import { getMemberCosts } from '../services/memberCostService';
 describe('memberCostService.getMemberCosts', () => {
   const originalFetch = global.fetch;
   const token = 'test-token';
-  const tenant = 'demo';
+  const tenant = 'prominencehealth';
 
   afterEach(() => {
     global.fetch = originalFetch;

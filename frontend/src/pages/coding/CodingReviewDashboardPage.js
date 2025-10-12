@@ -36,7 +36,7 @@ const CodingReviewDashboardPage = () => {
   const [error, setError] = useState(null);
 
   const effectiveToken = token || 'sample-coder-review';
-  const effectiveTenant = tenant || 'demo';
+  const effectiveTenant = tenant || 'prominencehealth';
   const currentEmail = user?.email || null;
 
   const loadDashboard = async (overrides = {}) => {

@@ -42,7 +42,7 @@ app = FastAPI(title="Nexora Analytics API", version="2.0.0")
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
-app.add_middleware(TenantMiddleware, default_tenant="demo", require_known_tenant=settings.HIPAA_MODE)
+app.add_middleware(TenantMiddleware, default_tenant="prominencehealth", require_known_tenant=settings.HIPAA_MODE)
 
 cors_origins = []
 for origin in settings.CORS_ORIGINS:

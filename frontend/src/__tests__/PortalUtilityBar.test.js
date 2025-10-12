@@ -7,8 +7,8 @@ import { AuthContext } from '../context/AuthContext';
 test('waffle opens a left-aligned waffle and notifications are right-aligned', async () => {
   const authValue = {
     user: { email: 'tester@nexora.test' },
-    tenant: 'demo',
-    tenantInfo: { name: 'Demo' },
+    tenant: 'prominencehealth',
+    tenantInfo: { name: 'ProminenceHealth' },
     hasApplicationAccess: () => true,
     availableTenants: [],
     auditTrail: [],

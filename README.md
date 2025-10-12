@@ -30,7 +30,7 @@ nexora-platform/
       routes/              # FastAPI routers (analytics, member endpoints)
       services/            # analytics, tenant registry, provisioning helpers
       utils/               # security helpers, audit logging
-    scripts/seed_demo.py   # Async control/tenant seeding for demo data
+    scripts/seed_prominence.py   # Provision ProminenceHealth tenant without sample data
     alembic/               # Control plane migrations
     tests/                 # pytest + httpx async tests for tenant isolation
   frontend/
@@ -53,8 +53,8 @@ nexora-platform/
 2. **Configuration** (set in shell or `.env`):
    - `ENVIRONMENT` (`development` | `test` | `production`)
    - `SECRET_KEY` (required in production; auto-generated for dev/tests)
-   - `CONTROL_DATABASE_URL` (e.g. `postgresql+asyncpg://user:pass@host/db` or `sqlite+aiosqlite:///./nexora_control.db`)
-   - `DEFAULT_TENANT_DATABASE_URL` or `TENANT_DATABASE_URL_TEMPLATE` (e.g. `postgresql+asyncpg://.../{tenant_key}`)
+   - `CONTROL_DATABASE_URL` (defaults to `postgresql+asyncpg://nexora_control:nexora_control@host:5432/nexora_control`)
+   - `DEFAULT_TENANT_DATABASE_URL` or `TENANT_DATABASE_URL_TEMPLATE` (defaults to `postgresql+asyncpg://nexora_control:nexora_control@host:5432/prominence_tenant`)
    - `TENANT_DATABASE_SCHEMA_TEMPLATE` (optional; e.g. `tenant_{tenant_slug}`)
    - `REDIS_URL` (`redis://localhost:6379/0`) to enable rate limiting
    - Optional: `CANONICAL_HOST_DOMAIN`, `ALLOWED_TENANT_HOSTS`, `AUDIT_LOG_PATH`, `USAGE_DAILY_LIMIT`, `RATE_LIMIT_MAX_PER_MINUTE`
@@ -65,9 +65,9 @@ nexora-platform/
    alembic upgrade head
    ```
 
-4. **Seed demo tenant (control + tenant DB):**
+4. **Seed ProminenceHealth tenant (control + tenant DB):**
    ```powershell
-   python scripts/seed_demo.py
+   python scripts/seed_prominence.py
    ```
 
 5. **Run API (async Uvicorn):**

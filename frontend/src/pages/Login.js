@@ -8,7 +8,7 @@ import "./Login.sfdc.css";
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8000";
 
 const Login = () => {
-  const [formData, setFormData] = useState({ email: "", password: "", tenant: "demo" });
+  const [formData, setFormData] = useState({ email: "", password: "", tenant: "prominencehealth" });
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
   const [error, setError] = useState("");
@@ -93,7 +93,7 @@ const Login = () => {
                 id="tenant"
                 value={formData.tenant}
                 onChange={handleChange}
-                placeholder="e.g., demo"
+                placeholder="e.g., prominencehealth"
                 required
               />
             </div>

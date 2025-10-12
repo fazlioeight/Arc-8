@@ -235,27 +235,27 @@ async def ensure_seed_data(session: AsyncSession) -> None:
     if member_count and member_count > 0:
         return
 
-    demo_member = CodingMember(
-        member_key="M-0001",
-        first_name="Alex",
-        last_name="Johnson",
+    seed_member = CodingMember(
+        member_key="PH-0001",
+        first_name="Jordan",
+        last_name="Reeves",
         status="active",
         line_of_business="Commercial",
         risk_score=0.84,
         primary_language="English",
-        pcp_name="Dr. Rivera",
-        pcp_npi="1234567890",
-        address_city="Austin",
-        address_state="TX",
+        pcp_name="Dr. Prominence",
+        pcp_npi="1987654321",
+        address_city="Chicago",
+        address_state="IL",
     )
-    session.add(demo_member)
+    session.add(seed_member)
     await session.flush()
 
     session.add_all(
         [
             CodingMemberChase(
-                member_id=demo_member.id,
-                chase_code="CH-1001",
+                member_id=seed_member.id,
+                chase_code="PH-CH-1001",
                 status="open",
                 priority="high",
                 assigned_coder_email="coder@nexora.test",
@@ -263,8 +263,8 @@ async def ensure_seed_data(session: AsyncSession) -> None:
                 hcc_code="HCC18",
             ),
             CodingMemberChase(
-                member_id=demo_member.id,
-                chase_code="CH-1002",
+                member_id=seed_member.id,
+                chase_code="PH-CH-1002",
                 status="in_review",
                 priority="normal",
                 assigned_coder_email="reviewer@nexora.test",
@@ -275,7 +275,7 @@ async def ensure_seed_data(session: AsyncSession) -> None:
     )
 
     provider = CodingProvider(
-        name="Rivera Family Practice",
+        name="Prominence Primary Care",
         npi="1457389023",
         tax_id="74-1234567",
         phone="555-123-4567",
@@ -285,19 +285,19 @@ async def ensure_seed_data(session: AsyncSession) -> None:
     session.add(
         CodingProviderLocation(
             provider_id=provider.id,
-            address_line1="123 Main St",
-            city="Austin",
-            state="TX",
-            postal_code="73301",
+            address_line1="456 Market St",
+            city="Chicago",
+            state="IL",
+            postal_code="60601",
         )
     )
 
     session.add(
         CodingMemberNote(
-            member_id=demo_member.id,
+            member_id=seed_member.id,
             author_email="coder@nexora.test",
-            author_name="Demo Coder",
-            body="Initial chart review completed.",
+            author_name="Prominence Coder",
+            body="Initial chart review completed for ProminenceHealth.",
         )
     )
 

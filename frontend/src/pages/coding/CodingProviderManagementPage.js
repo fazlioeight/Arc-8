@@ -41,7 +41,7 @@ const CodingProviderManagementPage = () => {
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   const effectiveToken = token || 'sample-provider-management';
-  const effectiveTenant = tenant || 'demo';
+  const effectiveTenant = tenant || 'prominencehealth';
 
   const loadProviders = async (term = search) => {
     setLoading(true);

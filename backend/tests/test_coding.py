@@ -3,8 +3,8 @@ import uuid
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-BASE_URL = "https://demo.localhost"
-TENANT_KEY = "demo"
+BASE_URL = "https://prominencehealth.localhost"
+TENANT_KEY = "prominencehealth"
 LOGIN_PATH = "/api/login"
 
 

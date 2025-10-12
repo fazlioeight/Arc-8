@@ -2,7 +2,7 @@
 from httpx import ASGITransport, AsyncClient
 from app.utils.security import create_access_token
 
-BASE_URL = "https://demo.localhost"
+BASE_URL = "https://prominencehealth.localhost"
 
 
 pytestmark = pytest.mark.anyio("asyncio")
@@ -15,7 +15,7 @@ async def test_cross_tenant_access_denied(fastapi_app):
             "/api/analytics/summary",
             headers={
                 "Authorization": f"Bearer {token}",
-                "X-Tenant-Key": "demo",
+                "X-Tenant-Key": "prominencehealth",
             },
         )
     assert resp.status_code == 403

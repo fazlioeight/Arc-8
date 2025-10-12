@@ -187,7 +187,7 @@ const ImportDataPage = () => {
       extension,
       status: 'processing',
       progress: 12,
-      tenant: tenant || 'tenant-demo',
+      tenant: tenant || 'prominencehealth',
       startedAt: new Date().toISOString(),
     };
     recordAuditEvent?.('import_data.started', {
@@ -245,7 +245,7 @@ const ImportDataPage = () => {
             View Job Status Center
           </Button>
           <small className="text-muted">
-            Current tenant: {tenant || 'demo'}
+            Current tenant: {tenant || 'prominencehealth'}
           </small>
         </div>
       </section>

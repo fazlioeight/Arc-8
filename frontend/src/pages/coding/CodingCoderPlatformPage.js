@@ -62,7 +62,7 @@ const CodingCoderPlatformPage = () => {
   const [error, setError] = useState(null);
 
   const effectiveToken = token || 'sample-coder-platform';
-  const effectiveTenant = tenant || 'demo';
+  const effectiveTenant = tenant || 'prominencehealth';
 
   const statusCounts = useMemo(() => summary.status_counts || {}, [summary]);
   const priorityCounts = useMemo(() => summary.priority_counts || {}, [summary]);

@@ -9,9 +9,7 @@ const TOUCH_THROTTLE_MS = 5000;
 const MAX_PERSISTED_AUDIT_EVENTS = 20;
 
 export const DEFAULT_TENANTS = [
-  { key: 'demo', name: 'Demo Health Plan', region: 'National', timezone: 'America/Chicago' },
-  { key: 'sunrise', name: 'Sunrise Clinics', region: 'West', timezone: 'America/Los_Angeles' },
-  { key: 'lakeside', name: 'Lakeside ACO', region: 'Midwest', timezone: 'America/Detroit' },
+  { key: 'prominencehealth', name: 'ProminenceHealth', region: 'National', timezone: 'America/Chicago' },
 ];
 
 export const DEFAULT_APPLICATIONS = {
@@ -46,7 +44,7 @@ const normalizeState = (raw) => {
     : Array.isArray(raw.tenants) && raw.tenants.length
       ? raw.tenants
       : DEFAULT_TENANTS;
-  const tenantKey = raw.tenant || raw.tenantKey || availableTenants[0]?.key || 'demo';
+  const tenantKey = raw.tenant || raw.tenantKey || availableTenants[0]?.key || 'prominencehealth';
   const tenantInfo = resolveTenantInfo(availableTenants, tenantKey);
   const applications = raw.applications && Object.keys(raw.applications).length
     ? raw.applications

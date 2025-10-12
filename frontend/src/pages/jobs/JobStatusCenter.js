@@ -307,7 +307,7 @@ const JobStatusCenter = () => {
                   <div className="job-center__empty">
                     <h3>No jobs match your filters</h3>
                     <p>Need data to explore? Load the sandbox tenant to view sample jobs.</p>
-                    <Button variant="outline-primary" onClick={() => setTenantFilter(tenant || 'demo')}>
+                    <Button variant="outline-primary" onClick={() => setTenantFilter(tenant || 'prominencehealth')}>
                       Show my tenant jobs
                     </Button>
                   </div>

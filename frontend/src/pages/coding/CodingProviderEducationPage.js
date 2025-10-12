@@ -31,7 +31,7 @@ const CodingProviderEducationPage = () => {
   const [error, setError] = useState(null);
 
   const effectiveToken = token || 'sample-provider-education';
-  const effectiveTenant = tenant || 'demo';
+  const effectiveTenant = tenant || 'prominencehealth';
 
   const loadProviders = async (nextSearch = search) => {
     setLoading(true);

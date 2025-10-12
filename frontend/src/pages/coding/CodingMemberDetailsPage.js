@@ -32,7 +32,7 @@ const CodingMemberDetailsPage = () => {
   const [error, setError] = useState(null);
 
   const effectiveToken = token || 'sample-member-details';
-  const effectiveTenant = tenant || 'demo';
+  const effectiveTenant = tenant || 'prominencehealth';
 
   const loadMembers = async () => {
     setLoadingMembers(true);

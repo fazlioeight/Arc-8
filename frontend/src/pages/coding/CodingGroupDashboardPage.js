@@ -24,7 +24,7 @@ const CodingGroupDashboardPage = () => {
   const [error, setError] = useState(null);
 
   const effectiveToken = token || 'sample-group-dashboard';
-  const effectiveTenant = tenant || 'demo';
+  const effectiveTenant = tenant || 'prominencehealth';
 
   const loadGroups = async (term = search) => {
     setLoading(true);

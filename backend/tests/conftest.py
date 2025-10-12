@@ -35,7 +35,7 @@ from app.models.coding import (
 TEST_CONTROL_DB = "sqlite+aiosqlite:///./tests/test_control.db"
 TEST_TENANT_DB_TEMPLATE = "sqlite+aiosqlite:///./tests/tenants/{tenant_key}.db"
 TEST_SECRET = "super-secret-for-tests"
-TEST_TENANT_KEY = "demo"
+TEST_TENANT_KEY = "prominencehealth"
 
 
 os.environ["ENVIRONMENT"] = "test"
@@ -90,7 +90,7 @@ async def _bootstrap_async():
         tenant = Tenant(
             key=TEST_TENANT_KEY,
             slug=TEST_TENANT_KEY,
-            name="Test Tenant",
+            name="ProminenceHealth",
             db_connection_uri=TEST_TENANT_DB_TEMPLATE.format(tenant_key=TEST_TENANT_KEY),
             billing_plan="standard",
             phi_data_classification="restricted",
