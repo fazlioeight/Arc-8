@@ -204,7 +204,7 @@ const CodingReviewDashboardPage = () => {
                       </td>
                       <td>{item.due_date || <span className="text-muted">Not set</span>}</td>
                       <td className="text-end">
-                        <Button variant="link" size="sm" onClick={() => navigate(`/coding/members/${item.member_id}`)}>
+                        <Button variant="link" size="sm" onClick={() => navigate(`/coding/member/${item.member_id}`)}>
                           View member
                         </Button>
                       </td>

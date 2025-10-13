@@ -131,7 +131,7 @@ const CodingLandingPage = () => {
                         <td>{member.line_of_business || '-'}</td>
                         <td>{member.pcp_name || '-'}</td>
                         <td className="text-end">
-                          <Button variant="link" size="sm" onClick={() => navigate(`/coding/members/${member.id}`)}>
+                          <Button variant="link" size="sm" onClick={() => navigate(`/coding/member/${member.id}`)}>
                             View
                           </Button>
                         </td>

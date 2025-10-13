@@ -155,7 +155,7 @@ const CodingMemberDetailsPage = () => {
                     disabled={!selectedMemberId}
                     onClick={() => {
                       const member = members.find((item) => item.id === selectedMemberId);
-                      navigate(`/coding/members/${selectedMemberId}`, {
+                      navigate(`/coding/member/${selectedMemberId}`, {
                         state: {
                           from: `${location.pathname}${location.search}`,
                           breadcrumb: member ? ([member.first_name, member.last_name].filter(Boolean).join(' ') || member.member_key) : undefined,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { UserPreferencesProvider } from './context/UserPreferencesContext';
@@ -29,7 +29,6 @@ const Settings = lazy(() => import('./pages/settings/Settings'));
 const Dashboard = lazy(() => import('./pages/dashboard/Dashboard'));
 const Docs = lazy(() => import('./pages/docs/Docs'));
 const CodingMembersPage = lazy(() => import('./pages/coding/CodingMembersPage'));
-const CodingMemberDetailPage = lazy(() => import('./pages/coding/CodingMemberDetailPage'));
 const CodingProvidersPage = lazy(() => import('./pages/coding/CodingProvidersPage'));
 const CodingLandingPage = lazy(() => import('./pages/coding/CodingLandingPage'));
 const CodingProviderDetailPage = lazy(() => import('./pages/coding/CodingProviderDetailPage'));
@@ -72,6 +71,14 @@ const CompanyInfo = lazy(() => import('./pages/contact/CompanyInfo'));
 // Section pages
 
 const RouteFallback = () => <div className="loading">Loading...</div>;
+
+const LegacyMemberDetailRedirect = () => {
+  const { memberId } = useParams();
+  if (!memberId) {
+    return <Navigate to="/coding/members" replace />;
+  }
+  return <Navigate to={`/coding/member/${memberId}`} replace />;
+};
 
 const Shell = ({ themePreference, setThemePreference }) => {
   const location = useLocation();
@@ -125,11 +132,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
               <CodingMembersPage />
             </ErrorBoundary>
           )} />
-          <Route path="/coding/members/:memberId" element={(
-            <ErrorBoundary title="Member detail unavailable" description="We couldn't open this member's chart details. Reload to try again.">
-              <CodingMemberDetailPage />
-            </ErrorBoundary>
-          )} />
+          <Route path="/coding/members/:memberId/*" element={<LegacyMemberDetailRedirect />} />
           <Route path="/coding/providers" element={(
             <ErrorBoundary title="Provider list failed to load">
               <CodingProvidersPage />

@@ -1,7 +1,8 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useParams, useNavigate, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useParams } from "react-router-dom";
 import { AuthContext } from "../../../../context/AuthContext";
 import { Chip, SectionHeader } from "../../../../components/ehr/Primitives";
+import "../memberWorkspace.css";
 
 import {
   fetchCodingMemberDetail,
@@ -28,12 +29,14 @@ const UTIL = [
   { label: "Settings", to: "settings" },
 ];
 
-const formatDate = (v) => {
-  if (!v) return "—";
-  const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+const formatDate = (value) => {
+  if (!value) return "N/A";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString();
 };
-const getMemberName = (m) => (m ? [m.first_name, m.last_name].filter(Boolean).join(" ") || m.member_key : "Member");
+
+const getMemberName = (member) =>
+  member ? [member.first_name, member.last_name].filter(Boolean).join(" ") || member.member_key : "Member";
 
 function PatientHeader({ member, gapCount = 0, onRefresh }) {
   const name = getMemberName(member);
@@ -41,36 +44,33 @@ function PatientHeader({ member, gapCount = 0, onRefresh }) {
   const chips = [mrn, member?.gender?.slice(0, 1)?.toUpperCase()].filter(Boolean);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur">
+    <header className="coding-member-header sticky top-0 z-40 backdrop-blur">
       <div className="mx-auto grid max-w-[1400px] grid-cols-12 items-center gap-4 px-4 py-2">
-        <div className="col-span-12 lg:col-span-6 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-gray-200" />
+        <div className="col-span-12 flex items-center gap-3 lg:col-span-6">
+          <div className="h-10 w-10 rounded-full border-0 coding-surface-subtle" />
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-base font-semibold text-gray-900">{name}</h1>
-              {chips.map((c) => (
-                <Chip key={c} label={c} />
+              <h1 className="coding-text-strong text-base font-semibold">{name}</h1>
+              {chips.map((chip) => (
+                <Chip key={chip} label={chip} />
               ))}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs coding-text-muted">
               {member?.line_of_business && <span>Plan: {member.line_of_business}</span>}
-              {member?.pcp_name && <span className="hidden md:inline">•</span>}
+              {member?.pcp_name && <span className="hidden md:inline">{"\u2022"}</span>}
               {member?.pcp_name && <span>PCP: {member.pcp_name}</span>}
-              {member?.last_encounter_date && <span className="hidden md:inline">•</span>}
+              {member?.last_encounter_date && <span className="hidden md:inline">{"\u2022"}</span>}
               {member?.last_encounter_date && <span>Last: {formatDate(member.last_encounter_date)}</span>}
             </div>
           </div>
         </div>
 
-        <div className="col-span-12 lg:col-span-4 flex flex-wrap items-center gap-2">
+        <div className="col-span-12 flex flex-wrap items-center gap-2 lg:col-span-4">
           <Chip label={`GAPS: ${gapCount}`} />
         </div>
 
-        <div className="col-span-12 lg:col-span-2 flex justify-end gap-2">
-          <button
-            onClick={onRefresh}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
-          >
+        <div className="col-span-12 flex justify-end gap-2 lg:col-span-2">
+          <button onClick={onRefresh} className="coding-ghost-button rounded-lg px-3 py-1.5 text-xs font-medium">
             Refresh
           </button>
         </div>
@@ -81,29 +81,33 @@ function PatientHeader({ member, gapCount = 0, onRefresh }) {
 
 function LeftNav() {
   const linkBase =
-    "group flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm hover:bg-gray-50";
-  const selected = "bg-gray-100 font-semibold";
+    "coding-nav-link flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm";
+  const buildClass = ({ isActive }) => `${linkBase}${isActive ? " coding-nav-link--active font-semibold" : ""}`;
 
   return (
-    <nav aria-label="Patient navigation" className="hidden w-60 shrink-0 border-r border-gray-200 bg-white md:block">
+    <nav aria-label="Patient navigation" className="coding-sidebar hidden w-60 shrink-0 md:block">
       <div className="sticky top-[52px] h-[calc(100vh-52px)] overflow-auto px-3 py-3">
-        <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Chart</div>
+        <div className="coding-sidebar__heading mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider">
+          Chart
+        </div>
         <ul className="space-y-1">
           {CHART.map(({ label, to }) => (
             <li key={label}>
-              <NavLink end to={to} className={({ isActive }) => `${linkBase} ${isActive ? selected : ""}`}>
-                <span className="truncate text-gray-800 group-aria-selected:text-gray-900">{label}</span>
+              <NavLink end to={to} className={buildClass}>
+                <span className="truncate">{label}</span>
               </NavLink>
             </li>
           ))}
         </ul>
 
-        <div className="mt-6 px-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Utilities</div>
+        <div className="coding-sidebar__heading mt-6 px-2 text-[11px] font-semibold uppercase tracking-wider">
+          Utilities
+        </div>
         <ul className="mt-1 space-y-1">
           {UTIL.map(({ label, to }) => (
             <li key={label}>
-              <NavLink to={to} className={({ isActive }) => `${linkBase} ${isActive ? selected : ""}`}>
-                <span className="truncate text-gray-800">{label}</span>
+              <NavLink to={to} className={buildClass}>
+                <span className="truncate">{label}</span>
               </NavLink>
             </li>
           ))}
@@ -115,46 +119,46 @@ function LeftNav() {
 
 function RightRail({ submissionState, onGenerateSubmission, submissionResult, timelineItems = [] }) {
   return (
-    <aside className="hidden w-80 shrink-0 border-l border-gray-200 bg-white xl:block">
+    <aside className="coding-right-rail hidden w-80 shrink-0 xl:block">
       <div className="sticky top-[52px] h-[calc(100vh-52px)] overflow-auto px-3 py-3">
         <SectionHeader title="Timeline" subtitle="Last 90 days" />
         <ul className="mt-2 space-y-3 text-xs">
           {timelineItems.length ? (
-            timelineItems.map((it) => (
-              <li key={it.id || it.date} className="flex items-start gap-2">
-                <div className="mt-1 h-1.5 w-1.5 rounded-full bg-gray-400" />
+            timelineItems.map((item) => (
+              <li key={item.id || item.date} className="flex items-start gap-2">
+                <div className="coding-timeline-dot" />
                 <div>
-                  <div className="font-medium text-gray-800">{it.date}</div>
-                  <div className="text-gray-600">{it.description}</div>
-                  {it.detail && <div className="text-[11px] text-gray-500">{it.detail}</div>}
+                  <div className="coding-text-strong font-medium">{item.date}</div>
+                  <div className="coding-text-soft">{item.description}</div>
+                  {item.detail && <div className="coding-text-muted text-[11px]">{item.detail}</div>}
                 </div>
               </li>
             ))
           ) : (
-            <li className="text-gray-500">No recent encounters available.</li>
+            <li className="coding-text-muted">No recent encounters available.</li>
           )}
         </ul>
 
         <div className="mt-6">
           <SectionHeader title="Sticky Actions" subtitle="Always available" />
           <div className="mt-2 space-y-2">
-            <button className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left text-sm text-gray-700" disabled>
+            <button className="coding-ghost-button w-full rounded-lg px-3 py-2 text-left text-sm" disabled>
               + Add Diagnosis
             </button>
-            <button className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left text-sm text-gray-700" disabled>
+            <button className="coding-ghost-button w-full rounded-lg px-3 py-2 text-left text-sm" disabled>
               + Add Encounter
             </button>
             <button
               onClick={onGenerateSubmission}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              className="coding-ghost-button w-full rounded-lg px-3 py-2 text-left text-sm font-semibold disabled:opacity-60"
               disabled={submissionState === "working"}
             >
-              {submissionState === "working" ? "Generating export…" : "Submit to Payer (Preview)"}
+              {submissionState === "working" ? "Generating export..." : "Submit to Payer (Preview)"}
             </button>
           </div>
           {submissionResult?.record_count != null && (
-            <p className="mt-2 text-[11px] text-gray-500">
-              Last export batch {submissionResult.batch_id} · {submissionResult.record_count} record(s)
+            <p className="coding-text-muted mt-2 text-[11px]">
+              Last export batch {submissionResult.batch_id} {"\u2022"} {submissionResult.record_count} record(s)
             </p>
           )}
         </div>
@@ -213,8 +217,8 @@ export default function CodingMemberLayout() {
     try {
       setSubmissionState("working");
       const year = new Date().getFullYear();
-      const r = await generateSubmissionExport(token, tenant, year, [memberId]);
-      setSubmissionResult(r);
+      const response = await generateSubmissionExport(token, tenant, year, [memberId]);
+      setSubmissionResult(response);
       setSubmissionState("done");
     } catch {
       setSubmissionState("error");
@@ -222,7 +226,11 @@ export default function CodingMemberLayout() {
   };
 
   if (!isAuthenticated) {
-    return <div className="min-h-screen grid place-items-center text-sm text-gray-700">Sign in required.</div>;
+    return (
+      <div className="coding-member-workspace min-h-screen grid place-items-center text-sm coding-text-soft">
+        Sign in required.
+      </div>
+    );
   }
 
   const member = detail?.member;
@@ -231,27 +239,51 @@ export default function CodingMemberLayout() {
     .filter(Boolean)
     .sort((a, b) => new Date(b.service_date || b.service_start) - new Date(a.service_date || a.service_start))
     .slice(0, 5)
-    .map((c) => ({
-      id: c.id || c.claim_number,
-      date: formatDate(c.service_date || c.service_start || c.service_end),
-      description: (c.claim_type || "Encounter").replace(/\b\w/g, (m) => m.toUpperCase()),
-      detail: c.provider_name || c.place_of_service,
+    .map((claim) => ({
+      id: claim.id || claim.claim_number,
+      date: formatDate(claim.service_date || claim.service_start || claim.service_end),
+      description: (claim.claim_type || "Encounter").replace(/\b\w/g, (match) => match.toUpperCase()),
+      detail: claim.provider_name || claim.place_of_service,
     }));
 
+  const [noteBody, setNoteBody] = useState("");
+  const [noteStatus, setNoteStatus] = useState("idle");
+  const onNoteBodyChange = setNoteBody;
+  const onSubmitNote = (event) => {
+    event?.preventDefault?.();
+    setNoteStatus("saving");
+    setTimeout(() => setNoteStatus("idle"), 400);
+  };
+
+  const [assessmentDate, setAssessmentDate] = useState("");
+  const [assessmentIcd, setAssessmentIcd] = useState("");
+  const [assessmentNotes, setAssessmentNotes] = useState("");
+  const [assessmentStatus, setAssessmentStatus] = useState("idle");
+  const onCreateAssessment = (event) => {
+    event?.preventDefault?.();
+    setAssessmentStatus("saving");
+    setTimeout(() => setAssessmentStatus("idle"), 400);
+  };
+
+  const [chaseUpdating, setChaseUpdating] = useState(null);
+  const onAdvanceChase = (chase) => {
+    setChaseUpdating(chase.id);
+    setTimeout(() => setChaseUpdating(null), 400);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900">
+    <div className="coding-member-workspace min-h-screen">
       <PatientHeader member={member} gapCount={missingHcc.length} onRefresh={onRefresh} />
 
-      {/* Global toolbar */}
-      <div className="border-b border-gray-200 bg-white">
+      <div className="coding-member-toolbar">
         <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2">
-          <input className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Search…" />
-          <button className="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">Advanced</button>
-          <div className="ml-auto text-xs text-gray-600 hidden sm:flex items-center gap-2">
+          <input className="coding-input w-full rounded-lg px-3 py-2 text-sm" placeholder="Search..." />
+          <button className="coding-ghost-button rounded-lg px-3 py-2 text-sm">Advanced</button>
+          <div className="ml-auto hidden items-center gap-2 text-xs coding-text-muted sm:flex">
             <span className="inline-flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> Synced
             </span>
-            <span>•</span>
+            <span>{"\u2022"}</span>
             <span>Autosave: On</span>
           </div>
         </div>
@@ -260,7 +292,31 @@ export default function CodingMemberLayout() {
       <div className="mx-auto flex max-w-[1400px] gap-0">
         <LeftNav />
         <main className="flex-1 px-4 py-4">
-          <Outlet context={{ detail, gap, loading, gapLoading }} />
+          <Outlet
+            context={{
+              detail,
+              gap,
+              loading,
+              gapLoading,
+              onGenerateSubmission,
+              submissionState,
+              submissionResult,
+              noteBody,
+              onNoteBodyChange,
+              onSubmitNote,
+              noteStatus,
+              assessmentDate,
+              onAssessmentDateChange: setAssessmentDate,
+              assessmentIcd,
+              onAssessmentIcdChange: setAssessmentIcd,
+              assessmentNotes,
+              onAssessmentNotesChange: setAssessmentNotes,
+              onCreateAssessment,
+              assessmentStatus,
+              onAdvanceChase,
+              chaseUpdating,
+            }}
+          />
         </main>
         <RightRail
           submissionState={submissionState}
@@ -270,14 +326,14 @@ export default function CodingMemberLayout() {
         />
       </div>
 
-      <footer className="sticky bottom-0 z-30 border-t border-gray-200 bg-white/95 px-4 py-2 text-[11px] text-gray-600 backdrop-blur">
+      <footer className="coding-member-footer sticky bottom-0 z-30 px-4 py-2 text-[11px] backdrop-blur">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between">
-          <div className="hidden sm:flex items-center gap-3">
-            <kbd className="rounded border bg-gray-50 px-1">N</kbd> Note
-            <kbd className="rounded border bg-gray-50 px-1">D</kbd> Diagnosis
-            <kbd className="rounded border bg-gray-50 px-1">/</kbd> Search
+          <div className="hidden items-center gap-3 sm:flex">
+            <kbd className="coding-key">N</kbd> Note
+            <kbd className="coding-key">D</kbd> Diagnosis
+            <kbd className="coding-key">/</kbd> Search
           </div>
-          <span className="text-gray-400">v0.1 Wireframe</span>
+          <span className="coding-text-soft">v0.1 Wireframe</span>
         </div>
       </footer>
     </div>

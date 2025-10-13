@@ -1,7 +1,22 @@
 ﻿.master-admin {
+  --sfdc-page-bg: var(--sfdc-bg, var(--bg));
+  --sfdc-surface: var(--sfdc-card, var(--bg-card));
+  --sfdc-surface-subtle: color-mix(in oklab, var(--sfdc-surface) 88%, transparent);
+  --sfdc-surface-elevated: color-mix(in oklab, var(--sfdc-surface) 94%, transparent);
+  --sfdc-border: var(--border, #d8dde6);
+  --sfdc-border-strong: color-mix(in srgb, var(--sfdc-border) 65%, var(--sfdc-text, #1b2631) 35%);
+  --sfdc-text: var(--text, #1b2631);
+  --sfdc-text-subtle: color-mix(in srgb, var(--sfdc-text) 62%, var(--text-muted, #6f7780) 38%);
+  --sfdc-blue: var(--brand-primary, #0a66c2);
+  --sfdc-shadow: var(--shadow, 0 10px 30px rgba(13, 28, 61, 0.08));
+  --sfdc-shadow-strong: var(--shadow-md, 0 18px 36px rgba(13, 28, 61, 0.16));
+  --sfdc-error-soft: color-mix(in srgb, #f87171 18%, var(--sfdc-page-bg) 82%);
+  --sfdc-error-border: color-mix(in srgb, #ef4444 55%, var(--sfdc-border) 45%);
+  --sfdc-error-text: color-mix(in srgb, #ef4444 75%, var(--sfdc-text) 25%);
   min-height: 100vh;
-  background: var(--sfdc-page-bg, #f6f7f9);
-  color: var(--sfdc-text, #1b2631);
+  background: var(--sfdc-page-bg);
+  color: var(--sfdc-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .master-admin__shell {
@@ -23,9 +38,9 @@
 }
 
 .master-admin__sample {
-  background: rgba(14, 165, 233, 0.16);
-  border: 1px solid rgba(14, 165, 233, 0.35);
-  color: #0c4a6e;
+  background: color-mix(in srgb, var(--sfdc-blue) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sfdc-blue) 45%, var(--sfdc-border) 55%);
+  color: color-mix(in srgb, var(--sfdc-blue) 65%, var(--sfdc-text) 35%);
   padding: 12px 16px;
   border-radius: 6px;
   margin-bottom: 16px;
@@ -60,12 +75,14 @@
 }
 
 .master-admin__users {
-  background: #fff;
+  background: var(--sfdc-surface);
+  border: 1px solid var(--sfdc-border);
   border-radius: 12px;
-  box-shadow: var(--sfdc-shadow, 0 10px 30px rgba(13, 28, 61, 0.08));
+  box-shadow: var(--sfdc-shadow);
   padding: 16px;
   display: flex;
   flex-direction: column;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .master-admin__toolbar {
@@ -78,9 +95,12 @@
 
 .master-admin__toolbar input[type="search"] {
   flex: 1;
-  border: 1px solid var(--sfdc-border, #d8dde6);
+  border: 1px solid var(--sfdc-border);
   border-radius: 20px;
   padding: 8px 16px;
+  background: var(--sfdc-surface-subtle);
+  color: var(--sfdc-text);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .master-admin__count {
@@ -164,8 +184,8 @@
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: capitalize;
-  background: #ecf1f7;
-  color: #334155;
+  background: var(--sfdc-surface-subtle);
+  color: var(--sfdc-text-subtle);
 }
 
 .badge--admin {
@@ -189,10 +209,12 @@
 }
 
 .master-admin__form {
-  background: #fff;
+  background: var(--sfdc-surface);
+  border: 1px solid var(--sfdc-border);
   border-radius: 12px;
-  box-shadow: var(--sfdc-shadow, 0 10px 30px rgba(13, 28, 61, 0.08));
+  box-shadow: var(--sfdc-shadow);
   padding: 24px;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .master-admin__formHeader {
@@ -220,10 +242,13 @@
 
 .master-admin__field input,
 .master-admin__field select {
-  border: 1px solid var(--sfdc-border, #d8dde6);
+  border: 1px solid var(--sfdc-border);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 0.95rem;
+  background: var(--sfdc-surface-subtle);
+  color: var(--sfdc-text);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .master-admin__checkbox {
@@ -245,10 +270,11 @@
 }
 
 .master-admin__appCard {
-  border: 1px solid var(--sfdc-border, #d8dde6);
+  border: 1px solid var(--sfdc-border);
   border-radius: 10px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--sfdc-surface-subtle);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .master-admin__appTitle {
@@ -332,8 +358,8 @@
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
-  background: rgba(1, 118, 211, 0.14);
-  color: #0a58ca;
+  background: color-mix(in srgb, var(--sfdc-blue) 20%, transparent);
+  color: color-mix(in srgb, var(--sfdc-blue) 70%, var(--sfdc-text) 30%);
 }
 
 .master-admin__badge--core {

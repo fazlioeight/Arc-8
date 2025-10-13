@@ -256,7 +256,7 @@ const CommandPalette = ({ onThemeToggle }) => {
         label: `Member • ${displayName}`,
         category: 'Records',
         keywords: `${member.member_key} ${memberName} ${member.pcp_name || ''}`,
-        action: () => navigate(`/coding/members/${member.id}`, {
+        action: () => navigate(`/coding/member/${member.id}`, {
           state: {
             from: currentPath,
             breadcrumb: displayName,

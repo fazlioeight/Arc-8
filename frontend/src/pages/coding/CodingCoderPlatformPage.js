@@ -299,7 +299,7 @@ const CodingCoderPlatformPage = () => {
                         <Button
                           variant="link"
                           size="sm"
-                          onClick={() => navigate(`/coding/members/${item.member_id}`)}
+                          onClick={() => navigate(`/coding/member/${item.member_id}`)}
                         >
                           View member
                         </Button>

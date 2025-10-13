@@ -225,7 +225,7 @@ const CodingMembersPage = () => {
                   <tr
                     key={item.member_id}
                     style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/coding/members/${item.member_id}`, {
+                    onClick={() => navigate(`/coding/member/${item.member_id}`, {
                       state: {
                         from: `${location.pathname}${location.search}`,
                         breadcrumb: item.member_key,
@@ -303,7 +303,7 @@ const CodingMembersPage = () => {
                 <td className="text-end">
                   <Button
                     variant="link"
-                    onClick={() => navigate(`/coding/members/${member.id}`, {
+                    onClick={() => navigate(`/coding/member/${member.id}`, {
                       state: {
                         from: `${location.pathname}${location.search}`,
                         breadcrumb: [member.first_name, member.last_name].filter(Boolean).join(' ') || member.member_key,

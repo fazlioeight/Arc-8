@@ -26,7 +26,7 @@ const NAV_GROUPS = [
       {
         label: 'Members',
         href: '/coding/members',
-        match: (path) => path === '/coding/members' || path.startsWith('/coding/members/'),
+        match: (path) => path === '/coding/members' || path.startsWith('/coding/members/') || path.startsWith('/coding/member/'),
       },
       { label: 'Member details', href: '/coding/member-details', match: (path) => path.startsWith('/coding/member-details') },
     ],
