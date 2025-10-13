@@ -1,0 +1,315 @@
+# SPEC-001-Nexora Platform
+
+## Background
+
+**Vision.** Nexora is a multi-tenant healthcare analytics and workflow SaaS for **payers, ACOs, and MSOs** with an expansion path to **providers**. It delivers risk adjustment, coding workflows, payer analytics, and FHIR-driven data exchange.
+
+**Problem.** Mid-market organizations lack an end-to-end platform that: (1) unifies claims/clinical data, (2) operationalizes risk/coding workflows, (3) is enterprise-ready (HIPAA/SOC 2), and (4) can be safely delegated to multiple tenants and sub-orgs without costly custom builds.
+
+**Current codebase (brief).** Backend is **FastAPI + SQLAlchemy (async) + Postgres + Redis + Alembic** with modular routers/services and early multi-tenancy scaffolding; frontend is **React (CRA/CRACO) + React Router + Bootstrap**. Tests exist across backend and frontend. Notable gaps: hardcoded secrets in seed paths, committed SQLite artifacts, no containerization/CI, limited observability, and SPA stack is not enterprise-optimized.
+
+**Goals for MVP→Enterprise (6–8 weeks).**
+
+* Ship a secure, reproducible, **HIPAA-ready** multi-tenant release with strong authZ/authN, auditability, and observability.
+* Introduce background processing for analytics and import/export flows.
+* Upgrade the web platform (SSR/edge-friendly or fast SPA) with a coherent design system and TypeScript safety.
+* Establish CI/CD, IaC, and an environment strategy (dev/stage/prod) suitable for SOC 2.
+
+**Key assumptions (to confirm).**
+
+* Tenancy model: **Postgres RLS** per tenant with strict policy templates and request-scoped tenant context.
+* Cloud target: **AWS** (EKS or ECS Fargate), **RDS Postgres**, **ElastiCache Redis**, **S3** for objects, **KMS** for encryption, **CloudWatch + OTEL** for telemetry; feature flags via **ConfigCat/LaunchDarkly**.
+* SSO via **OIDC (Okta/Azure AD)**; SCIM for user provisioning.
+
+---
+
+## Requirements (MoSCoW)
+
+**Must Have**
+
+* **Multi-tenancy (schema-per-tenant)** with tenant context resolved per-request and enforced at DB connection level (search_path) and app layer; super-tenant admin tools for provisioning.
+* **Enterprise AuthN/AuthZ**: OIDC SSO (Okta/Azure AD), JWT access/refresh, RBAC (tenant + app + feature scope), optional MFA.
+* **HIPAA/SOC 2 readiness**: encryption in-transit (TLS 1.2+), encryption at rest (KMS), secure secrets management, audit trail (immutable), PHI minimization, data retention policies.
+* **Secure SDLC**: Dockerized services, CI (lint/test/scan), image and dependency scanning, SBOM, IaC for AWS.
+* **Observability**: OpenTelemetry traces/metrics/logs, correlation IDs, SLOs + alerts.
+* **Background jobs** for analytics/import/export (non-blocking requests) with visible job status.
+* **FHIR integration** (payer read use-cases) with robust auth, throttling, and mapping layer.
+* **API versioning & docs** (OpenAPI/Swagger + Redoc) with per-tenant rate limits.
+* **Frontend UX** with accessible design system, TypeScript, and data-fetching layer with caching/retry.
+
+**Should Have**
+
+* **Data ingestion pipelines** for claims/encounters (CSV/S3), with validation and lineage.
+* **Audit reporting** and export for compliance.
+* **Feature flags** and per-tenant configuration.
+* **Row-level export filters** (minimum necessary PHI).
+* **Disaster recovery (RPO<=24h, RTO<=4h)** with automated snapshots and tested restore.
+
+**Could Have**
+
+* **Self-serve tenant onboarding** with SCIM user provisioning.
+* **Anomaly detection** for coding/risk outliers using managed notebooks/jobs.
+* **OpenSearch** for audit/event search and worklist querying.
+
+**Won’t Have (this cycle)**
+
+* Provider-facing EHR write-back, real-time HL7 interfaces, and on-prem installations.
+
+## Method
+
+### High-level architecture
+
+* **Cloud**: **AWS** (us-east-1 by default) using **ECS Fargate** for simplicity in 6–8 weeks (EKS is a future option).
+* **Services**: `web` (Next.js), `api` (FastAPI), `worker` (Celery), `scheduler` (Celery beat), `db` (RDS Postgres), `cache` (ElastiCache Redis), `object-store` (S3), `telemetry` (OTEL Collector → CloudWatch/managed APM), `search` (optional OpenSearch), `queue` (SQS for durable task triggers).
+* **Tenancy**: **schema-per-tenant**. A global `tenant_registry` schema tracks tenants and schema names. DB sessions set `search_path` to the tenant schema at request start, derived from the auth token + domain/headers. Migrations run across all schemas via orchestrated task.
+* **Security**: OIDC (Okta/Azure AD), RBAC in DB + app layer, KMS-managed secrets, WAF on ALB, rate limiting per tenant, VPC-private RDS/Redis.
+
+### Component diagram (PlantUML)
+
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+package "AWS VPC" {
+  [ALB/WAF] --> [Web (Next.js)]
+  [ALB/WAF] --> [API (FastAPI)]
+  [API (FastAPI)] --> [Redis]
+  [API (FastAPI)] --> [RDS Postgres]
+  [API (FastAPI)] --> [S3]
+  [API (FastAPI)] --> [SQS]
+  [Worker (Celery)] --> [Redis]
+  [Worker (Celery)] --> [RDS Postgres]
+  [Worker (Celery)] --> [S3]
+  [Scheduler (Celery Beat)] --> [SQS]
+  [OTEL Collector] --> [CloudWatch/APM]
+}
+[External IdP (OIDC)] --> [API (FastAPI)]
+[External FHIR APIs] <--> [API (FastAPI)]
+@enduml
+```
+
+### Request flow with schema-per-tenant (PlantUML sequence)
+
+```plantuml
+@startuml
+actor User
+participant Browser as B
+participant "ALB/WAF" as ALB
+participant API as A
+participant "TenantResolver" as TR
+database "RDS Postgres" as DB
+participant Redis as R
+
+User -> B: Auth via OIDC (redirect/login)
+B -> ALB: HTTPS request with JWT + tenant hint
+ALB -> A: Forward request
+A -> TR: Resolve tenant from JWT/domain
+TR -> DB: Load tenant schema from tenant_registry
+TR --> A: schema_name
+A -> DB: set search_path = schema_name
+A -> DB: execute business query
+A -> R: publish audit/event
+A --> B: 200 JSON (request-id)
+@enduml
+```
+
+### Data model (core schemas)
+
+**Global schema (`public`)**
+
+* `tenants(id, name, schema_name, status, created_at)`
+* `users(id, email, sub, status, created_at)`
+* `tenant_users(tenant_id, user_id, roles[])`
+* `roles(id, name, description)`
+* `role_permissions(role_id, permission)`
+* `migrations(id, version, applied_at)`
+
+**Per-tenant schema (`t_<slug>`)**
+
+* `members(id, payer_member_id, demographics_jsonb, created_at)`
+* `claims(id, member_id, type, service_date, amount, raw_jsonb)`
+* `encounters(id, member_id, date, provider_id, raw_jsonb)`
+* `coding_worklist(id, member_id, status, assignee_id, priority, metadata_jsonb)`
+* `audit_events(id, at, actor_id, action, entity, entity_id, before_jsonb, after_jsonb, request_id)`
+* `jobs(id, type, status, created_at, updated_at, payload_jsonb, result_jsonb)`
+* `configs(key, value_jsonb)`
+
+**Indexes & constraints**
+
+* Time-partition on `audit_events` and `jobs`.
+* GIN on JSONB fields used for filtering.
+* FK constraints across tenant schema tables.
+
+### API design
+
+* **Versioning**: `/api/v1/...` with strict `response_model` and error envelope `{ code, message, details, request_id }`.
+* **Auth**: Bearer JWT (OIDC), optional API keys for system-to-system with IP allow-lists.
+* **Rate limits**: per-tenant & per-IP using Redis tokens.
+* **Docs**: `/docs` (Swagger) gated to admin roles; `/redoc` read-only.
+
+### Background processing
+
+* **Celery** workers (Fargate) consume **SQS** tasks for ingestion, analytics, and exports. Redis used for short-lived caching; result backend in Postgres.
+* **Idempotency keys** on ingestion.
+
+### Observability & audit
+
+* **OpenTelemetry** SDK in API and Worker → OTEL Collector → CloudWatch (and compatible APM). Request/trace IDs injected in logs. Audit events persisted per-tenant.
+
+### Security posture
+
+* **Secrets** via AWS Secrets Manager; env injection at task start.
+* **Encryption**: TLS everywhere; RDS/ElastiCache/S3 with KMS CMKs.
+* **WAF** rules for common OWASP threats; ALB access logs to S3.
+* **Redis**: disable `EVAL/EVALSHA`, enforce ACLs; private subnets only.
+
+### Library & tool choices (pinned)
+
+> Versions pinned to current stable as of Oct 12, 2025.
+
+**Backend (Python)**
+
+* fastapi **0.119.0**
+* uvicorn **0.37.0** (workers via gunicorn/uvicorn workers optional)
+* sqlalchemy **2.0.44**
+* alembic **1.17.0**
+* pydantic **2.11.1**
+* redis (redis-py) **6.2.0**
+* celery **5.5.3**
+* httpx **0.28.1**
+* pyjwt **2.10.1**
+* pytest **8.4.2**, pytest-asyncio, coverage
+* opentelemetry-sdk **1.27.0** (pin latest in lockfile)
+
+**Frontend (TypeScript)**
+
+* Next.js **15.5** (App Router)
+* react **19.2.0**, react-dom **19.2.0**
+* @tanstack/react-query **5.90.2**
+* zod **4.1.12**
+* chakra-ui **3.27.x** *or* MUI **7.3.x** (choose one; Chakra recommended for speed)
+* eslint **9.x**, typescript **5.6+**, vitest/jest for unit tests
+
+**Platform & DevEx**
+
+* Docker 25.x, docker-compose v2.x
+* GitHub Actions runners `ubuntu-latest`
+* Trivy/Grype for image scan; Syft for SBOM
+* Terraform **1.9+** (AWS provider **5.x**)
+
+### Deployment (PlantUML)
+
+```plantuml
+@startuml
+node "AWS Account" {
+  node "VPC (3 AZ)" {
+    node "Public Subnets" {
+      [ALB + WAF]
+      [OTEL Collector]
+    }
+    node "Private Subnets" {
+      [ECS Fargate: Web]
+      [ECS Fargate: API]
+      [ECS Fargate: Worker]
+      [ECS Fargate: Scheduler]
+      database "RDS Postgres (Multi-AZ)" as RDS
+      [ElastiCache Redis]
+      [SQS]
+      [S3 Buckets]
+    }
+  }
+}
+@enduml
+```
+
+---
+
+## Implementation
+
+1. **Security remediation & repo hygiene**
+
+   * Remove committed `*.db` and secrets; add `.gitignore` rules and purge history.
+   * Introduce `pre-commit` (ruff, black, bandit, detect-secrets).
+2. **Containerization**
+
+   * Create `Dockerfile` (multi-stage) for API/Worker/Web; `docker-compose.yml` for local dev.
+3. **CI/CD** (GitHub Actions)
+
+   * Jobs: `lint`, `typecheck`, `test`, `build`, `scan`, `deploy`. Generate SBOM (Syft), scan (Grype/Trivy).
+4. **Auth & tenancy**
+
+   * Implement OIDC login flow; JWT middleware; tenant resolver (domain/header → tenant schema); DB session sets `search_path`.
+   * Migrate data model to global/tenant split; write per-tenant migrations runner.
+5. **Observability**
+
+   * Add OTEL to API/Worker; structured JSON logs with request-id; dashboards & alerts.
+6. **Background jobs**
+
+   * Provision SQS + Celery; implement ingestion/export jobs with status API.
+7. **Frontend uplift**
+
+   * Migrate CRA → Next.js 15 (TypeScript). Introduce Chakra UI + design tokens; TanStack Query + Zod; guarded routes by RBAC claims.
+8. **Compliance & audit**
+
+   * Immutable audit log table; export endpoints; retention configs; PHI minimization in logs.
+9. **Infra as Code**
+
+   * Terraform modules for VPC, ECS, RDS, ElastiCache, ALB/WAF, S3, SQS, Secrets Manager, CloudWatch.
+
+## Milestones (6–8 weeks)
+
+**Week 1** – Hardening & containers
+
+* Purge secrets & artifacts; add pre-commit.
+* Dockerize API/Worker/Web; local compose up.
+
+**Week 2** – CI/CD & IaC bootstrap
+
+* GitHub Actions pipeline (lint/test/build/scan). Terraform baseline (VPC, ECS clusters, ECR, ALB).
+
+**Week 3** – Auth & tenancy foundation
+
+* OIDC login, JWT/refresh; tenant resolver; split schemas and migrate core tables; RDS created.
+
+**Week 4** – Background jobs & ingestion
+
+* Celery+SQS workers running; ingestion/export flows with job status; S3 buckets & policies.
+
+**Week 5** – Observability & audit
+
+* OTEL traces/logs/metrics; dashboards + alerts; immutable audit events; rate limiting.
+
+**Week 6** – Frontend migration (phase 1)
+
+* Next.js skeleton + Chakra + TS; auth guard; 2–3 key pages (login, dashboard, coding worklist) wired via TanStack Query.
+
+**Week 7** – Enterprise polish
+
+* RBAC UI, feature flags, admin tenant tools; DR runbook (snapshot/restore test); pen-test scan fixes.
+
+**Week 8** – Release readiness
+
+* Load test (k6), security review, playbook/runbooks, staging→prod promotion with blue/green.
+
+## Gathering Results
+
+**Functional acceptance**
+
+* 95% endpoints with `response_model`; zero P0/P1 bugs in staging for 5 consecutive days.
+
+**Security & compliance**
+
+* CIS Docker benchmark passes; SBOM generated; no critical CVEs in images/deps; WAF logs clean of repeated attacks.
+* HIPAA controls documented; audit export validated; PHI e2e encryption verified.
+
+**Reliability & performance**
+
+* SLO: 99.9% availability (monthly); p95 API latency < 300ms for common endpoints.
+* Background jobs complete within SLA; no request exceeds 60s; zero blocking I/O in handlers.
+
+**DX**
+
+* Fresh clone → `docker compose up` in <10 minutes to working env.
+
+## Need Professional Help in Developing Your Architecture?
+
+Please contact me at [sammuti.com](https://sammuti.com) :)
