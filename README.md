@@ -1,48 +1,67 @@
 # Nexora Platform
 
-Nexora Platform is a healthcare analytics solution for payer groups, now hardened for HIPAA-compliant, multi-tenant SaaS operation. The system is split between a control plane (FastAPI + PostgreSQL/SQLite) that manages tenants, users, and audit trails, and isolated tenant data planes where PHI lives in per-tenant schemas or databases. A React SPA consumes the public APIs, and optional Streamlit dashboards can be layered on top of the API for ad-hoc analytics.
+Nexora Platform delivers a HIPAA-conscious, multi-tenant analytics and coding workspace for payer groups. The repository hosts the FastAPI control plane, per-tenant data plane helpers, Streamlit prototypes, and the React portal that surfaces analytics, coding workflows, and operational dashboards.
 
-## Architecture Overview
+## Highlights
+- Multi-tenant control plane with async SQLAlchemy connection pooling, per-request tenant context, audit trails, and JWT issuance.
+- Coding workbench APIs for chases, assignments, attachments, MAO-004 ingestion, and provider/member drill-downs.
+- React portal with session locking, guided tours, command palette, notifications, and rich job-import workflows.
+- Redis-backed tenant rate limiting, structured request logging, file + database audit logging, and configurable HIPAA enforcement.
+- CLI seeding, SQL bootstrapping scripts, and optional Streamlit dashboards to explore tenant data outside the SPA.
 
-- **Control Plane (FastAPI + SQLAlchemy async)**
-  - Stores tenants, users, billing plans, feature flags, and audit events.
-  - Issues JWTs with tenant scoping and enforces per-request tenant context.
-  - Exposes provisioning helpers (`app/services/provisioning.py`) to onboard new tenants and hydrate their data stores.
-- **Tenant Data Plane**
-  - Each tenant has an independent schema or database. SQLAlchemy connects dynamically per request using the resolved tenant context.
-  - PHI endpoints (`/member/*`, analytics) run against the tenant-bound `Member` and `Claim` tables.
-- **Cross-cutting controls**
-  - Redis-backed rate limiting middleware (`RateLimitMiddleware`) applies token-bucket throttles per tenant.
-  - Structured logging + dedicated audit logger persist immutable audit trails to both file (`logs/audit.log`) and the control plane.
-  - Tenant-aware request logging middleware stamps log lines with tenant and user identity for observability.
-
-## Project Structure
+## Monorepo Layout
 
 ```
 nexora-platform/
   backend/
     app/
-      core/                # settings, logging, redis helpers
-      db/                  # async control + tenant session managers
-      dependencies/        # FastAPI dependencies (tenant context, sessions)
-      middleware/          # tenant resolver, rate limiting, request logging
-      models/              # control-plane + tenant-plane SQLAlchemy models
-      routes/              # FastAPI routers (analytics, member endpoints)
-      services/            # analytics, tenant registry, provisioning helpers
-      utils/               # security helpers, audit logging
-    scripts/seed_prominence.py   # Provision ProminenceHealth tenant without sample data
-    alembic/               # Control plane migrations
-    tests/                 # pytest + httpx async tests for tenant isolation
+      core/             # settings + logging bootstrap
+      db/               # control + tenant session factories and LRU cache
+      dependencies/     # FastAPI dependencies (tenant context, sessions)
+      middleware/       # tenant resolver, rate limiter, request logging
+      models/           # SQLAlchemy control-plane + tenant-plane tables
+      routes/           # FastAPI routers (analytics, coding, admin, etc.)
+      schemas/          # Pydantic IO models for public APIs
+      services/         # provisioning, analytics, Mao analysis, submissions
+      utils/            # auth helpers, audit logger, password hashing
+    alembic/            # control-plane migrations
+    dashboards/         # optional Streamlit prototypes
+    scripts/
+      seed_prominence.py  # bootstrap ProminenceHealth tenant + admin
+      global/tenant/      # SQL create scripts for control + tenant engines
+    tenants/            # sample SQLite tenant databases
+    tests/              # pytest suite with async tenant coverage
   frontend/
-    src/context/AuthContext.js        # stores token + tenant context
-    src/pages/Login.js                # multi-tenant aware login flow
-    src/services/memberCostService.js # tenant-authenticated API calls
-    src/__tests__/                    # Jest tests
+    src/
+      components/       # portal navigation, command palette, overlays
+      context/          # Auth, notifications, user prefs, guided tours
+      pages/            # marketing site, portal, coding workspace, admin
+      services/         # API clients with tenant-aware headers
+      __tests__/        # Jest regressions for key surfaces
+    scripts/            # build helpers for the CRA + CRACO toolchain
+  docs/                 # supplementary architecture notes (optional)
 ```
+
+## Architecture Overview
+
+**Control plane (FastAPI + async SQLAlchemy)**
+- Manages tenants, users, feature flags, billing plans, applications, and audit events.
+- Issues JWTs with tenant scoping, enforces tenant context per request, and exposes provisioning helpers via `app/services/provisioning.py`.
+- Uses `TenantMiddleware` and header/subdomain resolution to guarantee tenant awareness for every request.
+
+**Tenant data plane**
+- Each tenant owns an independent database or schema. Connections are created lazily and cached with an LRU eviction strategy (`app/db/tenant_manager.py`).
+- Coding, analytics, member cost/risk, utilization, and admin endpoints run against tenant-isolated models in `app/models/tables.py`.
+- Schema helpers in `backend/scripts/tenant` ensure DDL consistency when onboarding new tenants.
+
+**Cross-cutting controls**
+- `RateLimitMiddleware` uses Redis (or a pluggable store) for per-tenant token buckets; headers expose remaining quota.
+- `RequestLoggingMiddleware` and `utils.audit_logger` capture structured logs, persist audit events to both file (`logs/audit.log`) and the control database, and surface actor/tenant metadata.
+- HIPAA mode (`HIPAA_MODE=True`) enforces known-tenant restrictions and suppresses dummy logins by default.
 
 ## Backend Setup
 
-1. **Environment**
+1. **Create a virtual environment**
    ```powershell
    cd backend
    python -m venv .venv
@@ -50,88 +69,104 @@ nexora-platform/
    pip install -r requirements.txt
    ```
 
-2. **Configuration** (set in shell or `.env`):
+2. **Configure environment** (shell exports or `.env` read by `pydantic-settings`):
    - `ENVIRONMENT` (`development` | `test` | `production`)
-   - `SECRET_KEY` (required in production; auto-generated for dev/tests)
-   - `CONTROL_DATABASE_URL` (defaults to `postgresql+asyncpg://nexora_control:nexora_control@host:5432/nexora_control`)
-   - `DEFAULT_TENANT_DATABASE_URL` or `TENANT_DATABASE_URL_TEMPLATE` (defaults to `postgresql+asyncpg://nexora_control:nexora_control@host:5432/prominence_tenant`)
-   - `TENANT_DATABASE_SCHEMA_TEMPLATE` (optional; e.g. `tenant_{tenant_slug}`)
-   - `REDIS_URL` (`redis://localhost:6379/0`) to enable rate limiting
-   - Optional: `CANONICAL_HOST_DOMAIN`, `ALLOWED_TENANT_HOSTS`, `AUDIT_LOG_PATH`, `USAGE_DAILY_LIMIT`, `RATE_LIMIT_MAX_PER_MINUTE`
+   - `SECRET_KEY` (required for production; generated automatically in dev/test)
+   - `CONTROL_DATABASE_URL` (e.g. `sqlite+aiosqlite:///../backend/nexora_control.db` for local dev)
+   - `DEFAULT_TENANT_DATABASE_URL` (e.g. `sqlite+aiosqlite:///../backend/tenants/demo.db`)
+   - `REDIS_URL` (`redis://localhost:6379/0`) to activate distributed rate limiting
+   - `ALLOW_DUMMY_LOGIN=true` enables the `admin@admin.com` seed login for demos
+   - Optional: `TENANT_DATABASE_SCHEMA_TEMPLATE`, `ALLOWED_TENANT_HOSTS`, `AUDIT_LOG_PATH`, `USAGE_DAILY_LIMIT`, `RATE_LIMIT_MAX_PER_MINUTE`
 
-3. **Database migrations**
+   ```env
+   ENVIRONMENT=development
+   CONTROL_DATABASE_URL=sqlite+aiosqlite:///../backend/nexora_control.db
+   DEFAULT_TENANT_DATABASE_URL=sqlite+aiosqlite:///../backend/tenants/demo.db
+   ALLOW_DUMMY_LOGIN=true
+   HIPAA_MODE=false
+   ```
+
+3. **Run migrations**
    ```powershell
-   cd backend
    alembic upgrade head
    ```
 
-4. **Seed ProminenceHealth tenant (control + tenant DB):**
+4. **Seed a tenant + admin**
    ```powershell
    python scripts/seed_prominence.py
    ```
+   The script ensures the control-plane schema, provisions the `prominencehealth` tenant, and creates an administrator at `admin@prominencehealth.com` with password `admin`.
 
-5. **Run API (async Uvicorn):**
+5. **Start the API**
    ```powershell
    python -m uvicorn app.main:app --reload
    ```
+   The API listens on `http://localhost:8000` with CORS configured for `http://localhost:3000` by default.
 
-### Tenant Provisioning
+### Tenant Provisioning & Sample Data
+- Use `app/services/provisioning.py::provision_tenant` to onboard additional tenants from application code (creates control records, hydrates tenant schemas, and merges feature flags).
+- DDL helpers under `backend/scripts/global` and `backend/scripts/tenant` provide reference CREATE statements for managed deployments.
+- `backend/scripts/generate_synthetic_data.py` can populate dev-friendly member, claim, and coding datasets inside a tenant database.
 
-Use `app/services/provisioning.py::provision_tenant` inside an async control-plane session to create new tenants. The helper merges global feature flags, writes tenant metadata, and ensures tenant schemas/databases are created before returning.
-
-### Compliance & Observability
-
-- All API calls must include both `Authorization: Bearer <JWT>` and `X-Tenant-Key` headers. Tenant context can also be inferred from subdomains when deployed.
-- Sensitive endpoints append audit events to the control database and `logs/audit.log` with actor, tenant, and payload metadata.
-- Rate limiting headers (`X-RateLimit-*`) surface token bucket state to clients.
+### Compliance & Observability Notes
+- All application endpoints require both `Authorization: Bearer <JWT>` and `X-Tenant-Key` headers. Subdomain tenant inference is available when `ALLOWED_TENANT_HOSTS` is configured.
+- Audit events persist to the control database and optionally to `logs/audit.log`. Ensure the path exists and is writable in your environment.
+- When Redis is unavailable, rate limiting downgrades gracefully but enforcement is disabled; use it in production for HIPAA throttling guarantees.
 
 ## Frontend Setup
 
-1. Install & run:
+1. **Install dependencies & run CRA dev server**
    ```powershell
-   cd frontend
+   cd ../frontend
    npm install
    npm start
    ```
-2. Configure `REACT_APP_API_BASE` (defaults to `http://localhost:8000`).
-3. The login view now sends `X-Tenant-Key` and persists `{ token, tenant, role }` in `AuthContext`. Service calls use those values when hitting backend APIs.
 
-### Import & Job Monitoring
+2. **Configure API base**
+   Create `frontend/.env.local` (CRA will auto-load) and override the default if necessary:
+   ```env
+   REACT_APP_API_BASE=http://localhost:8000
+   ```
 
-- Launch the importer at `/jobs/import-data` to upload members, providers, claims, MAO-004, or chart manifest files.
-- Each dataset card supports drag-and-drop or file browser uploads for `.txt`, `.csv`, and `.xlsx` sources and surfaces the first 900 characters of text files so you can verify formatting (spreadsheets note that previews are unavailable).
-- Queueing an import adds it to the on-page activity table and records audit events; progress is simulated locally until a backend pipeline is connected.
-- Use the `View Job Status Center` button (or directly visit `/jobs/status-center`) to review import progress, download logs, retry jobs, and take advantage of the new `Go to Import Data` shortcut back to the uploader.
+3. **Login flows**
+   - With seeded data, authenticate using `admin@prominencehealth.com` / `admin`.
+   - When `ALLOW_DUMMY_LOGIN=true`, the React portal exposes a shortcut login (`admin@admin.com` / `admin`) to accelerate UI smoke tests.
+
+4. **Portal features**
+   - The command palette (`Cmd+K` or `Ctrl+K`) surfaces quick actions and navigation shortcuts.
+   - Guided tours, notifications, and session locking are delivered via context providers in `src/context`.
+   - Job importers at `/jobs/import-data` support drag-and-drop CSV/TXT/XLSX uploads, surface previews, and synchronize with the Job Status Center.
 
 ## Testing
+- **Backend**: `cd backend && pytest` - starts async httpx clients, spins control + tenant SQLite databases, and validates multi-tenant isolation, analytics, coding, and security behaviour.
+- **Frontend**: `cd frontend && npm test` - runs Jest + React Testing Library suites for authentication guards, portal utilities, and coding UI scaffolding.
 
-- **Backend**: `cd backend && pytest` (uses async httpx client, bootstraps control + tenant test databases under `backend/tests/`).
-- **Frontend**: `cd frontend && npm test`.
+## Key API Surface
+> All routes require an authenticated user and tenant context unless noted.
 
-## Key API Endpoints
+- `POST /api/login` - issues JWT + tenant-scoped application permissions.
+- `GET /api/tenant/self` - returns tenant metadata, purchased apps, and user permissions.
+- `GET /api/analytics/summary` - aggregated clinical + financial metrics.
+- `GET /api/member/{member_id}/costs`, `/api/member/{member_id}/risk` - member deep dives.
+- `GET /api/utilization/overutilization` - utilization outliers with threshold filters.
+- `GET /api/coding/members`, `/api/coding/providers` - coding worklists with prioritization.
+- `POST /api/coding/chases`, `/api/coding/notes`, `/api/coding/attachments` - workflow management endpoints.
+- `GET /api/coding/assignments/overview`, `/api/coding/mao-records` - admin dashboards and MAO-004 insights.
 
-> All endpoints expect `X-Tenant-Key` and a valid JWT unless noted.
-
-- `POST /api/login` -> returns `{ token, email, tenant, role }`
-- `GET /api/tenant/self` -> tenant metadata, feature flags, current user context
-- `GET /api/analytics/summary`
-- `GET /member/{member_id}/costs`
-- `GET /member/{member_id}/risk`
-- `GET /overutilization/?threshold=`
-
-
-Unauthorized or cross-tenant attempts return `401/403`. Excessive calls return `429` with rate-limit headers.
+Unauthorized or cross-tenant attempts return `401/403`. Rate limiting failures surface `429` with informative `X-RateLimit-*` headers.
 
 ## Streamlit Dashboards
-
-Dashboards remain optional; ensure `Authorization` header and `X-Tenant-Key` are forwarded when invoking API calls inside Streamlit apps.
+Prototype dashboards under `backend/dashboards` can be launched with:
+```powershell
+streamlit run dashboards/utilization_dashboard.py
+```
+Forward the `Authorization` header and `X-Tenant-Key` when calling backend APIs from Streamlit to stay within compliance boundaries.
 
 ## Troubleshooting
-
-- Missing Redis: rate limiting gracefully degrades but is required for production hard-limits.
-- Tenant resolution errors: verify DNS/host mappings (`ALLOWED_TENANT_HOSTS`) or include `X-Tenant-Key` explicitly.
-- Async database drivers: install `asyncpg` for Postgres or `aiosqlite` for SQLite (included in `requirements.txt`).
+- **Tenant resolution**: confirm `X-Tenant-Key` is present or configure `ALLOWED_TENANT_HOSTS` for subdomain mapping.
+- **Database configuration**: ensure `DEFAULT_TENANT_DATABASE_URL` points to a writable SQLite/Postgres database; without it, seeding and tenant APIs fail.
+- **Redis optionality**: set `REDIS_URL` to enable rate limiting; otherwise middleware runs in no-op mode.
+- **Audit log path**: create the `logs/` directory or update `AUDIT_LOG_PATH` if the default is not writable.
 
 ## License
-
 Apache License 2.0
