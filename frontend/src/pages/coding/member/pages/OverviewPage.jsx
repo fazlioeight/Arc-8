@@ -1,6 +1,7 @@
 import React from "react";
 import { useOutletContext } from "react-router-dom";
 import { SectionHeader, TableSkeleton, KeyValue, AlertBanner } from "../../../../components/ehr/Primitives";
+import PortalUtilityBar from "../../../../components/PortalUtilityBar";
 
 /**
  * Helpers
@@ -123,7 +124,9 @@ export default function OverviewPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <>
+      <PortalUtilityBar />
+      <div className="space-y-4 mt-4">
       {errorMessage && <AlertBanner level="danger" title="We could not update some data" body={errorMessage} />}
       {gapLoading && (
         <AlertBanner level="info" title="Refreshing care gaps" body="Fetching the most recent gap analysis for this member." />
@@ -500,5 +503,6 @@ export default function OverviewPage() {
         </div>
       </div>
     </div>
+  </>
   );
 }
