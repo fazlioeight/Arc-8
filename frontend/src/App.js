@@ -39,6 +39,7 @@ const CodingReviewDashboardPage = lazy(() => import('./pages/coding/CodingReview
 const CodingProviderEducationPage = lazy(() => import('./pages/coding/CodingProviderEducationPage'));
 const CodingGroupDashboardPage = lazy(() => import('./pages/coding/CodingGroupDashboardPage'));
 const CodingMemberDetailsPage = lazy(() => import('./pages/coding/CodingMemberDetailsPage'));
+const CodingMemberWorkbenchPage = lazy(() => import('./pages/coding/CodingMemberWorkbenchPage'));
 const CodingProviderManagementPage = lazy(() => import('./pages/coding/CodingProviderManagementPage'));
 const CodingMemberLayout = lazy(() => import('./pages/coding/member/pages/CodingMemberLayout'));
 const OverviewPage = lazy(() => import('./pages/coding/member/pages/OverviewPage'));
@@ -77,7 +78,7 @@ const LegacyMemberDetailRedirect = () => {
   if (!memberId) {
     return <Navigate to="/coding/members" replace />;
   }
-  return <Navigate to={`/coding/member/${memberId}`} replace />;
+  return <Navigate to={`/coding/member/${memberId}/chart`} replace />;
 };
 
 const Shell = ({ themePreference, setThemePreference }) => {
@@ -168,7 +169,12 @@ const Shell = ({ themePreference, setThemePreference }) => {
               <CodingMemberDetailsPage />
             </ErrorBoundary>
           )} />
-          <Route path="/coding/member/:memberId" element={<CodingMemberLayout />}>
+          <Route path="/coding/member/:memberId" element={(
+            <ErrorBoundary title="Coder workbench unavailable" description="We could not load the member workbench. Try refreshing or return to the queue.">
+              <CodingMemberWorkbenchPage />
+            </ErrorBoundary>
+          )} />
+          <Route path="/coding/member/:memberId/chart" element={<CodingMemberLayout />}>
             {/* Chart pages */}
             <Route index element={<OverviewPage />} />
             <Route path="problems" element={<ProblemsHCCPage />} />

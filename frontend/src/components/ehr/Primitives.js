@@ -74,3 +74,5 @@ export function AlertBanner({ level = "info", title, body }) {
     </div>
   );
 }
+
+export { default as UtilityBar } from "../PortalUtilityBar";
