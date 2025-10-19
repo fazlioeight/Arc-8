@@ -1,9 +1,8 @@
 import React, { useContext, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button, Col, Form, Row, Alert } from 'react-bootstrap';
 import { AuthContext } from '../../context/AuthContext';
 import PortalUtilityBar from '../../components/PortalUtilityBar';
-import PortalHero from '../../components/PortalHero';
+import RideBookingHeader from './RideBookingHeader';
 import '../../styles/rideBooking.css';
 import '../portal_page/portalPage.sfdc.css';
 import { addRideRecord, getRideCompaniesForDate } from '../../services/rideBookingService';
@@ -14,7 +13,6 @@ const getLocalTime = () => new Date().toISOString().slice(11, 16);
 
 const RideBooking = () => {
   const { isAuthenticated } = useContext(AuthContext) || {};
-  const navigate = useNavigate();
 
   const [memberId, setMemberId] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -84,21 +82,9 @@ const RideBooking = () => {
   return (
     <div className="ride-booking">
       {isAuthenticated && <PortalUtilityBar />}
-      <PortalHero
-        align="left"
+      <RideBookingHeader
         title="Book a ride"
         subtitle="Enter member details and schedule transportation in a few quick steps."
-        actions={(
-          <div className="d-flex flex-wrap gap-2">
-            <Button variant="light" onClick={() => navigate('/RideBooking')}>
-              Recent rides
-            </Button>
-            <Button variant="outline-light" onClick={() => navigate('/RideBooking/partners')}>
-              Manage partners
-            </Button>
-          </div>
-        )}
-        wave={false}
       />
 
       <div className="ride-booking__shell" style={{ maxWidth: 720 }}>

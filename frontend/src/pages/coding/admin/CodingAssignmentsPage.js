@@ -2,12 +2,12 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 
-import PortalUtilityBar from '../../components/PortalUtilityBar';
-import { AuthContext } from '../../context/AuthContext';
+import PortalUtilityBar from '../../../components/PortalUtilityBar';
+import { AuthContext } from '../../../context/AuthContext';
 import {
   assignCodingAdminWork,
   fetchCodingAdminAssignments,
-} from '../../services/codingService';
+} from '../../../services/codingService';
 
 const CodingAssignmentsPage = () => {
   const navigate = useNavigate();
