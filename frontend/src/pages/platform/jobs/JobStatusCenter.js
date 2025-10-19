@@ -5,7 +5,7 @@ import PortalUtilityBar from '../../../components/PortalUtilityBar';
 import { AuthContext } from '../../../context/AuthContext';
 import { useCommandPalette } from '../../../context/CommandPaletteContext';
 import { SAMPLE_JOBS, SAMPLE_JOB_LOGS, sampleDownload } from '../../../utils/sampleData';
-import '../../styles/jobCenter.css';
+import '../../../styles/jobCenter.css';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },

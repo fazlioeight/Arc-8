@@ -1,10 +1,11 @@
-import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import PortalUtilityBar from "../../../components/PortalUtilityBar";
 import { AuthContext } from "../../../context/AuthContext";
 import "../../../index.css";
 import "./portalPage.sfdc.css";
+import { fetchCodingMembers } from "../../../services/codingService";
 
 const buildFallbackOverview = (apps, user) => {
   const accessible = apps.filter((app) => app.allowed);
@@ -94,9 +95,43 @@ const formatRoleLabel = (value) => {
   }
 };
 
+const toLowerString = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  return String(value).toLowerCase();
+};
+
+const extractMemberTokens = (member) => {
+  if (!member) {
+    return [];
+  }
+  return [
+    toLowerString(member?.id),
+    toLowerString(member?.member_id),
+    toLowerString(member?.memberId),
+    toLowerString(member?.member_key),
+  ].filter(Boolean);
+};
+
+const pickMemberIdForNavigation = (member) => {
+  if (!member) {
+    return null;
+  }
+  return member?.id || member?.member_id || member?.memberId || null;
+};
+
 const PortalPage = () => {
   const navigate = useNavigate();
-  const { user, applications: accessMap = {}, availableApplications = [], purchasedApplications = [] } = useContext(AuthContext) || {};
+  const auth = useContext(AuthContext) || {};
+  const {
+    user,
+    token,
+    tenant,
+    applications: accessMap = {},
+    availableApplications = [],
+    purchasedApplications = [],
+  } = auth;
   const [overview, setOverview] = useState({
     loading: true,
     error: null,
@@ -105,6 +140,11 @@ const PortalPage = () => {
     lastSaved: [],
     todos: [],
   });
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberSuggestions, setMemberSuggestions] = useState([]);
+  const [isSearchingMembers, setIsSearchingMembers] = useState(false);
+  const [isLaunchingMember, setIsLaunchingMember] = useState(false);
+  const [memberSearchError, setMemberSearchError] = useState(null);
 
   const appCatalog = useMemo(
     () => [
@@ -241,6 +281,124 @@ const PortalPage = () => {
     };
   }, [resolvedApps, user]);
 
+  useEffect(() => {
+    const term = memberQuery.trim();
+    if (term.length < 2) {
+      setMemberSuggestions([]);
+      setMemberSearchError(null);
+      setIsSearchingMembers(false);
+      return undefined;
+    }
+
+    let isActive = true;
+    setIsSearchingMembers(true);
+    setMemberSearchError(null);
+
+    const timeoutId = window.setTimeout(() => {
+      fetchCodingMembers(token, tenant, { search: term, pageSize: 7 })
+        .then((response) => {
+          if (!isActive) {
+            return;
+          }
+          const items = Array.isArray(response?.items) ? response.items : [];
+          setMemberSuggestions(items);
+        })
+        .catch((error) => {
+          if (!isActive) {
+            return;
+          }
+          console.error("Member search failed", error);
+          setMemberSuggestions([]);
+          setMemberSearchError(error?.message || "Unable to search members right now.");
+        })
+        .finally(() => {
+          if (!isActive) {
+            return;
+          }
+          setIsSearchingMembers(false);
+        });
+    }, 250);
+
+    return () => {
+      isActive = false;
+      window.clearTimeout(timeoutId);
+      setIsSearchingMembers(false);
+    };
+  }, [memberQuery, token, tenant]);
+
+  const resolveMemberId = useCallback((value) => {
+    const term = value?.trim().toLowerCase();
+    if (!term) {
+      return null;
+    }
+    const match = memberSuggestions.find((member) => extractMemberTokens(member).includes(term));
+    return pickMemberIdForNavigation(match);
+  }, [memberSuggestions]);
+
+  const handleMemberSearch = useCallback(
+    async (event) => {
+      event.preventDefault();
+      const term = memberQuery.trim();
+      if (!term) {
+        return;
+      }
+
+      setMemberSearchError(null);
+      setIsLaunchingMember(true);
+
+      let memberId = resolveMemberId(term);
+
+      if (!memberId) {
+        try {
+          const response = await fetchCodingMembers(token, tenant, { search: term, pageSize: 5 });
+          const items = Array.isArray(response?.items) ? response.items : [];
+          if (items.length) {
+            setMemberSuggestions(items);
+          }
+          const lowerTerm = term.toLowerCase();
+          const exactMatch = items.find((member) => extractMemberTokens(member).includes(lowerTerm));
+          if (exactMatch) {
+            memberId = pickMemberIdForNavigation(exactMatch);
+          } else if (items.length === 1) {
+            memberId = pickMemberIdForNavigation(items[0]);
+          }
+        } catch (error) {
+          console.error("Member lookup failed", error);
+          setMemberSearchError(error?.message || "Unable to open that member right now.");
+        }
+      }
+
+      if (memberId) {
+        setIsLaunchingMember(false);
+        navigate(`/coding/member/${memberId}/chart`);
+        return;
+      }
+
+      setMemberSearchError("Member not found. Try another ID.");
+      setIsLaunchingMember(false);
+    },
+    [memberQuery, navigate, resolveMemberId, tenant, token]
+  );
+
+  const memberSearchStatus = useMemo(() => {
+    if (memberSearchError) {
+      return memberSearchError;
+    }
+    if (isLaunchingMember) {
+      return "Opening member chart...";
+    }
+    if (isSearchingMembers) {
+      return "Searching members...";
+    }
+    if (!memberQuery.trim()) {
+      return "Enter at least two characters to search by member ID.";
+    }
+    if (memberSuggestions.length) {
+      return "Press Enter to open the highlighted member chart.";
+    }
+    return "No suggestions yet.";
+  }, [isLaunchingMember, isSearchingMembers, memberQuery, memberSearchError, memberSuggestions.length]);
+
   if (overview.loading) {
     return (
       <div className="portal-overview__loading">
@@ -268,6 +426,64 @@ const PortalPage = () => {
           </div>
         </div>
       </header>
+      <section className="portal-member-search" aria-label="Member quick search">
+        <form className="portal-member-search__form" onSubmit={handleMemberSearch}>
+          <div className="portal-member-search__field">
+            <label className="portal-member-search__label" htmlFor="portal-member-search-input">
+              Member ID
+            </label>
+            <div className="portal-member-search__inputwrap">
+              <input
+                id="portal-member-search-input"
+                type="search"
+                autoComplete="off"
+                placeholder="Search by member ID"
+                value={memberQuery}
+                onChange={(event) => setMemberQuery(event.target.value)}
+                list="portal-member-suggestions"
+                aria-describedby="portal-member-search-help"
+              />
+              <datalist id="portal-member-suggestions">
+                {memberSuggestions.map((member) => {
+                  const optionValue =
+                    member?.member_key ||
+                    member?.memberId ||
+                    member?.member_id ||
+                    member?.id;
+                  const optionKey = member?.id || member?.member_id || optionValue;
+                  if (!optionValue && !optionKey) {
+                    return null;
+                  }
+                  const altId = member?.id || member?.member_id || "";
+                  const label =
+                    altId && optionValue && altId !== optionValue
+                      ? `${optionValue} - ${altId}`
+                      : optionValue || altId;
+                  return (
+                    <option key={optionKey} value={(optionValue || altId || "").toString()}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </datalist>
+            </div>
+          </div>
+          <button
+            className="portal-member-search__submit"
+            type="submit"
+            disabled={!memberQuery.trim() || isLaunchingMember}
+          >
+            {isLaunchingMember ? "Opening..." : "Open chart"}
+          </button>
+        </form>
+        <p
+          className={`portal-member-search__status${memberSearchError ? " portal-member-search__status--error" : ""}`}
+          id="portal-member-search-help"
+          role="status"
+        >
+          {memberSearchStatus}
+        </p>
+      </section>
 
       {overview.error && (
         <div className="portal-alert" role="alert">

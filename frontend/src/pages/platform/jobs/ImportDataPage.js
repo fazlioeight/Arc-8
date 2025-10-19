@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import PortalUtilityBar from '../../../components/PortalUtilityBar';
 import { AuthContext } from '../../../context/AuthContext';
 import { useCommandPalette } from '../../../context/CommandPaletteContext';
-import '../../styles/importData.css';
+import '../../../styles/importData.css';
 
 const IMPORT_ENTITIES = [
   { key: 'members', label: 'Members', description: 'Member demographics, eligibility, and attribution data.' },

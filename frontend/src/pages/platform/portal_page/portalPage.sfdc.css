@@ -547,6 +547,100 @@
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
 }
 
+.portal-member-search {
+  background: var(--sfdc-card);
+  border-bottom: 1px solid var(--sfdc-border);
+  padding: 18px 20px;
+}
+
+.portal-member-search__form {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.portal-member-search__field {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.portal-member-search__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sfdc-muted);
+}
+
+.portal-member-search__inputwrap {
+  position: relative;
+}
+
+.portal-member-search__inputwrap input {
+  width: 100%;
+  border: 1px solid var(--sfdc-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  color: var(--sfdc-text);
+  background: var(--sfdc-card);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 120ms var(--easing-standard), box-shadow 120ms var(--easing-standard);
+}
+
+.portal-member-search__inputwrap input::placeholder {
+  color: var(--sfdc-muted);
+}
+
+.portal-member-search__inputwrap input:focus {
+  outline: none;
+  border-color: var(--sfdc-brand);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.18);
+}
+
+.portal-member-search__submit {
+  border: none;
+  background: var(--sfdc-brand);
+  color: var(--sfdc-brand-contrast);
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-weight: 600;
+  min-width: 140px;
+  cursor: pointer;
+  transition: background 120ms var(--easing-standard), transform 120ms var(--easing-standard);
+}
+
+.portal-member-search__submit:hover {
+  background: var(--sfdc-brand-dark);
+  transform: translateY(-1px);
+}
+
+.portal-member-search__submit:active {
+  transform: translateY(0);
+}
+
+.portal-member-search__submit:disabled {
+  background: rgba(148, 163, 184, 0.42);
+  color: var(--sfdc-muted);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.portal-member-search__status {
+  max-width: 1120px;
+  margin: 8px auto 0;
+  padding: 0 4px;
+  font-size: 0.85rem;
+  color: var(--sfdc-muted);
+}
+
+.portal-member-search__status--error {
+  color: #b91c1c;
+}
+
 .portal-alert {
   max-width: 1120px;
   margin: 16px auto 0;
@@ -853,6 +947,13 @@
   .portal-hero__inner {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .portal-member-search__form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .portal-member-search__submit {
+    width: 100%;
   }
   .portal-todos__item,
   .portal-list__item {

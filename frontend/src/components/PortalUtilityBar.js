@@ -74,11 +74,11 @@ const PortalUtilityBar = () => {
   const applicationTiles = useMemo(
     () => [
       { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: '/portal_page/portalPage' },
-      { key: 'dashboard', label: 'Analytics Dashboard', desc: 'KPIs & RAF', icon: 'DB', color: '#a855f7', path: '/dashboard' },
+     // { key: 'dashboard', label: 'Analytics Dashboard', desc: 'KPIs & RAF', icon: 'DB', color: '#a855f7', path: '/dashboard' },
       { key: 'coding', label: 'Coding Worklists', desc: 'Member reviews', icon: 'CD', color: '#0f172a', path: '/coding' },
       { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: '/RideBooking' },
       { key: 'docs', label: 'Docs Library', desc: 'Knowledge base', icon: 'DL', color: '#6366f1', path: '/docs' },
-      { key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: '/settings' },
+      //{ key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: '/settings' },
       { key: 'job_center', label: 'Job Center', desc: 'Logs & retry', icon: 'JC', color: '#0f766e', path: '/jobs/status-center' },
       { key: 'admin_console', label: 'Master Admin', desc: 'Roles & access', icon: 'MA', color: '#dc2626', path: '/admin/master', requiredLevel: 'admin' },
     ],
@@ -299,7 +299,7 @@ const PortalUtilityBar = () => {
 
         {showWaffle && (
           <div className="sfdc-waffle" onClick={(event) => event.stopPropagation()}>
-            <div className="sfdc-dropdown__header">Apps</div>
+            <div className="sfdc-dropdown__header">Quick Links</div>
             <div className="sfdc-waffle__grid">
               {accessibleApps.map((app) => (
                 <div key={app.key} className="sfdc-app" onClick={() => { closeAll(); navigate(app.path); }}>
