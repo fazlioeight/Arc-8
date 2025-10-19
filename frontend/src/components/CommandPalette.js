@@ -132,6 +132,14 @@ const CommandPalette = ({ onThemeToggle }) => {
       disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking') || !isNavItemEnabled('rideBooking'),
     });
     append({
+      id: 'nav-ride-payments',
+      label: 'Open Ride Payments and Billing',
+      category: 'Navigation',
+      keywords: 'payments billing invoices payouts ledger stripe',
+      action: () => navigate('/RideBooking/payments'),
+      disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking') || !isNavItemEnabled('rideBooking'),
+    });
+    append({
       id: 'nav-docs',
       label: 'Browse Documentation',
       category: 'Support',

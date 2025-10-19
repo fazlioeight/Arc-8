@@ -70,6 +70,47 @@ const ProviderHeatmap = ({ data, onCellSelect }) => {
       .style("position", "absolute")
       .style("top", `${visibleRange.start * rowHeight}px`);
 
+    const defs = svg.selectAll("defs").data([null]).join("defs");
+
+    const x = d3.scaleBand().domain(metrics).range([0, innerWidth]).padding(0.05);
+    const y = d3.scaleBand().domain(visibleProviders).range([0, innerHeight]).padding(0.05);
+    const [domainMin, domainMax] = colorDomain;
+    const sequentialDomain =
+      domainMin === domainMax
+        ? [domainMin || 0, (domainMin || 0) + 1]
+        : colorDomain;
+    const maxAbs = Math.max(Math.abs(domainMin || 0), Math.abs(domainMax || 0), 2);
+    const color = data?.normalize
+      ? d3.scaleDiverging(d3.interpolateSpectral).domain([-maxAbs, 0, maxAbs])
+      : d3.scaleSequential(d3.interpolateYlGnBu).domain(sequentialDomain);
+    const legendDomain = data?.normalize ? [-maxAbs, maxAbs] : sequentialDomain;
+    const legendSamplesCount = data?.normalize ? 7 : 6;
+    const legendSamples = Array.from({ length: legendSamplesCount }, (_, index) => {
+      const t = legendSamplesCount === 1 ? 0 : index / (legendSamplesCount - 1);
+      const value = legendDomain[0] + t * (legendDomain[1] - legendDomain[0]);
+      return {
+        offset: `${t * 100}%`,
+        color: Number.isFinite(value) ? color(value) : "var(--chart-empty)",
+      };
+    });
+    const legendGradientId = data?.normalize ? "heatmap-legend-diverging" : "heatmap-legend-sequential";
+    const legendGradient = defs
+      .selectAll(`linearGradient#${legendGradientId}`)
+      .data([null])
+      .join("linearGradient")
+      .attr("id", legendGradientId)
+      .attr("x1", "0%")
+      .attr("x2", "100%")
+      .attr("y1", "0%")
+      .attr("y2", "0%");
+
+    legendGradient
+      .selectAll("stop")
+      .data(legendSamples)
+      .join("stop")
+      .attr("offset", (d) => d.offset)
+      .attr("stop-color", (d) => d.color);
+
     const frame = svg
       .selectAll("g.frame")
       .data([null])
@@ -77,9 +118,53 @@ const ProviderHeatmap = ({ data, onCellSelect }) => {
       .attr("class", "frame")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    const x = d3.scaleBand().domain(metrics).range([0, innerWidth]).padding(0.05);
-    const y = d3.scaleBand().domain(visibleProviders).range([0, innerHeight]).padding(0.05);
-    const color = d3.scaleSequential(data?.normalize ? d3.interpolatePuBuGn : d3.interpolateTurbo).domain(colorDomain);
+    const legendWidth = Math.max(120, Math.min(220, innerWidth));
+    const legendY = Math.max(12, margin.top * 0.5);
+    const legend = svg
+      .selectAll("g.legend-container")
+      .data([null])
+      .join("g")
+      .attr("class", "legend-container")
+      .attr("transform", `translate(${margin.left}, ${legendY})`);
+
+    if (
+      legendWidth > 0 &&
+      Number.isFinite(legendDomain?.[0]) &&
+      Number.isFinite(legendDomain?.[1])
+    ) {
+      legend
+        .selectAll("text.legend-title")
+        .data([data?.normalize ? "Z-score" : "Metric value"])
+        .join("text")
+        .attr("class", "legend-title")
+        .attr("x", 0)
+        .attr("y", -8)
+        .text((value) => value);
+
+      legend
+        .selectAll("rect.legend-ramp")
+        .data([null])
+        .join("rect")
+        .attr("class", "legend-ramp")
+        .attr("width", legendWidth)
+        .attr("height", 10)
+        .attr("rx", 4)
+        .attr("fill", `url(#${legendGradientId})`);
+
+      const legendScale = d3.scaleLinear().domain(legendDomain).range([0, legendWidth]);
+      const legendFormatter = data?.normalize ? d3.format("+.1f") : d3.format(".2s");
+      const legendAxis = d3.axisBottom(legendScale).ticks(4).tickSize(0).tickPadding(6).tickFormat(legendFormatter);
+
+      const legendAxisGroup = legend
+        .selectAll("g.legend-axis")
+        .data([null])
+        .join("g")
+        .attr("class", "legend-axis")
+        .attr("transform", "translate(0, 12)");
+
+      legendAxisGroup.call(legendAxis);
+      legendAxisGroup.select(".domain").remove();
+    }
 
     const cells = frame
       .selectAll("rect.cell")
@@ -91,6 +176,7 @@ const ProviderHeatmap = ({ data, onCellSelect }) => {
             .attr("class", "cell")
             .attr("rx", 6)
             .attr("ry", 6)
+            .attr("fill", "var(--chart-empty)")
             .attr("tabindex", 0)
             .attr("role", "button")
             .on("focus", (_, cell) => {
@@ -111,10 +197,6 @@ const ProviderHeatmap = ({ data, onCellSelect }) => {
       .attr("y", (cell) => y(cell.provider) || 0)
       .attr("width", x.bandwidth())
       .attr("height", y.bandwidth())
-      .attr("fill", (cell) => {
-        if (cell.displayValue === null || cell.displayValue === undefined) return "var(--chart-empty)";
-        return color(cell.displayValue);
-      })
       .on("mousemove", (event, cell) => {
         const rect = outerRef.current?.getBoundingClientRect();
         setTooltip({
@@ -124,6 +206,14 @@ const ProviderHeatmap = ({ data, onCellSelect }) => {
         });
       })
       .on("mouseleave", () => setTooltip(null));
+    cells
+      .interrupt()
+      .transition()
+      .duration(400)
+      .attr("fill", (cell) => {
+        if (cell.displayValue === null || cell.displayValue === undefined) return "var(--chart-empty)";
+        return color(cell.displayValue);
+      });
     cells.on("keydown", (event, cell) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();

@@ -36,6 +36,23 @@ const SuspectsFunnelChart = ({ data, onStageSelect, partial, asOf }) => {
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
     const x = d3.scaleLinear().domain([0, maxCount]).range([0, Math.max(280, width - margin.left - margin.right)]);
+    const colorScale =
+      maxCount > 0
+        ? d3.scaleSequential().domain([maxCount, 0]).interpolator(d3.interpolatePuBuGn)
+        : () => "var(--chart-stage-fill)";
+    const stageIndex = new Map(stages.map((stage, index) => [stage.key, index]));
+    const yCenter = (stage) => {
+      const idx = stageIndex.get(stage.key) ?? 0;
+      return idx * (barHeight + barGap) + barHeight / 2;
+    };
+    const connectorLine = d3
+      .linkHorizontal()
+      .source((d) => ({ x: x(d.source.count), y: yCenter(d.source) }))
+      .target((d) => ({ x: x(d.target.count), y: yCenter(d.target) }));
+    const connectorData = stages.slice(0, -1).map((stage, index) => ({
+      source: stage,
+      target: stages[index + 1],
+    }));
 
     const pattern = frame
       .selectAll("defs")
@@ -59,6 +76,31 @@ const SuspectsFunnelChart = ({ data, onStageSelect, partial, asOf }) => {
           .attr("fill", "rgba(15, 76, 129, 0.25)");
       });
 
+    const connectors = frame
+      .selectAll("path.stage-connector")
+      .data(connectorData, (d) => `${d.source.key}-${d.target.key}`)
+      .join(
+        (enter) =>
+          enter
+            .append("path")
+            .attr("class", "stage-connector")
+            .attr("fill", "none")
+            .attr("stroke", "var(--chart-grid, rgba(15, 76, 129, 0.45))")
+            .attr("stroke-width", 2)
+            .attr("stroke-dasharray", "4 10")
+            .attr("opacity", 0)
+            .attr("d", (d) => connectorLine({ source: d.source, target: d.source })),
+        (update) => update,
+        (exit) => exit.remove()
+      );
+
+    connectors
+      .transition()
+      .duration(600)
+      .attr("opacity", 1)
+      .attr("d", (d) => connectorLine({ source: d.source, target: d.target }));
+    connectors.lower();
+
     const groups = frame
       .selectAll("g.stage")
       .data(stages, (stage) => stage.key)
@@ -69,15 +111,25 @@ const SuspectsFunnelChart = ({ data, onStageSelect, partial, asOf }) => {
       )
       .attr("transform", (_, index) => `translate(0, ${index * (barHeight + barGap)})`);
 
-    groups
+    const bars = groups
       .selectAll("rect.bar")
       .data((stage) => [stage])
-      .join("rect")
+      .join(
+        (enter) =>
+          enter
+            .append("rect")
+            .attr("class", "bar")
+            .attr("rx", 8)
+            .attr("ry", 8)
+            .attr("width", 0),
+        (update) => update,
+        (exit) => exit.remove()
+      )
       .attr("class", "bar")
       .attr("rx", 8)
       .attr("ry", 8)
-      .attr("fill", partial ? "url(#partial-stripe)" : "var(--chart-stage-fill)")
-      .attr("width", (stage) => x(stage.count))
+      .attr("fill", (stage) => (partial ? "url(#partial-stripe)" : colorScale(stage.count)))
+      .attr("fill-opacity", 0.95)
       .attr("height", barHeight)
       .attr("tabindex", 0)
       .attr("role", "button")
@@ -85,7 +137,7 @@ const SuspectsFunnelChart = ({ data, onStageSelect, partial, asOf }) => {
       .on("focus", (_, stage) => {
         setTooltip({
           x: x(stage.count) + margin.left,
-          y: stages.indexOf(stage) * (barHeight + barGap) + margin.top + barHeight / 2,
+          y: yCenter(stage) + margin.top,
           stage,
         });
       })
@@ -101,6 +153,12 @@ const SuspectsFunnelChart = ({ data, onStageSelect, partial, asOf }) => {
           onStageSelect(stage);
         }
       });
+
+    bars
+      .transition()
+      .duration(600)
+      .ease(d3.easeCubicOut)
+      .attr("width", (stage) => x(stage.count));
 
     groups
       .selectAll("text.label")

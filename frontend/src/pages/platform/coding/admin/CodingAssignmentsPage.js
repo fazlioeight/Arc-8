@@ -1,8 +1,8 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
 
 import PortalUtilityBar from '../../../../components/PortalUtilityBar';
+import CodingPortalHeader from '../CodingPortalHeader';
 import { AuthContext } from '../../../../context/AuthContext';
 import {
   assignCodingAdminWork,
@@ -10,9 +10,9 @@ import {
 } from '../../../../services/codingService';
 
 const CodingAssignmentsPage = () => {
-  const navigate = useNavigate();
-  const { token, tenant, isAuthenticated } = useContext(AuthContext) || {};
+  const { token, tenant, isAuthenticated, user } = useContext(AuthContext) || {};
   const canQuery = useMemo(() => Boolean(token && tenant), [token, tenant]);
+  const tenantLabel = tenant || user?.tenant || 'Tenant';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -99,141 +99,137 @@ const CodingAssignmentsPage = () => {
   }
 
   return (
-    <div className="container-fluid py-4">
+    <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h1 className="h4 mb-1">Coding work assignments</h1>
-          <div className="text-muted">Allocate open chases to available coders.</div>
-        </div>
-        <Button variant="outline-secondary" size="sm" onClick={() => navigate('/admin/master')}>
-          Back to admin
-        </Button>
-      </div>
+      <CodingPortalHeader
+        title="Coding assignments"
+        subtitle={`${tenantLabel} admin tools for allocating coders and work.`}
+      />
+      <div className="container-fluid py-4 coding-assignments-content">
+        {error && (
+          <Alert variant="danger" className="mb-3" onClose={() => setError(null)} dismissible>
+            {error}
+          </Alert>
+        )}
+        {successMessage && (
+          <Alert variant="success" className="mb-3" onClose={() => setSuccessMessage(null)} dismissible>
+            {successMessage}
+          </Alert>
+        )}
 
-      {error && (
-        <Alert variant="danger" className="mb-3" onClose={() => setError(null)} dismissible>
-          {error}
-        </Alert>
-      )}
-      {successMessage && (
-        <Alert variant="success" className="mb-3" onClose={() => setSuccessMessage(null)} dismissible>
-          {successMessage}
-        </Alert>
-      )}
+        <Card className="mb-4">
+          <Card.Header>Assignment controls</Card.Header>
+          <Card.Body>
+            <Form onSubmit={handleAssign} className="row g-3 align-items-end">
+              <Col md={4}>
+                <Form.Group controlId="coderSelect">
+                  <Form.Label>Assign to coder</Form.Label>
+                  <Form.Select
+                    value={selectedCoder}
+                    onChange={(event) => setSelectedCoder(event.target.value)}
+                    disabled={loading || overview.coders.length === 0}
+                  >
+                    {overview.coders.length === 0 && <option value="">No coders available</option>}
+                    {overview.coders.map((coder) => (
+                      <option key={coder.id ?? coder.email} value={coder.email}>
+                        {coder.email}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={2}>
+                <Button type="submit" variant="primary" disabled={assignState === 'working' || selectedChases.size === 0}>
+                  {assignState === 'working' ? 'Assigning...' : 'Assign work'}
+                </Button>
+              </Col>
+              <Col md={2}>
+                <Button variant="outline-secondary" onClick={clearSelection} disabled={selectedChases.size === 0}>
+                  Clear selection
+                </Button>
+              </Col>
+              <Col md={4} className="text-end text-muted small">
+                {selectedChases.size} chase(s) selected
+              </Col>
+            </Form>
+          </Card.Body>
+        </Card>
 
-      <Card className="mb-4">
-        <Card.Header>Assignment controls</Card.Header>
-        <Card.Body>
-          <Form onSubmit={handleAssign} className="row g-3 align-items-end">
-            <Col md={4}>
-              <Form.Group controlId="coderSelect">
-                <Form.Label>Assign to coder</Form.Label>
-                <Form.Select
-                  value={selectedCoder}
-                  onChange={(event) => setSelectedCoder(event.target.value)}
-                  disabled={loading || overview.coders.length === 0}
-                >
-                  {overview.coders.length === 0 && <option value="">No coders available</option>}
-                  {overview.coders.map((coder) => (
-                    <option key={coder.id ?? coder.email} value={coder.email}>
-                      {coder.email}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={2}>
-              <Button type="submit" variant="primary" disabled={assignState === 'working' || selectedChases.size === 0}>
-                {assignState === 'working' ? 'Assigning...' : 'Assign work'}
-              </Button>
-            </Col>
-            <Col md={2}>
-              <Button variant="outline-secondary" onClick={clearSelection} disabled={selectedChases.size === 0}>
-                Clear selection
-              </Button>
-            </Col>
-            <Col md={4} className="text-end text-muted small">
-              {selectedChases.size} chase(s) selected
-            </Col>
-          </Form>
-        </Card.Body>
-      </Card>
-
-      <Card>
-        <Card.Header>
-          Open chases
-          {loading && <Spinner animation="border" size="sm" className="ms-2" />}
-        </Card.Header>
-        <Card.Body className="p-0">
-          <Table responsive hover className="mb-0">
-            <thead>
-              <tr>
-                <th>
-                  <Form.Check
-                    type="checkbox"
-                    checked={overview.items.length > 0 && selectedChases.size === overview.items.length}
-                    onChange={(event) => {
-                      if (event.target.checked) {
-                        setSelectedChases(new Set(overview.items.map((item) => item.chase_id)));
-                      } else {
-                        clearSelection();
-                      }
-                    }}
-                    disabled={overview.items.length === 0}
-                  />
-                </th>
-                <th>Member</th>
-                <th>Chase</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>HCC</th>
-                <th>Assigned</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!loading && overview.items.length === 0 && (
+        <Card>
+          <Card.Header>
+            Open chases
+            {loading && <Spinner animation="border" size="sm" className="ms-2" />}
+          </Card.Header>
+          <Card.Body className="p-0">
+            <Table responsive hover className="mb-0">
+              <thead>
                 <tr>
-                  <td colSpan={7} className="text-center text-muted py-4">
-                    No open chases available for assignment.
-                  </td>
+                  <th>
+                    <Form.Check
+                      type="checkbox"
+                      checked={overview.items.length > 0 && selectedChases.size === overview.items.length}
+                      onChange={(event) => {
+                        if (event.target.checked) {
+                          setSelectedChases(new Set(overview.items.map((item) => item.chase_id)));
+                        } else {
+                          clearSelection();
+                        }
+                      }}
+                      disabled={overview.items.length === 0}
+                    />
+                  </th>
+                  <th>Member</th>
+                  <th>Chase</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>HCC</th>
+                  <th>Assigned</th>
                 </tr>
-              )}
-              {overview.items.map((item) => {
-                const isSelected = selectedChases.has(item.chase_id);
-                return (
-                  <tr key={item.chase_id} className={isSelected ? 'table-active' : ''}>
-                    <td>
-                      <Form.Check
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelection(item.chase_id)}
-                      />
+              </thead>
+              <tbody>
+                {!loading && overview.items.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="text-center text-muted py-4">
+                      No open chases available for assignment.
                     </td>
-                    <td>
-                      <div className="fw-semibold">{item.member_name || item.member_key}</div>
-                      <div className="small text-muted">#{item.member_id}</div>
-                    </td>
-                    <td>#{item.chase_id}</td>
-                    <td>{item.status}</td>
-                    <td>
-                      {item.priority ? (
-                        <Badge bg={item.priority === 'high' ? 'danger' : item.priority === 'normal' ? 'primary' : 'secondary'}>
-                          {item.priority}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted">-</span>
-                      )}
-                    </td>
-                    <td>{item.hcc_code || item.icd10_code || '-'}</td>
-                    <td>{item.assigned_coder_email || <span className="text-muted">Unassigned</span>}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-        </Card.Body>
-      </Card>
+                )}
+                {overview.items.map((item) => {
+                  const isSelected = selectedChases.has(item.chase_id);
+                  return (
+                    <tr key={item.chase_id} className={isSelected ? 'table-active' : ''}>
+                      <td>
+                        <Form.Check
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(item.chase_id)}
+                        />
+                      </td>
+                      <td>
+                        <div className="fw-semibold">{item.member_name || item.member_key}</div>
+                        <div className="small text-muted">#{item.member_id}</div>
+                      </td>
+                      <td>#{item.chase_id}</td>
+                      <td>{item.status}</td>
+                      <td>
+                        {item.priority ? (
+                          <Badge bg={item.priority === 'high' ? 'danger' : item.priority === 'normal' ? 'primary' : 'secondary'}>
+                            {item.priority}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted">-</span>
+                        )}
+                      </td>
+                      <td>{item.hcc_code || item.icd10_code || '-'}</td>
+                      <td>{item.assigned_coder_email || <span className="text-muted">Unassigned</span>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </Card.Body>
+        </Card>
+      </div>
     </div>
   );
 };
