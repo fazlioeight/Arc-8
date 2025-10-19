@@ -1,0 +1,60 @@
+2025-10-18 14:07:22,011 INFO request {'method': 'GET', 'path': '/api/raf/delta', 'status': 401, 'duration_ms': 0.37, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,012 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/raf/delta "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:07:22,014 INFO request {'method': 'GET', 'path': '/api/suspects/funnel', 'status': 401, 'duration_ms': 0.45, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,014 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/suspects/funnel "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:07:22,015 INFO request {'method': 'GET', 'path': '/api/deadlines/radar', 'status': 401, 'duration_ms': 0.31, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,016 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/deadlines/radar?cutoff=2025-12-31 "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:07:22,018 INFO request {'method': 'GET', 'path': '/api/providers/heatmap', 'status': 401, 'duration_ms': 0.88, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,019 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/providers/heatmap "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:07:22,362 INFO request {'method': 'POST', 'path': '/api/login', 'status': 200, 'duration_ms': 263.66, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,363 INFO httpx HTTP Request: POST https://prominencehealth.localhost/api/login "HTTP/1.1 200 OK"
+2025-10-18 14:07:22,370 INFO request {'method': 'GET', 'path': '/api/raf/delta', 'status': 200, 'duration_ms': 6.4, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,371 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/raf/delta?model_year=2025&lob=MA&provider_group=All&forecast=1 "HTTP/1.1 200 OK"
+2025-10-18 14:07:22,398 INFO request {'method': 'GET', 'path': '/api/suspects/funnel', 'status': 200, 'duration_ms': 26.19, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,399 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/suspects/funnel?from=2025-01-01&to=2025-01-31 "HTTP/1.1 200 OK"
+2025-10-18 14:07:22,405 INFO request {'method': 'GET', 'path': '/api/deadlines/radar', 'status': 200, 'duration_ms': 4.8, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,406 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/deadlines/radar?cutoff=2025-12-31&stage=accepted "HTTP/1.1 200 OK"
+2025-10-18 14:07:22,410 INFO request {'method': 'GET', 'path': '/api/providers/heatmap', 'status': 200, 'duration_ms': 3.49, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,411 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/providers/heatmap?metric=open_raf&lob=MA "HTTP/1.1 200 OK"
+2025-10-18 14:07:22,416 INFO request {'method': 'GET', 'path': '/api/deadlines/radar/export', 'status': 200, 'duration_ms': 3.62, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:07:22,418 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/deadlines/radar/export?cutoff=2025-12-31&stage=accepted&lob=MA&model_year=2025&provider_group=All "HTTP/1.1 200 OK"
+2025-10-18 14:08:15,788 INFO request {'method': 'GET', 'path': '/api/raf/delta', 'status': 401, 'duration_ms': 0.44, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:15,789 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/raf/delta "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:08:15,790 INFO request {'method': 'GET', 'path': '/api/suspects/funnel', 'status': 401, 'duration_ms': 0.34, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:15,791 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/suspects/funnel "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:08:15,792 INFO request {'method': 'GET', 'path': '/api/deadlines/radar', 'status': 401, 'duration_ms': 0.32, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:15,793 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/deadlines/radar?cutoff=2025-12-31 "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:08:15,794 INFO request {'method': 'GET', 'path': '/api/providers/heatmap', 'status': 401, 'duration_ms': 0.3, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:15,794 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/providers/heatmap "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:08:16,062 INFO request {'method': 'POST', 'path': '/api/login', 'status': 200, 'duration_ms': 254.66, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:16,063 INFO httpx HTTP Request: POST https://prominencehealth.localhost/api/login "HTTP/1.1 200 OK"
+2025-10-18 14:08:16,069 INFO request {'method': 'GET', 'path': '/api/raf/delta', 'status': 200, 'duration_ms': 5.58, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:16,070 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/raf/delta?model_year=2025&lob=MA&provider_group=All&forecast=1 "HTTP/1.1 200 OK"
+2025-10-18 14:08:16,081 INFO request {'method': 'GET', 'path': '/api/suspects/funnel', 'status': 200, 'duration_ms': 9.41, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:16,082 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/suspects/funnel?from=2025-01-01&to=2025-01-31 "HTTP/1.1 200 OK"
+2025-10-18 14:08:16,087 INFO request {'method': 'GET', 'path': '/api/deadlines/radar', 'status': 200, 'duration_ms': 4.95, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:16,088 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/deadlines/radar?cutoff=2025-12-31&stage=accepted "HTTP/1.1 200 OK"
+2025-10-18 14:08:16,093 INFO request {'method': 'GET', 'path': '/api/providers/heatmap', 'status': 200, 'duration_ms': 3.57, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:16,094 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/providers/heatmap?metric=open_raf&lob=MA "HTTP/1.1 200 OK"
+2025-10-18 14:08:16,098 INFO request {'method': 'GET', 'path': '/api/deadlines/radar/export', 'status': 200, 'duration_ms': 3.29, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:16,100 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/deadlines/radar/export?cutoff=2025-12-31&stage=accepted&lob=MA&model_year=2025&provider_group=All "HTTP/1.1 200 OK"
+2025-10-18 14:08:30,219 INFO request {'method': 'GET', 'path': '/api/raf/delta', 'status': 401, 'duration_ms': 0.58, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,220 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/raf/delta "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:08:30,222 INFO request {'method': 'GET', 'path': '/api/suspects/funnel', 'status': 401, 'duration_ms': 0.5, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,223 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/suspects/funnel "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:08:30,224 INFO request {'method': 'GET', 'path': '/api/deadlines/radar', 'status': 401, 'duration_ms': 0.32, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,224 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/deadlines/radar?cutoff=2025-12-31 "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:08:30,225 INFO request {'method': 'GET', 'path': '/api/providers/heatmap', 'status': 401, 'duration_ms': 0.3, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,226 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/providers/heatmap "HTTP/1.1 401 Unauthorized"
+2025-10-18 14:08:30,487 INFO request {'method': 'POST', 'path': '/api/login', 'status': 200, 'duration_ms': 248.98, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,487 INFO httpx HTTP Request: POST https://prominencehealth.localhost/api/login "HTTP/1.1 200 OK"
+2025-10-18 14:08:30,493 INFO request {'method': 'GET', 'path': '/api/raf/delta', 'status': 200, 'duration_ms': 4.38, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,494 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/raf/delta?model_year=2025&lob=MA&provider_group=All&forecast=1 "HTTP/1.1 200 OK"
+2025-10-18 14:08:30,505 INFO request {'method': 'GET', 'path': '/api/suspects/funnel', 'status': 200, 'duration_ms': 10.44, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,506 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/suspects/funnel?from=2025-01-01&to=2025-01-31 "HTTP/1.1 200 OK"
+2025-10-18 14:08:30,510 INFO request {'method': 'GET', 'path': '/api/deadlines/radar', 'status': 200, 'duration_ms': 3.67, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,511 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/deadlines/radar?cutoff=2025-12-31&stage=accepted "HTTP/1.1 200 OK"
+2025-10-18 14:08:30,515 INFO request {'method': 'GET', 'path': '/api/providers/heatmap', 'status': 200, 'duration_ms': 2.99, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,516 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/providers/heatmap?metric=open_raf&lob=MA "HTTP/1.1 200 OK"
+2025-10-18 14:08:30,522 INFO request {'method': 'GET', 'path': '/api/deadlines/radar/export', 'status': 200, 'duration_ms': 4.7, 'tenant': 'prominencehealth', 'user': None}
+2025-10-18 14:08:30,524 INFO httpx HTTP Request: GET https://prominencehealth.localhost/api/deadlines/radar/export?cutoff=2025-12-31&stage=accepted&lob=MA&model_year=2025&provider_group=All "HTTP/1.1 200 OK"
