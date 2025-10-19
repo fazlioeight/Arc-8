@@ -21,6 +21,7 @@ from .routes import admin as admin_router
 from .routes import analytics as analytics_router
 from .routes import coding as coding_router
 from .routes import coding_dashboards as coding_dashboards_router
+from .routes import dashboard as dashboard_router
 from .routes import terminology as terminology_router
 from .routes import member_cost as member_cost_router
 from .routes import member_risk as member_risk_router
@@ -170,6 +171,7 @@ app.include_router(admin_router.router)
 app.include_router(analytics_router.router)
 app.include_router(coding_router.router)
 app.include_router(coding_dashboards_router.router)
+app.include_router(dashboard_router.router)
 app.include_router(workbench_router.router)
 app.include_router(terminology_router.router)
 app.include_router(member_cost_router.router)

@@ -26,14 +26,14 @@ const RideBookingLandingPage = lazy(() => import('./pages/ride_booking/RideBooki
 const RideBooking = lazy(() => import('./pages/ride_booking/RideBooking'));
 const RidePartnerManagementPage = lazy(() => import('./pages/ride_booking/RidePartnerManagementPage'));
 const Settings = lazy(() => import('./pages/settings/Settings'));
-const Dashboard = lazy(() => import('./pages/dashboard/Dashboard'));
+const Dashboard = lazy(() => import('./pages/coding/admin/Dashboard'));
 const Docs = lazy(() => import('./pages/docs/Docs'));
 const CodingMembersPage = lazy(() => import('./pages/coding/CodingMembersPage'));
 const CodingProvidersPage = lazy(() => import('./pages/coding/CodingProvidersPage'));
 const CodingLandingPage = lazy(() => import('./pages/coding/CodingLandingPage'));
 const CodingProviderDetailPage = lazy(() => import('./pages/coding/CodingProviderDetailPage'));
 const MasterAdminPage = lazy(() => import('./pages/admin/MasterAdminPage'));
-const CodingAssignmentsPage = lazy(() => import('./pages/admin/CodingAssignmentsPage'));
+const CodingAssignmentsPage = lazy(() => import('./pages/coding/admin/CodingAssignmentsPage'));
 const CodingCoderPlatformPage = lazy(() => import('./pages/coding/CodingCoderPlatformPage'));
 const CodingReviewDashboardPage = lazy(() => import('./pages/coding/CodingReviewDashboardPage'));
 const CodingProviderEducationPage = lazy(() => import('./pages/coding/CodingProviderEducationPage'));

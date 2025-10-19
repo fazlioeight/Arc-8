@@ -1,19 +1,19 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import "../../index.css";
-import "../portal_page/portalPage.sfdc.css";
-import "./dashboard.css";
-import { AuthContext } from "../../context/AuthContext";
-import PortalUtilityBar from "../../components/PortalUtilityBar";
-import PortalHero from "../../components/PortalHero";
-import DashboardFilters from "./components/DashboardFilters";
-import ChartCard from "./components/ChartCard";
-import LiveRafDeltaChart from "./components/LiveRafDeltaChart";
-import SuspectsFunnelChart from "./components/SuspectsFunnelChart";
-import DeadlineRadarChart from "./components/DeadlineRadarChart";
-import ProviderHeatmap from "./components/ProviderHeatmap";
-import DetailDrawer from "./components/DetailDrawer";
-import Skeleton from "../../components/ui/Skeleton";
-import useChartData from "../../hooks/useChartData";
+import "../../../index.css";
+import "../../portal_page/portalPage.sfdc.css";
+import "../../dashboard/dashboard.css";
+import { AuthContext } from "../../../context/AuthContext";
+import PortalUtilityBar from "../../../components/PortalUtilityBar";
+import PortalHero from "../../../components/PortalHero";
+import DashboardFilters from "../../dashboard/components/DashboardFilters";
+import ChartCard from "../../dashboard/components/ChartCard";
+import LiveRafDeltaChart from "../../dashboard/components/LiveRafDeltaChart";
+import SuspectsFunnelChart from "../../dashboard/components/SuspectsFunnelChart";
+import DeadlineRadarChart from "../../dashboard/components/DeadlineRadarChart";
+import ProviderHeatmap from "../../dashboard/components/ProviderHeatmap";
+import DetailDrawer from "../../dashboard/components/DetailDrawer";
+import Skeleton from "../../../components/ui/Skeleton";
+import useChartData from "../../../hooks/useChartData";
 import {
   canExport,
   exportDeadlinesCsv,
@@ -21,8 +21,8 @@ import {
   fetchProviderHeatmap,
   fetchRafDelta,
   fetchSuspectsFunnel,
-} from "../../services/dashboardService";
-import { TELEMETRY_EVENTS, logTelemetry } from "../../services/telemetryService";
+} from "../../../services/dashboardService";
+import { TELEMETRY_EVENTS, logTelemetry } from "../../../services/telemetryService";
 
 const PACIFIC_TZ = "America/Los_Angeles";
 

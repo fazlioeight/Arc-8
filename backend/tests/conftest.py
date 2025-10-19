@@ -70,6 +70,9 @@ async def _bootstrap_async():
     config_module.settings.SECRET_KEY = TEST_SECRET
     config_module.settings.ALLOW_DUMMY_LOGIN = False
 
+    Path("tests").mkdir(parents=True, exist_ok=True)
+    Path("tests/tenants").mkdir(parents=True, exist_ok=True)
+
     _tests_dir().mkdir(parents=True, exist_ok=True)
     _tenant_dir().mkdir(parents=True, exist_ok=True)
 

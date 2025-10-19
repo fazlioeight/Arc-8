@@ -9,10 +9,9 @@ import {
   Row,
   Table,
 } from "react-bootstrap";
-import { useNavigate } from "react-router-dom";
 
 import PortalUtilityBar from "../../components/PortalUtilityBar";
-import PortalHero from "../../components/PortalHero";
+import RideBookingHeader from "./RideBookingHeader";
 import {
   addPartner,
   addPartnerSchedule,
@@ -46,7 +45,6 @@ const createScheduleForm = (frequency = "daily") => ({
 });
 
 const RidePartnerManagementPage = () => {
-  const navigate = useNavigate();
   const [partners, setPartners] = useState([]);
   const [partnerForm, setPartnerForm] = useState({
     companyName: "",
@@ -232,25 +230,9 @@ const RidePartnerManagementPage = () => {
   return (
     <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
-      <PortalHero
+      <RideBookingHeader
         title="Ride Partner Calendars"
         subtitle="Invite transportation partners to publish their open ride windows. Availability for today automatically feeds the booking dropdown."
-        actions={[
-          <Button
-            key="overview"
-            variant="light"
-            onClick={() => navigate("/RideBooking")}
-          >
-            View ride overview
-          </Button>,
-          <Button
-            key="book"
-            variant="outline-light"
-            onClick={() => navigate("/RideBooking/book")}
-          >
-            Book a ride
-          </Button>,
-        ]}
       />
 
       <main className="sfdc-grid" style={{ gridTemplateColumns: "1fr" }}>

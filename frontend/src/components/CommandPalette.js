@@ -64,6 +64,26 @@ const CommandPalette = ({ onThemeToggle }) => {
     return Array.from(map.values());
   }, []);
 
+  const paletteThemeVars = useMemo(() => ({
+    '--sfdc-surface': 'var(--bg-card)',
+    '--sfdc-surface-alt': 'var(--input-bg)',
+    '--sfdc-text': 'var(--text)',
+    '--sfdc-muted': 'var(--text-muted)',
+    '--sfdc-border': 'var(--border)',
+    '--cp-highlight-bg': 'rgba(14, 165, 233, 0.18)',
+    '--cp-highlight-border': 'rgba(14, 165, 233, 0.28)',
+  }), []);
+
+  const activeCommandStyle = useMemo(() => ({
+    background: 'var(--cp-highlight-bg)',
+    color: 'var(--sfdc-text)',
+    boxShadow: '0 0 0 1px var(--cp-highlight-border)',
+  }), []);
+
+  const activeShortcutStyle = useMemo(() => ({
+    color: 'var(--sfdc-text)',
+  }), []);
+
   const baseCommands = useMemo(() => {
     const enabledSet = new Set(
       (availableApplications && availableApplications.length)
@@ -409,7 +429,11 @@ const CommandPalette = ({ onThemeToggle }) => {
         onClick={() => closePalette()}
         aria-hidden="true"
       />
-      <div className="command-palette__panel" ref={listRef}>
+      <div
+        className="command-palette__panel"
+        ref={listRef}
+        style={paletteThemeVars}
+      >
         <header className="command-palette__header">
           <div className="command-palette__context">
             <span className="command-palette__tenant">{tenantInfo?.name || tenant}</span>
@@ -447,11 +471,13 @@ const CommandPalette = ({ onThemeToggle }) => {
                 {items.map((command, index) => {
                   const globalIndex = flatCommands.indexOf(command);
                   const isActive = globalIndex === activeIndex;
+                  const itemStyle = isActive ? activeCommandStyle : undefined;
                   return (
                     <li
                       key={command.id}
                       className={isActive ? 'active' : ''}
                       aria-selected={isActive}
+                      style={itemStyle}
                       onMouseEnter={() => setActiveIndex(globalIndex)}
                       onMouseDown={(event) => {
                         event.preventDefault();
@@ -467,7 +493,12 @@ const CommandPalette = ({ onThemeToggle }) => {
                     >
                       <div className="command-palette__label">{command.label}</div>
                       {command.shortcut && (
-                        <span className="command-palette__shortcut">{command.shortcut}</span>
+                        <span
+                          className="command-palette__shortcut"
+                          style={isActive ? activeShortcutStyle : undefined}
+                        >
+                          {command.shortcut}
+                        </span>
                       )}
                     </li>
                   );
