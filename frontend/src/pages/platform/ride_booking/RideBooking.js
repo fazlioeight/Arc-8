@@ -1,4 +1,5 @@
 import React, { useContext, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button, Col, Form, Row, Alert } from 'react-bootstrap';
 import { AuthContext } from '../../../context/AuthContext';
 import PortalUtilityBar from '../../../components/PortalUtilityBar';
@@ -13,6 +14,7 @@ const getLocalTime = () => new Date().toISOString().slice(11, 16);
 
 const RideBooking = () => {
   const { isAuthenticated } = useContext(AuthContext) || {};
+  const navigate = useNavigate();
 
   const [memberId, setMemberId] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -88,6 +90,22 @@ const RideBooking = () => {
       />
 
       <div className="ride-booking__shell" style={{ maxWidth: 720 }}>
+        <Alert variant="light" className="ride-booking__knowledge-banner">
+          <div>
+            <h2 className="h6 mb-1">Finance hand-off tip</h2>
+            <p className="mb-0">
+              After booking, log your provider payout and invoice steps in the payments playbook to keep ledger records current.
+            </p>
+          </div>
+          <Button
+            variant="outline-primary"
+            size="sm"
+            onClick={() => navigate('/RideBooking/payments')}
+          >
+            View guidance
+          </Button>
+        </Alert>
+
         <section className="ride-booking__form-card">
           <Form onSubmit={handleSubmit}>
             <div className="mb-3">

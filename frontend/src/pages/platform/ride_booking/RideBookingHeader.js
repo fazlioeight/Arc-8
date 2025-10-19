@@ -22,6 +22,16 @@ const NAV_GROUPS = [
       },
     ],
   },
+  {
+    label: 'finance',
+    items: [
+      {
+        label: 'Payments and billing',
+        href: '/RideBooking/payments',
+        match: (path) => path.startsWith('/RideBooking/payments'),
+      },
+    ],
+  },
 ];
 
 const RIBBON_CONTAINER_STYLE = {

@@ -15,6 +15,7 @@ const ROUTE_LABELS = {
   '/jobs/status-center': 'Operations Center',
   '/jobs/import-data': 'Data Imports',
   '/RideBooking': 'Ride Coordination',
+  '/RideBooking/payments': 'Ride Payments and Billing',
   '/docs': 'Documentation',
   '/portal_page/portalPage': 'Portal Home',
   '/settings': 'Settings',

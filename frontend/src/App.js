@@ -25,6 +25,7 @@ const PortalPage = lazy(() => import('./pages/platform/portal_page/portalPage'))
 const RideBookingLandingPage = lazy(() => import('./pages/platform/ride_booking/RideBookingLandingPage'));
 const RideBooking = lazy(() => import('./pages/platform/ride_booking/RideBooking'));
 const RidePartnerManagementPage = lazy(() => import('./pages/platform/ride_booking/RidePartnerManagementPage'));
+const RideBookingPaymentsPage = lazy(() => import('./pages/platform/ride_booking/RideBookingPaymentsPage'));
 const Settings = lazy(() => import('./pages/platform/settings/Settings'));
 const Dashboard = lazy(() => import('./pages/platform/coding/admin/Dashboard'));
 const Docs = lazy(() => import('./pages/docs/Docs'));
@@ -107,6 +108,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/RideBooking" element={<RideBookingLandingPage />} />
           <Route path="/RideBooking/book" element={<RideBooking />} />
           <Route path="/RideBooking/partners" element={<RidePartnerManagementPage />} />
+          <Route path="/RideBooking/payments" element={<RideBookingPaymentsPage />} />
           <Route path="/settings" element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/docs" element={<Docs />} />

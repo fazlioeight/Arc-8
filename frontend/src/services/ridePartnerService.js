@@ -7,6 +7,14 @@ const DEFAULT_PARTNERS = [
     contactName: 'Riley Carter',
     contactEmail: 'ops@transitease.example.com',
     createdAt: '2024-09-20T15:00:00.000Z',
+    billingProfile: {
+      payToName: 'TransitEase Co-op',
+      paymentEmail: 'billing@transitease.example.com',
+      paymentMethod: 'ach',
+      remitAddress: 'TransitEase Co-op\nPO Box 1456\nAustin, TX 78767',
+      taxId: '82-1456780',
+      updatedAt: '2024-09-20T15:00:00.000Z',
+    },
     schedules: [
       {
         id: 'schedule-transitease-weekly',
@@ -15,9 +23,9 @@ const DEFAULT_PARTNERS = [
         endDate: '2024-12-31',
         openSlots: 10,
         daysOfWeek: ['mon', 'wed', 'fri'],
-        notes: 'Midday hospital loops'
-      }
-    ]
+        notes: 'Midday hospital loops',
+      },
+    ],
   },
   {
     id: 'partner-cityline',
@@ -25,6 +33,14 @@ const DEFAULT_PARTNERS = [
     contactName: 'Alex Morgan',
     contactEmail: 'service@cityline.example.com',
     createdAt: '2024-09-24T11:30:00.000Z',
+    billingProfile: {
+      payToName: 'CityLine Mobility LLC',
+      paymentEmail: 'ar@cityline.example.com',
+      paymentMethod: 'virtual_card',
+      remitAddress: 'CityLine Mobility\n88 Market Street\nDallas, TX 75201',
+      taxId: '45-9981200',
+      updatedAt: '2024-09-24T11:30:00.000Z',
+    },
     schedules: [
       {
         id: 'schedule-cityline-monthly',
@@ -33,10 +49,10 @@ const DEFAULT_PARTNERS = [
         endDate: '2024-12-24',
         openSlots: 6,
         daysOfMonth: [1, 15, 28],
-        notes: 'Recurring dialysis runs'
-      }
-    ]
-  }
+        notes: 'Recurring dialysis runs',
+      },
+    ],
+  },
 ];
 
 const WEEKDAY_INDEX = {
@@ -58,18 +74,28 @@ const startOfDay = (value) => {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 };
 
+const normalizePartner = (partner) => ({
+  ...partner,
+  schedules: Array.isArray(partner.schedules) ? partner.schedules : [],
+  billingProfile: partner.billingProfile
+    ? { ...partner.billingProfile }
+    : null,
+});
+
 const readPartners = () => {
   if (!hasBrowserStorage()) {
-    return toCloned(DEFAULT_PARTNERS);
+    return toCloned(DEFAULT_PARTNERS).map(normalizePartner);
   }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PARTNERS));
-      return toCloned(DEFAULT_PARTNERS);
+      return toCloned(DEFAULT_PARTNERS).map(normalizePartner);
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed.map((partner) => normalizePartner(toCloned(partner)))
+      : [];
   } catch (error) {
     console.warn('Unable to read ride share partners:', error);
     return [];
@@ -131,6 +157,7 @@ export const addPartner = ({ companyName, contactName, contactEmail }) => {
     contactName: contactName?.trim() || '',
     contactEmail: contactEmail?.trim() || '',
     createdAt: new Date().toISOString(),
+    billingProfile: null,
     schedules: [],
   };
   partners.push(newPartner);
@@ -159,6 +186,27 @@ export const addPartnerSchedule = (partnerId, scheduleInput) => {
   partners[index].schedules = [...(partners[index].schedules || []), schedule];
   writePartners(partners);
   return schedule;
+};
+
+export const upsertPartnerBillingProfile = (partnerId, profileInput) => {
+  const partners = readPartners();
+  const index = partners.findIndex((partner) => partner.id === partnerId);
+  if (index === -1) {
+    throw new Error('Partner not found');
+  }
+
+  const profile = {
+    payToName: profileInput.payToName?.trim() || '',
+    paymentEmail: profileInput.paymentEmail?.trim() || '',
+    paymentMethod: profileInput.paymentMethod || 'ach',
+    remitAddress: profileInput.remitAddress?.trim() || '',
+    taxId: profileInput.taxId?.trim() || '',
+    updatedAt: new Date().toISOString(),
+  };
+
+  partners[index].billingProfile = profile;
+  writePartners(partners);
+  return profile;
 };
 
 export const getAvailablePartnersForDate = (date = new Date()) => {
