@@ -22,6 +22,7 @@ const DeadlineRadarChart = ({ data, onSegmentClick }) => {
     const w = Math.max(280, width);
     const h = Math.max(280, height);
     const radius = Math.min(w, h) / 2 - Math.max(margin.left, margin.top);
+    const transition = d3.transition().duration(650).ease(d3.easeCubicOut);
 
     const svg = d3
       .select(svgRef.current)
@@ -29,6 +30,54 @@ const DeadlineRadarChart = ({ data, onSegmentClick }) => {
       .attr("height", h)
       .attr("role", "img")
       .attr("aria-label", "Deadline radar chart");
+
+    const defs = svg.selectAll("defs").data([null]).join("defs");
+
+    const gradient = defs
+      .selectAll("radialGradient#deadline-gradient")
+      .data([null])
+      .join("radialGradient")
+      .attr("id", "deadline-gradient")
+      .attr("cx", "50%")
+      .attr("cy", "50%")
+      .attr("r", "65%");
+
+    gradient
+      .selectAll("stop")
+      .data([
+        { offset: "0%", color: "rgba(15, 94, 255, 0.35)" },
+        { offset: "65%", color: "rgba(15, 94, 255, 0.18)" },
+        { offset: "100%", color: "rgba(15, 94, 255, 0)" },
+      ])
+      .join("stop")
+      .attr("offset", (d) => d.offset)
+      .attr("stop-color", (d) => d.color);
+
+    const glow = defs
+      .selectAll("filter#deadline-glow")
+      .data([null])
+      .join("filter")
+      .attr("id", "deadline-glow")
+      .attr("x", "-50%")
+      .attr("y", "-50%")
+      .attr("width", "200%")
+      .attr("height", "200%");
+
+    glow
+      .selectAll("feGaussianBlur")
+      .data([null])
+      .join("feGaussianBlur")
+      .attr("in", "SourceGraphic")
+      .attr("stdDeviation", "4")
+      .attr("result", "blur");
+
+    const merge = glow.selectAll("feMerge").data([null]).join("feMerge");
+
+    merge
+      .selectAll("feMergeNode")
+      .data(["blur", "SourceGraphic"])
+      .join("feMergeNode")
+      .attr("in", (d) => d);
 
     const center = svg
       .selectAll("g.center")
@@ -65,23 +114,65 @@ const DeadlineRadarChart = ({ data, onSegmentClick }) => {
         (update) =>
           update.attr("class", (bucket) => `deadline-bar${bucket.urgent ? " is-urgent" : ""}`),
         (exit) => exit.remove()
-      )
-      .transition()
-      .duration(500)
+      );
+
+    bars
+      .attr("filter", (bucket) => (bucket.urgent ? "url(#deadline-glow)" : null))
+      .transition(transition)
       .attr("d", (bucket) =>
         arc({
           ...bucket,
           outerRadius: radial(bucket.count),
         })
-      );
+      )
+      .attr("opacity", (bucket) => (bucket.urgent ? 1 : 0.88));
 
+    const radialArea = d3
+      .areaRadial()
+      .angle((bucket) => angle(bucket.range) + angle.bandwidth() / 2)
+      .innerRadius(innerRadius)
+      .outerRadius((bucket) => radial(bucket.count))
+      .curve(d3.curveCardinalClosed.tension(0.75));
+
+    const areaPath = center
+      .selectAll("path.deadline-area")
+      .data([buckets])
+      .join("path")
+      .attr("class", "deadline-area")
+      .attr("fill", "url(#deadline-gradient)")
+      .attr("fill-opacity", 0.55)
+      .attr("stroke", "none");
+
+    areaPath.transition(transition).attr("d", radialArea);
+    areaPath.lower();
+
+    const radialLine = d3
+      .lineRadial()
+      .angle((bucket) => angle(bucket.range) + angle.bandwidth() / 2)
+      .radius((bucket) => radial(bucket.count))
+      .curve(d3.curveCardinalClosed.tension(0.75));
+
+    const outline = center
+      .selectAll("path.deadline-outline")
+      .data([buckets])
+      .join("path")
+      .attr("class", "deadline-outline")
+      .attr("fill", "none")
+      .attr("stroke", "var(--chart-line, #0f5eff)")
+      .attr("stroke-width", 1.2)
+      .attr("stroke-dasharray", "4 6")
+      .attr("opacity", 0.9);
+
+    outline.transition(transition).attr("d", radialLine);
+    outline.raise();
+
+    let pulseTimer;
     if (!pulseDone) {
       bars
         .filter((bucket) => bucket.urgent)
         .attr("data-pulse", "true")
         .attr("class", (bucket) => `deadline-bar is-urgent is-pulsing`);
-      const timer = setTimeout(() => setPulseDone(true), 3000);
-      return () => clearTimeout(timer);
+      pulseTimer = window.setTimeout(() => setPulseDone(true), 3000);
     }
 
     const guides = center
@@ -89,8 +180,10 @@ const DeadlineRadarChart = ({ data, onSegmentClick }) => {
       .data(radial.ticks(3))
       .join("circle")
       .attr("class", "guide")
-      .attr("r", (value) => radial(value))
-      .attr("fill", "none");
+      .attr("fill", "none")
+      .attr("stroke-dasharray", "4 8");
+
+    guides.transition(transition).attr("r", (value) => radial(value));
 
     const axis = center
       .selectAll("g.axis-line")
@@ -105,20 +198,27 @@ const DeadlineRadarChart = ({ data, onSegmentClick }) => {
       .join("line")
       .attr("x1", innerRadius)
       .attr("x2", radius)
-      .attr("stroke-dasharray", "2 2");
+      .attr("stroke-dasharray", "2 4");
 
-    center
+    const labels = center
       .selectAll("text.bucket-label")
       .data(buckets)
       .join("text")
       .attr("class", "bucket-label")
-      .attr("text-anchor", "middle")
+      .attr("text-anchor", "middle");
+
+    labels
+      .transition(transition)
       .attr("transform", (bucket) => {
         const angleCenter = angle(bucket.range) + angle.bandwidth() / 2 - Math.PI / 2;
-        const r = radial(bucket.count) + 20;
+        const r = radial(bucket.count) + 24;
         return `translate(${Math.cos(angleCenter) * r}, ${Math.sin(angleCenter) * r})`;
       })
       .text((bucket) => `${bucket.range} (${d3.format(",")(bucket.count)})`);
+
+    return () => {
+      if (pulseTimer) clearTimeout(pulseTimer);
+    };
   }, [width, height, buckets, maxCount, pulseDone]);
 
   useEffect(() => {

@@ -4,7 +4,7 @@ import "../../portal_page/portalPage.sfdc.css";
 import "../../dashboard/dashboard.css";
 import { AuthContext } from "../../../../context/AuthContext";
 import PortalUtilityBar from "../../../../components/PortalUtilityBar";
-import PortalHero from "../../../../components/PortalHero";
+import CodingPortalHeader from "../CodingPortalHeader";
 import DashboardFilters from "../../dashboard/components/DashboardFilters";
 import ChartCard from "../../dashboard/components/ChartCard";
 import LiveRafDeltaChart from "../../dashboard/components/LiveRafDeltaChart";
@@ -386,9 +386,12 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="sfdc-portal">
+    <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
-      <PortalHero align="left" title={tenantName} subtitle={`${companyLabel} Portal`} />
+      <CodingPortalHeader
+        title={`${tenantName} coding analytics`}
+        subtitle={`${companyLabel} dashboards for RAF, funnel, deadlines, and provider performance.`}
+      />
 
       <div className="ds-container dashboard-page">
         <DashboardFilters
@@ -397,7 +400,7 @@ const Dashboard = () => {
           providerGroups={providerGroups}
         />
 
-        <main className="dashboard-main">
+        <main className={`dashboard-main${detailState.open ? " dashboard-main--detail" : ""}`}>
           <section className="dashboard-content">
             <div className="dashboard-grid-visuals">
               <ChartCard
@@ -538,14 +541,19 @@ const formatDisplayDate = (value) =>
   }).format(new Date(value));
 
 const formatDisplayDateTime = (value) =>
-  new Intl.DateTimeFormat("en-US", {
-    timeZone: PACIFIC_TZ,
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
+  (() => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: PACIFIC_TZ,
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(date);
+  })();
 
 const formatPercent = (value) => {
   if (!Number.isFinite(value)) return "-";

@@ -108,6 +108,31 @@
   color: #92400e;
 }
 
+.ride-booking__status--processing {
+  background: rgba(59, 130, 246, 0.2);
+  color: #1d4ed8;
+}
+
+.ride-booking__status--paid {
+  background: rgba(34, 197, 94, 0.22);
+  color: #166534;
+}
+
+.ride-booking__status--sent {
+  background: rgba(99, 102, 241, 0.2);
+  color: #3730a3;
+}
+
+.ride-booking__status--draft {
+  background: rgba(148, 163, 184, 0.2);
+  color: #475569;
+}
+
+.ride-booking__status--overdue {
+  background: rgba(239, 68, 68, 0.2);
+  color: #991b1b;
+}
+
 .ride-booking__detail {
   margin-top: 18px;
 }
@@ -165,6 +190,331 @@
   color: var(--sfdc-muted, #6b7280);
 }
 
+.ride-booking__feature-shell {
+  max-width: 1240px;
+}
+
+.ride-booking__feature-alert {
+  margin-bottom: 24px;
+}
+
+.ride-booking__feature-metrics {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 24px;
+}
+
+.ride-booking__metric-card {
+  background: var(--sfdc-card, #ffffff);
+  border: 1px solid var(--sfdc-border, rgba(15, 23, 42, 0.1));
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--sfdc-shadow, 0 10px 24px rgba(15, 23, 42, 0.05));
+}
+
+.ride-booking__metric-label {
+  font-size: 0.85rem;
+  color: var(--sfdc-muted, #64748b);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ride-booking__metric-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.ride-booking__metric-trend {
+  font-size: 0.85rem;
+  color: var(--sfdc-muted, #6b7280);
+}
+
+.ride-booking__feature-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  margin-bottom: 28px;
+}
+
+.ride-booking__filter {
+  min-width: 200px;
+  flex: 1 1 220px;
+}
+
+.ride-booking__feature-actions {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ride-booking__feature-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  margin-bottom: 24px;
+}
+
+.ride-booking__feature-card {
+  background: var(--sfdc-card, #ffffff);
+  border: 1px solid var(--sfdc-border, rgba(15, 23, 42, 0.1));
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--sfdc-shadow, 0 12px 28px rgba(15, 23, 42, 0.06));
+}
+
+.ride-booking__feature-cardhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ride-booking__table-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.ride-booking__recon-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 16px;
+}
+
+.ride-booking__recon-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--sfdc-border, rgba(148, 163, 184, 0.5));
+  background: color-mix(in oklab, var(--sfdc-card) 96%, #f1f5f9 4%);
+}
+
+.ride-booking__recon-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.ride-booking__recon-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--sfdc-muted, #64748b);
+}
+
+.ride-booking__recon-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.ride-booking__webhook-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.ride-booking__webhook-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--sfdc-border, rgba(148, 163, 184, 0.5));
+  background: color-mix(in oklab, var(--sfdc-card) 98%, transparent);
+}
+
+.ride-booking__webhook-event {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.ride-booking__webhook-source {
+  color: #0f172a;
+}
+
+.ride-booking__webhook-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--sfdc-muted, #64748b);
+  margin-top: 6px;
+}
+
+.ride-booking__diagram-title {
+  font-weight: 600;
+}
+
+.ride-booking__diagram--feature {
+  margin-top: 12px;
+}
+
+.ride-booking__knowledge-intro {
+  margin-bottom: 32px;
+}
+
+.ride-booking__knowledge-banner {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 14px;
+  padding: 16px 24px;
+  margin-bottom: 32px;
+}
+
+.ride-booking__knowledge-banner .btn {
+  white-space: nowrap;
+}
+
+.ride-booking__knowledge-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  margin-bottom: 32px;
+}
+
+.ride-booking__knowledge-card {
+  background: var(--sfdc-card, #ffffff);
+  border: 1px solid var(--sfdc-border, rgba(15, 23, 42, 0.1));
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--sfdc-shadow, 0 12px 32px rgba(15, 23, 42, 0.06));
+}
+
+.ride-booking__knowledge-head h2 {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.ride-booking__knowledge-subhead {
+  margin: 0;
+  color: var(--sfdc-muted, #64748b);
+  font-size: 0.95rem;
+}
+
+.ride-booking__diagram {
+  margin: 24px 0 16px;
+  background: color-mix(in oklab, var(--sfdc-card) 94%, #f1f5f9 6%);
+  border: 1px solid var(--sfdc-border, rgba(148, 163, 184, 0.6));
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ride-booking__diagram img {
+  max-width: 100%;
+  height: auto;
+}
+
+.ride-booking__diagram figcaption {
+  margin-top: 12px;
+  font-size: 0.8rem;
+  color: var(--sfdc-muted, #64748b);
+}
+
+.ride-booking__knowledge-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  color: var(--sfdc-foreground, #0f172a);
+}
+
+.ride-booking__notes-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin-top: 24px;
+}
+
+.ride-booking__note h3 {
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.ride-booking__note ul {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+
+.ride-booking__stripe-table-wrapper {
+  margin-top: 24px;
+  overflow-x: auto;
+}
+
+.ride-booking__stripe-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.ride-booking__stripe-table th,
+.ride-booking__stripe-table td {
+  padding: 10px 12px;
+  border: 1px solid var(--sfdc-border, rgba(148, 163, 184, 0.6));
+  vertical-align: top;
+}
+
+.ride-booking__stripe-table th {
+  background: color-mix(in oklab, var(--sfdc-card) 85%, #e2e8f0 15%);
+  font-weight: 600;
+}
+
+.ride-booking__code-blocks {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  margin-top: 24px;
+}
+
+.ride-booking__code-blocks pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 0.8rem;
+  overflow-x: auto;
+}
+
+.ride-booking__inline-code {
+  display: inline-block;
+  background: rgba(15, 23, 42, 0.08);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-family: var(--font-mono, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace);
+  font-size: 0.8rem;
+}
+
+.ride-booking__tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
 @media (max-width: 1080px) {
   .ride-booking__grid {
     grid-template-columns: 1fr;
@@ -172,10 +522,20 @@
   .ride-booking__filters {
     grid-template-columns: 1fr 1fr;
   }
+  .ride-booking__feature-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
   .ride-booking__filters {
     grid-template-columns: 1fr;
+  }
+  .ride-booking__feature-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ride-booking__feature-actions {
+    justify-content: flex-start;
   }
 }
