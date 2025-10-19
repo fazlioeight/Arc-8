@@ -16,6 +16,14 @@ const SuspectsFunnelChart = ({ data, onStageSelect, partial, asOf }) => {
   const stages = useMemo(() => data?.stages || [], [data]);
   const maxCount = useMemo(() => d3.max(stages, (stage) => stage.count) || 0, [stages]);
 
+  const colorScale = useMemo(
+    () =>
+      maxCount > 0
+        ? d3.scaleSequential().domain([maxCount, 0]).interpolator(d3.interpolatePuBuGn)
+        : () => "var(--chart-stage-fill)",
+    [maxCount]
+  );
+
   useEffect(() => {
     if (!width || !stages.length) return;
     const computedHeight =
@@ -36,10 +44,7 @@ const SuspectsFunnelChart = ({ data, onStageSelect, partial, asOf }) => {
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
     const x = d3.scaleLinear().domain([0, maxCount]).range([0, Math.max(280, width - margin.left - margin.right)]);
-    const colorScale =
-      maxCount > 0
-        ? d3.scaleSequential().domain([maxCount, 0]).interpolator(d3.interpolatePuBuGn)
-        : () => "var(--chart-stage-fill)";
+    // colorScale is now memoized above with useMemo
     const stageIndex = new Map(stages.map((stage, index) => [stage.key, index]));
     const yCenter = (stage) => {
       const idx = stageIndex.get(stage.key) ?? 0;

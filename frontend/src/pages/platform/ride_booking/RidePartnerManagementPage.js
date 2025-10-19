@@ -349,7 +349,7 @@ const RidePartnerManagementPage = () => {
     }));
   };
 
-  const handleSaveBillingProfile = (event, partner) => {
+  const handleSaveBillingProfile = async (event, partner) => {
     event.preventDefault();
     const form = billingForms[partner.id] || createBillingForm(partner);
     if (!form.payToName || !form.payToName.trim()) {
@@ -368,7 +368,7 @@ const RidePartnerManagementPage = () => {
     }
 
     try {
-      const saved = upsertPartnerBillingProfile(partner.id, form);
+      const saved = await upsertPartnerBillingProfile(partner.id, form);
       setFeedback({
         type: "success",
         message: `Saved pay-to profile for ${partner.companyName}.`,

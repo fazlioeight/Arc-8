@@ -15,6 +15,9 @@ import '../../../styles/rideBooking.css';
 
 const PLANTUML_BASE_URL = 'https://www.plantuml.com/plantuml/svg/';
 
+// Only allow base64url and PlantUML-safe characters in encoded diagram data
+const isValidPlantUmlEncoded = (encoded) => /^[A-Za-z0-9\-_]+$/.test(encoded);
+
 const INITIAL_PAYOUTS = [
   {
     id: 'pay-1001',
@@ -690,11 +693,17 @@ const RideBookingPaymentsPage = () => {
                 <Accordion.Body>
                   <p className="text-muted small mb-3">{diagram.description}</p>
                   <figure className="ride-booking__diagram ride-booking__diagram--feature">
-                    <img
-                      src={`${PLANTUML_BASE_URL}${diagram.encoded}`}
-                      alt={`${diagram.title} diagram`}
-                      loading="lazy"
-                    />
+                    {isValidPlantUmlEncoded(diagram.encoded) ? (
+                      <img
+                        src={`${PLANTUML_BASE_URL}${diagram.encoded}`}
+                        alt={`${diagram.title} diagram`}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="text-danger small">
+                        Diagram data failed validation and will not be rendered.
+                      </div>
+                    )}
                     <figcaption>Rendered via PlantUML</figcaption>
                   </figure>
                 </Accordion.Body>

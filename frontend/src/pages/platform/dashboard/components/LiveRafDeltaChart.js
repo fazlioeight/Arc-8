@@ -3,8 +3,8 @@ import * as d3 from "d3";
 import useResizeObserver from "../../../../hooks/useResizeObserver";
 
 const margin = { top: 16, right: 32, bottom: 32, left: 56 };
-const CROSSHAIR_RADIUS = 5.5;
-const CROSSHAIR_TRANSITION_MS = 180;
+const crosshairRadius = 5.5;
+const crosshairTransitionMs = 180;
 
 const formatDate = (date) =>
   new Intl.DateTimeFormat("en-US", {
@@ -367,7 +367,7 @@ const LiveRafDeltaChart = ({
       .data([null])
       .join("circle")
       .attr("class", "crosshair-point")
-      .attr("r", CROSSHAIR_RADIUS)
+      .attr("r", crosshairRadius)
       .attr("stroke-width", 2)
       .attr("stroke", "white")
       .attr("fill", "var(--chart-line, #0f5eff)");
@@ -424,7 +424,7 @@ const LiveRafDeltaChart = ({
     });
 
     points.on("blur", () => {
-      crosshair.interrupt().transition().duration(CROSSHAIR_TRANSITION_MS).style("opacity", 0);
+      crosshair.interrupt().transition().duration(crosshairTransitionMs).style("opacity", 0);
       setTooltip(null);
     });
 
@@ -475,7 +475,7 @@ const LiveRafDeltaChart = ({
       crosshair
         .interrupt()
         .transition()
-        .duration(CROSSHAIR_TRANSITION_MS)
+        .duration(crosshairTransitionMs)
         .style("opacity", 1);
       crosshair
         .select("line.crosshair-x")
@@ -493,7 +493,7 @@ const LiveRafDeltaChart = ({
 
     const hideCrosshair = () => {
       if (!crosshair || crosshair.empty()) return;
-      crosshair.interrupt().transition().duration(CROSSHAIR_TRANSITION_MS).style("opacity", 0);
+      crosshair.interrupt().transition().duration(crosshairTransitionMs).style("opacity", 0);
     };
 
     const overlay = svg

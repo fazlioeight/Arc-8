@@ -5,6 +5,8 @@ import useResizeObserver from "../../../../hooks/useResizeObserver";
 const margin = { top: 24, right: 24, bottom: 24, left: 120 };
 const rowHeight = 36;
 const overscan = 3;
+// Minimum absolute value for color normalization to avoid zero range
+const MIN_ABS_COLOR_DOMAIN = 2;
 
 const ProviderHeatmap = ({ data, onCellSelect }) => {
   const outerRef = useRef(null);
@@ -79,7 +81,7 @@ const ProviderHeatmap = ({ data, onCellSelect }) => {
       domainMin === domainMax
         ? [domainMin || 0, (domainMin || 0) + 1]
         : colorDomain;
-    const maxAbs = Math.max(Math.abs(domainMin || 0), Math.abs(domainMax || 0), 2);
+    const maxAbs = Math.max(Math.abs(domainMin || 0), Math.abs(domainMax || 0), MIN_ABS_COLOR_DOMAIN);
     const color = data?.normalize
       ? d3.scaleDiverging(d3.interpolateSpectral).domain([-maxAbs, 0, maxAbs])
       : d3.scaleSequential(d3.interpolateYlGnBu).domain(sequentialDomain);

@@ -1,6 +1,20 @@
 const DEFAULT_TIMEZONE = "America/Los_Angeles";
 
-// Linear congruential generator for repeatable pseudo-randomness so demo charts stay stable
+/**
+ * Linear Congruential Generator (LCG) for repeatable pseudo-randomness so demo charts stay stable.
+ * 
+ * This implementation uses the Park-Miller "minimal standard" LCG:
+ *   X_{n+1} = (a * X_n) mod m
+ * where:
+ *   - a = 16807 (a well-known primitive root modulo m)
+ *   - m = 2147483647 (2^31 - 1, a Mersenne prime)
+ * 
+ * These constants are chosen for their good statistical properties and long period (m-1, or 2,147,483,646),
+ * ensuring a full cycle before repeating. The output is normalized to [0, 1).
+ * 
+ * Reference: Park, S.K. and Miller, K.W. (1988). "Random Number Generators: Good Ones Are Hard to Find".
+ * Communications of the ACM, 31(10), pp.1192-1201.
+ */
 const createRng = (seed = 1) => {
   let state = seed % 2147483647;
   if (state <= 0) state += 2147483646;
