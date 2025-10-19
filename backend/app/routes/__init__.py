@@ -3,6 +3,7 @@ __all__ = [
     "analytics",
     "coding",
     "coding_dashboards",
+    "dashboard",
     "terminology",
     "workbench",
     "member_cost",

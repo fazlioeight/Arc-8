@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Alert, Button, Form, InputGroup, Spinner, Table } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
-import PortalHero from '../../components/PortalHero';
+import RideBookingHeader from './RideBookingHeader';
 import { getRecentRides } from '../../services/rideBookingService';
 import '../../styles/rideBooking.css';
 
@@ -30,7 +29,6 @@ const formatCurrency = (value) => {
 };
 
 const RideBookingLandingPage = () => {
-  const navigate = useNavigate();
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -116,21 +114,9 @@ const RideBookingLandingPage = () => {
   return (
     <div className="ride-booking">
       <PortalUtilityBar />
-      <PortalHero
-        align="left"
+      <RideBookingHeader
         title="Ride booking overview"
         subtitle="Review the latest transportation activity and drill into ride details."
-        actions={(
-          <div className="d-flex flex-wrap gap-2">
-            <Button variant="light" onClick={() => navigate('/RideBooking/book')}>
-              Book a ride
-            </Button>
-            <Button variant="outline-light" onClick={() => navigate('/RideBooking/partners')}>
-              Manage partners
-            </Button>
-          </div>
-        )}
-        wave={false}
       />
 
       <div className="ride-booking__shell">

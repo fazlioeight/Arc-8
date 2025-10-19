@@ -117,14 +117,6 @@ const PortalPage = () => {
         color: "#0ea5e9",
       },
       {
-        key: "dashboard",
-        label: "Analytics Dashboard",
-        desc: "KPIs, RAF scoring, and member trends",
-        path: "/dashboard",
-        icon: "AD",
-        color: "#a855f7",
-      },
-      {
         key: "coding",
         label: "Coding Worklists",
         desc: "Coding queues and chart review tools",
@@ -274,9 +266,6 @@ const PortalPage = () => {
               Here's what changed across your applications since your last visit.
             </p>
           </div>
-          <button className="portal-hero__cta" onClick={() => navigate("/dashboard")}>
-            Go to dashboard
-          </button>
         </div>
       </header>
 

@@ -9,6 +9,7 @@ const NAV_GROUPS = [
     label: 'admin',
     items: [
       { label: 'Assignments', href: '/admin/coding-assignments', match: (path) => path.startsWith('/admin/coding-assignments') },
+      { label: 'Dashboards', href: '/dashboard', match: (path) => path.startsWith('/dashboard') },
     ],
   },
   {
