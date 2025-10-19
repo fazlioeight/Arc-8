@@ -4,10 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import { AuthContext } from '../context/AuthContext';
-import CodingLandingPage from '../pages/coding/CodingLandingPage';
-import CodingMembersPage from '../pages/coding/CodingMembersPage';
-import CodingProviderDetailPage from '../pages/coding/CodingProviderDetailPage';
-import CodingProvidersPage from '../pages/coding/CodingProvidersPage';
+import CodingLandingPage from '../pages/platform/coding/CodingLandingPage';
+import CodingMembersPage from '../pages/platform/coding/CodingMembersPage';
+import CodingProviderDetailPage from '../pages/platform/coding/CodingProviderDetailPage';
+import CodingProvidersPage from '../pages/platform/coding/CodingProvidersPage';
 
 import {
   fetchCodingMembers,

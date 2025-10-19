@@ -5,7 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { useCommandPalette } from '../context/CommandPaletteContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
 import { SAMPLE_TENANT_COMMENTS } from '../utils/sampleData';
-import '../pages/portal_page/portalPage.sfdc.css';
+import '../pages/platform/portal_page/portalPage.sfdc.css';
 import Icon from './ui/Icon';
 
 const ROUTE_LABELS = {

@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOMServer from "react-dom/server";
-import Login from "../pages/Login";
+import Login from "../pages/website/Login";
 import { AuthContext } from "../context/AuthContext";
 // Mock react-router-dom to avoid dependency on actual package
 jest.mock("react-router-dom", () => {

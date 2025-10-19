@@ -1,5 +1,5 @@
 import React from 'react';
-import '../pages/portal_page/portalPage.sfdc.css';
+import '../pages/platform/portal_page/portalPage.sfdc.css';
 
 const PortalHero = ({ title, subtitle, actions, align = 'center', wave = true, className = '', children }) => {
   let heroClass = 'sfdc-hero';

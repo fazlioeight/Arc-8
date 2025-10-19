@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import PortalUtilityBar from '../../components/PortalUtilityBar';
 import PortalHero from '../../components/PortalHero';
 import { AuthContext } from '../../context/AuthContext';
-import '../portal_page/portalPage.sfdc.css';
+import '../platform/portal_page/portalPage.sfdc.css';
 
 const useQuery = () => {
   const { search } = useLocation();
