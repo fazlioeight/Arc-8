@@ -143,6 +143,8 @@ const CodingPortalHeader = ({
   subtitle,
   align = 'center',
   additionalActions = null,
+  showViewChart = false,
+  onViewChart,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -219,8 +221,18 @@ const CodingPortalHeader = ({
               })}
             </div>
           </div>
-          {additionalActions ? (
-            <div className="d-flex align-items-start justify-content-center">
+          {showViewChart || additionalActions ? (
+            <div className="d-flex align-items-start justify-content-center flex-wrap gap-2">
+              {showViewChart ? (
+                <Button
+                  size="sm"
+                  variant="outline-secondary"
+                  onClick={onViewChart}
+                  disabled={typeof onViewChart !== 'function'}
+                >
+                  View chart
+                </Button>
+              ) : null}
               {additionalActions}
             </div>
           ) : null}

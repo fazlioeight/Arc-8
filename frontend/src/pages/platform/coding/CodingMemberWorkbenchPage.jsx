@@ -27,6 +27,7 @@ import {
   fetchWorkbenchSuspects,
   finalizeCode,
   getICDMap,
+  fetchDocumentPdf,
 } from '../../../services/workbenchService';
 
 const DEFAULT_CHECKLIST = {
@@ -47,12 +48,48 @@ const CodingMemberWorkbenchPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [workbench, setWorkbench] = useState(null);
+  const [documents, setDocuments] = useState([]);
   const [activeSuspectId, setActiveSuspectId] = useState(null);
   const [selectedICD, setSelectedICD] = useState(null);
   const [evidenceUsed, setEvidenceUsed] = useState([]);
   const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST);
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeResult, setFinalizeResult] = useState(null);
+
+  const handleDocumentRequest = useCallback(
+    async (doc) => {
+      if (!doc?.id) return null;
+      return fetchDocumentPdf(effectiveToken, effectiveTenant, doc.id);
+    },
+    [effectiveTenant, effectiveToken],
+  );
+
+  const handleDocumentUpload = useCallback(
+    async (file) => {
+      const id = `uploaded-${Date.now()}`;
+      const memberKey = workbench?.member?.id || null;
+      const newDoc = {
+        id,
+        label: file.name,
+        source_type: 'uploaded_pdf',
+        dos: new Date().toISOString().slice(0, 10),
+        provider: { name: 'User upload' },
+        file,
+        preview: `Uploaded file: ${file.name}`,
+        __uploaded: true,
+        memberId: memberKey,
+      };
+      setDocuments((prev) => [...prev, newDoc]);
+      recordAuditEvent?.('coding.workbench.upload-document', {
+        memberId: memberKey,
+        documentId: id,
+        fileName: file.name,
+        size: file.size,
+      });
+      return newDoc;
+    },
+    [recordAuditEvent, workbench?.member?.id],
+  );
 
   const activeSuspect = useMemo(() => {
     if (!workbench?.suspects?.length || !activeSuspectId) {
@@ -110,6 +147,21 @@ const CodingMemberWorkbenchPage = () => {
   useEffect(() => {
     void loadWorkbench();
   }, [loadWorkbench]);
+
+  useEffect(() => {
+    if (!workbench) {
+      setDocuments([]);
+      return;
+    }
+    const memberKey = workbench.member?.id || null;
+    setDocuments((prev) => {
+      const uploaded = prev.filter(
+        (doc) => doc.__uploaded && doc.memberId === memberKey,
+      );
+      const baseDocs = (workbench.documents || []).map((doc) => ({ ...doc }));
+      return [...baseDocs, ...uploaded];
+    });
+  }, [workbench]);
 
   const handleFinalize = useCallback(async () => {
     if (!activeSuspect || !selectedICD || !workbench) return;
@@ -231,15 +283,12 @@ const CodingMemberWorkbenchPage = () => {
     <div className="sfdc-portal coding-portal">
       <PortalUtilityBar />
       <CodingPortalHeader
-        title={`Coder workbench — ${workbench.member?.name || workbench.member?.id || ''}`}
+        title={`Coder workbench – ${workbench.member?.name || workbench.member?.id || ''}`}
         subtitle={`DOS: ${workbench.encounter?.dos || '—'} • LOB: ${workbench.member?.lob || '—'} • Model Year: ${
           workbench.model_year || '—'
         }`}
-        additionalActions={(
-          <Button variant="outline-secondary" size="sm" onClick={handleNavigateLegacy}>
-            View legacy chart
-          </Button>
-        )}
+        showViewChart
+        onViewChart={handleNavigateLegacy}
       />
 
       <main className="container my-3">
@@ -256,15 +305,17 @@ const CodingMemberWorkbenchPage = () => {
               <Card.Header className="d-flex justify-content-between align-items-center">
                 <span>Document viewer</span>
                 <Badge bg="light" text="dark">
-                  {workbench.documents?.length || 0} source(s)
+                  {documents.length || 0} source(s)
                 </Badge>
               </Card.Header>
               <Card.Body>
                 <DocumentViewer
-                  documents={workbench.documents}
+                  documents={documents}
                   activeSnippet={
                     activeSuspect?.evidence?.find((item) => item.snippet_id === evidenceUsed?.[0]) || null
                   }
+                  onRequestDocument={handleDocumentRequest}
+                  onUploadDocument={handleDocumentUpload}
                 />
               </Card.Body>
             </Card>

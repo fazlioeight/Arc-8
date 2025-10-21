@@ -1,5 +1,8 @@
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 
+const SAMPLE_DOCUMENT_PDF_BASE64 =
+  'JVBERi0xLjUKJeLjz9MKMSAwIG9iago8PC9UeXBlIC9DYXRhbG9nCi9QYWdlcyAyIDAgUgovT3V0bGluZXMgMyAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlIC9QYWdlcwovQ291bnQgMQovS2lkc1sgNCAwIFIgXQo+PgplbmRvYmoKNCAwIG9iago8PC9UeXBlIC9QYWdlCi9QYXJlbnQgMiAwIFIKL01lZGlhQm94IFswIDAgNTk1IDg0MiBdCi9Db250ZW50cyA1IDAgUgo+PgplbmRvYmoKNSAwIG9iago8PC9MZW5ndGggNjQ+PgpzdHJlYW0KQlQgL0YyNCAxMiBUZgokMzkgNCAxOSBUZgowLjUgVGYKOCAwIDAgMC4zIDAgMC4zIDAgVGYKKEhlbGxvLCBzYW1wbGUgUERGLikgVGoKRVQKZW5kc3RyZWFtCmVuZG9iagozIDAgb2JqCjw8L1R5cGUgL09vdGxpbmVzCi9Db3VudCAwCj4+CmVuZG9iagp4cmVmCjAgNgowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDA5MTggMDAwMDAgbiAKMDAwMDAwMDI2MiAwMDAwMCBuIAowMDAwMDAwMzUzIDAwMDAwIG4gCjAwMDAwMDA0MzQgMDAwMDAgbiAKMDAwMDAwMDU1MiAwMDAwMCBuIAowMDAwMDAwNjQwIDAwMDAwIG4gCnRyYWlsZXIKPDwvUm9vdCAxIDAgUgovU2l6ZSA2Pj4Kc3RhcnR4cmVmCjY2OQolJUVPRgo=';
+
 const shouldUseSample = (token) => {
   if (!token) return true;
   return String(token).toLowerCase().startsWith('sample');
@@ -19,6 +22,17 @@ const handleResponse = async (response) => {
     throw new Error(detail);
   }
   return body;
+};
+
+const base64ToBlob = (base64, contentType) => {
+  const byteCharacters =
+    typeof atob === 'function' ? atob(base64) : Buffer.from(base64, 'base64').toString('binary');
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i += 1) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: contentType });
 };
 
 const SAMPLE_WORKBENCH = {
@@ -94,6 +108,7 @@ const SAMPLE_WORKBENCH = {
       dos: '2025-10-03',
       provider: { name: 'C. Lee' },
       preview: '...Assessment: Diabetic neuropathy...CKD stage 3b noted...',
+      pdf_base64: SAMPLE_DOCUMENT_PDF_BASE64,
     },
     {
       id: 'D2',
@@ -101,6 +116,7 @@ const SAMPLE_WORKBENCH = {
       dos: '2025-08-14',
       provider: { name: 'Quest Diagnostics' },
       preview: 'Microalbumin ratio 45 mg/g creatinine (high)',
+      pdf_base64: SAMPLE_DOCUMENT_PDF_BASE64,
     },
   ],
   model_year: 2025,
@@ -179,4 +195,36 @@ export const getICDMap = async (token, tenant, { code, modelYear, lob }) => {
     headers: buildHeaders(token, tenant),
   });
   return handleResponse(response);
+};
+
+export const fetchDocumentPdf = async (token, tenant, documentId) => {
+  if (!documentId) throw new Error('Document id is required');
+
+  if (shouldUseSample(token)) {
+    return base64ToBlob(SAMPLE_DOCUMENT_PDF_BASE64, 'application/pdf');
+  }
+
+  const response = await fetch(
+    `${API_BASE}/api/workbench/documents/${encodeURIComponent(documentId)}/pdf`,
+    {
+      headers: buildHeaders(token, tenant),
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || 'Unable to retrieve document');
+  }
+
+  return response.blob();
+};
+
+export const getSampleWorkbench = () => SAMPLE_WORKBENCH;
+
+export default {
+  fetchWorkbenchSuspects,
+  finalizeCode,
+  getICDMap,
+  fetchDocumentPdf,
+  getSampleWorkbench,
 };
