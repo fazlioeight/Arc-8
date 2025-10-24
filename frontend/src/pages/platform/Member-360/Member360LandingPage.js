@@ -233,8 +233,7 @@ const Member360LandingPage = () => {
             currentSection="member-search"
             className="!bg-slate-900/40 !border-slate-800 !text-slate-200"
           />
-
-              <p className="text-xs font-semibold uppercase tracking-[var(--tracking-tight)] text-sky-400/80" style={{ "--tracking-tight": "0.4em" }}>
+          <section className="rounded-3xl border border-white/5 bg-slate-900/70 p-10 shadow-2xl shadow-slate-950/40 backdrop-blur">
             <header className="mb-8 text-center sm:text-left">
               <p className="text-xs font-semibold uppercase tracking-[0.4em] text-sky-400/80">
                 Member 360

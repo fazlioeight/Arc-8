@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { AuthContext } from "../../../../../context/AuthContext";
 import { Chip, SectionHeader } from "../../../../../components/ehr/Primitives";
 import "../memberWorkspace.css";
@@ -42,6 +42,22 @@ function PatientHeader({ member, gapCount = 0, onRefresh, onBackToSearch, onBack
   const name = getMemberName(member);
   const mrn = member?.member_key ? `MRN ${member.member_key}` : null;
   const chips = [mrn, member?.gender?.slice(0, 1)?.toUpperCase()].filter(Boolean);
+  const providerKeyRaw = member?.pcp_npi || member?.pcp_name;
+  const providerKey = providerKeyRaw ? String(providerKeyRaw).trim() : null;
+  const providerQueryParts = [];
+  if (member?.id) providerQueryParts.push(`fromMemberId=${encodeURIComponent(String(member.id))}`);
+  if (member?.pcp_name) providerQueryParts.push(`providerName=${encodeURIComponent(member.pcp_name)}`);
+  if (member?.pcp_npi) providerQueryParts.push(`providerNpi=${encodeURIComponent(member.pcp_npi)}`);
+  const providerSearch = providerQueryParts.length ? `?${providerQueryParts.join("&")}` : "";
+  const providerHref = providerKey ? `/coding/providers/${encodeURIComponent(providerKey)}${providerSearch}` : null;
+  const providerState = providerKey
+    ? {
+        fromMemberId: member?.id || undefined,
+        providerName: member?.pcp_name || undefined,
+        providerNpi: member?.pcp_npi || undefined,
+        breadcrumb: member?.pcp_name || member?.pcp_npi || undefined,
+      }
+    : undefined;
 
   return (
     <header className="coding-member-header sticky top-0 z-40 backdrop-blur">
@@ -58,7 +74,18 @@ function PatientHeader({ member, gapCount = 0, onRefresh, onBackToSearch, onBack
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs coding-text-muted">
               {member?.line_of_business && <span>Plan: {member.line_of_business}</span>}
               {member?.pcp_name && <span className="hidden md:inline">{"\u2022"}</span>}
-              {member?.pcp_name && <span>PCP: {member.pcp_name}</span>}
+              {member?.pcp_name &&
+                (providerHref ? (
+                  <Link
+                    to={providerHref}
+                    state={providerState}
+                    className="underline decoration-sky-400/70 underline-offset-4 hover:decoration-sky-300"
+                  >
+                    PCP: {member.pcp_name}
+                  </Link>
+                ) : (
+                  <span>PCP: {member.pcp_name}</span>
+                ))}
               {member?.last_encounter_date && <span className="hidden md:inline">{"\u2022"}</span>}
               {member?.last_encounter_date && <span>Last: {formatDate(member.last_encounter_date)}</span>}
             </div>
