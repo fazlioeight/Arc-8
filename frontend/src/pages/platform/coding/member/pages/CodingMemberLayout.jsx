@@ -83,7 +83,7 @@ function PatientHeader({ member, gapCount = 0, onRefresh, onBackToSearch, onBack
               onClick={onBackToSearch}
               className="coding-ghost-button rounded-lg px-3 py-1.5 text-xs font-medium"
             >
-              Back to Member 360
+              Member 360
             </button>
           )}
           <button onClick={onRefresh} className="coding-ghost-button rounded-lg px-3 py-1.5 text-xs font-medium">

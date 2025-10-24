@@ -46,6 +46,8 @@ const formatMemberLabel = (member) => {
   return pieces.join(" • ");
 };
 
+const MEMBER_CHART_BREADCRUMB = "Member chart";
+
 const Member360LandingPage = () => {
   const navigate = useNavigate();
   const { token, tenant } = useContext(AuthContext) || {};
@@ -131,7 +133,7 @@ const Member360LandingPage = () => {
       }
       setIsLaunchingMember(false);
       navigate(`/coding/member/${memberId}/chart`, {
-        state: { breadcrumb: "Member chart" },
+        state: { breadcrumb: MEMBER_CHART_BREADCRUMB },
       });
     },
     [navigate]
@@ -232,7 +234,7 @@ const Member360LandingPage = () => {
             className="!bg-slate-900/40 !border-slate-800 !text-slate-200"
           />
 
-          <section className="rounded-3xl border border-white/5 bg-slate-900/70 p-10 shadow-2xl shadow-slate-950/40 backdrop-blur">
+              <p className="text-xs font-semibold uppercase tracking-[var(--tracking-tight)] text-sky-400/80" style={{ "--tracking-tight": "0.4em" }}>
             <header className="mb-8 text-center sm:text-left">
               <p className="text-xs font-semibold uppercase tracking-[0.4em] text-sky-400/80">
                 Member 360
