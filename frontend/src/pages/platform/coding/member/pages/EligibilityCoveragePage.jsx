@@ -1,5 +1,35 @@
 import React from "react";
-import { SectionHeader, TableSkeleton, KeyValue } from "../../../../../components/ehr/Primitives";
+import { SectionHeader, DataTable, KeyValue, Chip } from "../../../../../components/ehr/Primitives";
+
+const authorizationColumns = [
+  { label: "Auth#", accessor: "authNumber" },
+  { label: "Service", accessor: "service" },
+  { label: "From", accessor: "from" },
+  { label: "To", accessor: "to" },
+  {
+    label: "Status",
+    render: (row) => <Chip label={row.status} title={`Authorization status: ${row.status}`} />,
+  },
+];
+
+const authorizationRows = [
+  {
+    id: "auth-1",
+    authNumber: "A-482193",
+    service: "Cardiac rehab sessions (12 visits)",
+    from: "Sep 01, 2025",
+    to: "Nov 30, 2025",
+    status: "Approved",
+  },
+  {
+    id: "auth-2",
+    authNumber: "A-479812",
+    service: "Home health nursing",
+    from: "Oct 10, 2025",
+    to: "Dec 10, 2025",
+    status: "Pending",
+  },
+];
 
 export default function EligibilityCoveragePage() {
   return (
@@ -18,7 +48,7 @@ export default function EligibilityCoveragePage() {
       <div className="coding-surface rounded-xl p-4">
         <SectionHeader title="Authorizations" subtitle="Active & historical" />
         <div className="mt-3">
-          <TableSkeleton columns={["Auth#", "Service", "From", "To", "Status"]} rows={6} />
+          <DataTable columns={authorizationColumns} rows={authorizationRows} />
         </div>
       </div>
     </div>

@@ -48,6 +48,52 @@ export function TableSkeleton({ columns = [], rows = 5 }) {
   );
 }
 
+export function DataTable({ columns = [], rows = [], emptyMessage = "No records yet.", getRowKey }) {
+  const resolveRowKey = (row, index) => {
+    if (typeof getRowKey === "function") return getRowKey(row, index);
+    if (row && (row.id || row.key)) return row.id || row.key;
+    return `row-${index}`;
+  };
+
+  return (
+    <div className="ehr-table-wrapper">
+      <table className="ehr-table">
+        <thead>
+          <tr>
+            {columns.map((column, index) => (
+              <th key={column.id || column.accessor || column.label || `col-${index}`}>{column.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length > 0 ? (
+            rows.map((row, rowIndex) => (
+              <tr key={resolveRowKey(row, rowIndex)}>
+                {columns.map((column, colIndex) => {
+                  const cellKey = column.id || column.accessor || column.label || `cell-${colIndex}`;
+                  const cellValue =
+                    typeof column.render === "function"
+                      ? column.render(row)
+                      : column.accessor
+                      ? row[column.accessor]
+                      : null;
+                  return <td key={cellKey}>{cellValue ?? "—"}</td>;
+                })}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={columns.length} className="py-6 text-center text-xs text-gray-500">
+                {emptyMessage}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function KeyValue({ k, v }) {
   return (
     <div className="ehr-key-value">

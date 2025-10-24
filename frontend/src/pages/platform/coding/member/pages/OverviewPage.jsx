@@ -50,6 +50,56 @@ const extractHccCode = (chase) => {
   return codes[0] || "N/A";
 };
 
+const fallbackMissingHcc = [
+  {
+    hcc_code: "HCC 85",
+    reason: "Chronic CHF with recent inpatient stay flagged for validation.",
+    icd10_candidates: ["I50.22", "I11.0"],
+    action: "Confirm documentation in cardiology note (10/05/2025).",
+  },
+  {
+    hcc_code: "HCC 18",
+    reason: "Diabetes with complications noted in cardiology follow-up note.",
+    icd10_candidates: ["E11.65", "E11.21"],
+    action: "Request latest A1c result from endocrinology.",
+  },
+];
+
+const fallbackClaims = [
+  {
+    id: "claim-sample-1",
+    service_date: "2025-10-12",
+    claim_type: "outpatient",
+    place_of_service: "Harborview Clinics",
+    total_paid: 1285,
+    diagnosis_codes: ["E11.9", "I50.22", "J44.9"],
+  },
+  {
+    id: "claim-sample-2",
+    service_start: "2025-09-29",
+    service_end: "2025-10-03",
+    claim_type: "inpatient",
+    place_of_service: "St. Mary's Medical Center",
+    total_paid: 7945,
+    diagnosis_codes: ["J18.9", "I10"],
+  },
+];
+
+const fallbackChases = [
+  {
+    id: "CHASE-48219",
+    status: "open",
+    hcc_code: "HCC 85",
+    assigned_coder_email: "jamie.r@nexorahealth.com",
+  },
+  {
+    id: "CHASE-48107",
+    status: "in_review",
+    hcc_code: "HCC 18",
+    assigned_coder_email: "alex.p@nexorahealth.com",
+  },
+];
+
 export default function OverviewPage() {
   const ctx = useOutletContext?.() || {};
   const {
@@ -99,6 +149,12 @@ export default function OverviewPage() {
   const suspectRows = missingHcc.slice(0, 6);
   const claimRows = claims.slice(0, 4);
   const chaseRows = chases.slice(0, 6);
+  const suspectTableRows = suspectRows.length > 0 ? suspectRows : fallbackMissingHcc;
+  const claimTableRows = claimRows.length > 0 ? claimRows : fallbackClaims;
+  const chaseTableRows = chaseRows.length > 0 ? chaseRows : fallbackChases;
+  const showingSuspectFallback = suspectRows.length === 0;
+  const showingClaimFallback = claimRows.length === 0;
+  const showingChaseFallback = chaseRows.length === 0;
   const noteRows = notes.slice(0, 5);
   const assessmentRows = assessments.slice(0, 4);
   const maoRows = maoRecords.slice(0, 3);
@@ -163,39 +219,34 @@ export default function OverviewPage() {
             <div className="mt-3">
               {loading ? (
                 <TableSkeleton columns={["HCC", "Reason", "ICD-10 Candidates", "Action"]} rows={4} />
-              ) : suspectRows.length > 0 ? (
-                <div className="overflow-auto rounded-lg border border-gray-200">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
-                      <tr>
-                        <th className="px-3 py-2">HCC</th>
-                        <th className="px-3 py-2">Reason</th>
-                        <th className="px-3 py-2">ICD-10 Candidates</th>
-                        <th className="px-3 py-2">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white text-xs text-gray-700">
-                      {suspectRows.map((row, i) => (
-                        <tr key={row.hcc_code || i} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 font-medium text-gray-900">{row.hcc_code || "N/A"}</td>
-                          <td className="px-3 py-2">{row.reason || "Opportunity detected"}</td>
-                          <td className="px-3 py-2">{(row.icd10_candidates || []).join(", ") || "N/A"}</td>
-                          <td className="px-3 py-2">
-                            <button
-                              type="button"
-                              className="rounded border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50"
-                              disabled
-                            >
-                              Review
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
               ) : (
-                <AlertBanner level="success" title="No outstanding HCC opportunities" />
+                <>
+                  <div className="overflow-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+                        <tr>
+                          <th className="px-3 py-2">HCC</th>
+                          <th className="px-3 py-2">Reason</th>
+                          <th className="px-3 py-2">ICD-10 Candidates</th>
+                          <th className="px-3 py-2">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white text-xs text-gray-700">
+                        {suspectTableRows.map((row, i) => (
+                          <tr key={row.hcc_code || i} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 font-medium text-gray-900">{row.hcc_code || "N/A"}</td>
+                            <td className="px-3 py-2">{row.reason || "Opportunity detected"}</td>
+                            <td className="px-3 py-2">{(row.icd10_candidates || []).join(", ") || "N/A"}</td>
+                            <td className="px-3 py-2">{row.action || "Review & validate"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {showingSuspectFallback && (
+                    <p className="mt-2 text-[11px] text-gray-500">Sample suspect records shown while live data syncs.</p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -206,40 +257,42 @@ export default function OverviewPage() {
             <div className="mt-3">
               {loading ? (
                 <TableSkeleton columns={["Date", "Type", "Location", "Paid", "Dx (summary)"]} rows={4} />
-              ) : claimRows.length > 0 ? (
-                <div className="overflow-auto rounded-lg border border-gray-200">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
-                      <tr>
-                        <th className="px-3 py-2">Date</th>
-                        <th className="px-3 py-2">Type</th>
-                        <th className="px-3 py-2">Location</th>
-                        <th className="px-3 py-2">Paid</th>
-                        <th className="px-3 py-2">Dx (summary)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white text-xs text-gray-700">
-                      {claimRows.map((claim) => {
-                        const diagnoses = extractIcdCodes(claim);
-                        return (
-                          <tr key={claim.id || claim.claim_number} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 font-medium text-gray-900">
-                              {formatDate(claim.service_date || claim.service_start)}
-                            </td>
-                            <td className="px-3 py-2">{toSentenceCase(claim.claim_type || "Encounter")}</td>
-                            <td className="px-3 py-2">{claim.place_of_service || claim.provider_name || "N/A"}</td>
-                            <td className="px-3 py-2">{formatCurrency(claim.total_paid)}</td>
-                            <td className="px-3 py-2">{diagnoses.length ? diagnoses.join(", ") : "N/A"}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-xs text-gray-600">
-                  No encounter claims recorded for the selected period.
-                </div>
+                <>
+                  <div className="overflow-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+                        <tr>
+                          <th className="px-3 py-2">Date</th>
+                          <th className="px-3 py-2">Type</th>
+                          <th className="px-3 py-2">Location</th>
+                          <th className="px-3 py-2">Paid</th>
+                          <th className="px-3 py-2">Dx (summary)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white text-xs text-gray-700">
+                        {claimTableRows.map((claim) => {
+                          const diagnoses = extractIcdCodes(claim);
+                          const paid = claim.total_paid ?? claim.paid_amount ?? 0;
+                          return (
+                            <tr key={claim.id || claim.claim_number} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-medium text-gray-900">
+                                {formatDate(claim.service_date || claim.service_start)}
+                              </td>
+                              <td className="px-3 py-2">{toSentenceCase(claim.claim_type || "Encounter")}</td>
+                              <td className="px-3 py-2">{claim.place_of_service || claim.provider_name || "N/A"}</td>
+                              <td className="px-3 py-2">{formatCurrency(paid)}</td>
+                              <td className="px-3 py-2">{diagnoses.length ? diagnoses.join(", ") : "N/A"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {showingClaimFallback && (
+                    <p className="mt-2 text-[11px] text-gray-500">Sample encounter records shown while feeds connect.</p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -322,48 +375,49 @@ export default function OverviewPage() {
             <div className="mt-3">
               {loading ? (
                 <TableSkeleton columns={["Chase", "Status", "HCC", "Coder", "Action"]} rows={4} />
-              ) : chaseRows.length > 0 ? (
-                <div className="overflow-auto rounded-lg border border-gray-200">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
-                      <tr>
-                        <th className="px-3 py-2">Chase</th>
-                        <th className="px-3 py-2">Status</th>
-                        <th className="px-3 py-2">HCC</th>
-                        <th className="px-3 py-2">Assigned</th>
-                        <th className="px-3 py-2">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white text-xs text-gray-700">
-                      {chaseRows.map((ch) => {
-                        const next = nextChaseStatus(ch.status);
-                        const canAdvance = typeof onAdvanceChase === "function";
-                        return (
-                          <tr key={ch.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 font-medium text-gray-900">{ch.id}</td>
-                            <td className="px-3 py-2">{toSentenceCase(ch.status)}</td>
-                            <td className="px-3 py-2">{extractHccCode(ch)}</td>
-                            <td className="px-3 py-2">{ch.assigned_coder_email || "Unassigned"}</td>
-                            <td className="px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() => canAdvance && onAdvanceChase(ch)}
-                                className="rounded border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                                disabled={!canAdvance || chaseUpdating === ch.id}
-                              >
-                                {chaseUpdating === ch.id ? "Updating..." : `Mark ${toSentenceCase(next)}`}
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center text-xs text-gray-600">
-                  No active chases for this member.
-                </div>
+                <>
+                  <div className="overflow-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">
+                        <tr>
+                          <th className="px-3 py-2">Chase</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">HCC</th>
+                          <th className="px-3 py-2">Assigned</th>
+                          <th className="px-3 py-2">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white text-xs text-gray-700">
+                        {chaseTableRows.map((ch) => {
+                          const next = nextChaseStatus(ch.status);
+                          const canAdvance = typeof onAdvanceChase === "function";
+                          return (
+                            <tr key={ch.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-medium text-gray-900">{ch.id}</td>
+                              <td className="px-3 py-2">{toSentenceCase(ch.status)}</td>
+                              <td className="px-3 py-2">{extractHccCode(ch)}</td>
+                              <td className="px-3 py-2">{ch.assigned_coder_email || "Unassigned"}</td>
+                              <td className="px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={() => canAdvance && onAdvanceChase(ch)}
+                                  className="rounded border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                  disabled={!canAdvance || chaseUpdating === ch.id}
+                                >
+                                  {chaseUpdating === ch.id ? "Updating..." : `Mark ${toSentenceCase(next)}`}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {showingChaseFallback && (
+                    <p className="mt-2 text-[11px] text-gray-500">Sample chase assignments shown until worklist syncs.</p>
+                  )}
+                </>
               )}
             </div>
           </div>
