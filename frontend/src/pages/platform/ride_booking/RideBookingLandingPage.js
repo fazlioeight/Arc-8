@@ -122,22 +122,6 @@ const RideBookingLandingPage = () => {
       />
 
       <div className="ride-booking__shell">
-        <Alert variant="secondary" className="ride-booking__knowledge-banner">
-          <div>
-            <h2 className="h5 mb-1">Need the payments and billing blueprint?</h2>
-            <p className="mb-0">
-              Review the PlantUML diagrams, webhook catalog, and reconciliation SQL in the new payments playbook.
-            </p>
-          </div>
-          <Button
-            variant="outline-primary"
-            size="sm"
-            onClick={() => navigate('/RideBooking/payments')}
-          >
-            Open playbook
-          </Button>
-        </Alert>
-
         <section className="ride-booking__history">
           <div className="ride-booking__history-header">
             <div>

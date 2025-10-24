@@ -90,22 +90,6 @@ const RideBooking = () => {
       />
 
       <div className="ride-booking__shell" style={{ maxWidth: 720 }}>
-        <Alert variant="light" className="ride-booking__knowledge-banner">
-          <div>
-            <h2 className="h6 mb-1">Finance hand-off tip</h2>
-            <p className="mb-0">
-              After booking, log your provider payout and invoice steps in the payments playbook to keep ledger records current.
-            </p>
-          </div>
-          <Button
-            variant="outline-primary"
-            size="sm"
-            onClick={() => navigate('/RideBooking/payments')}
-          >
-            View guidance
-          </Button>
-        </Alert>
-
         <section className="ride-booking__form-card">
           <Form onSubmit={handleSubmit}>
             <div className="mb-3">

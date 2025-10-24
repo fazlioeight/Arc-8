@@ -463,21 +463,6 @@ const RidePartnerManagementPage = () => {
         subtitle="Invite transportation partners to publish their open ride windows. Availability for today automatically feeds the booking dropdown."
       />
 
-      <Alert variant="light" className="ride-booking__knowledge-banner mx-3">
-        <div>
-          <h2 className="h6 mb-1">Finance alignment reminder</h2>
-          <p className="mb-0">
-            Share the payments and billing playbook with partner success so payouts, invoices, and ledger data stay in sync.
-          </p>
-        </div>
-        <Button
-          size="sm"
-          variant="outline-primary"
-          onClick={() => navigate("/RideBooking/payments")}
-        >
-          View playbook
-        </Button>
-      </Alert>
 
       <main className="sfdc-grid" style={{ gridTemplateColumns: "1fr" }}>
         <div className="sfdc-card sfdc-card--full">
