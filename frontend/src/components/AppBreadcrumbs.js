@@ -8,6 +8,7 @@ const SEGMENT_LABELS = {
   dashboard: 'Analytics Dashboard',
   portal_page: 'Workspace',
   portalpage: 'Workspace',
+  'member-360': 'Member 360',
   coding: 'Coding Workbench',
   platform: 'Work Queue',
   members: 'Members',

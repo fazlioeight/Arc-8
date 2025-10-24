@@ -22,6 +22,7 @@ const Contact = lazy(() => import('./pages/website/contact/Contact'));
 const Pricing = lazy(() => import('./pages/website/Pricing'));
 const Login = lazy(() => import('./pages/website/Login'));
 const PortalPage = lazy(() => import('./pages/platform/portal_page/portalPage'));
+const Member360LandingPage = lazy(() => import('./pages/platform/Member-360/Member360LandingPage'));
 const RideBookingLandingPage = lazy(() => import('./pages/platform/ride_booking/RideBookingLandingPage'));
 const RideBooking = lazy(() => import('./pages/platform/ride_booking/RideBooking'));
 const RidePartnerManagementPage = lazy(() => import('./pages/platform/ride_booking/RidePartnerManagementPage'));
@@ -84,7 +85,7 @@ const LegacyMemberDetailRedirect = () => {
 
 const Shell = ({ themePreference, setThemePreference }) => {
   const location = useLocation();
-  const hideNavbarOn = ['/portal_page/portalPage', '/RideBooking', '/dashboard', '/settings', '/coding', '/admin', '/jobs'];
+  const hideNavbarOn = ['/portal_page/portalPage', '/member-360', '/RideBooking', '/dashboard', '/settings', '/coding', '/admin', '/jobs'];
   const hideNavbar = hideNavbarOn.some((p) => location.pathname.startsWith(p));
 
   return (
@@ -105,6 +106,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/portal_page/portalPage" element={<PortalPage />} />
+          <Route path="/member-360" element={<Member360LandingPage />} />
           <Route path="/RideBooking" element={<RideBookingLandingPage />} />
           <Route path="/RideBooking/book" element={<RideBooking />} />
           <Route path="/RideBooking/partners" element={<RidePartnerManagementPage />} />

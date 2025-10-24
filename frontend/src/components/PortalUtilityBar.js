@@ -18,6 +18,7 @@ const ROUTE_LABELS = {
   '/RideBooking/payments': 'Ride Payments and Billing',
   '/docs': 'Documentation',
   '/portal_page/portalPage': 'Portal Home',
+  '/member-360': 'Member 360',
   '/settings': 'Settings',
 };
 
@@ -75,8 +76,9 @@ const PortalUtilityBar = () => {
   const applicationTiles = useMemo(
     () => [
       { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: '/portal_page/portalPage' },
-     // { key: 'dashboard', label: 'Analytics Dashboard', desc: 'KPIs & RAF', icon: 'DB', color: '#a855f7', path: '/dashboard' },
+      // { key: 'dashboard', label: 'Analytics Dashboard', desc: 'KPIs & RAF', icon: 'DB', color: '#a855f7', path: '/dashboard' },
       { key: 'coding', label: 'Coding Worklists', desc: 'Member reviews', icon: 'CD', color: '#0f172a', path: '/coding' },
+      { key: 'member360', label: 'Member 360', desc: 'Chart launchpad', icon: 'M3', color: '#0891b2', path: '/member-360' },
       { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: '/RideBooking' },
       { key: 'docs', label: 'Docs Library', desc: 'Knowledge base', icon: 'DL', color: '#6366f1', path: '/docs' },
       //{ key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: '/settings' },

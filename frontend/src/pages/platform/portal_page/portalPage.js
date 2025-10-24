@@ -165,6 +165,14 @@ const PortalPage = () => {
         color: "#0f172a",
       },
       {
+        key: "member360",
+        label: "Member 360",
+        desc: "Search and launch member charts",
+        path: "/member-360",
+        icon: "M3",
+        color: "#0891b2",
+      },
+      {
         key: "ride_booking",
         label: "Ride Booking",
         desc: "Transportation scheduling and tracking",
