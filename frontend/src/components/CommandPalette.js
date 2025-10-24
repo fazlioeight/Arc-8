@@ -88,7 +88,7 @@ const CommandPalette = ({ onThemeToggle }) => {
     const enabledSet = new Set(
       (availableApplications && availableApplications.length)
         ? availableApplications
-        : ['portal', 'settings', 'admin_console', 'dashboard', 'coding', 'ride_booking', 'docs', 'job_center']
+        : ['portal', 'settings', 'admin_console', 'dashboard', 'coding', 'member360', 'ride_booking', 'docs', 'job_center']
     );
     const isEnabled = (key) => enabledSet.has(key) || key === 'portal';
     const commands = [];
@@ -122,6 +122,14 @@ const CommandPalette = ({ onThemeToggle }) => {
       keywords: 'coding charts members worklist',
       action: () => navigate('/coding'),
       disabled: !isAuthenticated || !isEnabled('coding') || !hasApplicationAccess?.('coding') || !isNavItemEnabled('coding'),
+    });
+    append({
+      id: 'nav-member360',
+      label: 'Open Member 360',
+      category: 'Navigation',
+      keywords: 'member 360 chart search quick launch',
+      action: () => navigate('/member-360'),
+      disabled: !isAuthenticated || !isEnabled('member360') || !hasApplicationAccess?.('member360'),
     });
     append({
       id: 'nav-ride-booking',

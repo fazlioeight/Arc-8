@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { NavLink, Outlet, useParams } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { AuthContext } from "../../../../../context/AuthContext";
 import { Chip, SectionHeader } from "../../../../../components/ehr/Primitives";
 import "../memberWorkspace.css";
@@ -38,7 +38,7 @@ const formatDate = (value) => {
 const getMemberName = (member) =>
   member ? [member.first_name, member.last_name].filter(Boolean).join(" ") || member.member_key : "Member";
 
-function PatientHeader({ member, gapCount = 0, onRefresh }) {
+function PatientHeader({ member, gapCount = 0, onRefresh, onBackToSearch, onBackHome }) {
   const name = getMemberName(member);
   const mrn = member?.member_key ? `MRN ${member.member_key}` : null;
   const chips = [mrn, member?.gender?.slice(0, 1)?.toUpperCase()].filter(Boolean);
@@ -70,6 +70,22 @@ function PatientHeader({ member, gapCount = 0, onRefresh }) {
         </div>
 
         <div className="col-span-12 flex justify-end gap-2 lg:col-span-2">
+          {typeof onBackHome === "function" && (
+            <button
+              onClick={onBackHome}
+              className="coding-ghost-button rounded-lg px-3 py-1.5 text-xs font-medium"
+            >
+              Portal Home
+            </button>
+          )}
+          {typeof onBackToSearch === "function" && (
+            <button
+              onClick={onBackToSearch}
+              className="coding-ghost-button rounded-lg px-3 py-1.5 text-xs font-medium"
+            >
+              Member 360
+            </button>
+          )}
           <button onClick={onRefresh} className="coding-ghost-button rounded-lg px-3 py-1.5 text-xs font-medium">
             Refresh
           </button>
@@ -169,6 +185,7 @@ function RightRail({ submissionState, onGenerateSubmission, submissionResult, ti
 
 export default function CodingMemberLayout() {
   const { memberId } = useParams();
+  const navigate = useNavigate();
   const { token, tenant, isAuthenticated } = useContext(AuthContext) || {};
   const canQuery = useMemo(() => Boolean(token && tenant && memberId), [token, tenant, memberId]);
 
@@ -273,7 +290,13 @@ export default function CodingMemberLayout() {
 
   return (
     <div className="coding-member-workspace min-h-screen">
-      <PatientHeader member={member} gapCount={missingHcc.length} onRefresh={onRefresh} />
+      <PatientHeader
+        member={member}
+        gapCount={missingHcc.length}
+        onRefresh={onRefresh}
+        onBackToSearch={() => navigate("/member-360")}
+        onBackHome={() => navigate("/portal_page/portalPage")}
+      />
 
       <div className="coding-member-toolbar">
         <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2">

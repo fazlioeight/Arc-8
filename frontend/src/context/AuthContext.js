@@ -16,6 +16,7 @@ export const DEFAULT_APPLICATIONS = {
   portal: 'admin',
   dashboard: 'admin',
   coding: 'admin',
+  member360: 'user',
   ride_booking: 'manager',
   docs: 'user',
   settings: 'user',
