@@ -10,6 +10,81 @@ Nexora Platform delivers a HIPAA-conscious, multi-tenant analytics and coding wo
 - Deterministic analytics services that drive RAF deltas, suspects funnels, provider heatmaps, and CSV exports for dashboard surfaces.
 - CLI seeding, SQL bootstrapping scripts, and optional Streamlit dashboards to explore tenant data outside the SPA.
 
+## HERO / RAT 2.0 Requirements
+The HERO (RAT 2.0) rebuild described in `C:\Users\asian\Downloads\HERO High Level Requirements 2.docx` defines the next wave of coder-platform capabilities that Nexora must support.
+
+### Goals
+- Eliminate external vendor spend by consolidating programs into one internal tool.
+- Resolve known billing and claims issues earlier in the workflow.
+- Unite cross-functional teams (coding, outreach, HEDIS, providers, partners) on a shared workspace.
+- Commercialize the tool so it may be offered to partners outside Prominence.
+
+### Capability themes
+- **External workspaces:** Dedicated public/home entry points that present role-specific views (providers, vendors, partners) and enforce tenant/partner scoping (for example, Pinnacle-only rosters).
+- **Metrics & KPIs:** Real-time dashboards for every project with customizable visualizations and exports that refresh instantly after users act.
+- **BUR intelligence:** Office, provider, and member-level BUR displays with filter + export options.
+- **Member intelligence:** Robust, continuously refreshed search that spans member name, DOB, ID, contracts, regions, and other roster metadata.
+- **NPI directory sync:** Native linkage to the NPI registry plus tooling to associate providers with offices.
+
+### Project delivery surfaces
+- **PHA scheduling & coder dashboard:** Outreach/HEDIS/external teams record appointments that automatically generate coding queues, capture outreach status, support reassignment by priority/location, and expose coder dashboards with HCC/HEDIS gaps, history, and quality context. Completed work must export as 837 files or via metrics dashboards.
+- **PCF provider & coder views:** Live, editable PCF forms for providers (with quick upload/electronic submission) that flow directly into coder queues where reviewers grade selections without extra navigation while keeping HCC history and quality views aligned.
+- **Retrospective coding:** Import chase files, assign/upload charts, track ingestion progress, complete coding + audits, and emit custom export files already in use.
+- **Suspecting workflows:** Target offices, build queues from the chart repository, search medical records, surface new HCCs for provider presentation, and export supporting evidence.
+- **HEDIS overlays:** Flag HEDIS-related work across projects, clone visits for HEDIS review, expose open gaps, allow accept/reject per gap, link gaps to records, sync results back to MRA/PCF data, and provide custom exports.
+
+### Shared data and automation
+- Automated file imports for MRA gap, eligibility, and HEDIS feeds.
+- Claims tracking and submission lifecycle management.
+- A centralized chart repository that ingests all historical and future medical records with advanced search.
+- An education center where program-wide documents are uploaded once and shared with all users.
+- Platform-wide export coverage so coding output, PCF submissions, and reporting data remain portable.
+
+### Coder platform use cases
+- **Persona-specific external workspaces (providers, vendors, partners):** A configurable landing page ensures every external user views only the empaneled members, projects, and documents relevant to their organization (for example, a Pinnacle-only roster).
+- **Realtime KPI cockpit:** Project-level dashboards refresh immediately after activity, allow ad-hoc filters, and export the same data set for downstream analytics.
+- **BUR explorer:** BUR metrics surface at the office, provider, and member level with sorting, filtering, and CSV export support so operations can triage quickly.
+- **Member 360 search:** Fast search across name, DOB, member ID, contracts, regions, and other roster fields keeps coders and outreach aligned on the same source of truth.
+- **NPI + office relationship graph:** Native NPI registry sync plus bidirectional linking between providers and offices eliminates duplicate lookups during coding or scheduling.
+- **PHA scheduling pipeline:** Outreach/HEDIS/external teams schedule appointments inside RAT, track outreach state, reassign lists by UBUR/open gaps/location, and auto-create coding queues for the downstream teams.
+- **PHA coder dashboard:** Coders review every scheduled appointment with visibility into open HCC/HEDIS gaps, historical coding, quality checkpoints, and can export completed work as 837 files or via reporting dashboards.
+- **PCF provider submissions:** Providers edit live PCF forms, upload supporting evidence, and submit directly into the coder queue without leaving the tool.
+- **PCF coder grading:** Coder-side view renders the uploaded PCF/record inline so reviewers can grade each selection, maintain HCC history, and keep quality status in lockstep.
+- **Retrospective chase management:** RAT ingests chase files, assigns/upload charts, tracks processing progress, stores source documents, and outputs the custom export file already used in production.
+- **Suspecting queue:** Operations target offices, assemble review queues from the chart repository, search across medical records, and send newly identified HCCs to providers for capture with exportable audit trails.
+- **HEDIS overlay:** Any visit with HEDIS implications is cloned into a dedicated queue where reviewers see all open gaps, accept/reject at the gap level, link evidence, sync outcomes back to the MRA gap file/PCF, and export custom reports.
+- **Automated file ingestion:** Scheduled jobs pull MRA gap, eligibility, and HEDIS files, reconcile deltas, and surface discrepancies to both analytics and coding work queues.
+- **Claims tracking + submissions:** Coders and billers track claim lifecycle inside the platform to close the loop between coding, submission, and payment resolution.
+- **Centralized chart repository:** Every historical and future medical record lands in a single searchable library that powers suspecting, retrospective coding, and quality reviews.
+- **Education hub:** Program leaders drop training decks, policies, and reference guides into an accessible knowledge center so every persona shares the same guidance.
+
+### Internal Programs Module (PHA, PCF, PCPE)
+`C:\Users\asian\Downloads\HERO Internal Programs Module (PHA, PCF, PCPE).xlsx` defines the next iteration of the internal coder workspace (formerly "Coder Dashboard") and introduces three pillars: a reactive dashboard, richer filtering/search, and a modernized coding view.
+
+**Dashboard composition**
+- Rebrand the surface to "Internal Coding Programs," keep every program in a single board, and drive conditional visibility from the `Visit Type` (PHA initial/follow-up/commercial, PCF submission, PCPE wellness, misc chart review).
+- Add an Archive tab for prior program years and per-row assignment bubbles that allow single or bulk assignment without drilling into charts.
+- Top filter/search bar covers assigned user (auto-default to the logged-in coder), chart ID, DOS, completed/submitted/audit dates, project year, visit type, chart status, rendering group, and rendering provider. All dropdowns sort alphabetically, function independently (no tied columns), and persist across the project mix.
+- Data grid shows `Chart ID (link)`, patient name, visit type, rendering group/provider, DOS, assigned user, chart status, header query preview, submitted/completed dates, auditor, audit date, and paging controls (25/50/100/150/200 rows per page).
+
+**Filtering & metrics behavior**
+- Default login view filters the board to the signed-in user's charts across all programs; saved searches include assigned-user slices, date windows, and rendering group/provider combos.
+- Every table column supports multi-filtering; entering a chart ID should work via free-text paste.
+- High-level KPIs should summarize each program: for PHA/PCPE show counts of Post Review Completed, Audit Completed, Audit Feedback, Query Pending, and Pending; for PCF show totals for payable/not payable plus audit/query/pending counts. Present these widgets near the top of the dashboard so leadership can read trends without exporting.
+
+**Coding workspace expectations**
+- Coding view must be responsive, minimize wasted space, and remove autosave; coders enter selections (chart metadata, CPT/CPT II, ICD-10, quality inputs) and explicitly click Save to commit.
+- ICD-10 libraries switch automatically based on DOS (CMS model year runs Oct 1-Sep 30) and preload MRA history plus schedule-derived suspects. Code categories default from MRA logic (Section 1/2 -> Recapture, Section 3/coder suspect -> New); code source/category/status fields are required before saving.
+- CPT picker surfaces frequently used bundles (e.g., `99397` AWV variants, `3075F/3078F/1126F/1160F`, etc.) with multiselect adds/removes, always ordering 99-series codes first.
+- Quality pane shows only active HEDIS gaps for the member, lets coders enter values that auto-populate service + recommended CPTs, and defaults abstractor review to Pending (future abstractor dashboard).
+- Chart metadata auto-populates when visits originate from the scheduler (rendering group/provider, DOS); PCF visits remain manual until provider submission surfaces ship.
+- Documents section supports unlimited uploads (no size or naming limits) with columns for file name, created date, notes, uploader, and upload date.
+- Chart history collapses via caret, sorts by appointment date (newest first), and records every status change, query note, and audit action in an immutable audit log.
+
+**Workflow safeguards**
+- Completed dates stamp when coders choose terminal statuses, while audit dates stamp only when auditors set `Audit Feedback` or `Audit Complete`; the fields never overwrite one another.
+- Assignments default to "Unassigned" and reflect the assignee chosen on the dashboard; internal chart feedback is a free-text area (no character cap) for coder-to-coder communication and is never exposed externally.
+
 ## Monorepo Layout
 
 ```

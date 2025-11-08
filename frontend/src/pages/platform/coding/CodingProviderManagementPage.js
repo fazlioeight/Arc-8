@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -40,6 +40,11 @@ const CodingProviderManagementPage = () => {
   const [savingError, setSavingError] = useState(null);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
+  const searchRef = useRef(search);
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
+
   const effectiveToken = token || 'sample-provider-management';
   const effectiveTenant = tenant || 'prominencehealth';
 
@@ -50,7 +55,14 @@ const CodingProviderManagementPage = () => {
       const response = await fetchProviderManagement(effectiveToken, effectiveTenant, { search: term });
       setItems(response.items || []);
       recordAuditEvent?.('coding.provider_management.load', { search: term });
-      recordViewPreference('coding-provider-management', { search: term });
+      const existingPref = getViewPreference('coding-provider-management') || {};
+      const normalizedExistingSearch = existingPref.search ?? '';
+      if (normalizedExistingSearch !== term) {
+        recordViewPreference('coding-provider-management', {
+          ...existingPref,
+          search: term,
+        });
+      }
     } catch (err) {
       setError(err.message || 'Unable to load providers');
     } finally {
@@ -119,13 +131,13 @@ const CodingProviderManagementPage = () => {
 
   useEffect(() => {
     const saved = getViewPreference('coding-provider-management');
-    const initialTerm = saved?.search ?? search;
-    if (saved?.search && saved.search !== search) {
-      setSearch(saved.search);
+    const initialTerm = saved?.search ?? searchRef.current ?? '';
+    if (saved?.search) {
+      setSearch((current) => (current === saved.search ? current : saved.search));
     }
     void loadProviders(initialTerm);
     // eslint-disable-next-line
-  }, [effectiveToken, effectiveTenant, getViewPreference]);
+  }, [effectiveToken, effectiveTenant]);
 
   useEffect(() => {
     registerCommands([
