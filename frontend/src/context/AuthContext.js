@@ -473,7 +473,7 @@ export const AuthProvider = ({ children }) => {
     isImpersonating: Boolean(authState?.impersonation),
     auditTrail: authState?.auditTrail || [],
     session: authState?.session || null,
-    sessionLocked: Boolean(authState?.session?.locked),
+    sessionLocked: Boolean(authState?.token && authState?.session?.locked),
     isAuthenticated: Boolean(authState?.token),
     hasApplicationAccess,
     login,

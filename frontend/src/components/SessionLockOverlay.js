@@ -3,10 +3,10 @@ import { AuthContext } from '../context/AuthContext';
 import '../styles/sessionLock.css';
 
 const SessionLockOverlay = () => {
-  const { sessionLocked, unlockSession, logout, user } = useContext(AuthContext) || {};
+  const { sessionLocked, unlockSession, logout, user, isAuthenticated } = useContext(AuthContext) || {};
   const [unlocking, setUnlocking] = useState(false);
 
-  if (!sessionLocked) {
+  if (!sessionLocked || !isAuthenticated) {
     return null;
   }
 
