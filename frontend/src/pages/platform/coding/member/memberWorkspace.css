@@ -16,25 +16,28 @@
 
 /* Portal-specific theme tokens for consistent light/dark contrast */
 .portal-theme {
-  --bg: #f7f9fc;
-  --bg-light: #e5edf7;
-  --bg-card: #ffffff;
-  --border: #d7deea;
-  --text: #0f172a;
-  --text-muted: #52607a;
-  --brand-primary: #0ea5e9;
-  --shadow: 0 10px 35px rgba(15, 23, 42, 0.08);
+  /* Mirror the chart (mem-001) palette for light mode */
+  --bg: var(--lm-bg);
+  --bg-light: var(--lm-bg-light);
+  --bg-card: var(--lm-bg-card);
+  --border: var(--lm-border);
+  --text: var(--lm-text);
+  --text-muted: var(--lm-text-muted);
+  --brand-primary: var(--brand-primary);
+  --shadow: var(--shadow-sm);
 }
 
+.dark-mode .portal-theme,
 .dark .portal-theme {
-  --bg: #0b1220;
-  --bg-light: #111a2d;
-  --bg-card: #111827;
-  --border: #1f2b3d;
-  --text: #e2e8f0;
-  --text-muted: #9fb2d2;
-  --brand-primary: #38bdf8;
-  --shadow: 0 18px 40px rgba(2, 6, 23, 0.55);
+  /* Mirror the chart (mem-001) palette for dark mode */
+  --bg: var(--dm-bg);
+  --bg-light: var(--dm-bg-light);
+  --bg-card: var(--dm-bg-card);
+  --border: var(--dm-border);
+  --text: var(--dm-text);
+  --text-muted: #a8b3bd;
+  --brand-primary: var(--brand-primary);
+  --shadow: var(--shadow-sm);
 }
 
 .coding-text-strong {

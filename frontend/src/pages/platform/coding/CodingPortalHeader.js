@@ -44,8 +44,7 @@ const NAV_GROUPS = [
 
 const tabClasses = (isActive) =>
   [
-    "rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] transition",
-    "mx-auto",
+    "rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition",
     isActive
       ? "bg-white text-slate-900 shadow-sm ring-1 ring-white/70"
       : "bg-white/5 text-slate-200 ring-1 ring-white/10 hover:bg-white/10",
@@ -100,6 +99,15 @@ const CodingPortalHeader = ({
   const activeGroupConfig =
     NAV_GROUPS.find((group) => group.label === activeGroup) ?? NAV_GROUPS[0];
 
+  const gridLayoutClasses = React.useMemo(() => {
+    const count = activeGroupConfig.items.length;
+    if (count === 1) return "grid-cols-1 max-w-xs";
+    if (count === 2) return "grid-cols-1 sm:grid-cols-2 max-w-2xl";
+    if (count === 3) return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl";
+    if (count === 4) return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl";
+    return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl";
+  }, [activeGroupConfig.items.length]);
+
   return (
     <section className="mb-6 rounded-3xl border border-slate-800/60 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-6 py-7 text-white shadow-2xl shadow-slate-950/50 ring-1 ring-slate-900/40">
       <div className="flex flex-col items-center gap-3 text-center">
@@ -124,7 +132,7 @@ const CodingPortalHeader = ({
       </div>
 
       <div className="mt-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-center gap-2" role="tablist" aria-label="Coding portal sections">
+        <div className="flex flex-wrap items-center justify-center gap-1" role="tablist" aria-label="Coding portal sections">
           {NAV_GROUPS.map((group) => {
             const isActiveTab = group.label === activeGroup;
             return (
@@ -142,7 +150,7 @@ const CodingPortalHeader = ({
           })}
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="group" aria-label={`${activeGroup} links`}>
+        <div className={["mx-auto grid justify-items-center gap-2", gridLayoutClasses].join(" ")} role="group" aria-label={`${activeGroup} links`}>
           {activeGroupConfig.items.map((item) => {
             const isActiveItem = item.match ? item.match(location.pathname) : location.pathname === item.href;
             return (

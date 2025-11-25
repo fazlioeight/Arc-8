@@ -9,8 +9,10 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import PortalUtilityBar from "../../../components/PortalUtilityBar";
 import { AuthContext } from "../../../context/AuthContext";
+import { SectionHeader } from "../../../components/ehr/Primitives";
 import "../../../index.css";
 import "../coding/member/memberWorkspace.css";
+import "./portalPage.sfdc.css";
 import { fetchCodingMembers } from "../../../services/codingService";
 
 const buildFallbackOverview = (apps, user) => {
@@ -127,10 +129,10 @@ const pickMemberIdForNavigation = (member) => {
   return member?.id || member?.member_id || member?.memberId || null;
 };
 
-const PRIORITY_BADGE = {
-  high: "bg-red-100 text-red-700 ring-red-200 dark:bg-rose-500/20 dark:text-rose-100 dark:ring-rose-400/30",
-  medium: "bg-amber-100 text-amber-800 ring-amber-200 dark:bg-amber-500/20 dark:text-amber-50 dark:ring-amber-400/30",
-  low: "bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-50 dark:ring-emerald-400/30",
+const PRIORITY_VARIANT = {
+  high: "ehr-alert--danger",
+  medium: "ehr-alert--warning",
+  low: "ehr-alert--success",
 };
 
 const PortalPage = () => {
@@ -191,6 +193,14 @@ const PortalPage = () => {
         path: "/RideBooking",
         icon: "RB",
         color: "#2563eb",
+      },
+      {
+        key: "jobs/import-data",
+        label: "Jobs / Import Data",
+        desc: "Kick off and monitor bulk data imports",
+        path: "/jobs/import-data",
+        icon: "JI",
+        color: "#0d9488",
       },
       {
         key: "docs",
@@ -464,7 +474,7 @@ const PortalPage = () => {
   const appsToRender = accessibleApps.length
     ? accessibleApps
     : overview.applications;
-  const cardClass = "coding-surface rounded-2xl p-3";
+  const cardClass = "rounded-xl p-4 portal-alert-shell";
 
   return (
     <div className="coding-member-workspace portal-theme min-h-screen">
@@ -590,144 +600,121 @@ const PortalPage = () => {
       )}
 
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 lg:py-10">
-        <section className={cardClass} aria-label="User profile summary">
-          <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold coding-text-strong">Profile</h2>
-              <p className="text-sm coding-text-soft">Your account at a glance</p>
-            </div>
-            <button
-              className="coding-ghost-button inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold"
-              onClick={() => navigate("/settings")}
-            >
-              Manage profile
-            </button>
-          </header>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-700 text-base font-semibold text-white shadow-sm">
-                {user?.email?.slice(0, 1).toUpperCase() || "N"}
-              </span>
-              <div className="space-y-1">
-                <div className="text-sm font-semibold coding-text-strong">
-                  {overview.profile?.email || user?.email}
+        {/* <section className={cardClass} aria-label="User profile summary">
+          <SectionHeader title="Profile" subtitle="Your account at a glance" />
+          <div className="mt-3 space-y-2">
+            <div className="ehr-alert ehr-alert--info portal-alert-card">
+              <div className="flex w-full items-start gap-3">
+                <span className="portal-alert-icon">
+                  {user?.email?.slice(0, 1).toUpperCase() || "N"}
+                </span>
+                <div className="flex-1 space-y-1">
+                  <div className="portal-alert-card__title">
+                    {overview.profile?.email || user?.email}
+                  </div>
+                  <div className="portal-alert-card__meta">
+                    Tenant {overview.profile?.tenant || user?.tenant || "Nexora"} ·{" "}
+                    {formatRoleLabel(overview.profile?.role)} ·{" "}
+                    {overview.profile?.lastLogin
+                      ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
+                      : "Last login just now"}{" "}
+                    · {accessibleApps.length || appsToRender.length} applications
+                  </div>
                 </div>
-                <div className="text-sm coding-text-soft">
-                  Tenant | {overview.profile?.tenant || user?.tenant || "Nexora"}
-                </div>
+                <button
+                  className="portal-alert-button"
+                  onClick={() => navigate("/settings")}
+                  type="button"
+                >
+                  Manage
+                </button>
               </div>
             </div>
-            <dl className="grid flex-1 grid-cols-1 gap-2 text-sm coding-text-strong sm:grid-cols-2 lg:grid-cols-3">
-              <div className="coding-surface-subtle rounded-xl px-3 py-2">
-                <dt className="text-xs font-semibold uppercase tracking-wide coding-text-muted">
-                  Role
-                </dt>
-                <dd className="mt-1 font-semibold coding-text-strong">
-                  {formatRoleLabel(overview.profile?.role)}
-                </dd>
-              </div>
-              <div className="coding-surface-subtle rounded-xl px-3 py-2">
-                <dt className="text-xs font-semibold uppercase tracking-wide coding-text-muted">
-                  Last login
-                </dt>
-                <dd className="mt-1 font-semibold coding-text-strong">
-                  {overview.profile?.lastLogin
-                    ? formatRelativeTime(overview.profile.lastLogin)
-                    : "Just now"}
-                </dd>
-              </div>
-              <div className="coding-surface-subtle rounded-xl px-3 py-2">
-                <dt className="text-xs font-semibold uppercase tracking-wide coding-text-muted">
-                  Applications
-                </dt>
-                <dd className="mt-1 font-semibold coding-text-strong">
-                  {accessibleApps.length || appsToRender.length}
-                </dd>
-              </div>
-            </dl>
           </div>
-        </section>
+        </section> */}
 
         <div className="grid gap-6 lg:grid-cols-3">
           <section className={cardClass} aria-label="Applications">
-            <header className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold coding-text-strong">Applications</h2>
-                <p className="text-sm coding-text-soft">Launch into the areas you use most.</p>
-              </div>
-            </header>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            <SectionHeader
+              title="Applications"
+              subtitle="Launch into the areas you use most."
+            />
+            <div className="mt-3 space-y-2">
               {appsToRender.map((app) => {
                 const isLocked = !app.allowed;
+                const tone = isLocked ? "ehr-alert--warning" : "ehr-alert--info";
                 return (
-                  <button
+                  <div
                     key={app.key}
-                    className={`group flex items-start gap-4 rounded-xl p-4 text-left shadow-sm transition ${
-                      isLocked
-                        ? "coding-surface-subtle cursor-not-allowed opacity-60"
-                        : "coding-surface hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2"
-                    }`}
-                    onClick={() => !isLocked && navigate(app.path)}
-                    type="button"
+                    className={`ehr-alert portal-alert-card ${tone}`}
                     aria-disabled={isLocked}
-                    disabled={isLocked}
                   >
-                    <span
-                      className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-semibold text-white shadow-sm"
-                      style={{ background: app.color }}
-                    >
-                      {app.icon}
-                    </span>
-                    <span className="flex flex-col gap-1">
-                      <span className="text-sm font-semibold coding-text-strong">
-                        {app.label}
+                    <div className="flex w-full items-start gap-3">
+                      <span
+                        className="portal-alert-icon"
+                        style={{ background: app.color }}
+                        aria-hidden
+                      >
+                        {app.icon}
                       </span>
-                      <span className="text-sm coding-text-soft">
-                        {app.desc}
-                      </span>
-                      {isLocked && (
-                        <span className="text-xs font-semibold text-amber-700">
-                          Request access from your admin
-                        </span>
-                      )}
-                    </span>
-                  </button>
+                      <div className="flex-1">
+                        <div className="portal-alert-card__title">{app.label}</div>
+                        <p className="portal-alert-card__meta">{app.desc}</p>
+                        {isLocked && (
+                          <p className="portal-alert-card__meta">
+                            Request access from your admin.
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        className="portal-alert-button"
+                        onClick={() => !isLocked && navigate(app.path)}
+                        disabled={isLocked}
+                        type="button"
+                      >
+                        {isLocked ? "Locked" : "Open"}
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
             </div>
           </section>
 
           <section className={cardClass} aria-label="Last saved items">
-            <header className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold coding-text-strong">Last saved</h2>
-                <p className="text-sm coding-text-soft">Recent items you have pinned or updated.</p>
-              </div>
-            </header>
-            <ul className="space-y-2">
+            <SectionHeader
+              title="Last saved"
+              subtitle="Recent items you have pinned or updated."
+            />
+            <ul className="mt-3 space-y-2">
               {overview.lastSaved.map((item) => (
                 <li
                   key={item.id}
-                  className="coding-surface flex flex-col gap-2 rounded-xl p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="ehr-alert portal-alert-card ehr-alert--info"
                 >
-                  <div className="flex flex-col gap-1 coding-text-strong">
-                    <strong className="text-sm font-semibold coding-text-strong">
-                      {item.title}
-                    </strong>
-                    <span className="text-sm coding-text-soft">
-                      {item.summary}
-                    </span>
-                    <span className="text-xs font-medium uppercase tracking-wide coding-text-muted">
-                      Updated {formatRelativeTime(item.savedAt)}
-                    </span>
+                  <div className="flex w-full flex-col gap-2">
+                    <div>
+                      <div className="portal-alert-card__title">{item.title}</div>
+                      <p className="portal-alert-card__meta">{item.summary}</p>
+                      <p className="portal-alert-card__meta">
+                        Updated {formatRelativeTime(item.savedAt)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {item.appKey && (
+                        <span className="portal-alert-pill">
+                          {item.appKey.replace(/_/g, " ")}
+                        </span>
+                      )}
+                      <button
+                        className="portal-alert-button"
+                        type="button"
+                        onClick={() => navigate(item.path || "/dashboard")}
+                      >
+                        Open
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                    type="button"
-                    onClick={() => navigate(item.path || "/dashboard")}
-                  >
-                    Open
-                  </button>
                 </li>
               ))}
               {!overview.lastSaved.length && (
@@ -740,51 +727,52 @@ const PortalPage = () => {
           </section>
 
           <section className={cardClass} aria-label="Assigned to-do items">
-            <header className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold coding-text-strong">To-do</h2>
-                <p className="text-sm coding-text-soft">Assignments from your managers across applications.</p>
-              </div>
-            </header>
-            <ul className="space-y-2">
+            <SectionHeader
+              title="To-do"
+              subtitle="Assignments from your managers across applications."
+            />
+            <ul className="mt-3 space-y-2">
               {overview.todos.map((todo) => {
-                const badgeTone =
-                  PRIORITY_BADGE[todo.priority] || PRIORITY_BADGE.low;
+                const tone = PRIORITY_VARIANT[todo.priority] || PRIORITY_VARIANT.low;
                 return (
                   <li
                     key={todo.id}
-                    className="coding-surface flex flex-col gap-2 rounded-xl p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    className={`ehr-alert portal-alert-card ${tone}`}
                   >
-                    <div className="flex items-start gap-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset ${badgeTone}`}
-                      >
-                        {todo.priority || "low"}
-                      </span>
-                      <div className="flex flex-col gap-2">
-                        <strong className="text-sm font-semibold coding-text-strong">
-                          {todo.title}
-                        </strong>
-                        <div className="flex flex-wrap gap-3 text-xs coding-text-soft">
-                          {todo.appKey && (
-                            <span className="coding-pill">{todo.appKey.replace(/_/g, " ")}</span>
-                          )}
-                          {todo.dueAt && (
-                            <span className="coding-tag">Due {formatRelativeTime(todo.dueAt)}</span>
-                          )}
-                          {todo.assignedBy && (
-                            <span className="coding-tag">Assigned by {todo.assignedBy}</span>
-                          )}
-                        </div>
+                    <div className="flex w-full flex-col gap-2">
+                      <div className="portal-alert-card__title">
+                        {todo.title}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="portal-alert-pill">
+                          {todo.priority || "low"}
+                        </span>
+                        {todo.appKey && (
+                          <span className="portal-alert-pill">
+                            {todo.appKey.replace(/_/g, " ")}
+                          </span>
+                        )}
+                        {todo.dueAt && (
+                          <span className="portal-alert-pill portal-alert-pill--ghost">
+                            Due {formatRelativeTime(todo.dueAt)}
+                          </span>
+                        )}
+                        {todo.assignedBy && (
+                          <span className="portal-alert-pill portal-alert-pill--ghost">
+                            Assigned by {todo.assignedBy}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <button
+                          className="portal-alert-button"
+                          type="button"
+                          onClick={() => navigate(todo.path || "/dashboard")}
+                        >
+                          View task
+                        </button>
                       </div>
                     </div>
-                    <button
-                      className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-                      type="button"
-                      onClick={() => navigate(todo.path || "/dashboard")}
-                    >
-                      View task
-                    </button>
                   </li>
                 );
               })}
