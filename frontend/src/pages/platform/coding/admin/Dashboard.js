@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import "../../../../index.css";
-import "../../portal_page/portalPage.sfdc.css";
+import "../../coding/member/memberWorkspace.css";
 import "../../dashboard/dashboard.css";
 import { AuthContext } from "../../../../context/AuthContext";
 import PortalUtilityBar from "../../../../components/PortalUtilityBar";
@@ -386,23 +386,23 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="sfdc-portal coding-portal">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <PortalUtilityBar />
-      <CodingPortalHeader
-        title={`${tenantName} coding analytics`}
-        subtitle={`${companyLabel} dashboards for RAF, funnel, deadlines, and provider performance.`}
-      />
-
-      <div className="ds-container dashboard-page">
-        <DashboardFilters
-          filters={filters}
-          onChange={handleFilterChange}
-          providerGroups={providerGroups}
+      <div className="mx-auto max-w-7xl px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+        <CodingPortalHeader
+          title={`${tenantName} coding analytics`}
+          subtitle={`${companyLabel} dashboards for RAF, funnel, deadlines, and provider performance.`}
         />
 
-        <main className={`dashboard-main${detailState.open ? " dashboard-main--detail" : ""}`}>
-          <section className="dashboard-content">
-            <div className="dashboard-grid-visuals">
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-slate-900/90 dark:ring-white/5">
+          <DashboardFilters filters={filters} onChange={handleFilterChange} providerGroups={providerGroups} />
+        </div>
+
+        <main
+          className={`mt-6 grid gap-6 ${detailState.open ? "lg:grid-cols-[minmax(0,1fr)_320px]" : "lg:grid-cols-[minmax(0,1fr)]"}`}
+        >
+          <section className="space-y-6">
+            <div className="dashboard-grid-visuals grid gap-6 lg:grid-cols-2">
               <ChartCard
                 title="Live RAF Delta"
                 subtitle={`Target ${rafQuery.data?.target?.toFixed(2) ?? "-"}`}
@@ -508,7 +508,7 @@ const Dashboard = () => {
           />
         </main>
 
-        <footer className="sfdc-footer">
+        <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
           <p>&copy; 2025 Nexora - Multi-tenant Analytics Platform</p>
         </footer>
       </div>

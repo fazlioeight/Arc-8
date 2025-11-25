@@ -9,9 +9,7 @@ import {
   updateAdminUser,
   updatePurchasedApplications,
 } from "../../../services/adminService";
-import "../../../index.css";
-import "../portal_page/portalPage.sfdc.css";
-import "./masterAdmin.css";
+import "../coding/member/memberWorkspace.css";
 
 const API_ERROR_FALLBACK = "Unable to load admin data. Please try again.";
 
@@ -59,6 +57,29 @@ const formatGlobalRole = (value) => {
   if (value === 'admin') return 'Admin';
   return 'User';
 };
+
+const roleTone = (value) => {
+  if (value === "platform_admin") {
+    return "bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-100 dark:ring-indigo-500/40";
+  }
+  if (value === "admin") {
+    return "bg-sky-100 text-sky-800 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-100 dark:ring-sky-500/40";
+  }
+  return "bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-700/50 dark:text-slate-100 dark:ring-slate-600/50";
+};
+
+const statusTone = (active) =>
+  active
+    ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-50 dark:ring-emerald-500/30"
+    : "bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-600/20 dark:text-amber-50 dark:ring-amber-500/40";
+
+const CARD = "rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900";
+const CARD_EMPH = "rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
+const INPUT = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/30";
+const PRIMARY_BTN = "inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-500 dark:hover:bg-sky-400 dark:focus:ring-sky-400";
+const GHOST_BTN = "inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-sky-500 dark:hover:text-sky-100 dark:focus:ring-sky-400";
+const RADIO_CLASS = (active) =>
+  `flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${active ? "border-indigo-300 bg-indigo-50 text-indigo-800 dark:border-sky-500/50 dark:bg-sky-500/10 dark:text-sky-100" : "border-slate-200 hover:border-indigo-200 dark:border-slate-700 dark:hover:border-sky-500/50"}`;
 
 const MasterAdminPage = () => {
   const navigate = useNavigate();
@@ -427,288 +448,401 @@ const filteredUsers = useMemo(() => {
   }
 
   return (
-    <div className="master-admin">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <PortalUtilityBar />
-      <div className="master-admin__shell">
-        <header className="master-admin__header">
-          <div>
-            <h1 className="sfdc-hero__title">Master Admin Console</h1>
-            <p className="sfdc-hero__subtitle">
+      <div className="mx-auto max-w-7xl px-4 pb-12 pt-8 sm:px-6 lg:px-8">
+        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Platform Admin</p>
+            <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Master Admin Console</h1>
+            <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-300">
               Manage users, roles, and application access for the {user?.tenant || tenant} tenant.
             </p>
           </div>
-          <div className="master-admin__actions">
-            <button className="sfdc-button_neutral" onClick={resetFormForCreate} disabled={saving}>
-              + New User
-            </button>
-          </div>
+          <button className={GHOST_BTN} onClick={resetFormForCreate} disabled={saving}>
+            + New User
+          </button>
         </header>
 
-        {sampleMode && (
-          <div className="master-admin__sample" role="status">
-            <strong>Sandbox mode.</strong> User management is running on sample data while the API token is unavailable.
-          </div>
-        )}
-        {statusMessage && <div className="master-admin__status">{statusMessage}</div>}
-        {error && <div className="master-admin__error" role="alert">{error}</div>}
+        <div className="mt-6 space-y-4" id="admin-shell">
+          {statusMessage && (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-50">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
+              <span>{statusMessage}</span>
+            </div>
+          )}
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-50" role="alert">
+              <span className="h-2 w-2 rounded-full bg-rose-400" aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        {loading ? (
-          <div className="master-admin__loading">Loading administrator data...</div>
-        ) : (
-          <div className="master-admin__grid">
-            <section className="master-admin__users">
-              <div className="master-admin__toolbar">
-                <input
-                  type="search"
-                  placeholder="Search by email"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <div className="master-admin__count">{filteredUsers.length} users</div>
+          {loading ? (
+            <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
+              <div className="h-[520px] animate-pulse rounded-2xl bg-slate-200/70 dark:bg-slate-800/60" />
+              <div className="space-y-4">
+                <div className="h-44 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-slate-800/60" />
+                <div className="h-[520px] animate-pulse rounded-2xl bg-slate-200/70 dark:bg-slate-800/60" />
               </div>
-              <div className="master-admin__table">
-                <div className="master-admin__row master-admin__row--head">
-                  <span>Email</span>
-                  <span>Role</span>
-                  <span>Status</span>
-                  <span>Applications</span>
+            </div>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-[360px,1fr]" id="admin-grid">
+              <div className={CARD}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Users</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Select a user to edit their access.</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
+                    {filteredUsers.length} users
+                  </span>
                 </div>
-                {filteredUsers.map((record) => (
-                  <button
-                    type="button"
-                    key={record.id}
-                    className={`master-admin__row ${record.id === selectedUserId ? 'is-selected' : ''}`}
-                    onClick={() => handleSelectUser(record)}
-                  >
-                    <span>{record.email}</span>
-                    <span className={`badge badge--${record.role}`}>{formatGlobalRole(record.role)}</span>
-                    <span className={`badge badge--${record.is_active ? 'active' : 'inactive'}`}>
-                      {record.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                    <span className="master-admin__apps">{summarizeApplications(apps, record.applications)}</span>
-                  </button>
-                ))}
-                {!filteredUsers.length && (
-                  <div className="master-admin__empty">No users match your search.</div>
-                )}
-              </div>
-            </section>
 
-            <section className="master-admin__form">
-              {isPlatformAdmin ? (
-                <div className="master-admin__section">
-                  <h2>Application Catalog</h2>
-                  <p className="master-admin__hint">Enable optional applications for this tenant. Core applications are always included.</p>
-                  <div className="master-admin__appsGrid master-admin__appsGrid--purchases">
-                    {apps.map((app) => {
-                      const isSelected = purchaseSelections.has(app.key);
-                      return (
-                        <div key={app.key} className="master-admin__appCard">
-                          <div className="master-admin__appTitle">{app.label}</div>
-                          {app.description && <div className="master-admin__appDesc">{app.description}</div>}
-                          <div className="master-admin__purchaseRow">
-                            {app.core ? (
-                              <span className="master-admin__badge master-admin__badge--core">Included</span>
-                            ) : (
-                              <label className="master-admin__checkbox master-admin__checkbox--purchase">
+                <div className="mt-4 flex gap-2">
+                  <input
+                    type="search"
+                    placeholder="Search by email"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className={INPUT}
+                  />
+                  <button type="button" onClick={resetFormForCreate} className={GHOST_BTN} disabled={saving}>
+                    New
+                  </button>
+                </div>
+
+                <div className="mt-4 divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900/80">
+                  <div className="grid grid-cols-4 gap-2 bg-slate-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                    <span className="col-span-2">Email</span>
+                    <span>Role</span>
+                    <span>Status</span>
+                  </div>
+                  {filteredUsers.map((record) => {
+                    const isSelected = record.id === selectedUserId;
+                    return (
+                      <button
+                        type="button"
+                        key={record.id}
+                        onClick={() => handleSelectUser(record)}
+                        className={`grid grid-cols-4 items-center gap-2 px-3 py-3 text-left text-sm transition ${isSelected ? "bg-indigo-50 ring-2 ring-indigo-200 dark:bg-slate-800/80 dark:ring-sky-500/40" : "hover:bg-slate-50 dark:hover:bg-slate-800/60"}`}
+                      >
+                        <div className="col-span-2 min-w-0">
+                          <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{record.email}</p>
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                            {summarizeApplications(apps, record.applications)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${roleTone(record.role)}`}>
+                            {formatGlobalRole(record.role)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${statusTone(record.is_active)}`}>
+                            {record.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {!filteredUsers.length && (
+                    <div className="px-4 py-6 text-sm text-slate-500 dark:text-slate-300">No users match your search.</div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-6">
+                {isPlatformAdmin ? (
+                  <div className={CARD_EMPH}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Application catalog</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Enable optional apps. Core apps are always included.</p>
+                      </div>
+                      <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${purchaseDirty ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/20 dark:text-amber-50 dark:ring-amber-500/40" : "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-50 dark:ring-emerald-500/30"}`}>
+                        <span className={`h-2 w-2 rounded-full ${purchaseDirty ? "bg-amber-400" : "bg-emerald-400"}`} />
+                        {purchaseDirty ? "Unsaved changes" : "Synced"}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {apps.map((app) => {
+                        const isSelected = purchaseSelections.has(app.key);
+                        const badgeClass = app.core
+                          ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-500/15 dark:text-indigo-100 dark:ring-indigo-500/30"
+                          : isSelected
+                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-50 dark:ring-emerald-500/30"
+                          : "bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800/70 dark:text-slate-100 dark:ring-slate-700";
+                        const badgeLabel = app.core ? "Included" : isSelected ? "Purchased" : "Not purchased";
+                        return (
+                          <div
+                            key={app.key}
+                            className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/70 dark:hover:border-sky-500/50"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-slate-900 dark:text-slate-50">{app.label}</p>
+                                {app.description && <p className="text-xs text-slate-500 dark:text-slate-400">{app.description}</p>}
+                              </div>
+                              <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${badgeClass}`}>
+                                {badgeLabel}
+                              </span>
+                            </div>
+                            {!app.core && (
+                              <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-100">
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={(e) => handlePurchaseToggle(app.key, e.target.checked)}
+                                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-sky-400 dark:focus:ring-sky-400"
                                 />
                                 <span>Purchased</span>
                               </label>
                             )}
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                    <div className="mt-4 flex items-center justify-end">
+                      <button
+                        type="button"
+                        onClick={handleSavePurchases}
+                        disabled={savingPurchases || !purchaseDirty}
+                        className={PRIMARY_BTN}
+                      >
+                        {savingPurchases ? "Saving..." : "Save application purchases"}
+                      </button>
+                    </div>
                   </div>
-                  <div className="master-admin__actionsRow">
-                    <button
-                      type="button"
-                      className="sfdc-button_brand"
-                      onClick={handleSavePurchases}
-                      disabled={savingPurchases || !purchaseDirty}
-                    >
-                      {savingPurchases ? 'Saving...' : 'Save application purchases'}
-                    </button>
+                ) : (
+                  <div className={CARD_EMPH}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Application catalog</p>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{apps.length} apps</span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Contact Nexora to adjust your subscription.</p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {apps.map((app) => {
+                        const isPurchased = purchaseSelections.has(app.key);
+                        const badgeClass = app.core
+                          ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-500/15 dark:text-indigo-100 dark:ring-indigo-500/30"
+                          : isPurchased
+                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-50 dark:ring-emerald-500/30"
+                          : "bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800/70 dark:text-slate-100 dark:ring-slate-700";
+                        const badgeLabel = app.core ? "Included" : isPurchased ? "Purchased" : "Not purchased";
+                        return (
+                          <div
+                            key={app.key}
+                            className="rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900/70 dark:hover:border-sky-500/50"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-slate-900 dark:text-slate-50">{app.label}</p>
+                                {app.description && <p className="text-xs text-slate-500 dark:text-slate-400">{app.description}</p>}
+                              </div>
+                              <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${badgeClass}`}>
+                                {badgeLabel}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="master-admin__section">
-                  <h2>Application Catalog</h2>
-                  <p className="master-admin__hint">Contact Nexora to add or remove applications from your subscription.</p>
-                  <div className="master-admin__appsGrid master-admin__appsGrid--purchases">
-                    {apps.map((app) => {
-                      const isPurchased = purchaseSelections.has(app.key);
-                      const badgeClass = `master-admin__badge ${app.core ? 'master-admin__badge--core' : isPurchased ? 'master-admin__badge--purchased' : 'master-admin__badge--unpurchased'}`;
-                      const badgeLabel = app.core ? 'Included' : isPurchased ? 'Purchased' : 'Not purchased';
-                      return (
-                        <div key={app.key} className="master-admin__appCard">
-                          <div className="master-admin__appTitle">{app.label}</div>
-                          {app.description && <div className="master-admin__appDesc">{app.description}</div>}
-                          <div className={badgeClass}>{badgeLabel}</div>
-                        </div>
-                      );
-                    })}
+                )}
+
+                <form onSubmit={handleSubmit} className={CARD_EMPH}>
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {mode === "create" ? "Create new user" : `Edit ${form.email}`}
+                      </p>
+                      {mode === "edit" && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Leave password blank to keep the existing password.</p>
+                      )}
+                    </div>
+                    {mode === "edit" && (
+                      <button type="button" onClick={resetFormForCreate} className={GHOST_BTN} disabled={saving}>
+                        Create another user
+                      </button>
+                    )}
                   </div>
-                </div>
-              )}
-              <form onSubmit={handleSubmit}>
-                <div className="master-admin__formHeader">
-                  <h2>{mode === 'create' ? 'Create New User' : `Edit ${form.email}`}</h2>
-                  {mode === 'edit' && (
-                    <div className="master-admin__hint">Leave password blank to keep the existing password.</div>
-                  )}
-                </div>
 
-                <label className="master-admin__field">
-                  <span>Email</span>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => handleFieldChange('email', e.target.value)}
-                    disabled={mode === 'edit'}
-                    required
-                  />
-                </label>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <label className="space-y-1 text-sm">
+                      <span className="text-slate-700 dark:text-slate-200">Email</span>
+                      <input
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => handleFieldChange("email", e.target.value)}
+                        disabled={mode === "edit"}
+                        required
+                        className={INPUT}
+                      />
+                    </label>
 
-                <label className="master-admin__field">
-                  <span>Password {mode === 'edit' && <small>(optional)</small>}</span>
-                  <input
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => handleFieldChange('password', e.target.value)}
-                    placeholder={mode === 'edit' ? 'Leave blank to keep current password' : ''}
-                    required={mode === 'create'}
-                  />
-                </label>
+                    <label className="space-y-1 text-sm">
+                      <span className="text-slate-700 dark:text-slate-200">
+                        Password {mode === "edit" && <span className="text-xs text-slate-500">(optional)</span>}
+                      </span>
+                      <input
+                        type="password"
+                        value={form.password}
+                        onChange={(e) => handleFieldChange("password", e.target.value)}
+                        placeholder={mode === "edit" ? "Leave blank to keep current password" : ""}
+                        required={mode === "create"}
+                        className={INPUT}
+                      />
+                    </label>
 
-                <label className="master-admin__field">
-                  <span>Global Role</span>
-                  <select value={form.role} onChange={(e) => handleFieldChange('role', e.target.value)}>
-                    <option value="user">Non admin user</option>
-                    <option value="admin">Administration</option>
-                    {isPlatformAdmin && <option value="platform_admin">Platform administration</option>}
-                  </select>
-                </label>
+                    <label className="space-y-1 text-sm">
+                      <span className="text-slate-700 dark:text-slate-200">Global role</span>
+                      <select
+                        value={form.role}
+                        onChange={(e) => handleFieldChange("role", e.target.value)}
+                        className={INPUT}
+                      >
+                        <option value="user">Non admin user</option>
+                        <option value="admin">Administration</option>
+                        {isPlatformAdmin && <option value="platform_admin">Platform administration</option>}
+                      </select>
+                    </label>
 
-                <label className="master-admin__checkbox">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={(e) => handleFieldChange('is_active', e.target.checked)}
-                  />
-                  <span>Active user</span>
-                </label>
+                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-100">
+                      <input
+                        type="checkbox"
+                        checked={form.is_active}
+                        onChange={(e) => handleFieldChange("is_active", e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-900 dark:text-sky-400 dark:focus:ring-sky-400"
+                      />
+                      Active user
+                    </label>
+                  </div>
 
-                <div className="master-admin__section">
-                  <h3>Application Access</h3>
-                  <p className="master-admin__hint">Assign each application as Administration or Non admin access. Select "No access" to remove visibility.</p>
-                  <div className="master-admin__appsGrid">
-                    {apps.map((app) => {
-                      const value = form.applications?.[app.key] || (app.key === 'portal' ? 'user' : 'none');
-                      const isAdminOnly = app.key === 'admin_console';
-                      const isPurchased = app.core || purchaseSelections.has(app.key);
-                      return (
-                        <div key={app.key} className="master-admin__appCard">
-                          <div className="master-admin__appTitle">{app.label}</div>
-                          {app.description && <div className="master-admin__appDesc">{app.description}</div>}
-                          <div className="master-admin__radioGroup">
-                            {app.key === 'portal' ? (
-                              <>
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name={`app-${app.key}`}
-                                    value="user"
-                                    checked={value === 'user'}
-                                    onChange={() => handleApplicationChange(app.key, 'user')}
-                                    disabled={!isPurchased}
-                                  />
-                                  Non admin user
-                                </label>
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name={`app-${app.key}`}
-                                    value="admin"
-                                    checked={value === 'admin'}
-                                    onChange={() => handleApplicationChange(app.key, 'admin')}
-                                    disabled={!isPurchased}
-                                  />
-                                  Administration
-                                </label>
-                                <div className="master-admin__hint master-admin__hint--inline">Portal access is required for all users.</div>
-                              </>
-                            ) : (
-                              <>
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name={`app-${app.key}`}
-                                    value="none"
-                                    checked={value === 'none'}
-                                    onChange={() => handleApplicationChange(app.key, 'none')}
-                                  />
-                                  No access
-                                </label>
-                                {!isAdminOnly && (
-                                  <label>
+                  <div className="mt-6 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Application access</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Assign Administration or Non admin access. Choose "No access" to hide an app.
+                        </p>
+                      </div>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{apps.length} apps</span>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {apps.map((app) => {
+                        const value = form.applications?.[app.key] || (app.key === "portal" ? "user" : "none");
+                        const isAdminOnly = app.key === "admin_console";
+                        const isPurchased = app.core || purchaseSelections.has(app.key);
+                        const badgeClass = app.core
+                          ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 dark:bg-indigo-500/15 dark:text-indigo-100 dark:ring-indigo-500/30"
+                          : isPurchased
+                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-50 dark:ring-emerald-500/30"
+                          : "bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800/70 dark:text-slate-100 dark:ring-slate-700";
+                        const badgeLabel = app.core ? "Included" : isPurchased ? "Purchased" : "Not purchased";
+                        const radioInputClass = "h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-500 dark:bg-slate-900 dark:text-sky-400 dark:focus:ring-sky-400";
+                        return (
+                          <div key={app.key} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/90 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-semibold text-slate-900 dark:text-slate-50">{app.label}</p>
+                                {app.description && <p className="text-xs text-slate-500 dark:text-slate-400">{app.description}</p>}
+                              </div>
+                              <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${badgeClass}`}>
+                                {badgeLabel}
+                              </span>
+                            </div>
+                            <div className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
+                              {app.key === "portal" ? (
+                                <>
+                                  <label className={RADIO_CLASS(value === "user")}>
                                     <input
                                       type="radio"
                                       name={`app-${app.key}`}
                                       value="user"
-                                      checked={value === 'user'}
-                                      onChange={() => handleApplicationChange(app.key, 'user')}
+                                      checked={value === "user"}
+                                      onChange={() => handleApplicationChange(app.key, "user")}
                                       disabled={!isPurchased}
+                                      className={radioInputClass}
                                     />
-                                    Non admin user
+                                    <span>Non admin user</span>
                                   </label>
-                                )}
-                                <label>
-                                  <input
-                                    type="radio"
-                                    name={`app-${app.key}`}
-                                    value="admin"
-                                    checked={value === 'admin'}
-                                    onChange={() => handleApplicationChange(app.key, 'admin')}
-                                    disabled={!isPurchased}
-                                  />
-                                  Administration
-                                </label>
-                                {!isPurchased && (
-                                  <div className="master-admin__hint master-admin__hint--inline">Purchase this application to assign access.</div>
-                                )}
-                              </>
-                            )}
+                                  <label className={RADIO_CLASS(value === "admin")}>
+                                    <input
+                                      type="radio"
+                                      name={`app-${app.key}`}
+                                      value="admin"
+                                      checked={value === "admin"}
+                                      onChange={() => handleApplicationChange(app.key, "admin")}
+                                      disabled={!isPurchased}
+                                      className={radioInputClass}
+                                    />
+                                    <span>Administration</span>
+                                  </label>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400">Portal access is required.</div>
+                                </>
+                              ) : (
+                                <>
+                                  <label className={RADIO_CLASS(value === "none")}>
+                                    <input
+                                      type="radio"
+                                      name={`app-${app.key}`}
+                                      value="none"
+                                      checked={value === "none"}
+                                      onChange={() => handleApplicationChange(app.key, "none")}
+                                      className={radioInputClass}
+                                    />
+                                    <span>No access</span>
+                                  </label>
+                                  {!isAdminOnly && (
+                                    <label className={RADIO_CLASS(value === "user")}>
+                                      <input
+                                        type="radio"
+                                        name={`app-${app.key}`}
+                                        value="user"
+                                        checked={value === "user"}
+                                        onChange={() => handleApplicationChange(app.key, "user")}
+                                        disabled={!isPurchased}
+                                        className={radioInputClass}
+                                      />
+                                      <span>Non admin user</span>
+                                    </label>
+                                  )}
+                                  <label className={RADIO_CLASS(value === "admin")}>
+                                    <input
+                                      type="radio"
+                                      name={`app-${app.key}`}
+                                      value="admin"
+                                      checked={value === "admin"}
+                                      onChange={() => handleApplicationChange(app.key, "admin")}
+                                      disabled={!isPurchased}
+                                      className={radioInputClass}
+                                    />
+                                    <span>Administration</span>
+                                  </label>
+                                  {!isPurchased && <div className="text-xs text-amber-600 dark:text-amber-200">Purchase this app to assign access.</div>}
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
 
-                <div className="master-admin__actionsRow">
-                  <button type="submit" className="sfdc-button_brand" disabled={saving}>
-                    {saving ? 'Saving...' : mode === 'create' ? 'Create User' : 'Save Changes'}
-                  </button>
-                  {mode === 'edit' && (
-                    <button
-                      type="button"
-                      className="sfdc-button_outline"
-                      onClick={resetFormForCreate}
-                      disabled={saving}
-                    >
-                      Create another user
-                    </button>
-                  )}
-                </div>
-              </form>
-            </section>
-          </div>
-        )}
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Changes apply immediately after saving.</p>
+                    <div className="flex items-center gap-2">
+                      <button type="submit" disabled={saving} className={PRIMARY_BTN}>
+                        {saving ? "Saving..." : mode === "create" ? "Create user" : "Save changes"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

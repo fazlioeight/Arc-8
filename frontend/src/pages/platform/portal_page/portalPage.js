@@ -1,10 +1,16 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import PortalUtilityBar from "../../../components/PortalUtilityBar";
 import { AuthContext } from "../../../context/AuthContext";
 import "../../../index.css";
-import "./portalPage.sfdc.css";
+import "../coding/member/memberWorkspace.css";
 import { fetchCodingMembers } from "../../../services/codingService";
 
 const buildFallbackOverview = (apps, user) => {
@@ -84,14 +90,14 @@ const formatRelativeTime = (value) => {
 };
 
 const formatRoleLabel = (value) => {
-  if (!value) return 'User';
+  if (!value) return "User";
   switch (value) {
-    case 'admin':
-      return 'Admin';
-    case 'platform_admin':
-      return 'Platform admin';
+    case "admin":
+      return "Admin";
+    case "platform_admin":
+      return "Platform admin";
     default:
-      return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
+      return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, " ");
   }
 };
 
@@ -119,6 +125,12 @@ const pickMemberIdForNavigation = (member) => {
     return null;
   }
   return member?.id || member?.member_id || member?.memberId || null;
+};
+
+const PRIORITY_BADGE = {
+  high: "bg-red-100 text-red-700 ring-red-200 dark:bg-rose-500/20 dark:text-rose-100 dark:ring-rose-400/30",
+  medium: "bg-amber-100 text-amber-800 ring-amber-200 dark:bg-amber-500/20 dark:text-amber-50 dark:ring-amber-400/30",
+  low: "bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-50 dark:ring-emerald-400/30",
 };
 
 const PortalPage = () => {
@@ -210,9 +222,10 @@ const PortalPage = () => {
   );
 
   const filteredCatalog = useMemo(() => {
-    const sourceKeys = (availableApplications && availableApplications.length)
-      ? availableApplications
-      : (purchasedApplications && purchasedApplications.length)
+    const sourceKeys =
+      availableApplications && availableApplications.length
+        ? availableApplications
+        : purchasedApplications && purchasedApplications.length
         ? purchasedApplications
         : appCatalog.map((app) => app.key);
     const enabledKeys = new Set(sourceKeys);
@@ -265,10 +278,13 @@ const PortalPage = () => {
           profile: payload.profile || fallback.profile,
           applications:
             (payload.applications || []).map((app) => {
-              const catalogEntry = resolvedApps.find((item) => item.key === app.key) || {};
+              const catalogEntry =
+                resolvedApps.find((item) => item.key === app.key) || {};
               return { ...catalogEntry, ...app };
             }) || fallback.applications,
-          lastSaved: payload.lastSaved?.length ? payload.lastSaved : fallback.lastSaved,
+          lastSaved: payload.lastSaved?.length
+            ? payload.lastSaved
+            : fallback.lastSaved,
           todos: payload.todos?.length ? payload.todos : fallback.todos,
         });
       } catch (error) {
@@ -277,7 +293,8 @@ const PortalPage = () => {
         setOverview({
           ...fallback,
           loading: false,
-          error: "We could not reach the portal services. Showing the latest synced data.",
+          error:
+            "We could not reach the portal services. Showing the latest synced data.",
         });
       }
     };
@@ -317,7 +334,9 @@ const PortalPage = () => {
           }
           console.error("Member search failed", error);
           setMemberSuggestions([]);
-          setMemberSearchError(error?.message || "Unable to search members right now.");
+          setMemberSearchError(
+            error?.message || "Unable to search members right now."
+          );
         })
         .finally(() => {
           if (!isActive) {
@@ -334,14 +353,19 @@ const PortalPage = () => {
     };
   }, [memberQuery, token, tenant]);
 
-  const resolveMemberId = useCallback((value) => {
-    const term = value?.trim().toLowerCase();
-    if (!term) {
-      return null;
-    }
-    const match = memberSuggestions.find((member) => extractMemberTokens(member).includes(term));
-    return pickMemberIdForNavigation(match);
-  }, [memberSuggestions]);
+  const resolveMemberId = useCallback(
+    (value) => {
+      const term = value?.trim().toLowerCase();
+      if (!term) {
+        return null;
+      }
+      const match = memberSuggestions.find((member) =>
+        extractMemberTokens(member).includes(term)
+      );
+      return pickMemberIdForNavigation(match);
+    },
+    [memberSuggestions]
+  );
 
   const handleMemberSearch = useCallback(
     async (event) => {
@@ -358,13 +382,18 @@ const PortalPage = () => {
 
       if (!memberId) {
         try {
-          const response = await fetchCodingMembers(token, tenant, { search: term, pageSize: 5 });
+          const response = await fetchCodingMembers(token, tenant, {
+            search: term,
+            pageSize: 5,
+          });
           const items = Array.isArray(response?.items) ? response.items : [];
           if (items.length) {
             setMemberSuggestions(items);
           }
           const lowerTerm = term.toLowerCase();
-          const exactMatch = items.find((member) => extractMemberTokens(member).includes(lowerTerm));
+          const exactMatch = items.find((member) =>
+            extractMemberTokens(member).includes(lowerTerm)
+          );
           if (exactMatch) {
             memberId = pickMemberIdForNavigation(exactMatch);
           } else if (items.length === 1) {
@@ -372,7 +401,9 @@ const PortalPage = () => {
           }
         } catch (error) {
           console.error("Member lookup failed", error);
-          setMemberSearchError(error?.message || "Unable to open that member right now.");
+          setMemberSearchError(
+            error?.message || "Unable to open that member right now."
+          );
         }
       }
 
@@ -405,42 +436,89 @@ const PortalPage = () => {
       return "Press Enter to open the highlighted member chart.";
     }
     return "No suggestions yet.";
-  }, [isLaunchingMember, isSearchingMembers, memberQuery, memberSearchError, memberSuggestions.length]);
+  }, [
+    isLaunchingMember,
+    isSearchingMembers,
+    memberQuery,
+    memberSearchError,
+    memberSuggestions.length,
+  ]);
 
   if (overview.loading) {
     return (
-      <div className="portal-overview__loading">
+      <div className="coding-member-workspace portal-theme min-h-screen">
         <PortalUtilityBar />
-        <section className="portal-loading-panel">Loading your Nexora workspace...</section>
+        <section className="mx-auto flex max-w-3xl items-center justify-center px-4 py-24">
+          <div className="coding-surface w-full rounded-2xl p-8 text-center shadow-sm">
+            <p className="text-base font-medium coding-text-strong">
+              Loading your Nexora workspace...
+            </p>
+          </div>
+        </section>
       </div>
     );
   }
 
   const displayName = user?.email?.split("@")[0] || "there";
   const accessibleApps = overview.applications.filter((app) => app.allowed);
-  const appsToRender = accessibleApps.length ? accessibleApps : overview.applications;
+  const appsToRender = accessibleApps.length
+    ? accessibleApps
+    : overview.applications;
+  const cardClass = "coding-surface rounded-2xl p-3";
 
   return (
-    <div className="portal-overview sfdc-portal">
+    <div className="coding-member-workspace portal-theme min-h-screen">
       <PortalUtilityBar />
-      <header className="portal-hero">
-        <div className="portal-hero__inner">
-          <div>
-            <p className="portal-hero__eyebrow">Workspace overview</p>
-            <h1 className="portal-hero__title">Welcome back, {displayName}</h1>
-            <p className="portal-hero__subtitle">
-              Here's what changed across your applications since your last visit.
+
+      <header className="coding-member-header">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] coding-text-muted">
+              Portal Overview
             </p>
+            <h1 className="text-2xl font-semibold coding-text-strong sm:text-3xl">
+              Welcome back, {displayName}
+            </h1>
+            <p className="coding-text-soft text-base">
+              Stay aligned with the same workspace feel as your chart view.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 rounded-xl bg-white/60 px-4 py-3 shadow-sm ring-1 ring-gray-200 dark:bg-white/5 dark:ring-0">
+            <div className="flex flex-col text-right">
+              <span className="text-[11px] uppercase tracking-wide coding-text-muted">
+                Applications
+              </span>
+              <span className="text-lg font-semibold coding-text-strong">
+                {accessibleApps.length || appsToRender.length}
+              </span>
+            </div>
+            <span className="h-10 w-px bg-gray-200 dark:bg-white/20" />
+            <div className="flex flex-col text-right">
+              <span className="text-[11px] uppercase tracking-wide coding-text-muted">
+                Open tasks
+              </span>
+              <span className="text-lg font-semibold coding-text-strong">
+                {overview.todos.length}
+              </span>
+            </div>
           </div>
         </div>
       </header>
-      <section className="portal-member-search" aria-label="Member quick search">
-        <form className="portal-member-search__form" onSubmit={handleMemberSearch}>
-          <div className="portal-member-search__field">
-            <label className="portal-member-search__label" htmlFor="portal-member-search-input">
+
+      <section className="coding-member-toolbar">
+        <form
+          className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-end"
+          onSubmit={handleMemberSearch}
+          aria-label="Member quick search"
+        >
+          <div className="flex-1 space-y-2">
+            <label
+              className="text-sm font-semibold coding-text-strong"
+              htmlFor="portal-member-search-input"
+            >
               Member ID
             </label>
-            <div className="portal-member-search__inputwrap">
+            <div className="relative">
               <input
                 id="portal-member-search-input"
                 type="search"
@@ -450,6 +528,7 @@ const PortalPage = () => {
                 onChange={(event) => setMemberQuery(event.target.value)}
                 list="portal-member-suggestions"
                 aria-describedby="portal-member-search-help"
+                className="coding-input w-full rounded-xl px-4 py-3 text-sm"
               />
               <datalist id="portal-member-suggestions">
                 {memberSuggestions.map((member) => {
@@ -458,7 +537,8 @@ const PortalPage = () => {
                     member?.memberId ||
                     member?.member_id ||
                     member?.id;
-                  const optionKey = member?.id || member?.member_id || optionValue;
+                  const optionKey =
+                    member?.id || member?.member_id || optionValue;
                   if (!optionValue && !optionKey) {
                     return null;
                   }
@@ -468,7 +548,10 @@ const PortalPage = () => {
                       ? `${optionValue} - ${altId}`
                       : optionValue || altId;
                   return (
-                    <option key={optionKey} value={(optionValue || altId || "").toString()}>
+                    <option
+                      key={optionKey}
+                      value={(optionValue || altId || "").toString()}
+                    >
                       {label}
                     </option>
                   );
@@ -477,7 +560,7 @@ const PortalPage = () => {
             </div>
           </div>
           <button
-            className="portal-member-search__submit"
+            className="inline-flex h-12 items-center justify-center rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
             type="submit"
             disabled={!memberQuery.trim() || isLaunchingMember}
           >
@@ -485,7 +568,11 @@ const PortalPage = () => {
           </button>
         </form>
         <p
-          className={`portal-member-search__status${memberSearchError ? " portal-member-search__status--error" : ""}`}
+          className={`mx-auto max-w-6xl px-4 pb-5 text-sm ${
+            memberSearchError
+              ? "text-red-600"
+              : "coding-text-muted"
+          }`}
           id="portal-member-search-help"
           role="status"
         >
@@ -494,107 +581,148 @@ const PortalPage = () => {
       </section>
 
       {overview.error && (
-        <div className="portal-alert" role="alert">
-          {overview.error}
+        <div className="mx-auto max-w-6xl px-4 pt-4">
+          <div className="coding-surface-subtle flex items-start gap-3 rounded-xl px-4 py-3 text-amber-900 shadow-sm">
+            <span className="text-sm font-semibold coding-text-strong">Heads up</span>
+            <span className="text-sm coding-text-soft">{overview.error}</span>
+          </div>
         </div>
       )}
 
-      <div className="portal-shell">
-        <aside className="portal-sidebar">
-          <section className="portal-panel portal-profile" aria-label="User profile summary">
-            <header className="portal-panel__header">
-              <h2>Profile</h2>
-            </header>
-            <div className="portal-profile__body">
-              <div className="portal-profile__identity">
-                <span className="portal-profile__avatar">
-                  {user?.email?.slice(0, 1).toUpperCase() || "N"}
-                </span>
-                <div>
-                  <div className="portal-profile__name">
-                    {overview.profile?.email || user?.email}
-                  </div>
-                  <div className="portal-profile__meta">
-                    Tenant | {overview.profile?.tenant || user?.tenant || "Nexora"}
-                  </div>
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 lg:py-10">
+        <section className={cardClass} aria-label="User profile summary">
+          <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold coding-text-strong">Profile</h2>
+              <p className="text-sm coding-text-soft">Your account at a glance</p>
+            </div>
+            <button
+              className="coding-ghost-button inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold"
+              onClick={() => navigate("/settings")}
+            >
+              Manage profile
+            </button>
+          </header>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-700 text-base font-semibold text-white shadow-sm">
+                {user?.email?.slice(0, 1).toUpperCase() || "N"}
+              </span>
+              <div className="space-y-1">
+                <div className="text-sm font-semibold coding-text-strong">
+                  {overview.profile?.email || user?.email}
+                </div>
+                <div className="text-sm coding-text-soft">
+                  Tenant | {overview.profile?.tenant || user?.tenant || "Nexora"}
                 </div>
               </div>
-              <dl className="portal-profile__details">
-                <div>
-                  <dt>Role</dt>
-                  <dd>{formatRoleLabel(overview.profile?.role)}</dd>
-                </div>
-                <div>
-                  <dt>Last login</dt>
-                  <dd>
-                    {overview.profile?.lastLogin
-                      ? formatRelativeTime(overview.profile.lastLogin)
-                      : "Just now"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Applications</dt>
-                  <dd>{accessibleApps.length || appsToRender.length}</dd>
-                </div>
-              </dl>
-              <button className="portal-link" onClick={() => navigate("/settings")}>
-                Manage profile
-              </button>
+            </div>
+            <dl className="grid flex-1 grid-cols-1 gap-2 text-sm coding-text-strong sm:grid-cols-2 lg:grid-cols-3">
+              <div className="coding-surface-subtle rounded-xl px-3 py-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide coding-text-muted">
+                  Role
+                </dt>
+                <dd className="mt-1 font-semibold coding-text-strong">
+                  {formatRoleLabel(overview.profile?.role)}
+                </dd>
+              </div>
+              <div className="coding-surface-subtle rounded-xl px-3 py-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide coding-text-muted">
+                  Last login
+                </dt>
+                <dd className="mt-1 font-semibold coding-text-strong">
+                  {overview.profile?.lastLogin
+                    ? formatRelativeTime(overview.profile.lastLogin)
+                    : "Just now"}
+                </dd>
+              </div>
+              <div className="coding-surface-subtle rounded-xl px-3 py-2">
+                <dt className="text-xs font-semibold uppercase tracking-wide coding-text-muted">
+                  Applications
+                </dt>
+                <dd className="mt-1 font-semibold coding-text-strong">
+                  {accessibleApps.length || appsToRender.length}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <section className={cardClass} aria-label="Applications">
+            <header className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold coding-text-strong">Applications</h2>
+                <p className="text-sm coding-text-soft">Launch into the areas you use most.</p>
+              </div>
+            </header>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              {appsToRender.map((app) => {
+                const isLocked = !app.allowed;
+                return (
+                  <button
+                    key={app.key}
+                    className={`group flex items-start gap-4 rounded-xl p-4 text-left shadow-sm transition ${
+                      isLocked
+                        ? "coding-surface-subtle cursor-not-allowed opacity-60"
+                        : "coding-surface hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2"
+                    }`}
+                    onClick={() => !isLocked && navigate(app.path)}
+                    type="button"
+                    aria-disabled={isLocked}
+                    disabled={isLocked}
+                  >
+                    <span
+                      className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-semibold text-white shadow-sm"
+                      style={{ background: app.color }}
+                    >
+                      {app.icon}
+                    </span>
+                    <span className="flex flex-col gap-1">
+                      <span className="text-sm font-semibold coding-text-strong">
+                        {app.label}
+                      </span>
+                      <span className="text-sm coding-text-soft">
+                        {app.desc}
+                      </span>
+                      {isLocked && (
+                        <span className="text-xs font-semibold text-amber-700">
+                          Request access from your admin
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </section>
-        </aside>
 
-        <main className="portal-main">
-          <section className="portal-panel" aria-label="Applications">
-            <header className="portal-panel__header">
+          <section className={cardClass} aria-label="Last saved items">
+            <header className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
               <div>
-                <h2>Applications</h2>
-                <p className="portal-panel__subhead">Launch into the areas you use most.</p>
+                <h2 className="text-lg font-semibold coding-text-strong">Last saved</h2>
+                <p className="text-sm coding-text-soft">Recent items you have pinned or updated.</p>
               </div>
             </header>
-            <div className="portal-apps__grid">
-              {appsToRender.map((app) => (
-                <button
-                  key={app.key}
-                  className={`portal-apps__tile${app.allowed ? "" : " portal-apps__tile--locked"}`}
-                  onClick={() => app.allowed && navigate(app.path)}
-                  type="button"
-                  aria-disabled={!app.allowed}
-                >
-                  <span className="portal-apps__icon" style={{ background: app.color }}>
-                    {app.icon}
-                  </span>
-                  <span className="portal-apps__body">
-                    <span className="portal-apps__name">{app.label}</span>
-                    <span className="portal-apps__desc">{app.desc}</span>
-                    {!app.allowed && (
-                      <span className="portal-apps__hint">Request access from your admin</span>
-                    )}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="portal-panel" aria-label="Last saved items">
-            <header className="portal-panel__header">
-              <div>
-                <h2>Last saved</h2>
-                <p className="portal-panel__subhead">Recent items you have pinned or updated.</p>
-              </div>
-            </header>
-            <ul className="portal-list">
+            <ul className="space-y-2">
               {overview.lastSaved.map((item) => (
-                <li key={item.id} className="portal-list__item">
-                  <div className="portal-list__content">
-                    <strong>{item.title}</strong>
-                    <span>{item.summary}</span>
-                    <span className="portal-list__meta">
+                <li
+                  key={item.id}
+                  className="coding-surface flex flex-col gap-2 rounded-xl p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex flex-col gap-1 coding-text-strong">
+                    <strong className="text-sm font-semibold coding-text-strong">
+                      {item.title}
+                    </strong>
+                    <span className="text-sm coding-text-soft">
+                      {item.summary}
+                    </span>
+                    <span className="text-xs font-medium uppercase tracking-wide coding-text-muted">
                       Updated {formatRelativeTime(item.savedAt)}
                     </span>
                   </div>
                   <button
-                    className="portal-link"
+                    className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                     type="button"
                     onClick={() => navigate(item.path || "/dashboard")}
                   >
@@ -603,53 +731,71 @@ const PortalPage = () => {
                 </li>
               ))}
               {!overview.lastSaved.length && (
-                <li className="portal-list__empty">
-                  No saved items yet. Try bookmarking a report from the dashboard.
+                <li className="coding-empty-state">
+                  No saved items yet. Try bookmarking a report from the
+                  dashboard.
                 </li>
               )}
             </ul>
           </section>
 
-          <section className="portal-panel" aria-label="Assigned to-do items">
-            <header className="portal-panel__header">
+          <section className={cardClass} aria-label="Assigned to-do items">
+            <header className="mb-4 flex flex-wrap items-baseline justify-between gap-3">
               <div>
-                <h2>To-do</h2>
-                <p className="portal-panel__subhead">
-                  Assignments from your managers across applications.
-                </p>
+                <h2 className="text-lg font-semibold coding-text-strong">To-do</h2>
+                <p className="text-sm coding-text-soft">Assignments from your managers across applications.</p>
               </div>
             </header>
-            <ul className="portal-todos">
-              {overview.todos.map((todo) => (
-                <li key={todo.id} className="portal-todos__item">
-                  <div className="portal-todos__main">
-                    <span className={`portal-status portal-status--${todo.priority || "low"}`}>
-                      {todo.priority || "low"}
-                    </span>
-                    <div>
-                      <strong>{todo.title}</strong>
-                      <div className="portal-todos__meta">
-                        {todo.appKey && <span>{todo.appKey.replace(/_/g, " ")}</span>}
-                        {todo.dueAt && <span>Due {formatRelativeTime(todo.dueAt)}</span>}
-                        {todo.assignedBy && <span>Assigned by {todo.assignedBy}</span>}
+            <ul className="space-y-2">
+              {overview.todos.map((todo) => {
+                const badgeTone =
+                  PRIORITY_BADGE[todo.priority] || PRIORITY_BADGE.low;
+                return (
+                  <li
+                    key={todo.id}
+                    className="coding-surface flex flex-col gap-2 rounded-xl p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset ${badgeTone}`}
+                      >
+                        {todo.priority || "low"}
+                      </span>
+                      <div className="flex flex-col gap-2">
+                        <strong className="text-sm font-semibold coding-text-strong">
+                          {todo.title}
+                        </strong>
+                        <div className="flex flex-wrap gap-3 text-xs coding-text-soft">
+                          {todo.appKey && (
+                            <span className="coding-pill">{todo.appKey.replace(/_/g, " ")}</span>
+                          )}
+                          {todo.dueAt && (
+                            <span className="coding-tag">Due {formatRelativeTime(todo.dueAt)}</span>
+                          )}
+                          {todo.assignedBy && (
+                            <span className="coding-tag">Assigned by {todo.assignedBy}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <button
-                    className="portal-link"
-                    type="button"
-                    onClick={() => navigate(todo.path || "/dashboard")}
-                  >
-                    View task
-                  </button>
-                </li>
-              ))}
+                    <button
+                      className="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                      type="button"
+                      onClick={() => navigate(todo.path || "/dashboard")}
+                    >
+                      View task
+                    </button>
+                  </li>
+                );
+              })}
               {!overview.todos.length && (
-                <li className="portal-list__empty">No open tasks. Enjoy the clear slate!</li>
+                <li className="coding-empty-state">
+                  No open tasks. Enjoy the clear slate!
+                </li>
               )}
             </ul>
           </section>
-        </main>
+        </div>
       </div>
     </div>
   );

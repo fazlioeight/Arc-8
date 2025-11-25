@@ -1,8 +1,5 @@
 import React from 'react';
-import { Button } from 'react-bootstrap';
 import { useLocation, useNavigate } from 'react-router-dom';
-
-import PortalHero from '../../../components/PortalHero';
 
 const NAV_GROUPS = [
   {
@@ -45,98 +42,26 @@ const NAV_GROUPS = [
   },
 ];
 
-const RIBBON_CONTAINER_STYLE = {
-  width: '100%',
-  boxSizing: 'border-box',
-  background: 'linear-gradient(180deg, #f8f9fb 0%, #e2e6ef 100%)',
-  borderRadius: '10px',
-  border: '1px solid rgba(0, 0, 0, 0.08)',
-  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
-  padding: '0.9rem 1.2rem',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-};
+const tabClasses = (isActive) =>
+  [
+    "rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] transition",
+    "mx-auto",
+    isActive
+      ? "bg-white text-slate-900 shadow-sm ring-1 ring-white/70"
+      : "bg-white/5 text-slate-200 ring-1 ring-white/10 hover:bg-white/10",
+  ].join(" ");
 
-const RIBBON_TAB_ROW_STYLE = {
-  display: 'flex',
-  alignItems: 'flex-end',
-  gap: '0.35rem',
-  paddingBottom: '0.35rem',
-  borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
-  justifyContent: 'center',
-};
+const itemClasses = (isActive) =>
+  [
+    "flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition text-center",
+    "mx-auto w-full",
+    isActive
+      ? "border-sky-400/70 bg-sky-500/20 text-white shadow-md shadow-sky-900/40"
+      : "border-white/10 bg-white/5 text-slate-100 hover:border-sky-300/40 hover:bg-sky-500/10",
+  ].join(" ");
 
-const RIBBON_GROUP_AREA_STYLE = {
-  display: 'flex',
-  gap: '1.25rem',
-  flexDirection: 'column',
-  flexWrap: 'wrap',
-  justifyContent: 'center',
-  alignItems: 'center',
-  paddingTop: '0.65rem',
-};
-
-const RIBBON_GROUP_CARD_STYLE = {
-  background: '#ffffff',
-  border: '1px solid rgba(0, 0, 0, 0.08)',
-  borderRadius: '6px',
-  padding: '0.6rem 0.9rem',
-  flex: '1 1 100%',
-  minWidth: '220px',
-  width: '100%',
-  maxWidth: '720px',
-  boxSizing: 'border-box',
-};
-
-const RIBBON_GROUP_TITLE_STYLE = {
-  fontSize: '0.8rem',
-  fontWeight: 600,
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
-  color: '#5f6b7a',
-  marginBottom: '0.6rem',
-  textAlign: 'center',
-};
-
-const RIBBON_BUTTON_ROW_STYLE = {
-  display: 'flex',
-  gap: '0.4rem',
-  flexWrap: 'wrap',
-  alignItems: 'stretch',
-  justifyContent: 'center',
-};
-
-const getRibbonTabStyle = (isActive) => ({
-  fontSize: '0.875rem',
-  fontWeight: 600,
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
-  background: isActive ? '#ffffff' : 'transparent',
-  border: 'none',
-  borderBottom: isActive ? '3px solid #0078d4' : '3px solid transparent',
-  color: isActive ? '#1a1a1a' : '#4a4a4a',
-  padding: '0.45rem 0.9rem',
-  borderRadius: '6px 6px 0 0',
-  cursor: 'pointer',
-  transition: 'all 0.15s ease-in-out',
-});
-
-const getRibbonItemButtonStyle = (isActive) => ({
-  fontSize: '0.75rem',
-  padding: '0.5rem 0.75rem',
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.35rem',
-  justifyContent: 'flex-start',
-  backgroundColor: isActive ? '#0078d4' : '#f3f6fb',
-  borderColor: isActive ? '#0078d4' : 'rgba(0, 120, 212, 0.35)',
-  color: isActive ? '#ffffff' : '#0b5394',
-  fontWeight: 600,
-  boxShadow: isActive ? '0 1px 3px rgba(0, 120, 212, 0.4)' : 'none',
-  minWidth: '170px',
-  flex: '0 0 auto',
-});
+const actionButton =
+  "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-sky-300/60 hover:bg-sky-500/20 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 focus:ring-offset-slate-900";
 
 const CodingPortalHeader = ({
   title,
@@ -161,6 +86,7 @@ const CodingPortalHeader = ({
   const matchedGroupRef = React.useRef(matchedGroup);
 
   const [activeGroup, setActiveGroup] = React.useState(() => matchedGroup || NAV_GROUPS[0].label);
+  const textAlignment = 'text-center';
 
   React.useEffect(() => {
     if (matchedGroup !== matchedGroupRef.current) {
@@ -174,17 +100,38 @@ const CodingPortalHeader = ({
   const activeGroupConfig =
     NAV_GROUPS.find((group) => group.label === activeGroup) ?? NAV_GROUPS[0];
 
-  const actions = (
-    <div className="w-100 d-flex justify-content-center">
-      <div style={RIBBON_CONTAINER_STYLE}>
-        <div style={RIBBON_TAB_ROW_STYLE} role="tablist" aria-label="Coding portal sections">
+  return (
+    <section className="mb-6 rounded-3xl border border-slate-800/60 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-6 py-7 text-white shadow-2xl shadow-slate-950/50 ring-1 ring-slate-900/40">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-sky-400/80">Coding Workspace</p>
+        <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">{title}</h1>
+        {subtitle ? <p className="max-w-3xl text-sm text-slate-300">{subtitle}</p> : null}
+        {(showViewChart || additionalActions) && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {showViewChart ? (
+              <button
+                type="button"
+                className={actionButton}
+                onClick={onViewChart}
+                disabled={typeof onViewChart !== 'function'}
+              >
+                View chart
+              </button>
+            ) : null}
+            {additionalActions}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-center gap-2" role="tablist" aria-label="Coding portal sections">
           {NAV_GROUPS.map((group) => {
             const isActiveTab = group.label === activeGroup;
             return (
               <button
                 key={group.label}
                 type="button"
-                style={getRibbonTabStyle(isActiveTab)}
+                className={tabClasses(isActiveTab)}
                 aria-selected={isActiveTab}
                 role="tab"
                 onClick={() => setActiveGroup(group.label)}
@@ -194,61 +141,29 @@ const CodingPortalHeader = ({
             );
           })}
         </div>
-        <div style={RIBBON_GROUP_AREA_STYLE}>
-          <div style={RIBBON_GROUP_CARD_STYLE}>
-            <div style={RIBBON_GROUP_TITLE_STYLE}>{activeGroup}</div>
-            <div style={RIBBON_BUTTON_ROW_STYLE}>
-              {activeGroupConfig.items.map((item) => {
-                const isActiveItem = item.match
-                  ? item.match(location.pathname)
-                  : location.pathname === item.href;
 
-                return (
-                  <Button
-                    key={item.href}
-                    size="sm"
-                    variant={isActiveItem ? 'primary' : 'outline-primary'}
-                    aria-current={isActiveItem ? 'page' : undefined}
-                    onClick={() => {
-                      setActiveGroup(activeGroupConfig.label);
-                      navigate(item.href, { state: { breadcrumb: item.label } });
-                    }}
-                    style={getRibbonItemButtonStyle(isActiveItem)}
-                  >
-                    {item.label}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-          {showViewChart || additionalActions ? (
-            <div className="d-flex align-items-start justify-content-center flex-wrap gap-2">
-              {showViewChart ? (
-                <Button
-                  size="sm"
-                  variant="outline-secondary"
-                  onClick={onViewChart}
-                  disabled={typeof onViewChart !== 'function'}
-                >
-                  View chart
-                </Button>
-              ) : null}
-              {additionalActions}
-            </div>
-          ) : null}
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="group" aria-label={`${activeGroup} links`}>
+          {activeGroupConfig.items.map((item) => {
+            const isActiveItem = item.match ? item.match(location.pathname) : location.pathname === item.href;
+            return (
+              <button
+                key={item.href}
+                type="button"
+                className={itemClasses(isActiveItem)}
+                aria-current={isActiveItem ? 'page' : undefined}
+                onClick={() => {
+                  setActiveGroup(activeGroupConfig.label);
+                  navigate(item.href, { state: { breadcrumb: item.label } });
+                }}
+              >
+                <span>{item.label}</span>
+                <span className="text-xs text-slate-300">{isActiveItem ? '•' : ''}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
-    </div>
-  );
-
-  return (
-    <PortalHero
-      align={align}
-      title={title}
-      subtitle={subtitle}
-      actions={actions}
-      wave={false}
-    />
+    </section>
   );
 };
 

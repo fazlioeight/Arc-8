@@ -1,16 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  Col,
-  Form,
-  Row,
-  Table,
-} from "react-bootstrap";
-
 import PortalUtilityBar from "../../../components/PortalUtilityBar";
 import RideBookingHeader from "./RideBookingHeader";
 import {
@@ -21,252 +10,93 @@ import {
   upsertPartnerBillingProfile,
 } from "../../../services/ridePartnerService";
 import { getRecentRides } from "../../../services/rideBookingService";
+import "../coding/member/memberWorkspace.css";
 import "../../../styles/rideBooking.css";
 
-const WEEKDAY_OPTIONS = [
-  { value: "mon", label: "Monday" },
-  { value: "tue", label: "Tuesday" },
-  { value: "wed", label: "Wednesday" },
-  { value: "thu", label: "Thursday" },
-  { value: "fri", label: "Friday" },
-  { value: "sat", label: "Saturday" },
-  { value: "sun", label: "Sunday" },
-];
+const DAY_LABEL = {
+  mon: "Mon",
+  tue: "Tue",
+  wed: "Wed",
+  thu: "Thu",
+  fri: "Fri",
+  sat: "Sat",
+  sun: "Sun",
+};
 
-const DAY_LABEL = WEEKDAY_OPTIONS.reduce((acc, option) => {
-  acc[option.value] = option.label;
-  return acc;
-}, {});
-
-const createScheduleForm = (frequency = "daily") => ({
-  frequency,
-  startDate: "",
-  endDate: "",
-  openSlots: "",
-  daysOfWeek: [],
-  daysOfMonth: [],
+const defaultSchedule = {
+  frequency: "weekly",
+  daysOfWeek: ["mon"],
+  startDate: new Date().toISOString().slice(0, 10),
+  endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  openSlots: 4,
   notes: "",
-});
-
-const PAYMENT_METHOD_OPTIONS = [
-  { value: "ach", label: "ACH" },
-  { value: "virtual_card", label: "Virtual card" },
-  { value: "stripe_connect", label: "Stripe Connect" },
-  { value: "check", label: "Check" },
-];
-
-const describePaymentMethod = (value) => {
-  const option = PAYMENT_METHOD_OPTIONS.find((method) => method.value === value);
-  return option ? option.label : value || "";
 };
 
-const createBillingForm = (partner = {}) => ({
-  payToName: partner.billingProfile?.payToName || partner.companyName || "",
-  paymentEmail: partner.billingProfile?.paymentEmail || partner.contactEmail || "",
-  paymentMethod: partner.billingProfile?.paymentMethod || "ach",
-  remitAddress: partner.billingProfile?.remitAddress || "",
-  taxId: partner.billingProfile?.taxId || "",
-});
-
-const formatDateTime = (iso) => {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-};
-
-const escapeCsv = (value) => {
-  if (value === null || value === undefined) return "";
-  const string = String(value);
-  if (/[",\n]/.test(string)) {
-    return `"${string.replace(/"/g, '""')}"`;
+const formatRecurrence = (schedule) => {
+  if (!schedule?.frequency) return "Ad hoc";
+  if (schedule.frequency === "weekly") {
+    return (schedule.daysOfWeek || []).map((code) => DAY_LABEL[code] || code).join(", ") || "Weekly";
   }
-  return string;
-};
-
-const buildInvoiceCsv = (partner, billingProfile, rides) => {
-  const metadata = [
-    ["Partner Company", partner.companyName || ""],
-    ["Pay To Name", billingProfile.payToName || ""],
-    ["Remit Email", billingProfile.paymentEmail || ""],
-    ["Payment Method", describePaymentMethod(billingProfile.paymentMethod)],
-    ["Remit Address", billingProfile.remitAddress || ""],
-    ["Tax ID", billingProfile.taxId || ""],
-    ["Profile Updated", billingProfile.updatedAt || ""],
-    ["Generated At", new Date().toISOString()],
-  ];
-
-  const headers = [
-    "Ride ID",
-    "Member ID",
-    "Passenger",
-    "Pickup",
-    "Dropoff",
-    "Scheduled Pickup",
-    "Estimated Dropoff",
-    "Status",
-    "Cost (USD)",
-  ];
-
-  const sortedRides = rides
-    .slice()
-    .sort(
-      (a, b) =>
-        new Date(a.scheduledPickup || 0).getTime() -
-        new Date(b.scheduledPickup || 0).getTime()
-    );
-
-  const rideRows = sortedRides.map((ride) => {
-    const costValue = Number.parseFloat(ride.costUsd);
-    const formattedCost = Number.isFinite(costValue) ? costValue.toFixed(2) : "";
-    return [
-      ride.id,
-      ride.memberId,
-      `${ride.firstName || ""} ${ride.lastName || ""}`.trim(),
-      ride.pickup,
-      ride.dropoff,
-      formatDateTime(ride.scheduledPickup),
-      formatDateTime(ride.estimatedDropoff),
-      ride.status,
-      formattedCost,
-    ];
-  });
-
-  const lines = [
-    ...metadata.map((row) => row.map(escapeCsv).join(",")),
-    "",
-    headers.map(escapeCsv).join(","),
-    ...rideRows.map((row) => row.map(escapeCsv).join(",")),
-  ];
-
-  return lines.join("\n");
+  if (schedule.frequency === "monthly") {
+    return (schedule.daysOfMonth || []).join(", ") || "Monthly";
+  }
+  return "Ad hoc";
 };
 
 const RidePartnerManagementPage = () => {
   const navigate = useNavigate();
   const [partners, setPartners] = useState([]);
-  const [partnerForm, setPartnerForm] = useState({
-    companyName: "",
-    contactName: "",
-    contactEmail: "",
-  });
-  const [scheduleForms, setScheduleForms] = useState({});
-  const [billingForms, setBillingForms] = useState({});
+  const [availableToday, setAvailableToday] = useState([]);
+  const [rides, setRides] = useState([]);
   const [feedback, setFeedback] = useState(null);
-  const [expandedPartners, setExpandedPartners] = useState(() => new Set());
-
-  const partnersOpenToday = useMemo(() => {
-    const open = getAvailablePartnersForDate();
-    return new Set(open.map((partner) => partner.id));
-  }, [partners]);
-
-  const monthOptions = useMemo(
-    () => Array.from({ length: 31 }, (_, index) => index + 1),
-    []
-  );
+  const [scheduleState, setScheduleState] = useState({});
 
   const refreshPartners = () => {
-    const data = getPartners();
-    setPartners(data);
-    setBillingForms((current) => {
-      const next = {};
-      data.forEach((partner) => {
-        next[partner.id] = current[partner.id] || createBillingForm(partner);
-      });
-      return next;
-    });
-    setExpandedPartners((current) => {
-      if (!current || current.size === 0) {
-        return new Set();
-      }
-      const next = new Set();
-      data.forEach((partner) => {
-        if (current.has(partner.id)) {
-          next.add(partner.id);
-        }
-      });
-      return next;
-    });
+    setPartners(getPartners());
+    setAvailableToday(getAvailablePartnersForDate(new Date()));
+    setRides(getRecentRides());
   };
 
   useEffect(() => {
     refreshPartners();
   }, []);
 
-  const scheduleStateFor = (partnerId) =>
-    scheduleForms[partnerId] || createScheduleForm();
+  const scheduleStateFor = (partnerId) => scheduleState[partnerId] || defaultSchedule;
 
-  const resetScheduleForm = (partnerId, frequency = "daily") => {
-    setScheduleForms((current) => ({
-      ...current,
-      [partnerId]: createScheduleForm(frequency),
+  const updateScheduleForm = (partnerId, updates) => {
+    setScheduleState((prev) => ({
+      ...prev,
+      [partnerId]: { ...scheduleStateFor(partnerId), ...updates },
     }));
   };
 
-  const updateScheduleForm = (partnerId, changes) => {
-    setScheduleForms((current) => {
-      const existing = current[partnerId] || createScheduleForm();
-      const next =
-        typeof changes === "function"
-          ? changes(existing)
-          : { ...existing, ...changes };
-      if (!next.frequency) {
-        next.frequency = existing.frequency || "daily";
-      }
-      return {
-        ...current,
-        [partnerId]: next,
-      };
-    });
-  };
-
-  const handlePartnerInputChange = (event) => {
-    const { name, value } = event.target;
-    setPartnerForm((form) => ({ ...form, [name]: value }));
+  const resetScheduleForm = (partnerId, freq = "weekly") => {
+    setScheduleState((prev) => ({
+      ...prev,
+      [partnerId]: { ...defaultSchedule, frequency: freq },
+    }));
   };
 
   const handleAddPartner = (event) => {
     event.preventDefault();
-    try {
-      const record = addPartner(partnerForm);
-      setFeedback({
-        type: "success",
-        message: `Added ${record.companyName} to ride partners.`,
-      });
-      setPartnerForm({ companyName: "", contactName: "", contactEmail: "" });
-      refreshPartners();
-      setExpandedPartners((current) => {
-        const next = new Set(current);
-        next.add(record.id);
-        return next;
-      });
-    } catch (error) {
-      setFeedback({
-        type: "danger",
-        message: error.message || "Unable to add ride partner.",
-      });
+    const form = new FormData(event.target);
+    const name = form.get("partnerName");
+    const contact = form.get("partnerContact");
+    if (!name || !contact) {
+      setFeedback({ type: "danger", message: "Enter partner name and contact." });
+      return;
     }
+    addPartner({ name, contact });
+    setFeedback({ type: "success", message: "Partner added." });
+    event.target.reset();
+    refreshPartners();
   };
 
-  const handleFrequencyChange = (partnerId, value) => {
-    resetScheduleForm(partnerId, value);
-  };
-
-  const handleWeeklySelection = (partnerId, event) => {
-    const values = Array.from(event.target.selectedOptions || []).map(
-      (option) => option.value
-    );
-    updateScheduleForm(partnerId, { daysOfWeek: values });
-  };
-
-  const handleMonthlySelection = (partnerId, event) => {
-    const values = Array.from(event.target.selectedOptions || []).map(
-      (option) => Number(option.value)
-    );
-    updateScheduleForm(partnerId, { daysOfMonth: values });
+  const handleBillingInputChange = (partner, field, value) => {
+    const updated = { ...(partner.billingProfile || {}), [field]: value };
+    upsertPartnerBillingProfile(partner.id, updated);
+    setFeedback({ type: "success", message: "Billing profile updated." });
+    refreshPartners();
   };
 
   const handleAddSchedule = (partnerId, event) => {
@@ -279,642 +109,358 @@ const RidePartnerManagementPage = () => {
       return;
     }
     if (!startDate || !endDate) {
-      setFeedback({
-        type: "danger",
-        message: "Provide a start and end date for the schedule.",
-      });
+      setFeedback({ type: "danger", message: "Start and end dates are required." });
       return;
     }
-    if (new Date(startDate) > new Date(endDate)) {
-      setFeedback({
-        type: "danger",
-        message: "Schedule start date must be before the end date.",
-      });
-      return;
-    }
-    if (!openSlots || Number.parseInt(openSlots, 10) <= 0) {
-      setFeedback({
-        type: "danger",
-        message: "Enter the number of open rides available.",
-      });
-      return;
-    }
-    if (
-      frequency === "weekly" &&
-      (!form.daysOfWeek || form.daysOfWeek.length === 0)
-    ) {
-      setFeedback({
-        type: "danger",
-        message: "Select at least one day of the week.",
-      });
-      return;
-    }
-    if (
-      frequency === "monthly" &&
-      (!form.daysOfMonth || form.daysOfMonth.length === 0)
-    ) {
-      setFeedback({
-        type: "danger",
-        message: "Select at least one day of the month.",
-      });
-      return;
-    }
-
-    try {
-      addPartnerSchedule(partnerId, form);
-      setFeedback({
-        type: "success",
-        message: "Availability added to the partner calendar.",
-      });
-      refreshPartners();
-      resetScheduleForm(partnerId, form.frequency);
-    } catch (error) {
-      setFeedback({
-        type: "danger",
-        message: error.message || "Unable to add schedule.",
-      });
-    }
+    addPartnerSchedule(partnerId, form);
+    setFeedback({ type: "success", message: "Availability added to the partner calendar." });
+    refreshPartners();
+    resetScheduleForm(partnerId, form.frequency);
   };
 
-  const billingStateFor = (partner) =>
-    billingForms[partner.id] || createBillingForm(partner);
-
-  const handleBillingInputChange = (partner, field, value) => {
-    setBillingForms((current) => ({
-      ...current,
-      [partner.id]: {
-        ...(current[partner.id] || createBillingForm(partner)),
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleSaveBillingProfile = async (event, partner) => {
-    event.preventDefault();
-    const form = billingForms[partner.id] || createBillingForm(partner);
-    if (!form.payToName || !form.payToName.trim()) {
-      setFeedback({
-        type: "danger",
-        message: "Enter the pay-to name for invoice processing.",
-      });
-      return;
-    }
-    if (!form.paymentEmail || !form.paymentEmail.trim()) {
-      setFeedback({
-        type: "danger",
-        message: "Enter the remit email used for payout notifications.",
-      });
-      return;
-    }
-
-    try {
-      const saved = await upsertPartnerBillingProfile(partner.id, form);
-      setFeedback({
-        type: "success",
-        message: `Saved pay-to profile for ${partner.companyName}.`,
-      });
-      setBillingForms((current) => ({
-        ...current,
-        [partner.id]: createBillingForm({
-          ...partner,
-          billingProfile: saved,
-        }),
-      }));
-      refreshPartners();
-    } catch (error) {
-      console.error("Unable to save billing profile", error);
-      setFeedback({
-        type: "danger",
-        message: "Unable to save billing profile. Try again.",
-      });
-    }
-  };
-
-  const handleDownloadInvoiceData = (partner) => {
-    try {
-      const storedProfile = partner.billingProfile || {};
-      const form = billingForms[partner.id] || createBillingForm(partner);
-      const billingProfile = { ...storedProfile, ...form };
-      const rides = getRecentRides().filter(
-        (ride) => ride.rideType === partner.companyName
-      );
-      const csv = buildInvoiceCsv(partner, billingProfile, rides);
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      const safeName =
-        partner.companyName?.toLowerCase().replace(/[^a-z0-9]+/g, "-") ||
-        "partner";
-      link.href = url;
-      link.download = `${safeName}-invoice-data.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      setFeedback({
-        type: "success",
-        message: `Invoice data downloaded for ${partner.companyName}.`,
-      });
-    } catch (error) {
-      console.error("Unable to download invoice data", error);
-      setFeedback({
-        type: "danger",
-        message: "Unable to generate invoice download. Try again.",
-      });
-    }
-  };
-
-  const togglePartnerSection = (partnerId) => {
-    setExpandedPartners((current) => {
-      const next = new Set(current);
-      if (next.has(partnerId)) {
-        next.delete(partnerId);
-      } else {
-        next.add(partnerId);
-      }
-      return next;
+  const ridesByPartner = useMemo(() => {
+    const map = new Map();
+    rides.forEach((ride) => {
+      const bucket = map.get(ride.rideType) || [];
+      bucket.push(ride);
+      map.set(ride.rideType, bucket);
     });
-  };
-
-  const formatRecurrence = (schedule) => {
-    switch (schedule.frequency) {
-      case "daily":
-        return "Every day";
-      case "weekly":
-        return (
-          schedule.daysOfWeek
-            ?.map((code) => DAY_LABEL[code] || code)
-            .join(", ") || "Weekly"
-        );
-      case "monthly":
-        return schedule.daysOfMonth?.length
-          ? `Days ${schedule.daysOfMonth.join(", ")}`
-          : "Monthly";
-      default:
-        return "None";
-    }
-  };
+    return map;
+  }, [rides]);
 
   return (
-    <div className="sfdc-portal coding-portal">
+    <div className="ride-booking coding-member-workspace portal-theme min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <PortalUtilityBar />
       <RideBookingHeader
         title="Ride Partner Calendars"
-        subtitle="Invite transportation partners to publish their open ride windows. Availability for today automatically feeds the booking dropdown."
+        subtitle="Invite transportation partners to publish their open ride windows. Availability for today feeds the booking dropdown."
       />
 
-
-      <main className="sfdc-grid" style={{ gridTemplateColumns: "1fr" }}>
-        <div className="sfdc-card sfdc-card--full">
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
-            <div>
-              <h2 className="h5 mb-1">Register a partner</h2>
-              <div className="text-muted">
-                Capture basic contact details to publish ride availability.
-              </div>
-            </div>
+      <main className="mx-auto max-w-6xl px-4 py-6 space-y-6">
+        {feedback && (
+          <div
+            className={`rounded-lg border px-3 py-2 text-sm shadow-sm ${
+              feedback.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100"
+                : "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100"
+            }`}
+          >
+            {feedback.message}
           </div>
-          {feedback && (
-            <Alert
-              variant={feedback.type}
-              onClose={() => setFeedback(null)}
-              dismissible
+        )}
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <header className="mb-4">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Register a partner</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-300">Capture partner contact details.</p>
+          </header>
+          <form onSubmit={handleAddPartner} className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold" htmlFor="partnerName">
+                Partner name
+              </label>
+              <input
+                id="partnerName"
+                name="partnerName"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold" htmlFor="partnerContact">
+                Contact email
+              </label>
+              <input
+                id="partnerContact"
+                name="partnerContact"
+                type="email"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                required
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <button
+                className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                type="submit"
+              >
+                Add partner
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <header className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Today&apos;s availability</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-300">Partners with open slots.</p>
+            </div>
+            <button
+              className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+              onClick={refreshPartners}
             >
-              {feedback.message}
-            </Alert>
-          )}
-          <Form onSubmit={handleAddPartner} className="mb-4">
-            <Row className="g-3">
-              <Col md={4}>
-                <Form.Group controlId="companyName">
-                  <Form.Label>Company name</Form.Label>
-                  <Form.Control
-                    name="companyName"
-                    value={partnerForm.companyName}
-                    onChange={handlePartnerInputChange}
-                    placeholder="e.g., Riverside Mobility"
-                    required
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group controlId="contactName">
-                  <Form.Label>Contact name</Form.Label>
-                  <Form.Control
-                    name="contactName"
-                    value={partnerForm.contactName}
-                    onChange={handlePartnerInputChange}
-                    placeholder="Primary coordinator"
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group controlId="contactEmail">
-                  <Form.Label>Contact email</Form.Label>
-                  <Form.Control
-                    type="email"
-                    name="contactEmail"
-                    value={partnerForm.contactEmail}
-                    onChange={handlePartnerInputChange}
-                    placeholder="contact@example.com"
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-            <div className="d-flex justify-content-end mt-3">
-              <Button type="submit">Add partner</Button>
-            </div>
-          </Form>
+              Refresh
+            </button>
+          </header>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {availableToday.map((partner) => (
+              <div key={partner.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-inner dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex items-center justify-between text-sm text-slate-800 dark:text-slate-100">
+                  <div className="font-semibold">{partner.name}</div>
+                  <span className="text-xs text-slate-500 dark:text-slate-300">{partner.openSlots} slots</span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">{partner.contact}</div>
+              </div>
+            ))}
+            {!availableToday.length && (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                No availability published today.
+              </div>
+            )}
+          </div>
+        </section>
 
-          <h2 className="h6">Partner calendars</h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <header className="mb-4">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Partners</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-300">Manage billing profiles and schedules.</p>
+          </header>
+          <div className="space-y-4">
+            {partners.map((partner) => {
+              const ridesForPartner = ridesByPartner.get(partner.name) || [];
+              const scheduleForm = scheduleStateFor(partner.id);
+              return (
+                <div
+                  key={partner.id}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-inner dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-slate-900 dark:text-slate-100">{partner.name}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-300">{partner.contact}</div>
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-300">
+                      {ridesForPartner.length} rides in the last 48h
+                    </div>
+                  </div>
 
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Billing profile</div>
+                      <label className="text-xs text-slate-500 dark:text-slate-300">
+                        Pay-to name
+                        <input
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                          value={partner.billingProfile?.payToName || ""}
+                          onChange={(event) =>
+                            handleBillingInputChange(partner, "payToName", event.target.value)
+                          }
+                          placeholder="Payee name"
+                        />
+                      </label>
+                      <label className="text-xs text-slate-500 dark:text-slate-300">
+                        Remit address
+                        <input
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                          value={partner.billingProfile?.remitAddress || ""}
+                          onChange={(event) =>
+                            handleBillingInputChange(partner, "remitAddress", event.target.value)
+                          }
+                          placeholder="Street, city, state, ZIP"
+                        />
+                      </label>
+                    </div>
 
-
-          {partners.length === 0 ? (
-            <div className="text-muted">No partners registered yet.</div>
-          ) : (
-            <div className="d-flex flex-column gap-3">
-              {partners.map((partner) => {
-                const form = scheduleStateFor(partner.id);
-                const billingForm = billingStateFor(partner);
-                const isOpenToday = partnersOpenToday.has(partner.id);
-                const lastUpdated = partner.billingProfile?.updatedAt;
-                const savedMethod =
-                  partner.billingProfile?.paymentMethod ||
-                  billingForm.paymentMethod;
-                const isExpanded = expandedPartners.has(partner.id);
-                const detailsId = `partner-${partner.id}-details`;
-                return (
-                  <Card key={partner.id} className="shadow-sm">
-                    <Card.Body>
-                      <div className="d-flex flex-column flex-lg-row justify-content-between gap-3">
-                        <div>
-                          <Card.Title className="mb-1 d-flex flex-wrap align-items-center gap-2">
-                            <span>{partner.companyName}</span>
-                            {isOpenToday && (
-                              <Badge bg="success">Open today</Badge>
-                            )}
-                          </Card.Title>
-                          <div
-                            className="text-muted"
-                            style={{ fontSize: "0.9rem" }}
-                          >
-                            {partner.contactName || "Not provided"}
-                            {partner.contactEmail && (
-                              <>
-                                {" | "}
-                                {partner.contactEmail}
-                              </>
-                            )}
-                          </div>
-                          <div
-                            className="text-muted"
-                            style={{ fontSize: "0.8rem" }}
-                          >
-                            Joined {new Date(partner.createdAt).toLocaleDateString()}
-                          </div>
-                          <div
-                            className="text-muted"
-                            style={{ fontSize: "0.8rem" }}
-                          >
-                            Pay-to profile:{" "}
-                            {partner.billingProfile?.payToName
-                              ? partner.billingProfile.payToName
-                              : "Not saved"}{" "}
-                            - Method: {describePaymentMethod(savedMethod)}
-                          </div>
-                        </div>
-                        <div className="d-flex align-items-start gap-2">
-                          <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            onClick={() => togglePartnerSection(partner.id)}
-                            aria-expanded={isExpanded}
-                            aria-controls={detailsId}
-                          >
-                            {isExpanded ? "Hide details" : "Show details"}
-                          </Button>
-                        </div>
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Open rides</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-300">
+                        Last 48h rides for this partner.
                       </div>
+                      <ul className="space-y-1 text-sm text-slate-800 dark:text-slate-100">
+                        {ridesForPartner.slice(0, 3).map((ride) => (
+                          <li key={ride.id} className="flex justify-between text-xs">
+                            <span>{ride.memberName}</span>
+                            <span className="text-slate-500 dark:text-slate-300">{ride.status}</span>
+                          </li>
+                        ))}
+                        {!ridesForPartner.length && (
+                          <li className="text-xs text-slate-500 dark:text-slate-300">No recent rides.</li>
+                        )}
+                      </ul>
+                    </div>
 
-                      {isExpanded && (
-                        <div id={detailsId}>
-                          <div className="d-flex flex-column flex-lg-row justify-content-between gap-3 mt-3">
-                            <div style={{ minWidth: 260 }}>
-                              <Form
-                                onSubmit={(event) =>
-                                  handleAddSchedule(partner.id, event)
-                                }
-                              >
-                                <Row className="g-2">
-                                  <Col md={6}>
-                                    <Form.Group controlId={`frequency-${partner.id}`}>
-                                      <Form.Label>Frequency</Form.Label>
-                                      <Form.Select
-                                        value={form.frequency}
-                                        onChange={(event) =>
-                                          handleFrequencyChange(
-                                            partner.id,
-                                            event.target.value
-                                          )
-                                        }
-                                      >
-                                        <option value="daily">Daily</option>
-                                        <option value="weekly">Weekly</option>
-                                        <option value="monthly">Monthly</option>
-                                      </Form.Select>
-                                    </Form.Group>
-                                  </Col>
-                                  <Col md={6}>
-                                    <Form.Group controlId={`openSlots-${partner.id}`}>
-                                      <Form.Label>Open rides</Form.Label>
-                                      <Form.Control
-                                        type="number"
-                                        min={1}
-                                        value={form.openSlots}
-                                        onChange={(event) =>
-                                          updateScheduleForm(partner.id, {
-                                            openSlots: event.target.value,
-                                          })
-                                        }
-                                        required
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                  <Col md={6}>
-                                    <Form.Group controlId={`startDate-${partner.id}`}>
-                                      <Form.Label>Start date</Form.Label>
-                                      <Form.Control
-                                        type="date"
-                                        value={form.startDate}
-                                        onChange={(event) =>
-                                          updateScheduleForm(partner.id, {
-                                            startDate: event.target.value,
-                                          })
-                                        }
-                                        required
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                  <Col md={6}>
-                                    <Form.Group controlId={`endDate-${partner.id}`}>
-                                      <Form.Label>End date</Form.Label>
-                                      <Form.Control
-                                        type="date"
-                                        value={form.endDate}
-                                        onChange={(event) =>
-                                          updateScheduleForm(partner.id, {
-                                            endDate: event.target.value,
-                                          })
-                                        }
-                                        required
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                  {form.frequency === "weekly" && (
-                                    <Col md={12}>
-                                      <Form.Group controlId={`daysOfWeek-${partner.id}`}>
-                                        <Form.Label>Days of week</Form.Label>
-                                        <Form.Select
-                                          multiple
-                                          value={form.daysOfWeek}
-                                          onChange={(event) =>
-                                            handleWeeklySelection(partner.id, event)
-                                          }
-                                        >
-                                          {WEEKDAY_OPTIONS.map((option) => (
-                                            <option key={option.value} value={option.value}>
-                                              {option.label}
-                                            </option>
-                                          ))}
-                                        </Form.Select>
-                                        <Form.Text>
-                                          Use Ctrl/Cmd click to select multiple days.
-                                        </Form.Text>
-                                      </Form.Group>
-                                    </Col>
-                                  )}
-                                  {form.frequency === "monthly" && (
-                                    <Col md={12}>
-                                      <Form.Group controlId={`daysOfMonth-${partner.id}`}>
-                                        <Form.Label>Days of month</Form.Label>
-                                        <Form.Select
-                                          multiple
-                                          value={form.daysOfMonth.map(String)}
-                                          onChange={(event) =>
-                                            handleMonthlySelection(partner.id, event)
-                                          }
-                                        >
-                                          {monthOptions.map((day) => (
-                                            <option key={day} value={day}>
-                                              {day}
-                                            </option>
-                                          ))}
-                                        </Form.Select>
-                                        <Form.Text>
-                                          Select all calendar days that recur for this schedule.
-                                        </Form.Text>
-                                      </Form.Group>
-                                    </Col>
-                                  )}
-                                  <Col md={12}>
-                                    <Form.Group controlId={`notes-${partner.id}`}>
-                                      <Form.Label>Notes</Form.Label>
-                                      <Form.Control
-                                        as="textarea"
-                                        rows={2}
-                                        value={form.notes}
-                                        onChange={(event) =>
-                                          updateScheduleForm(partner.id, {
-                                            notes: event.target.value,
-                                          })
-                                        }
-                                        placeholder="Optional details (vehicles, regions, etc.)"
-                                      />
-                                    </Form.Group>
-                                  </Col>
-                                </Row>
-                                <div className="d-flex justify-content-end mt-3">
-                                  <Button type="submit" size="sm">
-                                    Add availability
-                                  </Button>
-                                </div>
-                              </Form>
-                            </div>
-                          </div>
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Publish availability</div>
+                      <form onSubmit={(event) => handleAddSchedule(partner.id, event)} className="space-y-2 text-xs">
+                        <label className="flex flex-col gap-1 text-slate-600 dark:text-slate-300">
+                          Frequency
+                          <select
+                            value={scheduleForm.frequency}
+                            onChange={(event) => updateScheduleForm(partner.id, { frequency: event.target.value })}
+                            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-inner outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                          >
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </label>
 
-                          <div className="mt-4 pt-3 border-top">
-                            <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-                              <div>
-                                <h3 className="h6 mb-1">Pay-to &amp; invoice profile</h3>
-                                <p className="text-muted small mb-0">
-                                  Store payout instructions and export invoice-ready ride data.
-                                </p>
-                              </div>
-                              <div className="text-muted small">
-                                {lastUpdated
-                                  ? `Updated ${formatDateTime(lastUpdated)}`
-                                  : "Not saved yet"}
-                              </div>
-                            </div>
-                            <Form
-                              className="mt-3"
-                              onSubmit={(event) => handleSaveBillingProfile(event, partner)}
+                        {scheduleForm.frequency === "weekly" ? (
+                          <label className="flex flex-col gap-1 text-slate-600 dark:text-slate-300">
+                            Days of week
+                            <select
+                              multiple
+                              value={scheduleForm.daysOfWeek}
+                              onChange={(event) => {
+                                const values = Array.from(event.target.selectedOptions || []).map(
+                                  (option) => option.value
+                                );
+                                updateScheduleForm(partner.id, { daysOfWeek: values });
+                              }}
+                              className="h-24 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-inner outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
                             >
-                              <Row className="g-3">
-                                <Col md={6}>
-                                  <Form.Group controlId={`payToName-${partner.id}`}>
-                                    <Form.Label>Pay-to name</Form.Label>
-                                    <Form.Control
-                                      value={billingForm.payToName}
-                                      onChange={(event) =>
-                                        handleBillingInputChange(
-                                          partner,
-                                          "payToName",
-                                          event.target.value
-                                        )
-                                      }
-                                      placeholder="Legal or remit-to name"
-                                      required
-                                    />
-                                  </Form.Group>
-                                </Col>
-                                <Col md={6}>
-                                  <Form.Group controlId={`paymentEmail-${partner.id}`}>
-                                    <Form.Label>Remit email</Form.Label>
-                                    <Form.Control
-                                      type="email"
-                                      value={billingForm.paymentEmail}
-                                      onChange={(event) =>
-                                        handleBillingInputChange(
-                                          partner,
-                                          "paymentEmail",
-                                          event.target.value
-                                        )
-                                      }
-                                      placeholder="billing@example.com"
-                                      required
-                                    />
-                                  </Form.Group>
-                                </Col>
-                                <Col md={6}>
-                                  <Form.Group controlId={`paymentMethod-${partner.id}`}>
-                                    <Form.Label>Preferred payment method</Form.Label>
-                                    <Form.Select
-                                      value={billingForm.paymentMethod}
-                                      onChange={(event) =>
-                                        handleBillingInputChange(
-                                          partner,
-                                          "paymentMethod",
-                                          event.target.value
-                                        )
-                                      }
-                                    >
-                                      {PAYMENT_METHOD_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                          {option.label}
-                                        </option>
-                                      ))}
-                                    </Form.Select>
-                                  </Form.Group>
-                                </Col>
-                                <Col md={6}>
-                                  <Form.Group controlId={`taxId-${partner.id}`}>
-                                    <Form.Label>Tax ID</Form.Label>
-                                    <Form.Control
-                                      value={billingForm.taxId}
-                                      onChange={(event) =>
-                                        handleBillingInputChange(
-                                          partner,
-                                          "taxId",
-                                          event.target.value
-                                        )
-                                      }
-                                      placeholder="EIN / SSN for 1099"
-                                    />
-                                  </Form.Group>
-                                </Col>
-                                <Col xs={12}>
-                                  <Form.Group controlId={`remitAddress-${partner.id}`}>
-                                    <Form.Label>Remit address</Form.Label>
-                                    <Form.Control
-                                      as="textarea"
-                                      rows={2}
-                                      value={billingForm.remitAddress}
-                                      onChange={(event) =>
-                                        handleBillingInputChange(
-                                          partner,
-                                          "remitAddress",
-                                          event.target.value
-                                        )
-                                      }
-                                      placeholder="Street, city, state, ZIP"
-                                    />
-                                  </Form.Group>
-                                </Col>
-                              </Row>
-                              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mt-3">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline-secondary"
-                                  onClick={() => handleDownloadInvoiceData(partner)}
-                                >
-                                  Download invoice data (CSV)
-                                </Button>
-                                <Button type="submit" size="sm">
-                                  Save pay-to profile
-                                </Button>
-                              </div>
-                            </Form>
-                          </div>
+                              {Object.entries(DAY_LABEL).map(([code, label]) => (
+                                <option key={code} value={code}>
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : (
+                          <label className="flex flex-col gap-1 text-slate-600 dark:text-slate-300">
+                            Days of month
+                            <select
+                              multiple
+                              value={scheduleForm.daysOfMonth || []}
+                              onChange={(event) => {
+                                const values = Array.from(event.target.selectedOptions || []).map((option) =>
+                                  Number(option.value)
+                                );
+                                updateScheduleForm(partner.id, { daysOfMonth: values });
+                              }}
+                              className="h-24 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-inner outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                            >
+                              {Array.from({ length: 28 }, (_, idx) => idx + 1).map((day) => (
+                                <option key={day} value={day}>
+                                  {day}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
 
-                          {(partner.schedules || []).length > 0 && (
-                            <div className="table-responsive mt-3">
-                              <Table bordered size="sm" className="mb-0">
-                                <thead>
-                                  <tr>
-                                    <th>Frequency</th>
-                                    <th>Recurrence</th>
-                                    <th>Dates</th>
-                                    <th>Open rides</th>
-                                    <th>Notes</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {partner.schedules.map((schedule) => (
-                                    <tr key={schedule.id}>
-                                      <td className="text-capitalize">
-                                        {schedule.frequency}
-                                      </td>
-                                      <td>{formatRecurrence(schedule)}</td>
-                                      <td>
-                                        {new Date(
-                                          schedule.startDate
-                                        ).toLocaleDateString()}{" "}
-                                        -{" "}
-                                        {new Date(
-                                          schedule.endDate
-                                        ).toLocaleDateString()}
-                                      </td>
-                                      <td>{schedule.openSlots}</td>
-                                      <td>{schedule.notes || "None"}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </Table>
-                            </div>
-                          )}
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex flex-col gap-1 text-slate-600 dark:text-slate-300">
+                            Start date
+                            <input
+                              type="date"
+                              value={scheduleForm.startDate}
+                              onChange={(event) => updateScheduleForm(partner.id, { startDate: event.target.value })}
+                              className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-inner outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                              required
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-slate-600 dark:text-slate-300">
+                            End date
+                            <input
+                              type="date"
+                              value={scheduleForm.endDate}
+                              onChange={(event) => updateScheduleForm(partner.id, { endDate: event.target.value })}
+                              className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-inner outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                              required
+                            />
+                          </label>
                         </div>
-                      )}
-                    </Card.Body>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+                        <label className="flex flex-col gap-1 text-slate-600 dark:text-slate-300">
+                          Open slots
+                          <input
+                            type="number"
+                            min="1"
+                            value={scheduleForm.openSlots}
+                            onChange={(event) =>
+                              updateScheduleForm(partner.id, { openSlots: Number(event.target.value) })
+                            }
+                            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-inner outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-slate-600 dark:text-slate-300">
+                          Notes
+                          <textarea
+                            value={scheduleForm.notes}
+                            onChange={(event) => updateScheduleForm(partner.id, { notes: event.target.value })}
+                            className="min-h-[80px] rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                          />
+                        </label>
 
-        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="submit"
+                            className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                          >
+                            Publish availability
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+                            onClick={() => resetScheduleForm(partner.id, scheduleForm.frequency)}
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+
+                  {(partner.schedules || []).length > 0 && (
+                    <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                      <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                        <thead className="bg-slate-50 dark:bg-slate-800/60">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Frequency
+                            </th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Recurrence
+                            </th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Dates
+                            </th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Open rides
+                            </th>
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                              Notes
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                          {partner.schedules.map((schedule) => (
+                            <tr key={schedule.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                              <td className="px-3 py-2 text-slate-900 dark:text-slate-100 capitalize">
+                                {schedule.frequency}
+                              </td>
+                              <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{formatRecurrence(schedule)}</td>
+                              <td className="px-3 py-2 text-slate-900 dark:text-slate-100">
+                                {new Date(schedule.startDate).toLocaleDateString()} -{" "}
+                                {new Date(schedule.endDate).toLocaleDateString()}
+                              </td>
+                              <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{schedule.openSlots}</td>
+                              <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{schedule.notes || "None"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {!partners.length && (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                No partners yet. Add a partner above to begin.
+              </div>
+            )}
+          </div>
+        </section>
       </main>
     </div>
   );

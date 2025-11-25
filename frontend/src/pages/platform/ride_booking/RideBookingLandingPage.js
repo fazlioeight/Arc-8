@@ -1,98 +1,66 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Form, InputGroup, Spinner, Table } from 'react-bootstrap';
-
-import PortalUtilityBar from '../../../components/PortalUtilityBar';
-import RideBookingHeader from './RideBookingHeader';
-import { getRecentRides } from '../../../services/rideBookingService';
-import '../../../styles/rideBooking.css';
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import PortalUtilityBar from "../../../components/PortalUtilityBar";
+import RideBookingHeader from "./RideBookingHeader";
+import { getRecentRides } from "../../../services/rideBookingService";
+import "../coding/member/memberWorkspace.css";
 
 const STATUS_OPTIONS = [
-  { value: 'all', label: 'All statuses' },
-  { value: 'queued', label: 'Queued' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'completed', label: 'Completed' },
+  { value: "all", label: "All statuses" },
+  { value: "queued", label: "Queued" },
+  { value: "in_progress", label: "In progress" },
+  { value: "completed", label: "Completed" },
 ];
 
 const formatDateTime = (iso) => {
-  if (!iso) return '�';
+  if (!iso) return "—";
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '�';
-  return date.toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-};
-
-const formatCurrency = (value) => {
-  if (value === undefined || value === null || Number.isNaN(Number(value))) return '�';
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 };
 
 const RideBookingLandingPage = () => {
   const navigate = useNavigate();
   const [rides, setRides] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedRideId, setSelectedRideId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [companyFilter, setCompanyFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  const loadRides = useCallback((focusId) => {
+  const loadRides = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      const results = getRecentRides();
-      setRides(results);
+      const result = getRecentRides();
+      setRides(result);
       setLastUpdated(new Date());
-      if (!results.length) {
-        setSelectedRideId(null);
-      } else {
-        setSelectedRideId((prev) => {
-          if (focusId) return focusId;
-          if (prev && results.some((ride) => ride.id === prev)) return prev;
-          return results[0].id;
-        });
-      }
     } catch (err) {
-      console.error('Unable to load rides', err);
-      setError('Unable to load recent rides.');
+      setError(err.message || "Unable to load rides");
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     loadRides();
-  }, [loadRides]);
-
-  const availableCompanies = useMemo(() => {
-    return Array.from(new Set(rides.map((ride) => ride.rideType)));
-  }, [rides]);
+  }, []);
 
   const filteredRides = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
     return rides.filter((ride) => {
-      const matchesStatus = statusFilter === 'all' || ride.status === statusFilter;
-      const matchesCompany = companyFilter === 'all' || ride.rideType === companyFilter;
-      if (!matchesStatus || !matchesCompany) return false;
-      if (!term) return true;
-      const haystack = [
-        ride.memberId,
-        ride.firstName,
-        ride.lastName,
-        ride.pickup,
-        ride.pickupAddress,
-        ride.dropoff,
-        ride.dropoffAddress,
-        ride.rideType,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(term);
+      if (statusFilter !== "all" && ride.status !== statusFilter) return false;
+      if (companyFilter && ride.rideType !== companyFilter) return false;
+      const term = searchTerm.trim().toLowerCase();
+      if (term) {
+        const haystack = [ride.memberName, ride.pickupAddress, ride.dropoffAddress, ride.rideType]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(term);
+      }
+      return true;
     });
   }, [rides, statusFilter, companyFilter, searchTerm]);
 
@@ -109,12 +77,50 @@ const RideBookingLandingPage = () => {
     });
   }, [filteredRides]);
 
-  const selectedRide = useMemo(() => {
-    return filteredRides.find((ride) => ride.id === selectedRideId) || null;
-  }, [filteredRides, selectedRideId]);
+  const selectedRide = useMemo(() => filteredRides.find((ride) => ride.id === selectedRideId) || null, [filteredRides, selectedRideId]);
+
+  const statusTone = (status) => {
+    switch (status) {
+      case "completed":
+        return "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200";
+      case "queued":
+        return "bg-slate-100 text-slate-700 ring-1 ring-slate-200";
+      case "in_progress":
+        return "bg-sky-100 text-sky-700 ring-1 ring-sky-200";
+      default:
+        return "bg-slate-100 text-slate-700 ring-1 ring-slate-200";
+    }
+  };
+
+  const companies = Array.from(new Set(rides.map((ride) => ride.rideType).filter(Boolean)));
+
+  const renderRow = useCallback(
+    (ride) => (
+      <tr
+        key={ride.id}
+        className={`cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-800/60 ${selectedRideId === ride.id ? "bg-sky-50 dark:bg-slate-800/80" : ""}`}
+        onClick={() => setSelectedRideId(ride.id)}
+      >
+        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">
+          <div className="font-semibold">{ride.memberName}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-300">{ride.memberId}</div>
+        </td>
+        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{ride.rideType}</td>
+        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">
+          <div className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusTone(ride.status)}`}>
+            {ride.status}
+          </div>
+        </td>
+        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{formatDateTime(ride.pickupAt)}</td>
+        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100">{ride.pickupAddress}</td>
+        <td className="px-4 py-3 text-sm text-slate-900 dark:text-slate-100 text-right">{ride.costUsd ? `$${ride.costUsd.toFixed(2)}` : "—"}</td>
+      </tr>
+    ),
+    [selectedRideId]
+  );
 
   return (
-    <div className="ride-booking">
+    <div className="ride-booking coding-member-workspace portal-theme min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <PortalUtilityBar />
       <RideBookingHeader
         title="Ride booking overview"
@@ -122,37 +128,49 @@ const RideBookingLandingPage = () => {
       />
 
       <div className="ride-booking__shell">
-        <section className="ride-booking__history">
-          <div className="ride-booking__history-header">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="h4 mb-1">Recent rides</h2>
-              <div className="ride-booking__timestamp">
-                Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : '�'}
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent rides</h2>
+              <div className="text-sm text-slate-500 dark:text-slate-300">
+                Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : "—"}
               </div>
             </div>
-            <Button variant="outline-secondary" size="sm" onClick={() => loadRides()} disabled={loading}>
-              {loading ? <Spinner size="sm" animation="border" /> : 'Refresh'}
-            </Button>
-          </div>
-
-          <div className="ride-booking__filters">
-            <div>
-              <Form.Label htmlFor="ride-search">Search</Form.Label>
-              <InputGroup size="sm">
-                <InputGroup.Text>Search</InputGroup.Text>
-                <Form.Control
-                  id="ride-search"
-                  type="search"
-                  placeholder="Member, address, or partner"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                />
-              </InputGroup>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+                onClick={() => navigate("/RideBooking/book")}
+              >
+                Book ride
+              </button>
+              <button
+                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+                onClick={() => loadRides()}
+                disabled={loading}
+              >
+                {loading ? "Refreshing..." : "Refresh"}
+              </button>
             </div>
-            <div>
-              <Form.Label>Status</Form.Label>
-              <Form.Select
-                size="sm"
+          </header>
+
+          <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 shadow-inner dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 sm:grid-cols-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300" htmlFor="ride-search">
+                Search
+              </label>
+              <input
+                id="ride-search"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                type="search"
+                placeholder="Member, address, or partner"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Status</label>
+              <select
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
               >
@@ -161,145 +179,122 @@ const RideBookingLandingPage = () => {
                     {option.label}
                   </option>
                 ))}
-              </Form.Select>
+              </select>
             </div>
-            <div>
-              <Form.Label>Partner</Form.Label>
-              <Form.Select
-                size="sm"
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Partner</label>
+              <select
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
                 value={companyFilter}
                 onChange={(event) => setCompanyFilter(event.target.value)}
               >
-                <option value="all">All partners</option>
-                {availableCompanies.map((company) => (
+                <option value="">All partners</option>
+                {companies.map((company) => (
                   <option key={company} value={company}>
                     {company}
                   </option>
                 ))}
-              </Form.Select>
+              </select>
             </div>
-            <div className="d-flex flex-column">
-              <Form.Label>&nbsp;</Form.Label>
-              <Button
-                size="sm"
-                variant="outline-secondary"
+            <div className="flex items-end justify-end">
+              <button
+                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-800"
                 onClick={() => {
-                  setSearchTerm('');
-                  setStatusFilter('all');
-                  setCompanyFilter('all');
-                  loadRides();
+                  setStatusFilter("all");
+                  setCompanyFilter("");
+                  setSearchTerm("");
                 }}
               >
                 Clear filters
-              </Button>
+              </button>
             </div>
           </div>
 
-          {error && <Alert variant="danger">{error}</Alert>}
-
-          <div className="ride-booking__tablewrap">
-            <Table striped hover responsive size="sm" className="ride-booking__table">
-              <thead>
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+              <thead className="bg-slate-50 dark:bg-slate-800/60">
                 <tr>
-                  <th>Member</th>
-                  <th>Pickup</th>
-                  <th>Dropoff</th>
-                  <th>Status</th>
-                  <th>Scheduled</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    Member
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    Partner
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    Pickup
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    From
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    Cost
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {loading && (
                   <tr>
-                    <td colSpan={5} className="text-center py-4">Loading rides...</td>
+                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+                      Loading rides...
+                    </td>
                   </tr>
                 )}
                 {!loading && filteredRides.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center text-muted py-4">
-                      No rides match your filters. Try adjusting your search or schedule a new ride.
+                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+                      No rides match your filters.
                     </td>
                   </tr>
                 )}
-                {!loading && filteredRides.map((ride) => {
-                  const isActive = ride.id === selectedRideId;
-                  return (
-                    <tr
-                      key={ride.id}
-                      className={isActive ? 'is-active' : ''}
-                      onClick={() => setSelectedRideId(ride.id)}
-                    >
-                      <td>
-                        {ride.firstName} {ride.lastName}
-                        <br />
-                        <span className="text-muted small">{ride.memberId}</span>
-                      </td>
-                      <td>{ride.pickup}</td>
-                      <td>{ride.dropoff}</td>
-                      <td>
-                        <span className={`ride-booking__status ride-booking__status--${ride.status}`}>
-                          {ride.status.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td>{formatDateTime(ride.scheduledPickup)}</td>
-                    </tr>
-                  );
-                })}
+                {filteredRides.map(renderRow)}
               </tbody>
-            </Table>
+            </table>
           </div>
 
-          <div className="ride-booking__detail">
+          <div className="mt-4 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-inner dark:border-slate-700 dark:bg-slate-800">
             {selectedRide ? (
-              <div className="ride-booking__detail-card">
-                <header>
+              <div className="space-y-3 text-sm text-slate-800 dark:text-slate-100">
+                <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="h5 mb-1">
-                      {selectedRide.firstName} {selectedRide.lastName}
-                    </h3>
-                    <div className="text-muted small">Member ID {selectedRide.memberId}</div>
+                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Member</div>
+                    <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                      {selectedRide.memberName} <span className="text-sm text-slate-500">({selectedRide.memberId})</span>
+                    </div>
                   </div>
-                  <span className={`ride-booking__status ride-booking__status--${selectedRide.status}`}>
-                    {selectedRide.status.replace('_', ' ')}
-                  </span>
-                </header>
-                <dl className="ride-booking__detail-grid">
-                  <div>
-                    <dt>Partner</dt>
-                    <dd>{selectedRide.rideType}</dd>
+                  <div className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusTone(selectedRide.status)}`}>
+                    {selectedRide.status}
                   </div>
-                  <div>
-                    <dt>Pickup time</dt>
-                    <dd>{formatDateTime(selectedRide.scheduledPickup)}</dd>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Partner</div>
+                    <div className="font-semibold">{selectedRide.rideType}</div>
                   </div>
-                  <div>
-                    <dt>Estimated drop-off</dt>
-                    <dd>{formatDateTime(selectedRide.estimatedDropoff)}</dd>
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Pickup time</div>
+                    <div className="font-semibold">{formatDateTime(selectedRide.pickupAt)}</div>
                   </div>
-                  <div>
-                    <dt>Estimated cost</dt>
-                    <dd>{formatCurrency(selectedRide.costUsd)}</dd>
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Pickup</div>
+                    <div className="font-semibold">{selectedRide.pickupAddress}</div>
                   </div>
-                  <div>
-                    <dt>Pickup location</dt>
-                    <dd>
-                      {selectedRide.pickup}
-                      <br />
-                      <span className="text-muted small">{selectedRide.pickupAddress}</span>
-                    </dd>
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Dropoff</div>
+                    <div className="font-semibold">{selectedRide.dropoffAddress}</div>
                   </div>
-                  <div>
-                    <dt>Dropoff location</dt>
-                    <dd>
-                      {selectedRide.dropoff}
-                      <br />
-                      <span className="text-muted small">{selectedRide.dropoffAddress}</span>
-                    </dd>
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Cost</div>
+                    <div className="font-semibold">{selectedRide.costUsd ? `$${selectedRide.costUsd.toFixed(2)}` : "—"}</div>
                   </div>
-                </dl>
+                </div>
               </div>
             ) : (
-              <div className="ride-booking__detail-empty">Select a ride to view details.</div>
+              <div className="text-center text-sm text-slate-500 dark:text-slate-300">
+                Select a ride to view details.
+              </div>
             )}
           </div>
         </section>

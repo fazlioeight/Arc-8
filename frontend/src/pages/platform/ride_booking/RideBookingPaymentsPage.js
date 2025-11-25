@@ -1,720 +1,356 @@
-import React, { useMemo, useState } from 'react';
-import {
-  Alert,
-  Accordion,
-  Badge,
-  Button,
-  ButtonGroup,
-  Form,
-  Table,
-} from 'react-bootstrap';
+import React, { useMemo, useState } from "react";
+import { Accordion } from "react-bootstrap";
+import PortalUtilityBar from "../../../components/PortalUtilityBar";
+import RideBookingHeader from "./RideBookingHeader";
+import "../coding/member/memberWorkspace.css";
+import "../../../styles/rideBooking.css";
 
-import PortalUtilityBar from '../../../components/PortalUtilityBar';
-import RideBookingHeader from './RideBookingHeader';
-import '../../../styles/rideBooking.css';
-
-const PLANTUML_BASE_URL = 'https://www.plantuml.com/plantuml/svg/';
-
-// Only allow base64url and PlantUML-safe characters in encoded diagram data
-const isValidPlantUmlEncoded = (encoded) => /^[A-Za-z0-9\-_]+$/.test(encoded);
-
-const INITIAL_PAYOUTS = [
-  {
-    id: 'pay-1001',
-    provider: 'Uber Health',
-    partnerType: 'Network',
-    amount: 3421.25,
-    currency: 'USD',
-    scheduledFor: '2025-10-21T16:00:00Z',
-    method: 'Virtual card',
-    rideCount: 18,
-    status: 'scheduled',
-  },
-  {
-    id: 'pay-1002',
-    provider: 'Lyft Assist',
-    partnerType: 'Network',
-    amount: 2810.1,
-    currency: 'USD',
-    scheduledFor: '2025-10-19T19:00:00Z',
-    method: 'ACH',
-    rideCount: 14,
-    status: 'processing',
-  },
-  {
-    id: 'pay-1003',
-    provider: 'Austin Care Vans',
-    partnerType: '3rd Party Driver',
-    amount: 965.45,
-    currency: 'USD',
-    scheduledFor: '2025-10-17T14:30:00Z',
-    method: 'Stripe Connect',
-    rideCount: 6,
-    status: 'paid',
-    paidAt: '2025-10-18T01:05:00Z',
-  },
+const PAYMENT_METRICS = [
+  { id: "payouts", label: "Total payouts", value: "$182,400", trend: 8 },
+  { id: "invoices", label: "Subscriber invoices", value: "$141,200", trend: 5 },
+  { id: "disputes", label: "Open disputes", value: "12", trend: -3 },
+  { id: "sla", label: "Avg SLA", value: "2.2 days", trend: 4 },
+  { id: "collections", label: "Collections", value: "$31,900", trend: 2 },
+  { id: "refunds", label: "Refunds", value: "$2,180", trend: -6 },
 ];
 
-const INITIAL_INVOICES = [
-  {
-    id: 'inv-2087',
-    subscriber: 'Lone Star Health',
-    periodStart: '2025-09-01',
-    periodEnd: '2025-09-30',
-    dueDate: '2025-10-20',
-    total: 14875.52,
-    status: 'sent',
-    autoPay: true,
-    lastSentAt: '2025-10-05T12:10:00Z',
-  },
-  {
-    id: 'inv-2088',
-    subscriber: 'Acme Biotech',
-    periodStart: '2025-09-01',
-    periodEnd: '2025-09-30',
-    dueDate: '2025-10-14',
-    total: 6230.75,
-    status: 'overdue',
-    autoPay: false,
-    lastSentAt: '2025-10-01T15:00:00Z',
-    lastReminderAt: '2025-10-16T13:10:00Z',
-  },
-  {
-    id: 'inv-2089',
-    subscriber: 'Sunrise Clinics',
-    periodStart: '2025-10-01',
-    periodEnd: '2025-10-31',
-    dueDate: '2025-11-14',
-    total: 4021.2,
-    status: 'draft',
-    autoPay: true,
-    lastSentAt: null,
-  },
-];
-
-const INITIAL_RECONCILIATION = [
-  {
-    id: 'adj-3101',
-    rideId: 'ride-1003',
-    provider: 'Uber Health',
-    variance: -4.8,
-    type: 'fare_delta',
-    reason: 'Provider receipt lower than ledger',
-    assignedTo: 'finance@nexora.com',
-    status: 'open',
-  },
-  {
-    id: 'adj-3102',
-    rideId: 'ride-1011',
-    provider: 'Lyft Assist',
-    variance: 12.5,
-    type: 'surcharge',
-    reason: 'Additional wait time charge',
-    assignedTo: 'ops@nexora.com',
-    status: 'in_progress',
-  },
-  {
-    id: 'adj-3103',
-    rideId: 'ride-1024',
-    provider: 'Austin Care Vans',
-    variance: -18.75,
-    type: 'refund',
-    reason: 'Duplicate charge reversed',
-    assignedTo: 'finance@nexora.com',
-    status: 'resolved',
-  },
-];
-
-const RECENT_WEBHOOKS = [
-  {
-    id: 'wh-901',
-    receivedAt: '2025-10-18T18:42:10Z',
-    source: 'Stripe Billing',
-    event: 'invoice.payment_succeeded',
-    reference: 'inv-2086',
-    status: 'processed',
-  },
-  {
-    id: 'wh-902',
-    receivedAt: '2025-10-18T16:12:33Z',
-    source: 'Uber Health',
-    event: 'trip.completed',
-    reference: 'ride-1050',
-    status: 'processed',
-  },
-  {
-    id: 'wh-903',
-    receivedAt: '2025-10-18T14:01:09Z',
-    source: 'Stripe Connect',
-    event: 'payout.paid',
-    reference: 'pay-1003',
-    status: 'processed',
-  },
-  {
-    id: 'wh-904',
-    receivedAt: '2025-10-18T11:27:58Z',
-    source: 'Lyft Assist',
-    event: 'trip.canceled',
-    reference: 'ride-1064',
-    status: 'investigating',
-  },
-];
-
-const REFERENCE_DIAGRAMS = [
-  {
-    id: 'money_flow',
-    title: 'Money and data flow',
-    description: 'Trace passenger bookings to provider payouts and subscriber invoices.',
-    encoded:
-      'bLHDYzim4BthLmpf9O6474ekUoZhU2bTA3Jiqa8fEIYox8YLDTwHd19A_tj7ifqr2KdPaoNvpTFJcuzx7oI5jhR2wZ90G21JxGCKXhGA1ftmByOracGD2ki6dNRXEHojXWYGhh9w1Cc8y7UE5Wa-h5Oh8QGAlDv8xxMhDFNxIIwjXPofD45MyNS2qdShSUA5oNExyuhCZb7JlFK1QrxbB4Ewuoo5l264S5Xmp4zi-K8hGubK9yomWJy2uDSQaULMy8tKNlj0aWLjuu-DFDPyFtDgEXYbq-7QM1lHuxElkk2dRCLV8PJ5je39Xl1W2ar-qjtnFIhEDeyT_CZ63fkFL2msxFWH7iWSE68R5VRhCMCd1fwaiGFhSo3JQEWbRKT7EJh7hgMZBF-o_64ufv8TbbJu93HP2ul5foi6m1taf6NWjF93EBUlBV-3SfmycAA3dTvBMyx45Pfqm-dvp1fXi8JN5fbxoJNaIiEfc68Jgmkosqmdx_xFjBx9r3lCD0_6DpAe_IamdmanadpJey_6iQqAVPX3hOCiP91YfFBzmOEmzqVUDgwhKOvzqWgfI6cTGzCNwhmd2wQPGwcr5vVbtn5TbXDpClP41TFetJ9vm3SrIB6A54DdLqdFohPZn9PnF81YYpIfHOg-BSH56vu_CgigqjLGldwUPbNBsrhIIzjS8pZhA2PwzBxLODm16HNLZ0RCQ1fTYOw-3B7Jw5pUsN2EJE6NtjpnCWIhK-Sx3AOqIgOXVAzT4OVqFm00',
-  },
-  {
-    id: 'booking_sequence',
-    title: 'Booking → settlement sequence',
-    description: 'Detailed sequence for booking, payouts, invoicing, and cash application.',
-    encoded:
-      'RLJ1Rk8m4BtxAqRT2sXJEFNGbLWr2PMAX0GBoqezLSQPfbuIsxKdRFdx7GT22kebIZpllPbvVif38EcfgIiHTjeuwMKD0TyRD0fJx-s_t5RMmxUxkxil49dzoAmlq9zGz_VtGaX5_9wMQ4WmdBJIJXg2cuLNRnZ8IwxVW0omMELFbv2bjtlDUf0kPp26gTTxF6ANgyMVAwmyrDmZ7ClfioWaoQqC23TpBCeJR_uulQHbkggqATjYDflFBwjhyjeXV0Qjioj8imtAw-sfmNgJ2T5k2xS_svNW1-GU9I5utWK6JeQ0XWTAOBaPJnS95EWe0MK3WM8Y-g5eYImGzsI1Nuqb76VMxaHxqakdIZ4RliFZxvIViSMBBivythVllvfD7s70LqnDc6nP38i4tgFqK8n6eslfTGk4nh6J6620vjRRXZ01fnLpRnlt9I-tjQkGiE1vNhMHrKkx6W-72hMZg-4shVxbSAgJI3ufV78bVMRYAiQEXLsNae145SOKY8ZexUDizAY1ahuOvzOOL4oM1zvfs16E8wrGSOwFPd90JU0GQsluxauYB-wOjg4GaqaN3yWFgk8Bnb4vIg2sXjwgmn0c4n63rQkdPUcnx08HO7k0S0xHE9fnHOY6ikzGIxzhN08aFp0a88k_JQ0sz6V2EkklMvkzrGhPU9wEFmdh81WGOPk8MwCfEfI8Hvr0z6kGva_ZdAqQdZYTwRKcU6rC4O0ik4hIg_Nrb_wTf2yjx5VjJNpWGU9Fvpy0',
-  },
-];
-
-const TIMEFRAME_OPTIONS = [
-  { value: '30', label: 'Last 30 days' },
-  { value: '60', label: 'Last 60 days' },
-  { value: '90', label: 'Last 90 days' },
-];
-
-const STATUS_VARIANTS = {
-  paid: 'paid',
-  processing: 'processing',
-  scheduled: 'queued',
-  overdue: 'overdue',
-  sent: 'sent',
-  draft: 'draft',
-  open: 'queued',
-  in_progress: 'in_progress',
-  resolved: 'completed',
-  processed: 'completed',
-  investigating: 'overdue',
+const PAYMENT_FILTERS = {
+  timeframe: [
+    { value: "last_7_days", label: "Last 7 days" },
+    { value: "last_30_days", label: "Last 30 days" },
+    { value: "qtr", label: "This quarter" },
+    { value: "ytd", label: "Year to date" },
+  ],
+  providers: [
+    { value: "", label: "All providers" },
+    { value: "SwiftLift", label: "SwiftLift" },
+    { value: "CareRide", label: "CareRide" },
+    { value: "Metro Wheels", label: "Metro Wheels" },
+  ],
+  subscribers: [
+    { value: "", label: "All subscribers" },
+    { value: "Horizon Health", label: "Horizon Health" },
+    { value: "Beacon Clinics", label: "Beacon Clinics" },
+    { value: "TriCity Medical", label: "TriCity Medical" },
+  ],
 };
 
-const formatCurrency = (amount, currency = 'USD') => {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(amount);
+const WEBHOOK_FEED = [
+  { id: "wh-1", source: "Stripe", event: "payment_intent.succeeded", detail: "Payment for invoice INV-4312 succeeded", ts: "2025-05-12 10:21 PT" },
+  { id: "wh-2", source: "Stripe", event: "invoice.payment_failed", detail: "Subscriber Horizon Health payment failed", ts: "2025-05-12 09:54 PT" },
+  { id: "wh-3", source: "Custom", event: "ride.payout.created", detail: "Provider Metro Wheels payout initiated", ts: "2025-05-11 18:14 PT" },
+  { id: "wh-4", source: "Custom", event: "ride.invoice.generated", detail: "Monthly invoice generated for Beacon Clinics", ts: "2025-05-11 07:32 PT" },
+];
+
+const SAMPLE_PAYMENTS = {
+  providers: [
+    { provider: "SwiftLift", invoice: "INV-4102", amount: 38210, status: "Paid" },
+    { provider: "CareRide", invoice: "INV-4128", amount: 27440, status: "Pending" },
+    { provider: "Metro Wheels", invoice: "INV-4177", amount: 18990, status: "Paid" },
+    { provider: "CareRide", invoice: "INV-4189", amount: 16330, status: "In review" },
+  ],
+  subscribers: [
+    { subscriber: "Horizon Health", invoice: "SUB-5512", amount: 42110, status: "Open" },
+    { subscriber: "Beacon Clinics", invoice: "SUB-5531", amount: 31800, status: "Paid" },
+    { subscriber: "TriCity Medical", invoice: "SUB-5542", amount: 24880, status: "Open" },
+    { subscriber: "Horizon Health", invoice: "SUB-5555", amount: 20850, status: "Paid" },
+  ],
+  reconciliation: [
+    { id: "rec-1", title: "Duplicate ride ID", detail: "Ride 9921 listed twice in payout batch #2104.", date: "May 12" },
+    { id: "rec-2", title: "Bank reject", detail: "SwiftLift payout rejected: routing mismatch.", date: "May 11" },
+    { id: "rec-3", title: "Invoice dispute", detail: "TriCity Medical disputed late cancel fee.", date: "May 10" },
+  ],
+  diagrams: [
+    { id: "d1", title: "Billing flow", caption: "Ride -> invoice -> payout -> reconciliation" },
+    { id: "d2", title: "Webhook contract", caption: "Stripe + internal events mapped to ride states" },
+    { id: "d3", title: "SLA timeline", caption: "Provider payout SLA across batch windows" },
+  ],
 };
 
-const formatDateTime = (iso) => {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-};
+const getRecentPayments = (filters) => {
+  const matchProvider = (row) => !filters.provider || row.provider === filters.provider;
+  const matchSubscriber = (row) => !filters.subscriber || row.subscriber === filters.subscriber;
 
-const formatDate = (iso) => {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString();
+  return {
+    providers: SAMPLE_PAYMENTS.providers.filter(matchProvider),
+    subscribers: SAMPLE_PAYMENTS.subscribers.filter(matchSubscriber),
+    reconciliation: SAMPLE_PAYMENTS.reconciliation,
+    diagrams: SAMPLE_PAYMENTS.diagrams,
+  };
 };
 
 const RideBookingPaymentsPage = () => {
-  const [timeframe, setTimeframe] = useState('30');
-  const [subscriber, setSubscriber] = useState('all');
-  const [payouts, setPayouts] = useState(INITIAL_PAYOUTS);
-  const [invoices, setInvoices] = useState(INITIAL_INVOICES);
-  const [reconciliation, setReconciliation] = useState(INITIAL_RECONCILIATION);
-  const [syncNotice, setSyncNotice] = useState(null);
+  const [filters, setFilters] = useState({
+    timeframe: "last_30_days",
+    provider: "",
+    subscriber: "",
+  });
 
-  const timeframeCutoff = useMemo(() => {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - Number(timeframe));
-    return cutoff;
-  }, [timeframe]);
+  const payments = useMemo(() => getRecentPayments(filters), [filters]);
 
-  const subscriberOptions = useMemo(() => {
-    const base = new Set(invoices.map((invoice) => invoice.subscriber));
-    return ['all', ...Array.from(base)];
-  }, [invoices]);
-
-  const filteredPayouts = useMemo(() => {
-    return payouts.filter((payout) => new Date(payout.scheduledFor) >= timeframeCutoff);
-  }, [payouts, timeframeCutoff]);
-
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter((invoice) => {
-      const dueDate = new Date(invoice.dueDate);
-      const inWindow = dueDate >= timeframeCutoff;
-      const matchesSubscriber = subscriber === 'all' || invoice.subscriber === subscriber;
-      return inWindow && matchesSubscriber;
-    });
-  }, [invoices, subscriber, timeframeCutoff]);
-
-  const outstandingInvoices = useMemo(
-    () => filteredInvoices.filter((invoice) => invoice.status !== 'paid'),
-    [filteredInvoices],
-  );
-
-  const metrics = useMemo(() => {
-    const pendingPayouts = filteredPayouts.filter((payout) => payout.status !== 'paid');
-    const pendingPayoutTotal = pendingPayouts.reduce((sum, payout) => sum + payout.amount, 0);
-    const outstandingTotal = outstandingInvoices.reduce((sum, invoice) => sum + invoice.total, 0);
-    const autopayInvoices = filteredInvoices.filter((invoice) => invoice.autoPay);
-    const autopayRate = filteredInvoices.length
-      ? Math.round((autopayInvoices.length / filteredInvoices.length) * 100)
-      : 0;
-    const netCash = outstandingTotal - pendingPayoutTotal;
-
-    return [
-      {
-        id: 'outstanding-invoices',
-        label: 'Outstanding invoices',
-        value: formatCurrency(outstandingTotal),
-        trend: `${outstandingInvoices.length} open`,
-      },
-      {
-        id: 'pending-payouts',
-        label: 'Pending provider payouts',
-        value: formatCurrency(pendingPayoutTotal),
-        trend: `${pendingPayouts.length} pending`,
-      },
-      {
-        id: 'autopay-rate',
-        label: 'Autopay coverage',
-        value: `${autopayRate}%`,
-        trend: `${autopayInvoices.length} of ${filteredInvoices.length || 0} subscribers`,
-      },
-      {
-        id: 'net-cash',
-        label: 'Net cash impact',
-        value: formatCurrency(netCash),
-        trend: netCash >= 0 ? 'Positive inflow' : 'Outflow risk',
-      },
-    ];
-  }, [filteredInvoices, filteredPayouts, outstandingInvoices]);
-
-  const openAdjustments = useMemo(
-    () => reconciliation.filter((item) => item.status !== 'resolved'),
-    [reconciliation],
-  );
-
-  const handleMarkPayoutPaid = (id) => {
-    setPayouts((current) =>
-      current.map((payout) =>
-        payout.id === id
-          ? {
-              ...payout,
-              status: 'paid',
-              paidAt: new Date().toISOString(),
-            }
-          : payout,
-      ),
-    );
-  };
-
-  const handleSendReminder = (id) => {
-    setInvoices((current) =>
-      current.map((invoice) =>
-        invoice.id === id
-          ? {
-              ...invoice,
-              lastReminderAt: new Date().toISOString(),
-            }
-          : invoice,
-      ),
-    );
-  };
-
-  const handleFinalizeDraft = (id) => {
-    setInvoices((current) =>
-      current.map((invoice) =>
-        invoice.id === id
-          ? {
-              ...invoice,
-              status: 'sent',
-              lastSentAt: new Date().toISOString(),
-            }
-          : invoice,
-      ),
-    );
-  };
-
-  const handleResolveAdjustment = (id) => {
-    setReconciliation((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: 'resolved',
-            }
-          : item,
-      ),
-    );
-  };
-
-  const handleRunReconciliation = () => {
-    setSyncNotice({
-      type: 'success',
-      message: `Nightly reconciliation queued for ${new Date().toLocaleTimeString()}. We will email finance once adjustments are posted.`,
-    });
-  };
-
-  const handleGenerateDrafts = () => {
-    setSyncNotice({
-      type: 'info',
-      message: 'Draft invoices will refresh in Stripe Billing in a few minutes. Check invoice-creation logs for progress.',
-    });
-  };
-
-  const renderStatusBadge = (status) => {
-    const variantKey = STATUS_VARIANTS[status] || 'queued';
-    return (
-      <span className={`ride-booking__status ride-booking__status--${variantKey}`}>
-        {status.replace('_', ' ')}
-      </span>
-    );
-  };
+  const metricCards = PAYMENT_METRICS;
 
   return (
-    <div className="ride-booking">
+    <div className="ride-booking coding-member-workspace portal-theme min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <PortalUtilityBar />
       <RideBookingHeader
-        title="Ride payments console"
-        subtitle="Track provider payouts, subscriber invoices, and reconciliation tasks for the ride booking program."
+        title="Ride Payments & Billing"
+        subtitle="Track payouts, invoices, and reconciliation activity for ride partners."
       />
 
-      <div className="ride-booking__shell ride-booking__feature-shell">
-        {syncNotice && (
-          <Alert
-            variant={syncNotice.type}
-            onClose={() => setSyncNotice(null)}
-            dismissible
-            className="ride-booking__feature-alert"
-          >
-            {syncNotice.message}
-          </Alert>
-        )}
-
-        <div className="ride-booking__feature-metrics">
-          {metrics.map((metric) => (
-            <div key={metric.id} className="ride-booking__metric-card">
-              <div className="ride-booking__metric-label">{metric.label}</div>
-              <div className="ride-booking__metric-value">{metric.value}</div>
-              <div className="ride-booking__metric-trend">{metric.trend}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="ride-booking__feature-filters">
-          <Form.Group controlId="timeframe" className="ride-booking__filter">
-            <Form.Label>Time window</Form.Label>
-            <Form.Select value={timeframe} onChange={(event) => setTimeframe(event.target.value)}>
-              {TIMEFRAME_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-          <Form.Group controlId="subscriber" className="ride-booking__filter">
-            <Form.Label>Subscriber</Form.Label>
-            <Form.Select value={subscriber} onChange={(event) => setSubscriber(event.target.value)}>
-              {subscriberOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option === 'all' ? 'All subscribers' : option}
-                </option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-          <div className="ride-booking__feature-actions">
-            <ButtonGroup size="sm">
-              <Button variant="outline-primary" onClick={handleRunReconciliation}>
-                Run reconciliation now
-              </Button>
-              <Button variant="outline-secondary" onClick={handleGenerateDrafts}>
-                Refresh draft invoices
-              </Button>
-            </ButtonGroup>
-          </div>
-        </div>
-
-        <div className="ride-booking__feature-grid">
-          <section className="ride-booking__feature-card" aria-labelledby="provider-payouts">
-            <header className="ride-booking__feature-cardhead">
-              <div>
-                <h2 id="provider-payouts" className="h5 mb-1">
-                  Provider payouts
-                </h2>
-                <p className="text-muted small mb-0">
-                  Monitor upcoming settlements across virtual cards, ACH, and Stripe Connect.
-                </p>
-              </div>
-            </header>
-            <div className="ride-booking__tablewrap">
-              <Table hover responsive size="sm" className="ride-booking__table">
-                <thead>
-                  <tr>
-                    <th>Provider</th>
-                    <th>Amount</th>
-                    <th>Scheduled</th>
-                    <th>Method</th>
-                    <th>Rides</th>
-                    <th>Status</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPayouts.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="text-center text-muted py-4">
-                        No payouts in this window.
-                      </td>
-                    </tr>
-                  )}
-                  {filteredPayouts.map((payout) => (
-                    <tr key={payout.id}>
-                      <td>
-                        <div className="fw-semibold">{payout.provider}</div>
-                        <div className="text-muted small">{payout.partnerType}</div>
-                      </td>
-                      <td>{formatCurrency(payout.amount, payout.currency)}</td>
-                      <td>{formatDateTime(payout.status === 'paid' ? payout.paidAt || payout.scheduledFor : payout.scheduledFor)}</td>
-                      <td>{payout.method}</td>
-                      <td>{payout.rideCount}</td>
-                      <td>{renderStatusBadge(payout.status)}</td>
-                      <td className="text-end">
-                        {payout.status !== 'paid' ? (
-                          <Button
-                            size="sm"
-                            variant="outline-success"
-                            onClick={() => handleMarkPayoutPaid(payout.id)}
-                          >
-                            Mark paid
-                          </Button>
-                        ) : (
-                          <Badge bg="secondary" pill>
-                            Paid
-                          </Badge>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          </section>
-
-          <section className="ride-booking__feature-card" aria-labelledby="subscriber-invoices">
-            <header className="ride-booking__feature-cardhead">
-              <div>
-                <h2 id="subscriber-invoices" className="h5 mb-1">
-                  Subscriber invoices
-                </h2>
-                <p className="text-muted small mb-0">
-                  Keep tabs on open balances and quickly trigger follow-ups from the console.
-                </p>
-              </div>
-            </header>
-            <div className="ride-booking__tablewrap">
-              <Table hover responsive size="sm" className="ride-booking__table">
-                <thead>
-                  <tr>
-                    <th>Subscriber</th>
-                    <th>Period</th>
-                    <th>Due</th>
-                    <th>Total</th>
-                    <th>Autopay</th>
-                    <th>Status</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoices.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="text-center text-muted py-4">
-                        No invoices match your filters.
-                      </td>
-                    </tr>
-                  )}
-                  {filteredInvoices.map((invoice) => (
-                    <tr key={invoice.id}>
-                      <td>
-                        <div className="fw-semibold">{invoice.subscriber}</div>
-                        <div className="text-muted small">{invoice.id}</div>
-                      </td>
-                      <td>
-                        {formatDate(invoice.periodStart)} – {formatDate(invoice.periodEnd)}
-                      </td>
-                      <td>{formatDate(invoice.dueDate)}</td>
-                      <td>{formatCurrency(invoice.total)}</td>
-                      <td>
-                        {invoice.autoPay ? (
-                          <Badge bg="primary" pill>
-                            Autopay
-                          </Badge>
-                        ) : (
-                          <Badge bg="warning" pill text="dark">
-                            Manual
-                          </Badge>
-                        )}
-                      </td>
-                      <td>{renderStatusBadge(invoice.status)}</td>
-                      <td className="text-end">
-                        <div className="ride-booking__table-actions">
-                          {invoice.status === 'draft' ? (
-                            <Button
-                              size="sm"
-                              variant="outline-primary"
-                              onClick={() => handleFinalizeDraft(invoice.id)}
-                            >
-                              Finalize &amp; send
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline-secondary"
-                              onClick={() => handleSendReminder(invoice.id)}
-                            >
-                              Send reminder
-                            </Button>
-                          )}
-                          {invoice.lastReminderAt && (
-                            <span className="text-muted small">
-                              Last reminder {formatDateTime(invoice.lastReminderAt)}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          </section>
-
-          <section className="ride-booking__feature-card" aria-labelledby="reconciliation-queue">
-            <header className="ride-booking__feature-cardhead">
-              <div>
-                <h2 id="reconciliation-queue" className="h5 mb-1">
-                  Reconciliation queue
-                </h2>
-                <p className="text-muted small mb-0">
-                  Resolve variances between provider receipts and the ride ledger.
-                </p>
-              </div>
-              <Badge bg="secondary">{openAdjustments.length} open</Badge>
-            </header>
-            <ul className="ride-booking__recon-list">
-              {reconciliation.map((item) => (
-                <li key={item.id} className="ride-booking__recon-item">
-                  <div>
-                    <div className="ride-booking__recon-title">
-                      {item.provider} · Ride {item.rideId}
-                    </div>
-                    <div className="ride-booking__recon-meta">
-                      <span>
-                        Variance {formatCurrency(item.variance)}
-                      </span>
-                      <span>{item.reason}</span>
-                      <span>{item.assignedTo}</span>
-                    </div>
-                  </div>
-                  <div className="ride-booking__recon-actions">
-                    {renderStatusBadge(item.status)}
-                    {item.status !== 'resolved' && (
-                      <Button
-                        size="sm"
-                        variant="outline-success"
-                        onClick={() => handleResolveAdjustment(item.id)}
-                      >
-                        Resolve
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="ride-booking__feature-card" aria-labelledby="webhook-feed">
-            <header className="ride-booking__feature-cardhead">
-              <div>
-                <h2 id="webhook-feed" className="h5 mb-1">
-                  Live webhook feed
-                </h2>
-                <p className="text-muted small mb-0">
-                  Monitor inbound events from Stripe and provider integrations.
-                </p>
-              </div>
-            </header>
-            <ul className="ride-booking__webhook-list">
-              {RECENT_WEBHOOKS.map((entry) => (
-                <li key={entry.id} className="ride-booking__webhook-item">
-                  <div>
-                    <div className="ride-booking__webhook-event">
-                      <span className="ride-booking__webhook-source">{entry.source}</span>
-                      <code className="ride-booking__inline-code">{entry.event}</code>
-                    </div>
-                    <div className="ride-booking__webhook-meta">
-                      <span>{formatDateTime(entry.receivedAt)}</span>
-                      <span>Ref {entry.reference}</span>
-                    </div>
-                  </div>
-                  <div>{renderStatusBadge(entry.status)}</div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-
-        <section className="ride-booking__feature-card" aria-labelledby="reference-diagrams">
-          <header className="ride-booking__feature-cardhead">
+      <div className="ride-booking__shell">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 id="reference-diagrams" className="h5 mb-1">
-                Reference diagrams
-              </h2>
-              <p className="text-muted small mb-0">
-                Keep architecture and sequence diagrams handy while resolving finance operations.
-              </p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Billing overview</h2>
+              <p className="text-sm text-slate-600 dark:text-slate-300">Payments, invoices, and webhook events.</p>
             </div>
-          </header>
-          <Accordion alwaysOpen>
-            {REFERENCE_DIAGRAMS.map((diagram, index) => (
-              <Accordion.Item eventKey={diagram.id} key={diagram.id}>
-                <Accordion.Header>
-                  <span className="ride-booking__diagram-title">
-                    {index + 1}. {diagram.title}
-                  </span>
-                </Accordion.Header>
+            <div className="flex flex-wrap gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <div className="inline-flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Synced
+              </div>
+              <span>•</span>
+              <span>Autosave: On</span>
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-inner dark:border-slate-700 dark:bg-slate-800 sm:grid-cols-2 lg:grid-cols-3">
+            {metricCards.map((metric) => (
+              <div key={metric.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">{metric.label}</div>
+                <div className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">{metric.value}</div>
+                <div className={`mt-1 text-xs font-semibold ${metric.trend > 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                  {metric.trend > 0 ? "+" : ""}
+                  {metric.trend}%
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300" htmlFor="timeframe">
+                Timeframe
+              </label>
+              <select
+                id="timeframe"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                value={filters.timeframe}
+                onChange={(e) => setFilters((prev) => ({ ...prev, timeframe: e.target.value }))}
+              >
+                {PAYMENT_FILTERS.timeframe.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300" htmlFor="provider">
+                Provider
+              </label>
+              <select
+                id="provider"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                value={filters.provider}
+                onChange={(e) => setFilters((prev) => ({ ...prev, provider: e.target.value }))}
+              >
+                {PAYMENT_FILTERS.providers.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300" htmlFor="subscriber">
+                Subscriber
+              </label>
+              <select
+                id="subscriber"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                value={filters.subscriber}
+                onChange={(e) => setFilters((prev) => ({ ...prev, subscriber: e.target.value }))}
+              >
+                {PAYMENT_FILTERS.subscribers.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby="provider-payouts">
+              <header className="flex items-center justify-between">
+                <div>
+                  <h3 id="provider-payouts" className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    Provider payouts
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-300">Top payouts across partners.</p>
+                </div>
+                <button className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700">
+                  Export CSV
+                </button>
+              </header>
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Provider
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Invoice #
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Amount
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {payments.providers.map((row) => (
+                      <tr key={row.invoice} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{row.provider}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{row.invoice}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">${row.amount.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">
+                            {row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby="subscriber-invoices">
+              <header className="flex items-center justify-between">
+                <div>
+                  <h3 id="subscriber-invoices" className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    Subscriber invoices
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-300">Latest invoices issued to subscribers.</p>
+                </div>
+                <button className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700">
+                  Export PDF
+                </button>
+              </header>
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Subscriber
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Invoice #
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Amount
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {payments.subscribers.map((row) => (
+                      <tr key={row.invoice} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{row.subscriber}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">{row.invoice}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">${row.amount.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-slate-900 dark:text-slate-100">
+                          <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700 ring-1 ring-sky-200">
+                            {row.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <section className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <header className="mb-2">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Reconciliation queue</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-300">Items requiring manual review.</p>
+              </header>
+              <ul className="space-y-3">
+                {payments.reconciliation.map((item) => (
+                  <li key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-inner dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex items-center justify-between text-sm text-slate-800 dark:text-slate-100">
+                      <div className="font-semibold">{item.title}</div>
+                      <span className="text-xs text-slate-500 dark:text-slate-300">{item.date}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">{item.detail}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700">
+                        Resolve
+                      </button>
+                      <button className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700">
+                        Open invoice
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <header className="mb-2">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Webhook feed</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-300">Recent webhook events for payments.</p>
+              </header>
+              <ul className="space-y-3">
+                {WEBHOOK_FEED.map((entry) => (
+                  <li key={entry.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-inner dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex items-center justify-between text-sm text-slate-800 dark:text-slate-100">
+                      <span className="font-semibold">{entry.source}</span>
+                      <code className="rounded bg-slate-900 px-2 py-1 text-xs text-white">{entry.event}</code>
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">{entry.detail}</div>
+                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-300">{entry.ts}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          <section className="mt-6">
+            <Accordion defaultActiveKey="0">
+              <Accordion.Item eventKey="0">
+                <Accordion.Header>Reference diagrams</Accordion.Header>
                 <Accordion.Body>
-                  <p className="text-muted small mb-3">{diagram.description}</p>
-                  <figure className="ride-booking__diagram ride-booking__diagram--feature">
-                    {isValidPlantUmlEncoded(diagram.encoded) ? (
-                      <img
-                        src={`${PLANTUML_BASE_URL}${diagram.encoded}`}
-                        alt={`${diagram.title} diagram`}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="text-danger small">
-                        Diagram data failed validation and will not be rendered.
-                      </div>
-                    )}
-                    <figcaption>Rendered via PlantUML</figcaption>
-                  </figure>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {payments.diagrams.map((diagram) => (
+                      <figure
+                        key={diagram.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 shadow-inner dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      >
+                        <div className="text-sm font-semibold">{diagram.title}</div>
+                        <div className="mt-2 text-xs text-slate-500 dark:text-slate-300">{diagram.caption}</div>
+                      </figure>
+                    ))}
+                  </div>
                 </Accordion.Body>
               </Accordion.Item>
-            ))}
-          </Accordion>
-        </section>
+            </Accordion>
+          </section>
+        </div>
       </div>
     </div>
   );
 };
 
 export default RideBookingPaymentsPage;
-

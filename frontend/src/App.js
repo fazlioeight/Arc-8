@@ -7,6 +7,7 @@ import { GuidedTourProvider } from './context/GuidedTourContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles/commandPalette.css';
+import './pages/platform/coding/member/memberWorkspace.css';
 import Navbar from './components/Navbar';
 import AppBreadcrumbs from './components/AppBreadcrumbs';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -89,7 +90,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
   const hideNavbar = hideNavbarOn.some((p) => location.pathname.startsWith(p));
 
   return (
-    <>
+    <div className="coding-member-workspace min-h-screen">
       {!hideNavbar && (
         <>
           <Navbar />
@@ -207,7 +208,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/jobs/status-center" element={<JobStatusCenter />} />
         </Routes>
       </Suspense>
-    </>
+    </div>
   );
 };
 
