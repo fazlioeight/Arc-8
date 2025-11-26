@@ -17,7 +17,12 @@ export const CommandPaletteProvider = ({ children }) => {
   }, []);
 
   const registerCommands = useCallback((commands = []) => {
-    setDynamicCommands(commands);
+    setDynamicCommands((prev) => {
+      if (typeof commands === 'function') {
+        return commands(prev || []);
+      }
+      return commands || [];
+    });
   }, []);
 
   const value = useMemo(() => ({

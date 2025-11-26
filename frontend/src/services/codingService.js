@@ -1,4 +1,10 @@
 import { SAMPLE_CODING_MEMBERS } from '../utils/sampleData';
+import {
+  createMemberDetail,
+  createMemberSummary,
+  createWorklistItem,
+  createWorklistSummary,
+} from '../viewModels/common';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 const SAMPLE_STORE_LIMIT = 5;
@@ -1101,3 +1107,65 @@ export const updateProviderManagement = async (token, tenant, providerId, payloa
   });
   return handleResponse(res);
 };
+
+export class MemberSearchService {
+  constructor({ token, tenant, fetchMembers = fetchCodingMembers, fetchMemberDetail = fetchCodingMemberDetail } = {}) {
+    this.token = token;
+    this.tenant = tenant;
+    this.fetchMembers = fetchMembers;
+    this.fetchMemberDetail = fetchMemberDetail;
+  }
+
+  async search({ search = "", status = [], lob = [], page = 1, pageSize = 25 } = {}) {
+    const response = await this.fetchMembers(this.token, this.tenant, { search, status, lob, page, pageSize });
+    const items = (response?.items || []).map((item) => createMemberSummary(item)).filter(Boolean);
+    return {
+      items,
+      total: response?.total ?? items.length,
+      page: response?.page ?? page,
+      pageSize: response?.page_size ?? pageSize,
+      isSample: Boolean(response?.__sample),
+    };
+  }
+
+  async getMember(memberId) {
+    if (!memberId) {
+      throw new Error("memberId is required");
+    }
+    const response = await this.fetchMemberDetail(this.token, this.tenant, memberId);
+    return {
+      member: createMemberDetail(response?.member ? response : { member: response }),
+      raw: response,
+      isSample: Boolean(response?.__sample),
+    };
+  }
+}
+
+export class CoderWorklistService {
+  constructor({ token, tenant, fetchWorklist = fetchCoderPlatformWorklist } = {}) {
+    this.token = token;
+    this.tenant = tenant;
+    this.fetchWorklistFn = fetchWorklist;
+  }
+
+  async fetchWorklist({ status = [], priority = [], assigned, search, page = 1, pageSize = 25 } = {}) {
+    const response = await this.fetchWorklistFn(this.token, this.tenant, {
+      status,
+      priority,
+      assigned,
+      search,
+      page,
+      pageSize,
+    });
+    const items = (response?.items || []).map((item) => createWorklistItem(item)).filter(Boolean);
+    const summary = createWorklistSummary(response?.summary);
+    return {
+      items,
+      summary,
+      total: response?.total ?? items.length,
+      page: response?.page ?? page,
+      pageSize: response?.page_size ?? pageSize,
+      isSample: Boolean(response?.__sample),
+    };
+  }
+}

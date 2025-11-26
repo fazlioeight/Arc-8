@@ -4,10 +4,9 @@ import PortalUtilityBar from "../../../components/PortalUtilityBar";
 import { AuthContext } from "../../../context/AuthContext";
 import {
   createAdminUser,
-  fetchAdminApplications,
   fetchAdminUsers,
   updateAdminUser,
-  updatePurchasedApplications,
+  ApplicationAccessService,
 } from "../../../services/adminService";
 import "../coding/member/memberWorkspace.css";
 
@@ -84,6 +83,7 @@ const RADIO_CLASS = (active) =>
 const MasterAdminPage = () => {
   const navigate = useNavigate();
   const { token, tenant, role, user } = useContext(AuthContext) || {};
+  const applicationService = useMemo(() => new ApplicationAccessService({ token, tenant }), [tenant, token]);
   const [loading, setLoading] = useState(true);
   const isPlatformAdmin = role === 'platform_admin';
   const isTenantAdmin = role === 'admin';
@@ -108,7 +108,7 @@ const MasterAdminPage = () => {
       return;
     }
     if (token && role && !isAdmin) {
-      navigate("/portal_page/portalPage");
+      navigate("/portalPage");
     }
   }, [token, role, isAdmin, navigate]);
 
@@ -120,17 +120,17 @@ const MasterAdminPage = () => {
       setError("");
       try {
         const [appsResponse, usersResponse] = await Promise.all([
-          fetchAdminApplications({ token, tenant }),
+          applicationService.fetchApplications(),
           fetchAdminUsers({ token, tenant }),
         ]);
         if (!isActive) return;
-        const sortedApps = [...(appsResponse.applications || [])].sort((a, b) => a.label.localeCompare(b.label));
+        const sortedApps = [...(appsResponse.items || [])].sort((a, b) => a.label.localeCompare(b.label));
         const sortedUsers = [...(usersResponse.users || [])].sort((a, b) => a.email.localeCompare(b.email));
         setApps(sortedApps);
         setPurchaseSelections(new Set(sortedApps.filter((app) => app.core || app.purchased).map((app) => app.key)));
         setPurchaseDirty(false);
         setUsers(sortedUsers);
-        const sampleActive = Boolean(appsResponse.__sample || usersResponse.__sample);
+        const sampleActive = Boolean(appsResponse.isSample || usersResponse.__sample);
         setSampleMode(sampleActive);
         if (sortedUsers.length) {
           const first = sortedUsers[0];
@@ -167,7 +167,7 @@ const MasterAdminPage = () => {
     return () => {
       isActive = false;
     };
-  }, [token, tenant, isAdmin]);
+  }, [token, tenant, isAdmin, applicationService]);
 
   useEffect(() => {
     if (!statusMessage) return;
@@ -218,13 +218,9 @@ const MasterAdminPage = () => {
           .sort((a, b) => a.label.localeCompare(b.label));
         setStatusMessage('Updated purchased applications (sample)');
       } else {
-        const response = await updatePurchasedApplications({
-          token,
-          tenant,
-          purchased: optionalSelections,
-        });
-        updatedApps = [...(response.applications || [])].sort((a, b) => a.label.localeCompare(b.label));
-        setStatusMessage('Application purchases updated');
+        const response = await applicationService.updatePurchases(optionalSelections);
+        updatedApps = [...(response.items || [])].sort((a, b) => a.label.localeCompare(b.label));
+        setStatusMessage(response.isSample ? 'Updated purchased applications (sample)' : 'Application purchases updated');
       }
 
       setApps(updatedApps);
@@ -265,7 +261,7 @@ const MasterAdminPage = () => {
     } finally {
       setSavingPurchases(false);
     }
-  }, [apps, purchaseSelections, sampleMode, selectedUserId, token, tenant, users, isPlatformAdmin]);
+  }, [apps, purchaseSelections, sampleMode, selectedUserId, token, tenant, users, isPlatformAdmin, applicationService]);
 
 const filteredUsers = useMemo(() => {
     if (!search) return users;

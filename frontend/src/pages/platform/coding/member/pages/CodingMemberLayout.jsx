@@ -322,7 +322,7 @@ export default function CodingMemberLayout() {
         gapCount={missingHcc.length}
         onRefresh={onRefresh}
         onBackToSearch={() => navigate("/member-360")}
-        onBackHome={() => navigate("/portal_page/portalPage")}
+        onBackHome={() => navigate("/portalPage")}
       />
 
       <div className="coding-member-toolbar">

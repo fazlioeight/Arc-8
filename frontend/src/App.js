@@ -86,7 +86,7 @@ const LegacyMemberDetailRedirect = () => {
 
 const Shell = ({ themePreference, setThemePreference }) => {
   const location = useLocation();
-  const hideNavbarOn = ['/portal_page/portalPage', '/member-360', '/RideBooking', '/dashboard', '/settings', '/coding', '/admin', '/jobs'];
+  const hideNavbarOn = ['/portalPage', '/member-360', '/rideBooking', '/dashboard', '/settings', '/coding', '/admin', '/jobs'];
   const hideNavbar = hideNavbarOn.some((p) => location.pathname.startsWith(p));
 
   return (
@@ -106,12 +106,12 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/portal_page/portalPage" element={<PortalPage />} />
+          <Route path="/portalPage" element={<PortalPage />} />
           <Route path="/member-360" element={<Member360LandingPage />} />
-          <Route path="/RideBooking" element={<RideBookingLandingPage />} />
-          <Route path="/RideBooking/book" element={<RideBooking />} />
-          <Route path="/RideBooking/partners" element={<RidePartnerManagementPage />} />
-          <Route path="/RideBooking/payments" element={<RideBookingPaymentsPage />} />
+          <Route path="/rideBooking" element={<RideBookingLandingPage />} />
+          <Route path="/rideBooking/book" element={<RideBooking />} />
+          <Route path="/rideBooking/partners" element={<RidePartnerManagementPage />} />
+          <Route path="/rideBooking/payments" element={<RideBookingPaymentsPage />} />
           <Route path="/settings" element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/docs" element={<Docs />} />

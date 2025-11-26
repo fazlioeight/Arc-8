@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalUtilityBar from "../../../components/PortalUtilityBar";
 import RideBookingHeader from "./RideBookingHeader";
-import { getRecentRides } from "../../../services/rideBookingService";
+import { RideBookingService } from "../../../services/rideBookingService";
 import "../coding/member/memberWorkspace.css";
 
 const STATUS_OPTIONS = [
@@ -21,6 +21,7 @@ const formatDateTime = (iso) => {
 
 const RideBookingLandingPage = () => {
   const navigate = useNavigate();
+  const rideBookingService = useMemo(() => new RideBookingService(), []);
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -34,8 +35,8 @@ const RideBookingLandingPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const result = getRecentRides();
-      setRides(result);
+      const result = await rideBookingService.getRecentRides();
+      setRides(result || []);
       setLastUpdated(new Date());
     } catch (err) {
       setError(err.message || "Unable to load rides");
@@ -46,7 +47,7 @@ const RideBookingLandingPage = () => {
 
   useEffect(() => {
     loadRides();
-  }, []);
+  }, [rideBookingService]);
 
   const filteredRides = useMemo(() => {
     return rides.filter((ride) => {
@@ -139,7 +140,7 @@ const RideBookingLandingPage = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-                onClick={() => navigate("/RideBooking/book")}
+                onClick={() => navigate("/rideBooking/book")}
               >
                 Book ride
               </button>
@@ -209,6 +210,12 @@ const RideBookingLandingPage = () => {
               </button>
             </div>
           </div>
+
+          {error && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-inner dark:border-red-800 dark:bg-red-900/60 dark:text-red-100">
+              {error}
+            </div>
+          )}
 
           <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">

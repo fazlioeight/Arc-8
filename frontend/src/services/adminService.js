@@ -123,3 +123,55 @@ export const updatePurchasedApplications = async ({ token, tenant, purchased = [
   });
   return handleResponse(response);
 };
+
+class ApplicationAccessViewModel {
+  constructor({ key, label, description, purchased, core, accessLevel }) {
+    this.key = key;
+    this.label = label;
+    this.description = description || "";
+    this.core = Boolean(core);
+    this.purchased = Boolean(purchased || core);
+    this.accessLevel = accessLevel || (this.purchased ? "user" : "none");
+  }
+
+  static fromApi(raw) {
+    if (!raw) return null;
+    return new ApplicationAccessViewModel({
+      key: raw.key,
+      label: raw.label,
+      description: raw.description,
+      core: raw.core,
+      purchased: raw.purchased,
+      accessLevel: raw.access_level || raw.accessLevel,
+    });
+  }
+}
+
+export class ApplicationAccessService {
+  constructor({ token, tenant } = {}) {
+    this.token = token;
+    this.tenant = tenant;
+  }
+
+  async fetchApplications() {
+    const response = await fetchAdminApplications({ token: this.token, tenant: this.tenant });
+    const items = (response?.applications || [])
+      .map((app) => ApplicationAccessViewModel.fromApi(app))
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return { items, isSample: Boolean(response?.__sample) };
+  }
+
+  async updatePurchases(purchasedKeys = []) {
+    const response = await updatePurchasedApplications({
+      token: this.token,
+      tenant: this.tenant,
+      purchased: purchasedKeys,
+    });
+    const items = (response?.applications || [])
+      .map((app) => ApplicationAccessViewModel.fromApi(app))
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label));
+    return { items, isSample: Boolean(response?.__sample) };
+  }
+}

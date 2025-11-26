@@ -1,72 +1,13 @@
-import React, {
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import PortalUtilityBar from "../../../components/PortalUtilityBar";
 import { AuthContext } from "../../../context/AuthContext";
 import { SectionHeader } from "../../../components/ehr/Primitives";
 import "../../../index.css";
 import "../coding/member/memberWorkspace.css";
 import "./portalPage.sfdc.css";
-import { fetchCodingMembers } from "../../../services/codingService";
-
-const buildFallbackOverview = (apps, user) => {
-  const accessible = apps.filter((app) => app.allowed);
-  const source = accessible.length ? accessible : apps;
-  const now = Date.now();
-
-  const lastSaved = source.slice(0, 4).map((app, idx) => ({
-    id: `saved-${idx}`,
-    title: `${app.label} snapshot ${idx % 2 ? "(draft)" : "(published)"}`,
-    appKey: app.key,
-    summary:
-      app.key === "coding"
-        ? "Queued chart review saved by you"
-        : app.key === "ride_booking"
-        ? "Ride manifest changes captured"
-        : app.key === "portal"
-        ? "Personal overview preferences cached"
-        : "Latest workspace preferences stored",
-    savedAt: new Date(now - (idx + 1) * 45 * 60 * 1000).toISOString(),
-    path: app.path,
-  }));
-
-  const todos = source.slice(0, 5).map((app, idx) => ({
-    id: `todo-${idx}`,
-    title:
-      app.key === "coding"
-        ? "Complete chart validation for high-risk cohort"
-        : app.key === "dashboard"
-        ? "Review metrics variance for Q3 close"
-        : app.key === "ride_booking"
-        ? "Confirm transport coverage for dialysis members"
-        : app.key === "portal"
-        ? "Publish weekly updates on your overview"
-        : "Follow up on configuration updates",
-    appKey: app.key,
-    assignedBy: "Manager",
-    dueAt: new Date(now + (idx + 1) * 24 * 60 * 60 * 1000).toISOString(),
-    priority: idx === 0 ? "high" : idx === 1 ? "medium" : "low",
-    path: app.path,
-  }));
-
-  return {
-    applications: apps,
-    profile: {
-      email: user?.email || "guest@nexora.ai",
-      tenant: user?.tenant || "Nexora Tenant",
-      role: user?.role || "user",
-      lastLogin: new Date(now - 6 * 60 * 60 * 1000).toISOString(),
-    },
-    lastSaved,
-    todos,
-  };
-};
+import { useMemberSearch } from "../../../hooks/useMemberSearch";
+import { usePortalOverview } from "../../../hooks/usePortalOverview";
 
 const formatRelativeTime = (value) => {
   try {
@@ -103,32 +44,6 @@ const formatRoleLabel = (value) => {
   }
 };
 
-const toLowerString = (value) => {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  return String(value).toLowerCase();
-};
-
-const extractMemberTokens = (member) => {
-  if (!member) {
-    return [];
-  }
-  return [
-    toLowerString(member?.id),
-    toLowerString(member?.member_id),
-    toLowerString(member?.memberId),
-    toLowerString(member?.member_key),
-  ].filter(Boolean);
-};
-
-const pickMemberIdForNavigation = (member) => {
-  if (!member) {
-    return null;
-  }
-  return member?.id || member?.member_id || member?.memberId || null;
-};
-
 const PRIORITY_VARIANT = {
   high: "ehr-alert--danger",
   medium: "ehr-alert--warning",
@@ -146,19 +61,19 @@ const PortalPage = () => {
     availableApplications = [],
     purchasedApplications = [],
   } = auth;
-  const [overview, setOverview] = useState({
-    loading: true,
-    error: null,
-    profile: null,
-    applications: [],
-    lastSaved: [],
-    todos: [],
+  const {
+    memberQuery,
+    memberOptions,
+    memberSearchError,
+    isLaunchingMember,
+    statusMessage: memberSearchStatus,
+    handleMemberQueryChange,
+    handleMemberSearch,
+  } = useMemberSearch({
+    token,
+    tenant,
+    onNavigate: (memberId) => navigate(`/coding/member/${memberId}/chart`),
   });
-  const [memberQuery, setMemberQuery] = useState("");
-  const [memberSuggestions, setMemberSuggestions] = useState([]);
-  const [isSearchingMembers, setIsSearchingMembers] = useState(false);
-  const [isLaunchingMember, setIsLaunchingMember] = useState(false);
-  const [memberSearchError, setMemberSearchError] = useState(null);
 
   const appCatalog = useMemo(
     () => [
@@ -166,7 +81,7 @@ const PortalPage = () => {
         key: "portal",
         label: "Portal Overview",
         desc: "Daily digest and workspace snapshot",
-        path: "/portal_page/portalPage",
+        path: "/portalPage",
         icon: "OV",
         color: "#0ea5e9",
       },
@@ -190,7 +105,7 @@ const PortalPage = () => {
         key: "ride_booking",
         label: "Ride Booking",
         desc: "Transportation scheduling and tracking",
-        path: "/RideBooking",
+        path: "/rideBooking",
         icon: "RB",
         color: "#2563eb",
       },
@@ -231,230 +146,22 @@ const PortalPage = () => {
     []
   );
 
-  const filteredCatalog = useMemo(() => {
-    const sourceKeys =
-      availableApplications && availableApplications.length
-        ? availableApplications
-        : purchasedApplications && purchasedApplications.length
-        ? purchasedApplications
-        : appCatalog.map((app) => app.key);
-    const enabledKeys = new Set(sourceKeys);
-    return appCatalog.filter((app) => enabledKeys.has(app.key));
-  }, [appCatalog, availableApplications, purchasedApplications]);
+  const {
+    overview,
+    isLoading: overviewLoading,
+    error: overviewError,
+    appsToRender,
+    accessibleApps: allowedApps,
+  } = usePortalOverview({
+    user,
+    accessMap,
+    availableApplications,
+    purchasedApplications,
+    appCatalog,
+    token,
+  });
 
-  const hasAccessInfo = useMemo(
-    () => Object.keys(accessMap || {}).length > 0,
-    [accessMap]
-  );
-
-  const resolvedApps = useMemo(() => {
-    return filteredCatalog.map((app) => {
-      const level = accessMap?.[app.key];
-      const allowed = hasAccessInfo
-        ? app.key === "portal"
-          ? true
-          : app.requiredLevel === "admin"
-          ? level === "admin"
-          : Boolean(level)
-        : true;
-      return { ...app, level, allowed };
-    });
-  }, [filteredCatalog, accessMap, hasAccessInfo]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadOverview = async () => {
-      const fallback = buildFallbackOverview(resolvedApps, user);
-      try {
-        const baseUrl = process.env.REACT_APP_API_URL;
-        if (!baseUrl) {
-          setOverview({ ...fallback, loading: false, error: null });
-          return;
-        }
-
-        const response = await axios.get(`${baseUrl}/api/portal/overview`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          },
-        });
-
-        if (!isMounted) return;
-
-        const payload = response?.data || {};
-        setOverview({
-          loading: false,
-          error: null,
-          profile: payload.profile || fallback.profile,
-          applications:
-            (payload.applications || []).map((app) => {
-              const catalogEntry =
-                resolvedApps.find((item) => item.key === app.key) || {};
-              return { ...catalogEntry, ...app };
-            }) || fallback.applications,
-          lastSaved: payload.lastSaved?.length
-            ? payload.lastSaved
-            : fallback.lastSaved,
-          todos: payload.todos?.length ? payload.todos : fallback.todos,
-        });
-      } catch (error) {
-        if (!isMounted) return;
-        console.warn("Falling back to mocked portal overview", error);
-        setOverview({
-          ...fallback,
-          loading: false,
-          error:
-            "We could not reach the portal services. Showing the latest synced data.",
-        });
-      }
-    };
-
-    loadOverview();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [resolvedApps, user]);
-
-  useEffect(() => {
-    const term = memberQuery.trim();
-    if (term.length < 2) {
-      setMemberSuggestions([]);
-      setMemberSearchError(null);
-      setIsSearchingMembers(false);
-      return undefined;
-    }
-
-    let isActive = true;
-    setIsSearchingMembers(true);
-    setMemberSearchError(null);
-
-    const timeoutId = window.setTimeout(() => {
-      fetchCodingMembers(token, tenant, { search: term, pageSize: 7 })
-        .then((response) => {
-          if (!isActive) {
-            return;
-          }
-          const items = Array.isArray(response?.items) ? response.items : [];
-          setMemberSuggestions(items);
-        })
-        .catch((error) => {
-          if (!isActive) {
-            return;
-          }
-          console.error("Member search failed", error);
-          setMemberSuggestions([]);
-          setMemberSearchError(
-            error?.message || "Unable to search members right now."
-          );
-        })
-        .finally(() => {
-          if (!isActive) {
-            return;
-          }
-          setIsSearchingMembers(false);
-        });
-    }, 250);
-
-    return () => {
-      isActive = false;
-      window.clearTimeout(timeoutId);
-      setIsSearchingMembers(false);
-    };
-  }, [memberQuery, token, tenant]);
-
-  const resolveMemberId = useCallback(
-    (value) => {
-      const term = value?.trim().toLowerCase();
-      if (!term) {
-        return null;
-      }
-      const match = memberSuggestions.find((member) =>
-        extractMemberTokens(member).includes(term)
-      );
-      return pickMemberIdForNavigation(match);
-    },
-    [memberSuggestions]
-  );
-
-  const handleMemberSearch = useCallback(
-    async (event) => {
-      event.preventDefault();
-      const term = memberQuery.trim();
-      if (!term) {
-        return;
-      }
-
-      setMemberSearchError(null);
-      setIsLaunchingMember(true);
-
-      let memberId = resolveMemberId(term);
-
-      if (!memberId) {
-        try {
-          const response = await fetchCodingMembers(token, tenant, {
-            search: term,
-            pageSize: 5,
-          });
-          const items = Array.isArray(response?.items) ? response.items : [];
-          if (items.length) {
-            setMemberSuggestions(items);
-          }
-          const lowerTerm = term.toLowerCase();
-          const exactMatch = items.find((member) =>
-            extractMemberTokens(member).includes(lowerTerm)
-          );
-          if (exactMatch) {
-            memberId = pickMemberIdForNavigation(exactMatch);
-          } else if (items.length === 1) {
-            memberId = pickMemberIdForNavigation(items[0]);
-          }
-        } catch (error) {
-          console.error("Member lookup failed", error);
-          setMemberSearchError(
-            error?.message || "Unable to open that member right now."
-          );
-        }
-      }
-
-      if (memberId) {
-        setIsLaunchingMember(false);
-        navigate(`/coding/member/${memberId}/chart`);
-        return;
-      }
-
-      setMemberSearchError("Member not found. Try another ID.");
-      setIsLaunchingMember(false);
-    },
-    [memberQuery, navigate, resolveMemberId, tenant, token]
-  );
-
-  const memberSearchStatus = useMemo(() => {
-    if (memberSearchError) {
-      return memberSearchError;
-    }
-    if (isLaunchingMember) {
-      return "Opening member chart...";
-    }
-    if (isSearchingMembers) {
-      return "Searching members...";
-    }
-    if (!memberQuery.trim()) {
-      return "Enter at least two characters to search by member ID.";
-    }
-    if (memberSuggestions.length) {
-      return "Press Enter to open the highlighted member chart.";
-    }
-    return "No suggestions yet.";
-  }, [
-    isLaunchingMember,
-    isSearchingMembers,
-    memberQuery,
-    memberSearchError,
-    memberSuggestions.length,
-  ]);
-
-  if (overview.loading) {
+  if (overviewLoading) {
     return (
       <div className="coding-member-workspace portal-theme min-h-screen">
         <PortalUtilityBar />
@@ -470,11 +177,8 @@ const PortalPage = () => {
   }
 
   const displayName = user?.email?.split("@")[0] || "there";
-  const accessibleApps = overview.applications.filter((app) => app.allowed);
-  const appsToRender = accessibleApps.length
-    ? accessibleApps
-    : overview.applications;
   const cardClass = "rounded-xl p-4 portal-alert-shell";
+  const portalError = overview.error || overviewError;
 
   return (
     <div className="coding-member-workspace portal-theme min-h-screen">
@@ -499,7 +203,7 @@ const PortalPage = () => {
                 Applications
               </span>
               <span className="text-lg font-semibold coding-text-strong">
-                {accessibleApps.length || appsToRender.length}
+                {allowedApps.length || appsToRender.length}
               </span>
             </div>
             <span className="h-10 w-px bg-gray-200 dark:bg-white/20" />
@@ -535,37 +239,19 @@ const PortalPage = () => {
                 autoComplete="off"
                 placeholder="Search by member ID"
                 value={memberQuery}
-                onChange={(event) => setMemberQuery(event.target.value)}
+                onChange={(event) =>
+                  handleMemberQueryChange(event.target.value)
+                }
                 list="portal-member-suggestions"
                 aria-describedby="portal-member-search-help"
                 className="coding-input w-full rounded-xl px-4 py-3 text-sm"
               />
               <datalist id="portal-member-suggestions">
-                {memberSuggestions.map((member) => {
-                  const optionValue =
-                    member?.member_key ||
-                    member?.memberId ||
-                    member?.member_id ||
-                    member?.id;
-                  const optionKey =
-                    member?.id || member?.member_id || optionValue;
-                  if (!optionValue && !optionKey) {
-                    return null;
-                  }
-                  const altId = member?.id || member?.member_id || "";
-                  const label =
-                    altId && optionValue && altId !== optionValue
-                      ? `${optionValue} - ${altId}`
-                      : optionValue || altId;
-                  return (
-                    <option
-                      key={optionKey}
-                      value={(optionValue || altId || "").toString()}
-                    >
-                      {label}
-                    </option>
-                  );
-                })}
+                {memberOptions.map((option) => (
+                  <option key={option.key} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </datalist>
             </div>
           </div>
@@ -590,17 +276,17 @@ const PortalPage = () => {
         </p>
       </section>
 
-      {overview.error && (
+      {portalError && (
         <div className="mx-auto max-w-6xl px-4 pt-4">
           <div className="coding-surface-subtle flex items-start gap-3 rounded-xl px-4 py-3 text-amber-900 shadow-sm">
             <span className="text-sm font-semibold coding-text-strong">Heads up</span>
-            <span className="text-sm coding-text-soft">{overview.error}</span>
+            <span className="text-sm coding-text-soft">{portalError}</span>
           </div>
         </div>
       )}
 
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 lg:py-10">
-        {/* <section className={cardClass} aria-label="User profile summary">
+        <section className={cardClass} aria-label="User profile summary">
           <SectionHeader title="Profile" subtitle="Your account at a glance" />
           <div className="mt-3 space-y-2">
             <div className="ehr-alert ehr-alert--info portal-alert-card">
@@ -613,12 +299,12 @@ const PortalPage = () => {
                     {overview.profile?.email || user?.email}
                   </div>
                   <div className="portal-alert-card__meta">
-                    Tenant {overview.profile?.tenant || user?.tenant || "Nexora"} ·{" "}
-                    {formatRoleLabel(overview.profile?.role)} ·{" "}
+                    Tenant {overview.profile?.tenant || user?.tenant || "Nexora"} |{" "}
+                    {formatRoleLabel(overview.profile?.role)} |{" "}
                     {overview.profile?.lastLogin
                       ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
                       : "Last login just now"}{" "}
-                    · {accessibleApps.length || appsToRender.length} applications
+                    | {allowedApps.length || appsToRender.length} applications
                   </div>
                 </div>
                 <button
@@ -631,7 +317,7 @@ const PortalPage = () => {
               </div>
             </div>
           </div>
-        </section> */}
+        </section>
 
         <div className="grid gap-6 lg:grid-cols-3">
           <section className={cardClass} aria-label="Applications">

@@ -5,6 +5,7 @@ import { AuthContext } from "../../../context/AuthContext";
 import { fetchCodingMembers } from "../../../services/codingService";
 import CodingPortalHeader from "./CodingPortalHeader";
 import "../coding/member/memberWorkspace.css";
+import { createMemberSummary } from "../../../viewModels/common";
 
 const STATUS_BADGES = {
   closed: "bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-700/40 dark:text-slate-100 dark:ring-slate-600/50",
@@ -32,7 +33,8 @@ const CodingLandingPage = () => {
         status: ["active", "in_review"],
         pageSize: 25,
       });
-      setWorklist(response.items || []);
+      const items = (response.items || []).map((item) => createMemberSummary(item)).filter(Boolean);
+      setWorklist(items);
     } catch (err) {
       setError(err.message || "Unable to load worklist");
     } finally {
@@ -49,7 +51,7 @@ const CodingLandingPage = () => {
     if (!userEmail) return worklist;
     const normalizedEmail = userEmail.toLowerCase();
     const matched = worklist.filter((member) => {
-      const emails = Array.isArray(member.assigned_coder_emails) ? member.assigned_coder_emails : [];
+      const emails = Array.isArray(member.assignedCoderEmails) ? member.assignedCoderEmails : [];
       return emails.some((email) => typeof email === "string" && email.toLowerCase() === normalizedEmail);
     });
     return matched.length > 0 ? matched : worklist;
@@ -151,14 +153,14 @@ const CodingLandingPage = () => {
                   </tr>
                 )}
                 {displayedMembers.map((member) => {
-                  const name = [member.first_name, member.last_name].filter(Boolean).join(" ") || "-";
+                  const name = member.fullName || [member.firstName, member.lastName].filter(Boolean).join(" ") || "-";
                   return (
                     <tr key={member.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
                       <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{name}</td>
-                      <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{member.member_key}</td>
+                      <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{member.memberKey || "-"}</td>
                       <td className="px-4 py-3">{renderBadge(member.status)}</td>
-                      <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{member.line_of_business || "-"}</td>
-                      <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{member.pcp_name || "-"}</td>
+                      <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{member.lineOfBusiness || "-"}</td>
+                      <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{member.pcpName || "-"}</td>
                       <td className="px-4 py-3 text-right">
                         <button
                           className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"

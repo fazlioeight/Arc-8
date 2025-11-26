@@ -238,7 +238,7 @@ nexora-platform/
    - The command palette (`Cmd+K` or `Ctrl+K`) surfaces quick actions and navigation shortcuts.
    - Guided tours, notifications, and session locking are delivered via context providers in `src/context`.
    - Job importers at `/jobs/import-data` support drag-and-drop CSV/TXT/XLSX uploads, surface previews, and synchronize with the Job Status Center.
-   - Ride Booking at `/RideBooking` coordinates transportation requests, partner availability, payments, and internal knowledge content using the `rideBookingService` + `ridePartnerService` local stores and styles in `src/styles/rideBooking.css`.
+   - Ride Booking at `/rideBooking` coordinates transportation requests, partner availability, payments, and internal knowledge content using the `rideBookingService` + `ridePartnerService` local stores and styles in `src/styles/rideBooking.css`.
    - Dashboard pages source deterministic data from `dashboardSeedData.js` and the new `/api/raf/*`, `/api/deadlines/*`, and `/api/providers/heatmap` endpoints for RAF tracking, suspects funnels, and provider performance heatmaps.
 
 ## Testing

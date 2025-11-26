@@ -118,11 +118,72 @@ const writeHistory = (history) => {
   }
 };
 
+export class RideBookingViewModel {
+  constructor({
+    id,
+    memberId,
+    firstName,
+    lastName,
+    rideType,
+    pickup,
+    pickupAddress,
+    dropoff,
+    dropoffAddress,
+    pickupAt,
+    dropoffAt,
+    createdAt,
+    costUsd,
+    status,
+  }) {
+    this.id = id;
+    this.memberId = memberId;
+    this.firstName = firstName;
+    this.lastName = lastName;
+    this.memberName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'Member';
+    this.rideType = rideType;
+    this.pickup = pickup;
+    this.pickupAddress = pickupAddress;
+    this.dropoff = dropoff;
+    this.dropoffAddress = dropoffAddress;
+    this.pickupAt = pickupAt || createdAt;
+    this.dropoffAt = dropoffAt || null;
+    this.createdAt = createdAt;
+    this.costUsd = typeof costUsd === 'number' ? costUsd : null;
+    this.status = status || 'queued';
+    this.scheduledPickup = this.pickupAt;
+    this.estimatedDropoff = this.dropoffAt;
+  }
+
+  static fromRecord(record) {
+    if (!record) return null;
+    const pickupAt = record.pickupAt || record.scheduledPickup || record.createdAt || new Date().toISOString();
+    const dropoffAt = record.dropoffAt || record.estimatedDropoff || null;
+    return new RideBookingViewModel({
+      id: record.id,
+      memberId: record.memberId,
+      firstName: record.firstName,
+      lastName: record.lastName,
+      rideType: record.rideType,
+      pickup: record.pickup,
+      pickupAddress: record.pickupAddress,
+      dropoff: record.dropoff,
+      dropoffAddress: record.dropoffAddress,
+      pickupAt,
+      dropoffAt,
+      createdAt: record.createdAt || pickupAt,
+      costUsd: record.costUsd,
+      status: record.status,
+    });
+  }
+}
+
 export const getRecentRides = (limit) => {
   const history = readHistory();
   const sorted = history
     .slice()
-    .sort((a, b) => new Date(b.scheduledPickup).getTime() - new Date(a.scheduledPickup).getTime());
+    .sort((a, b) => new Date(b.scheduledPickup).getTime() - new Date(a.scheduledPickup).getTime())
+    .map((record) => RideBookingViewModel.fromRecord(record))
+    .filter(Boolean);
   return typeof limit === 'number' ? sorted.slice(0, limit) : sorted;
 };
 
@@ -131,7 +192,7 @@ export const addRideRecord = (ride) => {
   const record = normalizeRideRecord(ride);
   history.push(record);
   writeHistory(history);
-  return record;
+  return RideBookingViewModel.fromRecord(record);
 };
 
 export const clearRideHistory = () => {
@@ -146,3 +207,26 @@ export const getRideCompaniesForDate = (date = new Date()) => {
   const combined = [...BASE_RIDE_COMPANIES, ...partnerCompanies];
   return Array.from(new Set(combined));
 };
+
+export class RideBookingService {
+  constructor({ token, tenant } = {}) {
+    this.token = token;
+    this.tenant = tenant;
+  }
+
+  getRideOptionsForDate(date = new Date()) {
+    return getRideCompaniesForDate(date);
+  }
+
+  getRecentRides(limit) {
+    return getRecentRides(limit);
+  }
+
+  bookRide(input) {
+    return addRideRecord({ ...input, token: this.token, tenant: this.tenant });
+  }
+
+  clearHistory() {
+    clearRideHistory();
+  }
+}

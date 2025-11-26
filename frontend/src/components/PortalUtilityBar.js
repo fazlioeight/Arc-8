@@ -14,10 +14,10 @@ const ROUTE_LABELS = {
   '/coding': 'Coding Worklists',
   '/jobs/status-center': 'Operations Center',
   '/jobs/import-data': 'Data Imports',
-  '/RideBooking': 'Ride Coordination',
-  '/RideBooking/payments': 'Ride Payments and Billing',
+  '/rideBooking': 'Ride Coordination',
+  '/rideBooking/payments': 'Ride Payments and Billing',
   '/docs': 'Documentation',
-  '/portal_page/portalPage': 'Portal Home',
+  '/portalPage': 'Portal Home',
   '/member-360': 'Member 360',
   '/settings': 'Settings',
 };
@@ -75,11 +75,11 @@ const PortalUtilityBar = () => {
 
   const applicationTiles = useMemo(
     () => [
-      { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: '/portal_page/portalPage' },
+      { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: '/portalPage' },
       // { key: 'dashboard', label: 'Analytics Dashboard', desc: 'KPIs & RAF', icon: 'DB', color: '#a855f7', path: '/dashboard' },
       { key: 'coding', label: 'Coding Worklists', desc: 'Member reviews', icon: 'CD', color: '#0f172a', path: '/coding' },
       { key: 'member360', label: 'Member 360', desc: 'Chart launchpad', icon: 'M3', color: '#0891b2', path: '/member-360' },
-      { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: '/RideBooking' },
+      { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: '/rideBooking' },
       { key: 'docs', label: 'Docs Library', desc: 'Knowledge base', icon: 'DL', color: '#6366f1', path: '/docs' },
       //{ key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: '/settings' },
       { key: 'job_center', label: 'Job Center', desc: 'Logs & retry', icon: 'JC', color: '#0f766e', path: '/jobs/status-center' },
@@ -207,7 +207,7 @@ const PortalUtilityBar = () => {
               onClick={(event) => {
                 event.stopPropagation();
                 closeAll();
-                navigate('/portal_page/portalPage');
+                navigate('/portalPage');
               }}
             >
               <svg viewBox="0 0 24 24"><path d="M12 3l9 7h-2v9h-5v-6H10v6H5v-9H3l9-7z"/></svg>

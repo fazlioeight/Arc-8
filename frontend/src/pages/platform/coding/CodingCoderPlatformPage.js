@@ -1,22 +1,18 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  Col,
-  Form,
-  Row,
-  Spinner,
-  Table,
-} from 'react-bootstrap';
 
-import PortalUtilityBar from '../../../components/PortalUtilityBar';
+import PortalPageLayout from '../../../components/PortalPageLayout';
 import { AuthContext } from '../../../context/AuthContext';
 import { useCommandPalette } from '../../../context/CommandPaletteContext';
-import { fetchCoderPlatformWorklist } from '../../../services/codingService';
+import { CoderWorklistService } from '../../../services/codingService';
 import CodingPortalHeader from './CodingPortalHeader';
+
+const CODING_PORTAL_NAV = [
+  { key: 'overview', label: 'Overview', href: '/coding' },
+  { key: 'platform', label: 'Coder Platform', href: '/coding/platform' },
+  { key: 'review', label: 'Review Dashboard', href: '/coding/review-dashboard' },
+  { key: 'group', label: 'Group Dashboard', href: '/coding/group-dashboard' },
+];
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -32,17 +28,48 @@ const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low' },
 ];
 
-const STATUS_VARIANTS = {
-  open: 'primary',
-  in_review: 'warning',
-  closed: 'secondary',
+const STATUS_TONES = {
+  open: 'bg-sky-100 text-sky-800 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-100 dark:ring-sky-400/40',
+  in_review: 'bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-400/40',
+  closed: 'bg-slate-200 text-slate-700 ring-1 ring-slate-300 dark:bg-slate-700/40 dark:text-slate-200 dark:ring-slate-600/50',
+  default: 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-400/40',
 };
 
-const PRIORITY_VARIANTS = {
-  high: 'danger',
-  medium: 'warning',
-  low: 'secondary',
+const PRIORITY_TONES = {
+  high: 'bg-rose-100 text-rose-800 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-100 dark:ring-rose-400/40',
+  medium: 'bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-400/40',
+  low: 'bg-slate-200 text-slate-700 ring-1 ring-slate-300 dark:bg-slate-700/40 dark:text-slate-200 dark:ring-slate-600/50',
+  default: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-700/40 dark:text-slate-100 dark:ring-slate-600/50',
 };
+
+const inputClasses =
+  'mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-2 focus:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-offset-slate-900';
+
+const primaryButtonClasses =
+  'inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-70 dark:bg-sky-500 dark:hover:bg-sky-400 dark:focus-visible:ring-offset-slate-900';
+
+const subtleButtonClasses =
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900';
+
+const linkButtonClasses =
+  'inline-flex items-center justify-center rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-sky-200 dark:hover:text-sky-100 dark:focus-visible:ring-offset-slate-900';
+
+const SpinnerIcon = ({ className = 'h-4 w-4 text-sky-500' }) => (
+  <svg
+    className={`animate-spin ${className}`}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path
+      className="opacity-75"
+      fill="currentColor"
+      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+    />
+  </svg>
+);
 
 const CodingCoderPlatformPage = () => {
   const navigate = useNavigate();
@@ -56,16 +83,20 @@ const CodingCoderPlatformPage = () => {
     search: '',
   });
   const [worklist, setWorklist] = useState([]);
-  const [summary, setSummary] = useState({ status_counts: {}, priority_counts: {}, due_soon: 0, overdue: 0 });
+  const [summary, setSummary] = useState({ statusCounts: {}, priorityCounts: {}, dueSoon: 0, overdue: 0 });
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const effectiveToken = token || 'sample-coder-platform';
   const effectiveTenant = tenant || 'prominencehealth';
+  const worklistService = useMemo(
+    () => new CoderWorklistService({ token: effectiveToken, tenant: effectiveTenant }),
+    [effectiveTenant, effectiveToken]
+  );
 
-  const statusCounts = useMemo(() => summary.status_counts || {}, [summary]);
-  const priorityCounts = useMemo(() => summary.priority_counts || {}, [summary]);
+  const statusCounts = useMemo(() => summary.statusCounts || {}, [summary]);
+  const priorityCounts = useMemo(() => summary.priorityCounts || {}, [summary]);
   const openTotal = useMemo(
     () => (statusCounts.open || 0) + (statusCounts.in_review || 0),
     [statusCounts],
@@ -73,8 +104,8 @@ const CodingCoderPlatformPage = () => {
 
   const metrics = useMemo(() => ([
     { label: 'Open queue', value: openTotal, hint: 'Open or in review records' },
-    { label: 'Due in 7 days', value: summary.due_soon || 0, hint: 'Due within the next week' },
-    { label: 'Overdue', value: summary.overdue || 0, hint: 'Past due date' },
+    { label: 'Due in 7 days', value: summary.dueSoon ?? 0, hint: 'Due within the next week' },
+    { label: 'Overdue', value: summary.overdue ?? 0, hint: 'Past due date' },
     { label: 'Total matches', value: total, hint: 'Records matching filters' },
   ]), [openTotal, summary, total]);
 
@@ -83,7 +114,7 @@ const CodingCoderPlatformPage = () => {
     setError(null);
     const nextFilters = { ...filters, ...overrides };
     try {
-      const response = await fetchCoderPlatformWorklist(effectiveToken, effectiveTenant, {
+      const response = await worklistService.fetchWorklist({
         status: nextFilters.status ? [nextFilters.status] : [],
         priority: nextFilters.priority ? [nextFilters.priority] : [],
         assigned: nextFilters.assigned?.trim() || undefined,
@@ -92,7 +123,7 @@ const CodingCoderPlatformPage = () => {
         pageSize: 50,
       });
       setWorklist(response.items || []);
-      setSummary(response.summary || { status_counts: {}, priority_counts: {}, due_soon: 0, overdue: 0 });
+      setSummary(response.summary || { statusCounts: {}, priorityCounts: {}, dueSoon: 0, overdue: 0 });
       setTotal(response.total || 0);
       recordAuditEvent?.('coding.platform.load', { filters: nextFilters });
     } catch (err) {
@@ -108,7 +139,7 @@ const CodingCoderPlatformPage = () => {
   }, [effectiveToken, effectiveTenant]);
 
   useEffect(() => {
-    registerCommands([
+    const coderPlatformCommands = [
       {
         id: 'coder-platform-refresh',
         label: 'Refresh coder platform',
@@ -125,8 +156,20 @@ const CodingCoderPlatformPage = () => {
           void loadWorklist(reset);
         },
       },
-    ]);
-    return () => registerCommands([]);
+    ];
+
+    registerCommands((existing = []) => {
+      const remaining = existing.filter(
+        (command) => !coderPlatformCommands.some((added) => added.id === command.id),
+      );
+      return [...remaining, ...coderPlatformCommands];
+    });
+
+    return () => {
+      registerCommands((existing = []) => existing.filter(
+        (command) => !coderPlatformCommands.some((added) => added.id === command.id),
+      ));
+    };
     // eslint-disable-next-line
   }, [registerCommands, user?.email]);
 
@@ -142,218 +185,323 @@ const CodingCoderPlatformPage = () => {
 
   const renderStatusBadge = (status) => {
     if (!status) return '-';
-    const variant = STATUS_VARIANTS[status] || 'secondary';
-    return <Badge bg={variant}>{status}</Badge>;
+    const tone = STATUS_TONES[status] || STATUS_TONES.default;
+    return (
+      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${tone}`}>
+        {status}
+      </span>
+    );
   };
 
   const renderPriorityBadge = (priority) => {
     if (!priority) return '-';
-    const variant = PRIORITY_VARIANTS[priority] || 'secondary';
-    return <Badge bg={variant}>{priority}</Badge>;
+    const tone = PRIORITY_TONES[priority] || PRIORITY_TONES.default;
+    return (
+      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${tone}`}>
+        {priority}
+      </span>
+    );
   };
 
   return (
-    <div className="sfdc-portal coding-portal">
-      <PortalUtilityBar />
-      <CodingPortalHeader
-        title="Coder platform"
-        subtitle="Review, triage, and assign member coding tasks in one workspace."
-      />
+    <PortalPageLayout
+      headerContent={(
+        <CodingPortalHeader
+          title="Coder platform"
+          subtitle="Review, triage, and assign member coding tasks in one workspace."
+        />
+      )}
+      navItems={CODING_PORTAL_NAV}
+      currentNav="platform"
+      navProps={{ align: 'center' }}
+    >
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {metrics.map((metric) => (
+          <div
+            key={metric.label}
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+              {metric.label}
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{metric.value}</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{metric.hint}</p>
+          </div>
+        ))}
+      </section>
 
-      <main className="container my-4">
-        <Row className="gy-3">
-          {metrics.map((metric) => (
-            <Col md={3} sm={6} xs={12} key={metric.label}>
-              <Card className="h-100 shadow-sm">
-                <Card.Body>
-                  <div className="text-muted small">{metric.label}</div>
-                  <div className="display-6 fw-semibold">{metric.value}</div>
-                  <div className="small text-muted">{metric.hint}</div>
-                </Card.Body>
-              </Card>
-            </Col>
-          ))}
-        </Row>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Worklist</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Filter by status, priority, or assignee. Showing up to 50 items.
+            </p>
+          </div>
+          <button
+            type="button"
+            className={subtleButtonClasses}
+            onClick={() => void loadWorklist()}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <SpinnerIcon />
+                Refreshing
+              </>
+            ) : (
+              'Refresh'
+            )}
+          </button>
+        </header>
 
-        <Card className="mt-4 shadow-sm">
-          <Card.Header>
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
-              <div>
-                <h2 className="h5 mb-1">Worklist</h2>
-                <div className="text-muted">
-                  Filter by status, priority, or assignee. Showing up to 50 items.
+        <form onSubmit={handleSubmit} className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-2">
+            <label
+              htmlFor="coder-platform-status"
+              className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200"
+            >
+              Status
+            </label>
+            <select
+              id="coder-platform-status"
+              name="status"
+              value={filters.status}
+              onChange={handleInputChange}
+              className={inputClasses}
+            >
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="coder-platform-priority"
+              className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200"
+            >
+              Priority
+            </label>
+            <select
+              id="coder-platform-priority"
+              name="priority"
+              value={filters.priority}
+              onChange={handleInputChange}
+              className={inputClasses}
+            >
+              {PRIORITY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="coder-platform-assigned"
+              className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200"
+            >
+              Assigned to
+            </label>
+            <input
+              id="coder-platform-assigned"
+              type="email"
+              name="assigned"
+              value={filters.assigned}
+              onChange={handleInputChange}
+              placeholder="coder@example.com"
+              className={inputClasses}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="coder-platform-search"
+              className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200"
+            >
+              Search
+            </label>
+            <input
+              id="coder-platform-search"
+              type="text"
+              name="search"
+              value={filters.search}
+              onChange={handleInputChange}
+              placeholder="Member name or key"
+              className={inputClasses}
+            />
+          </div>
+
+          <div className="sm:col-span-2 lg:col-span-4">
+            <div className="flex justify-end">
+              <button type="submit" className={primaryButtonClasses} disabled={loading}>
+                {loading ? (
+                  <>
+                    <SpinnerIcon className="h-4 w-4 text-white" />
+                    Applying...
+                  </>
+                ) : (
+                  'Apply filters'
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+            {error}
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+            <thead className="bg-slate-50 dark:bg-slate-800/60">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  Member
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  Priority
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  Assigned
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  Due date
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  Service dates
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  Codes
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              {loading && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+                    <div className="flex items-center justify-center gap-2">
+                      <SpinnerIcon className="h-5 w-5 text-sky-500" />
+                      Loading coder platform records...
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {!loading && worklist.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+                    No coder platform records found. Adjust filters or try loading sample data.
+                  </td>
+                </tr>
+              )}
+
+              {worklist.map((item) => (
+                <tr key={item.chaseId || item.chase_id || item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                  <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
+                    <div className="font-semibold">{item.memberName || '-'}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-300">{item.memberKey || '-'}</div>
+                  </td>
+                  <td className="px-4 py-3">{renderStatusBadge(item.status)}</td>
+                  <td className="px-4 py-3">{renderPriorityBadge(item.priority)}</td>
+                  <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
+                    {item.assignedCoderEmail || (
+                      <span className="text-slate-500 dark:text-slate-300">Unassigned</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
+                    {item.dueDate || <span className="text-slate-500 dark:text-slate-300">Not set</span>}
+                  </td>
+                  <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
+                    <div>{item.serviceDateFrom || '-'}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-300">{item.serviceDateTo || '-'}</div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
+                    <div>{item.icd10Code || '-'}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-300">{item.hccCode || '-'}</div>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      className={linkButtonClasses}
+                      onClick={() => navigate(`/coding/member/${item.memberId || item.member_id}`)}
+                    >
+                      View member
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <header className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-900 dark:text-white">Status distribution</span>
+            <span className="text-xs text-slate-500 dark:text-slate-300">Live counts</span>
+          </header>
+          <div className="mt-3 space-y-2">
+            {Object.keys(statusCounts).length === 0 && (
+              <div className="text-sm text-slate-500 dark:text-slate-300">No status data yet.</div>
+            )}
+            {Object.entries(statusCounts).map(([key, value]) => {
+              const label = key.replace(/_/g, ' ');
+              return (
+                <div
+                  key={key}
+                  className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-800 dark:bg-slate-800/60 dark:text-slate-100"
+                >
+                  <span className="capitalize">{label}</span>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-800 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700">
+                    {value}
+                  </span>
                 </div>
-              </div>
-              <div className="mt-2 mt-md-0">
-                <Button variant="outline-primary" size="sm" onClick={() => void loadWorklist()} disabled={loading}>
-                  {loading ? <Spinner animation="border" size="sm" /> : 'Refresh'}
-                </Button>
-              </div>
-            </div>
-          </Card.Header>
-          <Card.Body>
-            <Form onSubmit={handleSubmit} className="mb-3">
-              <Row className="gy-2 gx-3">
-                <Col sm={6} md={3}>
-                  <Form.Group controlId="coder-platform-status">
-                    <Form.Label className="small text-muted">Status</Form.Label>
-                    <Form.Select name="status" value={filters.status} onChange={handleInputChange}>
-                      {STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-                <Col sm={6} md={3}>
-                  <Form.Group controlId="coder-platform-priority">
-                    <Form.Label className="small text-muted">Priority</Form.Label>
-                    <Form.Select name="priority" value={filters.priority} onChange={handleInputChange}>
-                      {PRIORITY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-                <Col sm={6} md={3}>
-                  <Form.Group controlId="coder-platform-assigned">
-                    <Form.Label className="small text-muted">Assigned to</Form.Label>
-                    <Form.Control
-                      type="email"
-                      name="assigned"
-                      value={filters.assigned}
-                      onChange={handleInputChange}
-                      placeholder="coder@example.com"
-                    />
-                  </Form.Group>
-                </Col>
-                <Col sm={6} md={3}>
-                  <Form.Group controlId="coder-platform-search">
-                    <Form.Label className="small text-muted">Search</Form.Label>
-                    <Form.Control
-                      type="text"
-                      name="search"
-                      value={filters.search}
-                      onChange={handleInputChange}
-                      placeholder="Member name or key"
-                    />
-                  </Form.Group>
-                </Col>
-                <Col xs={12} className="text-end">
-                  <Button type="submit" variant="primary" disabled={loading}>
-                    {loading ? <Spinner animation="border" size="sm" /> : 'Apply filters'}
-                  </Button>
-                </Col>
-              </Row>
-            </Form>
+              );
+            })}
+          </div>
+        </div>
 
-            {error && <Alert variant="danger">{error}</Alert>}
-
-            <div className="table-responsive">
-              <Table hover responsive className="align-middle">
-                <thead>
-                  <tr>
-                    <th>Member</th>
-                    <th>Status</th>
-                    <th>Priority</th>
-                    <th>Assigned</th>
-                    <th>Due date</th>
-                    <th>Service dates</th>
-                    <th>Codes</th>
-                    <th className="text-end">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading && (
-                    <tr>
-                      <td colSpan={8} className="text-center py-4">
-                        <Spinner animation="border" />
-                      </td>
-                    </tr>
-                  )}
-                  {!loading && worklist.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="text-center text-muted py-4">
-                        No coder platform records found. Adjust filters or try loading sample data.
-                      </td>
-                    </tr>
-                  )}
-                  {worklist.map((item) => (
-                    <tr key={item.chase_id}>
-                      <td>
-                        <div className="fw-semibold">{item.member_name || '-'}</div>
-                        <div className="text-muted small">{item.member_key}</div>
-                      </td>
-                      <td>{renderStatusBadge(item.status)}</td>
-                      <td>{renderPriorityBadge(item.priority)}</td>
-                      <td>{item.assigned_coder_email || <span className="text-muted">Unassigned</span>}</td>
-                      <td>{item.due_date || <span className="text-muted">Not set</span>}</td>
-                      <td>
-                        <div>{item.service_date_from || '-'}</div>
-                        <div className="text-muted small">{item.service_date_to || '-'}</div>
-                      </td>
-                      <td>
-                        <div>{item.icd10_code || '-'}</div>
-                        <div className="text-muted small">{item.hcc_code || '-'}</div>
-                      </td>
-                      <td className="text-end">
-                        <Button
-                          variant="link"
-                          size="sm"
-                          onClick={() => navigate(`/coding/member/${item.member_id}`)}
-                        >
-                          View member
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          </Card.Body>
-        </Card>
-
-        <Row className="mt-4 g-3">
-          <Col md={6}>
-            <Card className="h-100 shadow-sm">
-              <Card.Header className="d-flex justify-content-between align-items-center">
-                <span>Status distribution</span>
-                <span className="small text-muted">Live counts</span>
-              </Card.Header>
-              <Card.Body>
-                {Object.keys(statusCounts).length === 0 && (
-                  <div className="text-muted">No status data yet.</div>
-                )}
-                {Object.entries(statusCounts).map(([key, value]) => (
-                  <div key={key} className="d-flex justify-content-between align-items-center mb-2">
-                    <span className="text-capitalize">{key}</span>
-                    <Badge bg="light" text="dark">{value}</Badge>
-                  </div>
-                ))}
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col md={6}>
-            <Card className="h-100 shadow-sm">
-              <Card.Header className="d-flex justify-content-between align-items-center">
-                <span>Priority mix</span>
-                <span className="small text-muted">Across current results</span>
-              </Card.Header>
-              <Card.Body>
-                {Object.keys(priorityCounts).length === 0 && (
-                  <div className="text-muted">No priority data yet.</div>
-                )}
-                {Object.entries(priorityCounts).map(([key, value]) => (
-                  <div key={key} className="d-flex justify-content-between align-items-center mb-2">
-                    <span className="text-capitalize">{key}</span>
-                    <Badge bg="light" text="dark">{value}</Badge>
-                  </div>
-                ))}
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </main>
-    </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <header className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-900 dark:text-white">Priority mix</span>
+            <span className="text-xs text-slate-500 dark:text-slate-300">Across current results</span>
+          </header>
+          <div className="mt-3 space-y-2">
+            {Object.keys(priorityCounts).length === 0 && (
+              <div className="text-sm text-slate-500 dark:text-slate-300">No priority data yet.</div>
+            )}
+            {Object.entries(priorityCounts).map(([key, value]) => {
+              const label = key.replace(/_/g, ' ');
+              return (
+                <div
+                  key={key}
+                  className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-800 dark:bg-slate-800/60 dark:text-slate-100"
+                >
+                  <span className="capitalize">{label}</span>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-800 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700">
+                    {value}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    </PortalPageLayout>
   );
 };
 

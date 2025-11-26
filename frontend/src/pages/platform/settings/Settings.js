@@ -155,7 +155,7 @@ const Settings = ({ themePreference, setThemePreference }) => {
           </div>
           <button
             className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            onClick={() => navigate("/portal_page/portalPage")}
+            onClick={() => navigate("/portalPage")}
             type="button"
           >
             Portal home

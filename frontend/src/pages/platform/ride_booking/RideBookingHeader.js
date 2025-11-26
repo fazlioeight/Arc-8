@@ -8,8 +8,8 @@ const NAV_GROUPS = [
   {
     label: 'operations',
     items: [
-      { label: 'Ride overview', href: '/RideBooking', match: (path) => path === '/RideBooking' },
-      { label: 'Book a ride', href: '/RideBooking/book', match: (path) => path.startsWith('/RideBooking/book') },
+      { label: 'Ride overview', href: '/rideBooking', match: (path) => path === '/rideBooking' },
+      { label: 'Book a ride', href: '/rideBooking/book', match: (path) => path.startsWith('/rideBooking/book') },
     ],
   },
   {
@@ -17,8 +17,8 @@ const NAV_GROUPS = [
     items: [
       {
         label: 'Partner calendars',
-        href: '/RideBooking/partners',
-        match: (path) => path.startsWith('/RideBooking/partners'),
+        href: '/rideBooking/partners',
+        match: (path) => path.startsWith('/rideBooking/partners'),
       },
     ],
   },
@@ -27,8 +27,8 @@ const NAV_GROUPS = [
     items: [
       {
         label: 'Payments and billing',
-        href: '/RideBooking/payments',
-        match: (path) => path.startsWith('/RideBooking/payments'),
+        href: '/rideBooking/payments',
+        match: (path) => path.startsWith('/rideBooking/payments'),
       },
     ],
   },

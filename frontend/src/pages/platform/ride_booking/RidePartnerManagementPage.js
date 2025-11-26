@@ -9,7 +9,7 @@ import {
   getPartners,
   upsertPartnerBillingProfile,
 } from "../../../services/ridePartnerService";
-import { getRecentRides } from "../../../services/rideBookingService";
+import { RideBookingService } from "../../../services/rideBookingService";
 import "../coding/member/memberWorkspace.css";
 import "../../../styles/rideBooking.css";
 
@@ -45,6 +45,7 @@ const formatRecurrence = (schedule) => {
 
 const RidePartnerManagementPage = () => {
   const navigate = useNavigate();
+  const rideBookingService = useMemo(() => new RideBookingService(), []);
   const [partners, setPartners] = useState([]);
   const [availableToday, setAvailableToday] = useState([]);
   const [rides, setRides] = useState([]);
@@ -54,12 +55,12 @@ const RidePartnerManagementPage = () => {
   const refreshPartners = () => {
     setPartners(getPartners());
     setAvailableToday(getAvailablePartnersForDate(new Date()));
-    setRides(getRecentRides());
+    setRides(rideBookingService.getRecentRides());
   };
 
   useEffect(() => {
     refreshPartners();
-  }, []);
+  }, [rideBookingService]);
 
   const scheduleStateFor = (partnerId) => scheduleState[partnerId] || defaultSchedule;
 

@@ -22,7 +22,7 @@ const Login = () => {
         ...SAMPLE_SESSION,
         tenant: formData.tenant || SAMPLE_SESSION.tenant,
       });
-      navigate('/portal_page/portalPage');
+      navigate('/portalPage');
       setSubmitting(false);
     }, 350);
   };
@@ -34,7 +34,7 @@ const Login = () => {
       tenant: formData.tenant || SAMPLE_SESSION.tenant,
     };
     login(payload);
-    navigate('/portal_page/portalPage');
+    navigate('/portalPage');
   };
 
   const handleChange = (e) => {
@@ -59,7 +59,7 @@ const Login = () => {
         throw new Error(data.detail || "Login failed. Please try again.");
       }
       login(data);
-      navigate("/portal_page/portalPage");
+      navigate("/portalPage");
     } catch (err) {
       setError(err.message || "An unexpected error occurred.");
     } finally {

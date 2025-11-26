@@ -8,6 +8,7 @@ import {
   assignCodingAdminWork,
   fetchCodingAdminAssignments,
 } from '../../../../services/codingService';
+import { createWorklistItem } from '../../../../viewModels/common';
 
 const CodingAssignmentsPage = () => {
   const { token, tenant, isAuthenticated, user } = useContext(AuthContext) || {};
@@ -28,7 +29,8 @@ const CodingAssignmentsPage = () => {
     setError(null);
     try {
       const response = await fetchCodingAdminAssignments(token, tenant);
-      setOverview({ coders: response.coders || [], items: response.items || [] });
+      const items = (response.items || []).map((item) => createWorklistItem(item)).filter(Boolean);
+      setOverview({ coders: response.coders || [], items });
       if (!selectedCoder && response.coders && response.coders.length) {
         setSelectedCoder(response.coders[0].email);
       }
@@ -80,7 +82,8 @@ const CodingAssignmentsPage = () => {
         chase_ids: Array.from(selectedChases),
         member_ids: [],
       });
-      setOverview({ coders: response.coders || [], items: response.items || [] });
+      const items = (response.items || []).map((item) => createWorklistItem(item)).filter(Boolean);
+      setOverview({ coders: response.coders || [], items });
       setSuccessMessage(`Assigned ${selectedChases.size} chase(s) to ${selectedCoder}`);
       clearSelection();
     } catch (err) {
@@ -170,7 +173,7 @@ const CodingAssignmentsPage = () => {
                       checked={overview.items.length > 0 && selectedChases.size === overview.items.length}
                       onChange={(event) => {
                         if (event.target.checked) {
-                          setSelectedChases(new Set(overview.items.map((item) => item.chase_id)));
+                          setSelectedChases(new Set(overview.items.map((item) => item.chaseId || item.chase_id)));
                         } else {
                           clearSelection();
                         }
@@ -195,21 +198,22 @@ const CodingAssignmentsPage = () => {
                   </tr>
                 )}
                 {overview.items.map((item) => {
-                  const isSelected = selectedChases.has(item.chase_id);
+                  const chaseId = item.chaseId || item.chase_id;
+                  const isSelected = selectedChases.has(chaseId);
                   return (
-                    <tr key={item.chase_id} className={isSelected ? 'table-active' : ''}>
+                    <tr key={chaseId} className={isSelected ? 'table-active' : ''}>
                       <td>
                         <Form.Check
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleSelection(item.chase_id)}
+                          onChange={() => toggleSelection(chaseId)}
                         />
                       </td>
                       <td>
-                        <div className="fw-semibold">{item.member_name || item.member_key}</div>
-                        <div className="small text-muted">#{item.member_id}</div>
+                        <div className="fw-semibold">{item.memberName || item.memberKey}</div>
+                        <div className="small text-muted">#{item.memberId}</div>
                       </td>
-                      <td>#{item.chase_id}</td>
+                      <td>#{chaseId}</td>
                       <td>{item.status}</td>
                       <td>
                         {item.priority ? (
@@ -220,8 +224,8 @@ const CodingAssignmentsPage = () => {
                           <span className="text-muted">-</span>
                         )}
                       </td>
-                      <td>{item.hcc_code || item.icd10_code || '-'}</td>
-                      <td>{item.assigned_coder_email || <span className="text-muted">Unassigned</span>}</td>
+                      <td>{item.hccCode || item.icd10Code || '-'}</td>
+                      <td>{item.assignedCoderEmail || <span className="text-muted">Unassigned</span>}</td>
                     </tr>
                   );
                 })}

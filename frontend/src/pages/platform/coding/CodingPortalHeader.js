@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import PortalNav from '../../../components/PortalNav';
 
 const NAV_GROUPS = [
   {
@@ -42,14 +43,6 @@ const NAV_GROUPS = [
   },
 ];
 
-const tabClasses = (isActive) =>
-  [
-    "rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition",
-    isActive
-      ? "bg-white text-slate-900 shadow-sm ring-1 ring-white/70"
-      : "bg-white/5 text-slate-200 ring-1 ring-white/10 hover:bg-white/10",
-  ].join(" ");
-
 const itemClasses = (isActive) =>
   [
     "flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition text-center",
@@ -62,10 +55,30 @@ const itemClasses = (isActive) =>
 const actionButton =
   "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-sky-300/60 hover:bg-sky-500/20 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-2 focus:ring-offset-slate-900";
 
+const ALIGNMENT_PRESETS = {
+  left: {
+    stack: "items-start text-left",
+    actions: "justify-start text-left",
+    grid: "justify-items-start mr-auto",
+  },
+  center: {
+    stack: "items-center text-center",
+    actions: "justify-center text-center",
+    grid: "justify-items-center mx-auto",
+  },
+  right: {
+    stack: "items-end text-right",
+    actions: "justify-end text-right",
+    grid: "justify-items-end ml-auto",
+  },
+};
+
+const DEFAULT_ALIGNMENT = "center";
+
 const CodingPortalHeader = ({
   title,
   subtitle,
-  align = 'center',
+  align = DEFAULT_ALIGNMENT,
   additionalActions = null,
   showViewChart = false,
   onViewChart,
@@ -84,8 +97,17 @@ const CodingPortalHeader = ({
 
   const matchedGroupRef = React.useRef(matchedGroup);
 
+  const resolvedAlign = React.useMemo(() => {
+    if (ALIGNMENT_PRESETS[align]) {
+      return align;
+    }
+    console.warn(`[CodingPortalHeader] Unsupported align value "${align}". Try one of: ${Object.keys(ALIGNMENT_PRESETS).join(', ')}`);
+    return DEFAULT_ALIGNMENT;
+  }, [align]);
+
+  const alignment = ALIGNMENT_PRESETS[resolvedAlign];
+
   const [activeGroup, setActiveGroup] = React.useState(() => matchedGroup || NAV_GROUPS[0].label);
-  const textAlignment = 'text-center';
 
   React.useEffect(() => {
     if (matchedGroup !== matchedGroupRef.current) {
@@ -107,15 +129,16 @@ const CodingPortalHeader = ({
     if (count === 4) return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 max-w-6xl";
     return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl";
   }, [activeGroupConfig.items.length]);
+  const navAlign = resolvedAlign === 'right' ? 'end' : resolvedAlign === 'center' ? 'center' : 'start';
 
   return (
     <section className="mb-6 rounded-3xl border border-slate-800/60 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 px-6 py-7 text-white shadow-2xl shadow-slate-950/50 ring-1 ring-slate-900/40">
-      <div className="flex flex-col items-center gap-3 text-center">
+      <div className={["flex flex-col gap-3", alignment.stack].join(" ")}>
         <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-sky-400/80">Coding Workspace</p>
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">{title}</h1>
         {subtitle ? <p className="max-w-3xl text-sm text-slate-300">{subtitle}</p> : null}
         {(showViewChart || additionalActions) && (
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          <div className={["flex flex-wrap items-center gap-2", alignment.actions].join(" ")}>
             {showViewChart ? (
               <button
                 type="button"
@@ -132,25 +155,16 @@ const CodingPortalHeader = ({
       </div>
 
       <div className="mt-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-center gap-1" role="tablist" aria-label="Coding portal sections">
-          {NAV_GROUPS.map((group) => {
-            const isActiveTab = group.label === activeGroup;
-            return (
-              <button
-                key={group.label}
-                type="button"
-                className={tabClasses(isActiveTab)}
-                aria-selected={isActiveTab}
-                role="tab"
-                onClick={() => setActiveGroup(group.label)}
-              >
-                {group.label}
-              </button>
-            );
-          })}
-        </div>
+        <PortalNav
+          items={NAV_GROUPS}
+          currentKey={activeGroup}
+          onSelect={(item) => setActiveGroup(item.label)}
+          align={navAlign}
+          size="sm"
+          tone="inverted"
+        />
 
-        <div className={["mx-auto grid justify-items-center gap-2", gridLayoutClasses].join(" ")} role="group" aria-label={`${activeGroup} links`}>
+        <div className={["grid gap-2", alignment.grid, gridLayoutClasses].join(" ")} role="group" aria-label={`${activeGroup} links`}>
           {activeGroupConfig.items.map((item) => {
             const isActiveItem = item.match ? item.match(location.pathname) : location.pathname === item.href;
             return (
@@ -165,7 +179,7 @@ const CodingPortalHeader = ({
                 }}
               >
                 <span>{item.label}</span>
-                <span className="text-xs text-slate-300">{isActiveItem ? '•' : ''}</span>
+                <span className="text-xs text-slate-300">{isActiveItem ? '>' : ''}</span>
               </button>
             );
           })}

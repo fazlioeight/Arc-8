@@ -1,19 +1,20 @@
-import React, { useContext, useRef, useState } from "react";
+import React, { useContext, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../../../context/AuthContext";
 import PortalUtilityBar from "../../../components/PortalUtilityBar";
 import RideBookingHeader from "./RideBookingHeader";
 import "../coding/member/memberWorkspace.css";
 import "../../../styles/rideBooking.css";
-import { addRideRecord, getRideCompaniesForDate } from "../../../services/rideBookingService";
+import { RideBookingService } from "../../../services/rideBookingService";
 import useGooglePlacesAutocomplete from "../../../hooks/useGooglePlacesAutocomplete";
 
 const getLocalDate = () => new Date().toISOString().slice(0, 10);
 const getLocalTime = () => new Date().toISOString().slice(11, 16);
 
 const RideBooking = () => {
-  const { isAuthenticated } = useContext(AuthContext) || {};
+  const { isAuthenticated, token, tenant } = useContext(AuthContext) || {};
   const navigate = useNavigate();
+  const rideBookingService = useMemo(() => new RideBookingService({ token, tenant }), [tenant, token]);
 
   const [memberId, setMemberId] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -22,8 +23,8 @@ const RideBooking = () => {
   const [dropoff, setDropoff] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
-  const [rideOptions, setRideOptions] = useState(() => getRideCompaniesForDate(new Date()));
-  const [rideType, setRideType] = useState(() => getRideCompaniesForDate(new Date())[0] || "Other");
+  const [rideOptions, setRideOptions] = useState(() => rideBookingService.getRideOptionsForDate(new Date()));
+  const [rideType, setRideType] = useState(() => rideBookingService.getRideOptionsForDate(new Date())[0] || "Other");
   const [rideDate, setRideDate] = useState(getLocalDate());
   const [rideTime, setRideTime] = useState(getLocalTime());
   const [estimatedCost, setEstimatedCost] = useState("");
@@ -36,7 +37,7 @@ const RideBooking = () => {
   const isDropoffAutocompleteReady = useGooglePlacesAutocomplete(dropoffAddressInputRef, setDropoffAddress);
 
   const refreshRideOptions = () => {
-    const options = getRideCompaniesForDate(new Date());
+    const options = rideBookingService.getRideOptionsForDate(new Date());
     setRideOptions(options);
     setRideType((current) => (current && options.includes(current) ? current : options[0] || "Other"));
   };
@@ -58,7 +59,7 @@ const RideBooking = () => {
     event.preventDefault();
     setFormStatus(null);
     const scheduledPickupIso = new Date(`${rideDate}T${rideTime || "08:00"}`).toISOString();
-    const record = addRideRecord({
+    const record = rideBookingService.bookRide({
       memberId,
       firstName,
       lastName,
@@ -277,7 +278,7 @@ const RideBooking = () => {
           <button
             type="button"
             className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            onClick={() => navigate("/RideBooking")}
+            onClick={() => navigate("/rideBooking")}
           >
             Back to overview
           </button>

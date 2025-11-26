@@ -103,7 +103,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Navigation',
       keywords: 'home overview landing',
       shortcut: 'G H',
-      action: () => navigate('/portal_page/portalPage'),
+      action: () => navigate('/portalPage'),
       disabled: !isNavItemEnabled('home'),
     });
     append({
@@ -136,7 +136,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       label: 'Open Ride Booking',
       category: 'Navigation',
       keywords: 'transport rides partners scheduling',
-      action: () => navigate('/RideBooking'),
+      action: () => navigate('/rideBooking'),
       disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking') || !isNavItemEnabled('rideBooking'),
     });
     append({
@@ -144,7 +144,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       label: 'Open Ride Payments and Billing',
       category: 'Navigation',
       keywords: 'payments billing invoices payouts ledger stripe',
-      action: () => navigate('/RideBooking/payments'),
+      action: () => navigate('/rideBooking/payments'),
       disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking') || !isNavItemEnabled('rideBooking'),
     });
     append({
