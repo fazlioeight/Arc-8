@@ -14,6 +14,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import CommandPalette from './components/CommandPalette';
 import SessionLockOverlay from './components/SessionLockOverlay';
 import GuidedTourOverlay from './components/GuidedTourOverlay';
+import { LoadingState } from './components/ehr/Primitives';
+import { ROUTES } from './constants/routes';
 
 const Home = lazy(() => import('./pages/website/Home'));
 const About = lazy(() => import('./pages/website/about/About'));
@@ -74,7 +76,15 @@ const ContactFormPage = lazy(() => import('./pages/website/contact/ContactFormPa
 const CompanyInfo = lazy(() => import('./pages/website/contact/CompanyInfo'));
 // Section pages
 
-const RouteFallback = () => <div className="loading">Loading...</div>;
+const RouteFallback = () => (
+  <div className="py-12">
+    <LoadingState
+      title="Loading"
+      description="Preparing your Nexora workspace..."
+      className="mx-auto max-w-md"
+    />
+  </div>
+);
 
 const LegacyMemberDetailRedirect = () => {
   const { memberId } = useParams();
@@ -86,7 +96,18 @@ const LegacyMemberDetailRedirect = () => {
 
 const Shell = ({ themePreference, setThemePreference }) => {
   const location = useLocation();
-  const hideNavbarOn = ['/portalPage', '/member-360', '/rideBooking', '/dashboard', '/settings', '/coding', '/admin', '/jobs'];
+  const hideNavbarOn = [
+    ROUTES.PORTAL.LANDING,
+    "/portalPage",
+    ROUTES.MEMBER_360.LANDING,
+    ROUTES.RIDE_BOOKING.LANDING,
+    "/rideBooking",
+    ROUTES.DASHBOARD,
+    ROUTES.SETTINGS,
+    ROUTES.CODING.LANDING,
+    "/admin",
+    "/jobs",
+  ];
   const hideNavbar = hideNavbarOn.some((p) => location.pathname.startsWith(p));
 
   return (
@@ -106,15 +127,20 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/portalPage" element={<PortalPage />} />
-          <Route path="/member-360" element={<Member360LandingPage />} />
-          <Route path="/rideBooking" element={<RideBookingLandingPage />} />
-          <Route path="/rideBooking/book" element={<RideBooking />} />
-          <Route path="/rideBooking/partners" element={<RidePartnerManagementPage />} />
-          <Route path="/rideBooking/payments" element={<RideBookingPaymentsPage />} />
-          <Route path="/settings" element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/docs" element={<Docs />} />
+          <Route path={ROUTES.PORTAL.LANDING} element={<PortalPage />} />
+          <Route path="/portalPage" element={<Navigate to={ROUTES.PORTAL.LANDING} replace />} />
+          <Route path={ROUTES.MEMBER_360.LANDING} element={<Member360LandingPage />} />
+          <Route path={ROUTES.RIDE_BOOKING.LANDING} element={<RideBookingLandingPage />} />
+          <Route path={ROUTES.RIDE_BOOKING.BOOK} element={<RideBooking />} />
+          <Route path={ROUTES.RIDE_BOOKING.PARTNERS} element={<RidePartnerManagementPage />} />
+          <Route path={ROUTES.RIDE_BOOKING.PAYMENTS} element={<RideBookingPaymentsPage />} />
+          <Route path="/rideBooking" element={<Navigate to={ROUTES.RIDE_BOOKING.LANDING} replace />} />
+          <Route path="/rideBooking/book" element={<Navigate to={ROUTES.RIDE_BOOKING.BOOK} replace />} />
+          <Route path="/rideBooking/partners" element={<Navigate to={ROUTES.RIDE_BOOKING.PARTNERS} replace />} />
+          <Route path="/rideBooking/payments" element={<Navigate to={ROUTES.RIDE_BOOKING.PAYMENTS} replace />} />
+          <Route path={ROUTES.SETTINGS} element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
+          <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
+          <Route path={ROUTES.DOCS} element={<Docs />} />
           {/* Section routes */}
           <Route path="/about/mission" element={<Mission />} />
           <Route path="/about/values" element={<Values />} />

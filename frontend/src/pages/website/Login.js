@@ -4,6 +4,7 @@ import { AuthContext } from "../../context/AuthContext";
 import { SAMPLE_SESSION } from "../../utils/sampleData";
 import "../../index.css";
 import "./Login.sfdc.css";
+import { ROUTES } from "../../constants/routes";
 
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8000";
 
@@ -22,7 +23,7 @@ const Login = () => {
         ...SAMPLE_SESSION,
         tenant: formData.tenant || SAMPLE_SESSION.tenant,
       });
-      navigate('/portalPage');
+      navigate(ROUTES.PORTAL.LANDING);
       setSubmitting(false);
     }, 350);
   };
@@ -34,7 +35,7 @@ const Login = () => {
       tenant: formData.tenant || SAMPLE_SESSION.tenant,
     };
     login(payload);
-    navigate('/portalPage');
+    navigate(ROUTES.PORTAL.LANDING);
   };
 
   const handleChange = (e) => {
@@ -59,7 +60,7 @@ const Login = () => {
         throw new Error(data.detail || "Login failed. Please try again.");
       }
       login(data);
-      navigate("/portalPage");
+      navigate(ROUTES.PORTAL.LANDING);
     } catch (err) {
       setError(err.message || "An unexpected error occurred.");
     } finally {

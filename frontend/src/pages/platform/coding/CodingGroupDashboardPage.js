@@ -14,6 +14,8 @@ import { useCommandPalette } from '../../../context/CommandPaletteContext';
 import { fetchGroupDashboard } from '../../../services/codingService';
 import CodingPortalHeader from './CodingPortalHeader';
 
+const CODING_GROUP_DASHBOARD_COMMAND_SCOPE = 'coding-group-dashboard-commands';
+
 const CodingGroupDashboardPage = () => {
   const { token, tenant, recordAuditEvent } = useContext(AuthContext) || {};
   const { registerCommands } = useCommandPalette();
@@ -46,15 +48,15 @@ const CodingGroupDashboardPage = () => {
   }, [effectiveToken, effectiveTenant]);
 
   useEffect(() => {
-    registerCommands([
+    const unregister = registerCommands([
       {
         id: 'coding-group-dashboard-refresh',
         label: 'Refresh group dashboard',
         category: 'Coding',
         action: () => { void loadGroups(); },
       },
-    ]);
-    return () => registerCommands([]);
+    ], { id: CODING_GROUP_DASHBOARD_COMMAND_SCOPE });
+    return unregister;
     // eslint-disable-next-line
   }, [registerCommands]);
 

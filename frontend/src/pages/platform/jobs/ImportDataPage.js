@@ -45,6 +45,8 @@ const FHIR_STATUS_VARIANTS = {
   error: "bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-100 dark:ring-rose-500/30",
 };
 
+const IMPORT_DATA_COMMAND_SCOPE = "import-data-commands";
+
 const formatBytes = (size) => {
   if (!size && size !== 0) return "-";
   const units = ["B", "KB", "MB", "GB"];
@@ -358,7 +360,7 @@ const ImportDataPage = () => {
   }, [fhirConfig, fhirResources, recordAuditEvent, simulateUpload, tenant]);
 
   useEffect(() => {
-    registerCommands(
+    const unregister = registerCommands(
       [
         {
           id: "import-data-open-status",
@@ -383,12 +385,13 @@ const ImportDataPage = () => {
               id: "import-data-clear-complete",
               label: "Clear completed imports",
               category: "Imports",
-              action: clearCompleted,
-            }
+          action: clearCompleted,
+        }
           : null,
-      ].filter(Boolean)
+      ].filter(Boolean),
+      { id: IMPORT_DATA_COMMAND_SCOPE }
     );
-    return () => registerCommands([]);
+    return unregister;
   }, [clearCompleted, navigate, queue, registerCommands, startFhirImport, testFhirConnection]);
 
   return (

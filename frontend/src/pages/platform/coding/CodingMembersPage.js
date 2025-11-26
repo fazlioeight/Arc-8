@@ -17,6 +17,8 @@ const STATUS_OPTIONS = [
 
 const LOB_OPTIONS = ['Commercial', 'Medicare Advantage', 'DSNP', 'Exchange'];
 
+const CODING_MEMBERS_COMMAND_SCOPE = 'coding-members-commands';
+
 const CodingMembersPage = () => {
   const { registerCommands } = useCommandPalette();
   const navigate = useNavigate();
@@ -81,7 +83,7 @@ const CodingMembersPage = () => {
   }, [isAuthenticated, canQuery, loadPrioritizedMembers]);
 
   useEffect(() => {
-    registerCommands([
+    const unregister = registerCommands([
       {
         id: 'coding-members-load-sample',
         label: 'Load sample coding members',
@@ -98,8 +100,8 @@ const CodingMembersPage = () => {
           setSearchValue('');
         },
       },
-    ]);
-    return () => registerCommands([]);
+    ], { id: CODING_MEMBERS_COMMAND_SCOPE });
+    return unregister;
   }, [registerCommands, loadSampleMembers]);
 
   const loadMembers = async (overrides = {}) => {

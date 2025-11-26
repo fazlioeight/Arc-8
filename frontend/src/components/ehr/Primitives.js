@@ -1,6 +1,8 @@
 import React from "react";
 import "./primitives.css";
 
+const joinClassNames = (...parts) => parts.filter(Boolean).join(" ");
+
 export function Chip({ label, title }) {
   return (
     <span title={title || label} className="ehr-chip">
@@ -122,3 +124,116 @@ export function AlertBanner({ level = "info", title, body }) {
 }
 
 export { default as UtilityBar } from "../PortalUtilityBar";
+
+const DEFAULT_STATE_GLYPH = <span className="ehr-state__dot" aria-hidden />;
+
+const toneFromLevel = (level) =>
+  ({
+    danger: "danger",
+    warning: "warning",
+    success: "success",
+    info: "info",
+    muted: "muted",
+    loading: "loading",
+  }[level] || "muted");
+
+export function StateMessage({
+  tone = "muted",
+  title,
+  description,
+  actions,
+  icon,
+  align = "center",
+  size = "md",
+  role = "status",
+  className = "",
+  bodyClassName = "",
+}) {
+  const resolvedTone = toneFromLevel(tone);
+  const glyph = icon === null ? null : icon || DEFAULT_STATE_GLYPH;
+
+  return (
+    <div
+      className={joinClassNames(
+        "ehr-state",
+        `ehr-state--${resolvedTone}`,
+        `ehr-state--${align}`,
+        `ehr-state--${size}`,
+        className
+      )}
+      role={role}
+      aria-live={resolvedTone === "loading" ? "polite" : undefined}
+    >
+      {glyph ? <div className="ehr-state__icon">{glyph}</div> : null}
+      <div className={joinClassNames("ehr-state__body", bodyClassName)}>
+        {title ? <p className="ehr-state__title">{title}</p> : null}
+        {description ? (
+          <p className="ehr-state__description">{description}</p>
+        ) : null}
+        {actions ? <div className="ehr-state__actions">{actions}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+export function ErrorState({
+  title = "Something went wrong",
+  description,
+  actions,
+  className = "",
+}) {
+  return (
+    <StateMessage
+      tone="danger"
+      title={title}
+      description={description}
+      actions={actions}
+      className={className}
+      role="alert"
+      align="left"
+    />
+  );
+}
+
+export function EmptyState({
+  title = "Nothing to show yet",
+  description = "Try adjusting filters or come back later.",
+  actions,
+  className = "",
+  size = "md",
+}) {
+  return (
+    <StateMessage
+      tone="muted"
+      title={title}
+      description={description}
+      actions={actions}
+      className={className}
+      size={size}
+      align="center"
+    />
+  );
+}
+
+export function LoadingState({
+  title = "Loading",
+  description = "Hang tight while we fetch the latest data.",
+  actions,
+  className = "",
+  size = "md",
+  tone = "loading",
+}) {
+  return (
+    <StateMessage
+      tone={tone}
+      title={title}
+      description={description}
+      actions={actions}
+      className={className}
+      size={size}
+      align="center"
+      icon={<span className="ehr-spinner" aria-hidden />}
+      role="status"
+    />
+  );
+}

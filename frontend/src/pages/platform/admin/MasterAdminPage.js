@@ -8,6 +8,7 @@ import {
   updateAdminUser,
   ApplicationAccessService,
 } from "../../../services/adminService";
+import { ROUTES } from "../../../constants/routes";
 import "../coding/member/memberWorkspace.css";
 
 const API_ERROR_FALLBACK = "Unable to load admin data. Please try again.";
@@ -108,7 +109,7 @@ const MasterAdminPage = () => {
       return;
     }
     if (token && role && !isAdmin) {
-      navigate("/portalPage");
+      navigate(ROUTES.PORTAL.LANDING);
     }
   }, [token, role, isAdmin, navigate]);
 

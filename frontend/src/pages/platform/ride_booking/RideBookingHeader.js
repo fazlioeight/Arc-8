@@ -2,14 +2,15 @@ import React from 'react';
 import { Button } from 'react-bootstrap';
 import { useLocation, useNavigate } from 'react-router-dom';
 
+import { ROUTES } from '../../../constants/routes';
 import PortalHero from '../../../components/PortalHero';
 
 const NAV_GROUPS = [
   {
     label: 'operations',
     items: [
-      { label: 'Ride overview', href: '/rideBooking', match: (path) => path === '/rideBooking' },
-      { label: 'Book a ride', href: '/rideBooking/book', match: (path) => path.startsWith('/rideBooking/book') },
+      { label: 'Ride overview', href: ROUTES.RIDE_BOOKING.LANDING, match: (path) => path === ROUTES.RIDE_BOOKING.LANDING },
+      { label: 'Book a ride', href: ROUTES.RIDE_BOOKING.BOOK, match: (path) => path.startsWith(ROUTES.RIDE_BOOKING.BOOK) },
     ],
   },
   {
@@ -17,8 +18,8 @@ const NAV_GROUPS = [
     items: [
       {
         label: 'Partner calendars',
-        href: '/rideBooking/partners',
-        match: (path) => path.startsWith('/rideBooking/partners'),
+        href: ROUTES.RIDE_BOOKING.PARTNERS,
+        match: (path) => path.startsWith(ROUTES.RIDE_BOOKING.PARTNERS),
       },
     ],
   },
@@ -27,8 +28,8 @@ const NAV_GROUPS = [
     items: [
       {
         label: 'Payments and billing',
-        href: '/rideBooking/payments',
-        match: (path) => path.startsWith('/rideBooking/payments'),
+        href: ROUTES.RIDE_BOOKING.PAYMENTS,
+        match: (path) => path.startsWith(ROUTES.RIDE_BOOKING.PAYMENTS),
       },
     ],
   },

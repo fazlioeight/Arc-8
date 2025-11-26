@@ -24,6 +24,8 @@ const STATUS_VARIANTS = {
   closed: 'secondary',
 };
 
+const CODING_REVIEW_COMMAND_SCOPE = 'coding-review-dashboard-commands';
+
 const CodingReviewDashboardPage = () => {
   const navigate = useNavigate();
   const { registerCommands } = useCommandPalette();
@@ -65,7 +67,7 @@ const CodingReviewDashboardPage = () => {
   }, [effectiveToken, effectiveTenant]);
 
   useEffect(() => {
-    registerCommands([
+    const unregister = registerCommands([
       {
         id: 'coder-review-refresh',
         label: 'Refresh coder review dashboard',
@@ -84,8 +86,8 @@ const CodingReviewDashboardPage = () => {
           });
         },
       },
-    ]);
-    return () => registerCommands([]);
+    ], { id: CODING_REVIEW_COMMAND_SCOPE });
+    return unregister;
     // eslint-disable-next-line
   }, [registerCommands, currentEmail]);
 

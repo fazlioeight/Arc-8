@@ -2,11 +2,7 @@ import React, { useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import { AuthContext } from "../../../context/AuthContext";
-import {
-  formatMemberLabel,
-  pickMemberIdForNavigation,
-  useMemberSearch,
-} from "../../../hooks/useMemberSearch";
+import { useMemberSearch } from "../../../hooks/useMemberSearch";
 import { PORTAL_NAV_ITEMS } from "../portal_page/portalNavItems";
 
 const MEMBER_CHART_BREADCRUMB = "Member chart";
@@ -17,7 +13,6 @@ const Member360LandingPage = () => {
 
   const {
     memberQuery,
-    memberSuggestions,
     memberSearchError,
     isSearchingMembers,
     isLaunchingMember,
@@ -115,30 +110,26 @@ const Member360LandingPage = () => {
               {statusMessage}
             </p>
 
-            {memberSuggestions.length > 0 && (
+            {memberOptions.length > 0 && (
               <ul className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/5 bg-slate-950/40">
-                {memberSuggestions.map((member) => {
-                  const label = formatMemberLabel(member);
-                  const memberId = pickMemberIdForNavigation(member);
-                  return (
-                    <li key={member?.id || memberId}>
-                      <button
-                        type="button"
-                        onClick={() => handleSuggestionSelect(member)}
-                        className="flex w-full flex-col items-start gap-1 px-4 py-3 text-left transition hover:bg-sky-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-                      >
-                        <span className="text-sm font-semibold text-white">
-                          {label || "Unknown member"}
+                {memberOptions.map((option) => (
+                  <li key={option.key}>
+                    <button
+                      type="button"
+                      onClick={() => handleSuggestionSelect(option)}
+                      className="flex w-full flex-col items-start gap-1 px-4 py-3 text-left transition hover:bg-sky-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                    >
+                      <span className="text-sm font-semibold text-white">
+                        {option.label || "Unknown member"}
+                      </span>
+                      {option.memberId && (
+                        <span className="text-xs uppercase tracking-wide text-slate-400">
+                          Member ID: {option.memberId}
                         </span>
-                        {memberId && (
-                          <span className="text-xs uppercase tracking-wide text-slate-400">
-                            Member ID: {memberId}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
+                      )}
+                    </button>
+                  </li>
+                ))}
               </ul>
             )}
           </div>

@@ -87,10 +87,14 @@ const RidePartnerManagementPage = () => {
       setFeedback({ type: "danger", message: "Enter partner name and contact." });
       return;
     }
-    addPartner({ name, contact });
-    setFeedback({ type: "success", message: "Partner added." });
-    event.target.reset();
-    refreshPartners();
+    try {
+      addPartner({ companyName: name, contactEmail: contact, contactName: name });
+      setFeedback({ type: "success", message: "Partner added." });
+      event.target.reset();
+      refreshPartners();
+    } catch (error) {
+      setFeedback({ type: "danger", message: error?.message || "Unable to add partner." });
+    }
   };
 
   const handleBillingInputChange = (partner, field, value) => {

@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom"
 import { AuthContext } from "../../../../../context/AuthContext";
 import { Chip, SectionHeader } from "../../../../../components/ehr/Primitives";
 import "../memberWorkspace.css";
+import { ROUTES } from "../../../../../constants/routes";
 
 import {
   fetchCodingMemberDetail,
@@ -321,8 +322,8 @@ export default function CodingMemberLayout() {
         member={member}
         gapCount={missingHcc.length}
         onRefresh={onRefresh}
-        onBackToSearch={() => navigate("/member-360")}
-        onBackHome={() => navigate("/portalPage")}
+        onBackToSearch={() => navigate(ROUTES.MEMBER_360.LANDING)}
+        onBackHome={() => navigate(ROUTES.PORTAL.LANDING)}
       />
 
       <div className="coding-member-toolbar">

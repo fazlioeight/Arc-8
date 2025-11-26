@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import PortalUtilityBar from '../../components/PortalUtilityBar';
 import PortalHero from '../../components/PortalHero';
 import { AuthContext } from '../../context/AuthContext';
+import { ROUTES } from '../../constants/routes';
 import '../platform/coding/member/memberWorkspace.css';
 
 const useQuery = () => {
@@ -20,7 +21,7 @@ const Docs = () => {
 
   const onSubmit = (event) => {
     event.preventDefault();
-    navigate(`/docs?q=${encodeURIComponent(q)}`);
+    navigate(`${ROUTES.DOCS}?q=${encodeURIComponent(q)}`);
   };
 
   return (
@@ -34,7 +35,7 @@ const Docs = () => {
           <button
             type="button"
             className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-            onClick={() => navigate(isAuthenticated ? '/portalPage' : '/')}
+            onClick={() => navigate(isAuthenticated ? ROUTES.PORTAL.LANDING : '/')}
           >
             Back to portal
           </button>

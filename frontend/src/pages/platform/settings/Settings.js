@@ -8,6 +8,7 @@ import ToggleSwitch from "../../../components/ToggleSwitch";
 import PortalUtilityBar from "../../../components/PortalUtilityBar";
 import { AuthContext } from "../../../context/AuthContext";
 import { useUserPreferences } from "../../../context/UserPreferencesContext";
+import { ROUTES } from "../../../constants/routes";
 
 const NAV_ITEMS = [
   { key: "home", label: "Home & Landing" },
@@ -155,7 +156,7 @@ const Settings = ({ themePreference, setThemePreference }) => {
           </div>
           <button
             className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            onClick={() => navigate("/portalPage")}
+            onClick={() => navigate(ROUTES.PORTAL.LANDING)}
             type="button"
           >
             Portal home

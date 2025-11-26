@@ -5,6 +5,8 @@ import { createPortalOverview } from "../viewModels/common";
 
 const DEFAULT_ERROR_MESSAGE =
   "We could not reach the portal services. Showing the latest synced data.";
+const PORTAL_OVERVIEW_TIMEOUT_MS = 8000;
+const PORTAL_FALLBACK_DELAY_MS = 1200;
 
 const buildFilteredCatalog = (catalog = [], available = [], purchased = []) => {
   const sourceKeys = available && available.length
@@ -164,15 +166,16 @@ export const usePortalOverview = ({
   const requestIdRef = useRef(0);
   const isMountedRef = useRef(true);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // React 18 StrictMode runs effects twice in dev; reset mounted flag on each run
+    isMountedRef.current = true;
+    return () => {
       isMountedRef.current = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-    },
-    []
-  );
+    };
+  }, []);
 
   const accessibleApps = useMemo(
     () => resolvedApps.filter((app) => app.allowed),
@@ -226,7 +229,6 @@ export const usePortalOverview = ({
       const applyResult = (nextOverview, nextError = null) => {
         if (
           requestIdRef.current !== requestId ||
-          signal?.aborted ||
           !isMountedRef.current
         ) {
           return nextOverview;
@@ -237,10 +239,25 @@ export const usePortalOverview = ({
         return nextOverview;
       };
 
+      const fallbackTimer =
+        typeof window !== "undefined"
+          ? window.setTimeout(() => {
+              applyResult(fallbackView, errorMessage);
+            }, PORTAL_FALLBACK_DELAY_MS)
+          : null;
+
+      const clearFallbackTimer = () => {
+        if (fallbackTimer) {
+          window.clearTimeout(fallbackTimer);
+        }
+      };
+
       if (!apiBaseUrl) {
         if (signal?.aborted) {
+          clearFallbackTimer();
           return handleAbort();
         }
+        clearFallbackTimer();
         return applyResult(fallbackView);
       }
 
@@ -252,10 +269,15 @@ export const usePortalOverview = ({
       const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
       try {
-        const response = await axios.get(`${apiBaseUrl}/api/portal/overview`, {
-          headers,
-          signal,
-        });
+        const response = await axios.get(
+          `${apiBaseUrl}/api/portal/overview`,
+          {
+            headers,
+            signal,
+            timeout: PORTAL_OVERVIEW_TIMEOUT_MS,
+          }
+        );
+        clearFallbackTimer();
         if (signal?.aborted) {
           return handleAbort();
         }
@@ -266,6 +288,7 @@ export const usePortalOverview = ({
         );
         return applyResult(nextOverview);
       } catch (err) {
+        clearFallbackTimer();
         if (signal?.aborted || err?.code === "ERR_CANCELED") {
           return handleAbort();
         }

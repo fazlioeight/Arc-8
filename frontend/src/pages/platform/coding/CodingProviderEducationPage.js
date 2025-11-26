@@ -21,6 +21,8 @@ const STATUS_VARIANTS = {
   at_risk: 'danger',
 };
 
+const CODING_PROVIDER_EDU_COMMAND_SCOPE = 'coding-provider-education-commands';
+
 const CodingProviderEducationPage = () => {
   const { token, tenant, recordAuditEvent } = useContext(AuthContext) || {};
   const { registerCommands } = useCommandPalette();
@@ -53,15 +55,15 @@ const CodingProviderEducationPage = () => {
   }, [effectiveToken, effectiveTenant]);
 
   useEffect(() => {
-    registerCommands([
+    const unregister = registerCommands([
       {
         id: 'provider-education-refresh',
         label: 'Refresh provider education dashboard',
         category: 'Coding',
         action: () => { void loadProviders(); },
       },
-    ]);
-    return () => registerCommands([]);
+    ], { id: CODING_PROVIDER_EDU_COMMAND_SCOPE });
+    return unregister;
     // eslint-disable-next-line
   }, [registerCommands]);
 

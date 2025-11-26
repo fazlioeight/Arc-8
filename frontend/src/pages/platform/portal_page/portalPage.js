@@ -2,13 +2,19 @@ import React, { useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import { AuthContext } from "../../../context/AuthContext";
-import { SectionHeader } from "../../../components/ehr/Primitives";
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  SectionHeader,
+} from "../../../components/ehr/Primitives";
 import "../../../index.css";
 import "../coding/member/memberWorkspace.css";
 import "./portalPage.sfdc.css";
 import { useMemberSearch } from "../../../hooks/useMemberSearch";
 import { usePortalOverview } from "../../../hooks/usePortalOverview";
 import { PORTAL_NAV_ITEMS } from "./portalNavItems";
+import { ROUTES } from "../../../constants/routes";
 
 const formatRelativeTime = (value) => {
   try {
@@ -99,7 +105,7 @@ const PortalPage = () => {
         key: "portal",
         label: "Portal Overview",
         desc: "Daily digest and workspace snapshot",
-        path: "/portalPage",
+        path: ROUTES.PORTAL.LANDING,
         icon: "OV",
         color: "#0ea5e9",
       },
@@ -107,7 +113,7 @@ const PortalPage = () => {
         key: "coding",
         label: "Coding Worklists",
         desc: "Coding queues and chart review tools",
-        path: "/coding",
+        path: ROUTES.CODING.LANDING,
         icon: "CD",
         color: "#0f172a",
       },
@@ -115,7 +121,7 @@ const PortalPage = () => {
         key: "member360",
         label: "Member 360",
         desc: "Search and launch member charts",
-        path: "/member-360",
+        path: ROUTES.MEMBER_360.LANDING,
         icon: "M3",
         color: "#0891b2",
       },
@@ -123,7 +129,7 @@ const PortalPage = () => {
         key: "ride_booking",
         label: "Ride Booking",
         desc: "Transportation scheduling and tracking",
-        path: "/rideBooking",
+        path: ROUTES.RIDE_BOOKING.LANDING,
         icon: "RB",
         color: "#2563eb",
       },
@@ -131,7 +137,7 @@ const PortalPage = () => {
         key: "jobs/import-data",
         label: "Jobs / Import Data",
         desc: "Kick off and monitor bulk data imports",
-        path: "/jobs/import-data",
+        path: ROUTES.JOBS.IMPORT_DATA,
         icon: "JI",
         color: "#0d9488",
       },
@@ -139,7 +145,7 @@ const PortalPage = () => {
         key: "docs",
         label: "Docs Library",
         desc: "Guides, SOPs, and enablement",
-        path: "/docs",
+        path: ROUTES.DOCS,
         icon: "DL",
         color: "#6366f1",
       },
@@ -147,7 +153,7 @@ const PortalPage = () => {
         key: "settings",
         label: "Settings",
         desc: "Preferences and integrations",
-        path: "/settings",
+        path: ROUTES.SETTINGS,
         icon: "ST",
         color: "#64748b",
       },
@@ -155,7 +161,7 @@ const PortalPage = () => {
         key: "admin_console",
         label: "Master Admin",
         desc: "Access policies and user controls",
-        path: "/admin/master",
+        path: ROUTES.ADMIN.MASTER,
         icon: "MA",
         color: "#dc2626",
         requiredLevel: "admin",
@@ -170,6 +176,7 @@ const PortalPage = () => {
     error: overviewError,
     appsToRender,
     accessibleApps: allowedApps,
+    refresh: refreshOverview,
   } = usePortalOverview({
     user,
     accessMap,
@@ -228,11 +235,11 @@ const PortalPage = () => {
         mainClassName="pt-10"
       >
         <section className="flex items-center justify-center py-16">
-          <div className="coding-surface w-full rounded-2xl p-8 text-center shadow-sm">
-            <p className="text-base font-medium coding-text-strong">
-              Loading your Nexora workspace...
-            </p>
-          </div>
+          <LoadingState
+            title="Loading your Nexora workspace"
+            description="Pulling recent tasks, saved items, and applications."
+            className="w-full max-w-2xl"
+          />
         </section>
       </PortalPageLayout>
     );
@@ -298,10 +305,20 @@ const PortalPage = () => {
       </section>
 
       {portalError && (
-        <div className="coding-surface-subtle flex items-start gap-3 rounded-xl px-4 py-3 text-amber-900 shadow-sm">
-          <span className="text-sm font-semibold coding-text-strong">Heads up</span>
-          <span className="text-sm coding-text-soft">{portalError}</span>
-        </div>
+        <ErrorState
+          title="Portal overview is offline"
+          description={portalError}
+          actions={
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+              onClick={() => refreshOverview()}
+            >
+              Retry
+            </button>
+          }
+          className="w-full"
+        />
       )}
 
       <section className={cardClass} aria-label="User profile summary">
@@ -422,9 +439,13 @@ const PortalPage = () => {
               </li>
             ))}
             {!overview.lastSaved.length && (
-              <li className="coding-empty-state">
-                No saved items yet. Try bookmarking a report from the
-                dashboard.
+              <li>
+                <EmptyState
+                  title="No saved items yet"
+                  description="Bookmark a report from the dashboard to keep it handy here."
+                  size="sm"
+                  className="w-full"
+                />
               </li>
             )}
           </ul>
@@ -481,8 +502,13 @@ const PortalPage = () => {
               );
             })}
             {!overview.todos.length && (
-              <li className="coding-empty-state">
-                No open tasks. Enjoy the clear slate!
+              <li>
+                <EmptyState
+                  title="No open tasks"
+                  description="Enjoy the clear slate—new assignments will appear here."
+                  size="sm"
+                  className="w-full"
+                />
               </li>
             )}
           </ul>

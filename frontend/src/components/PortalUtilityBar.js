@@ -5,21 +5,22 @@ import { AuthContext } from '../context/AuthContext';
 import { useCommandPalette } from '../context/CommandPaletteContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
 import { SAMPLE_TENANT_COMMENTS } from '../utils/sampleData';
+import { ROUTES } from '../constants/routes';
 import '../pages/platform/portal_page/portalPage.sfdc.css';
 import Icon from './ui/Icon';
 
 const ROUTE_LABELS = {
   '/': 'Home',
-  '/dashboard': 'Analytics Dashboard',
-  '/coding': 'Coding Worklists',
-  '/jobs/status-center': 'Operations Center',
-  '/jobs/import-data': 'Data Imports',
-  '/rideBooking': 'Ride Coordination',
-  '/rideBooking/payments': 'Ride Payments and Billing',
-  '/docs': 'Documentation',
-  '/portalPage': 'Portal Home',
-  '/member-360': 'Member 360',
-  '/settings': 'Settings',
+  [ROUTES.DASHBOARD]: 'Analytics Dashboard',
+  [ROUTES.CODING.LANDING]: 'Coding Worklists',
+  [ROUTES.JOBS.STATUS_CENTER]: 'Operations Center',
+  [ROUTES.JOBS.IMPORT_DATA]: 'Data Imports',
+  [ROUTES.RIDE_BOOKING.LANDING]: 'Ride Coordination',
+  [ROUTES.RIDE_BOOKING.PAYMENTS]: 'Ride Payments and Billing',
+  [ROUTES.DOCS]: 'Documentation',
+  [ROUTES.PORTAL.LANDING]: 'Portal Home',
+  [ROUTES.MEMBER_360.LANDING]: 'Member 360',
+  [ROUTES.SETTINGS]: 'Settings',
 };
 
 const PortalUtilityBar = () => {
@@ -75,15 +76,15 @@ const PortalUtilityBar = () => {
 
   const applicationTiles = useMemo(
     () => [
-      { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: '/portalPage' },
+      { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: ROUTES.PORTAL.LANDING },
       // { key: 'dashboard', label: 'Analytics Dashboard', desc: 'KPIs & RAF', icon: 'DB', color: '#a855f7', path: '/dashboard' },
-      { key: 'coding', label: 'Coding Worklists', desc: 'Member reviews', icon: 'CD', color: '#0f172a', path: '/coding' },
-      { key: 'member360', label: 'Member 360', desc: 'Chart launchpad', icon: 'M3', color: '#0891b2', path: '/member-360' },
-      { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: '/rideBooking' },
-      { key: 'docs', label: 'Docs Library', desc: 'Knowledge base', icon: 'DL', color: '#6366f1', path: '/docs' },
-      //{ key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: '/settings' },
-      { key: 'job_center', label: 'Job Center', desc: 'Logs & retry', icon: 'JC', color: '#0f766e', path: '/jobs/status-center' },
-      { key: 'admin_console', label: 'Master Admin', desc: 'Roles & access', icon: 'MA', color: '#dc2626', path: '/admin/master', requiredLevel: 'admin' },
+      { key: 'coding', label: 'Coding Worklists', desc: 'Member reviews', icon: 'CD', color: '#0f172a', path: ROUTES.CODING.LANDING },
+      { key: 'member360', label: 'Member 360', desc: 'Chart launchpad', icon: 'M3', color: '#0891b2', path: ROUTES.MEMBER_360.LANDING },
+      { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: ROUTES.RIDE_BOOKING.LANDING },
+      { key: 'docs', label: 'Docs Library', desc: 'Knowledge base', icon: 'DL', color: '#6366f1', path: ROUTES.DOCS },
+      //{ key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: ROUTES.SETTINGS },
+      { key: 'job_center', label: 'Job Center', desc: 'Logs & retry', icon: 'JC', color: '#0f766e', path: ROUTES.JOBS.STATUS_CENTER },
+      { key: 'admin_console', label: 'Master Admin', desc: 'Roles & access', icon: 'MA', color: '#dc2626', path: ROUTES.ADMIN.MASTER, requiredLevel: 'admin' },
     ],
     []
   );
@@ -207,7 +208,7 @@ const PortalUtilityBar = () => {
               onClick={(event) => {
                 event.stopPropagation();
                 closeAll();
-                navigate('/portalPage');
+                navigate(ROUTES.PORTAL.LANDING);
               }}
             >
               <svg viewBox="0 0 24 24"><path d="M12 3l9 7h-2v9h-5v-6H10v6H5v-9H3l9-7z"/></svg>
@@ -261,7 +262,7 @@ const PortalUtilityBar = () => {
                 onClick={(event) => {
                   event.stopPropagation();
                   closeAll();
-                  navigate('/jobs/status-center');
+                  navigate(ROUTES.JOBS.STATUS_CENTER);
                 }}
               >
                 <svg viewBox="0 0 24 24"><path d="M5 4h14l1 4H4l1-4zm-1 6h16v9H4v-9zm4 2v5h2v-5H8zm4 0v5h2v-5h-2z"/></svg>
@@ -374,7 +375,7 @@ const PortalUtilityBar = () => {
 
         {showUser && (
           <div className="sfdc-dropdown sfdc-dropdown--right" onClick={(event) => event.stopPropagation()}>
-            <div className="sfdc-dropdown__item" onClick={() => { closeAll(); navigate('/settings'); }}>
+            <div className="sfdc-dropdown__item" onClick={() => { closeAll(); navigate(ROUTES.SETTINGS); }}>
               <div>Profile & preferences</div>
             </div>
             <div className="sfdc-dropdown__item" onClick={() => { closeAll(); handleCommandPalette(); }}>

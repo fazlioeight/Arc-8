@@ -7,6 +7,8 @@ import "../coding/member/memberWorkspace.css";
 import "../../../styles/rideBooking.css";
 import { RideBookingService } from "../../../services/rideBookingService";
 import useGooglePlacesAutocomplete from "../../../hooks/useGooglePlacesAutocomplete";
+import { ErrorState } from "../../../components/ehr/Primitives";
+import { ROUTES } from "../../../constants/routes";
 
 const getLocalDate = () => new Date().toISOString().slice(0, 10);
 const getLocalTime = () => new Date().toISOString().slice(11, 16);
@@ -29,6 +31,7 @@ const RideBooking = () => {
   const [rideTime, setRideTime] = useState(getLocalTime());
   const [estimatedCost, setEstimatedCost] = useState("");
   const [formStatus, setFormStatus] = useState(null);
+  const [formError, setFormError] = useState(null);
 
   const pickupAddressInputRef = useRef(null);
   const dropoffAddressInputRef = useRef(null);
@@ -58,21 +61,26 @@ const RideBooking = () => {
   const handleSubmit = (event) => {
     event.preventDefault();
     setFormStatus(null);
-    const scheduledPickupIso = new Date(`${rideDate}T${rideTime || "08:00"}`).toISOString();
-    const record = rideBookingService.bookRide({
-      memberId,
-      firstName,
-      lastName,
-      rideType: rideType || rideOptions[0] || "Other",
-      pickup,
-      dropoff,
-      pickupAddress,
-      dropoffAddress,
-      scheduledPickup: scheduledPickupIso,
-      costUsd: estimatedCost ? Number(estimatedCost) : undefined,
-    });
-    setFormStatus(`Ride booked with ${record.rideType} for ${record.firstName} ${record.lastName}.`);
-    resetForm();
+    setFormError(null);
+    try {
+      const scheduledPickupIso = new Date(`${rideDate}T${rideTime || "08:00"}`).toISOString();
+      const record = rideBookingService.bookRide({
+        memberId,
+        firstName,
+        lastName,
+        rideType: rideType || rideOptions[0] || "Other",
+        pickup,
+        dropoff,
+        pickupAddress,
+        dropoffAddress,
+        scheduledPickup: scheduledPickupIso,
+        costUsd: estimatedCost ? Number(estimatedCost) : undefined,
+      });
+      setFormStatus(`Ride booked with ${record.rideType} for ${record.firstName} ${record.lastName}.`);
+      resetForm();
+    } catch (error) {
+      setFormError(error?.message || "We couldn't book the ride. Try again in a moment.");
+    }
   };
 
   return (
@@ -267,6 +275,11 @@ const RideBooking = () => {
             </button>
           </form>
 
+          {formError && (
+            <div className="mt-4">
+              <ErrorState description={formError} title="Ride booking failed" />
+            </div>
+          )}
           {formStatus && (
             <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100">
               {formStatus}
@@ -278,7 +291,7 @@ const RideBooking = () => {
           <button
             type="button"
             className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            onClick={() => navigate("/rideBooking")}
+            onClick={() => navigate(ROUTES.RIDE_BOOKING.LANDING)}
           >
             Back to overview
           </button>

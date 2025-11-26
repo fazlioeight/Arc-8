@@ -23,6 +23,8 @@ import InfoTooltip from '../../../components/ui/InfoTooltip';
 import EmptyState from '../../../components/ui/EmptyState';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 
+const CODING_PROVIDER_MGMT_COMMAND_SCOPE = 'coding-provider-management-commands';
+
 const CodingProviderManagementPage = () => {
   const { token, tenant, recordAuditEvent } = useContext(AuthContext) || {};
   const { registerCommands } = useCommandPalette();
@@ -140,15 +142,15 @@ const CodingProviderManagementPage = () => {
   }, [effectiveToken, effectiveTenant]);
 
   useEffect(() => {
-    registerCommands([
+    const unregister = registerCommands([
       {
         id: 'coding-provider-management-refresh',
         label: 'Refresh provider management',
         category: 'Coding',
         action: () => { void loadProviders(); },
       },
-    ]);
-    return () => registerCommands([]);
+    ], { id: CODING_PROVIDER_MGMT_COMMAND_SCOPE });
+    return unregister;
     // eslint-disable-next-line
   }, [registerCommands]);
 

@@ -1,21 +1,23 @@
+import { ROUTES } from "../../../constants/routes";
+
 export const PORTAL_NAV_ITEMS = [
   {
     key: "portal",
     label: "Portal Overview",
-    href: "/portalPage",
-    match: (path) => path === "/portalPage",
+    href: ROUTES.PORTAL.LANDING,
+    match: (path) => path === ROUTES.PORTAL.LANDING,
   },
   {
     key: "member-360",
     label: "Member 360",
-    href: "/member-360",
-    match: (path) => path === "/member-360",
+    href: ROUTES.MEMBER_360.LANDING,
+    match: (path) => path === ROUTES.MEMBER_360.LANDING,
   },
   {
     key: "coding",
     label: "Coding Worklists",
-    href: "/coding",
-    match: (path) => path === "/coding" || path.startsWith("/coding/"),
+    href: ROUTES.CODING.LANDING,
+    match: (path) =>
+      path === ROUTES.CODING.LANDING || path.startsWith(`${ROUTES.CODING.LANDING}/`),
   },
 ];
-

@@ -30,6 +30,8 @@ const badgeTone = (status) => {
   }
 };
 
+const JOB_CENTER_COMMAND_SCOPE = "job-center-commands";
+
 const JobStatusCenter = () => {
   const { tenant, availableTenants = [], recordAuditEvent } = useContext(AuthContext) || {};
   const navigate = useNavigate();
@@ -102,7 +104,7 @@ const JobStatusCenter = () => {
   }, []);
 
   useEffect(() => {
-    registerCommands(
+    const unregister = registerCommands(
       [
         {
           id: "job-center-filter-failed",
@@ -130,13 +132,14 @@ const JobStatusCenter = () => {
           ? {
               id: "job-center-download-logs",
               label: "Download logs for selected job",
-              category: "Job Center",
-              action: () => handleDownload(selectedJobId),
-            }
+          category: "Job Center",
+          action: () => handleDownload(selectedJobId),
+        }
           : null,
-      ].filter(Boolean)
+      ].filter(Boolean),
+      { id: JOB_CENTER_COMMAND_SCOPE }
     );
-    return () => registerCommands([]);
+    return unregister;
   }, [registerCommands, selectedJobId, handleDownload, navigate]);
 
   const filteredJobs = useMemo(() => {

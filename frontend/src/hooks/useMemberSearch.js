@@ -56,7 +56,8 @@ export const buildMemberOption = (member) => {
     return null;
   }
   const value = pickMemberDisplayValue(member);
-  const key = member?.id || member?.member_id || value;
+  const memberId = pickMemberIdForNavigation(member);
+  const key = memberId || value;
   if (!value && !key) {
     return null;
   }
@@ -64,10 +65,12 @@ export const buildMemberOption = (member) => {
     key: key || value,
     value: value || String(key || ""),
     label: formatMemberLabel(member) || value || "Unknown member",
+    memberId: memberId || null,
+    member,
   };
 };
 
-const DEFAULT_MEMBER_SEARCH_MESSAGES = {
+export const DEFAULT_MEMBER_SEARCH_MESSAGES = {
   emptySearchError: "Enter a member ID to continue.",
   searchErrorFallback: "Unable to search members right now.",
   lookupErrorFallback: "Unable to open that member right now.",
@@ -272,7 +275,8 @@ export const useMemberSearch = ({
   );
 
   const handleSuggestionSelect = useCallback(
-    (member) => {
+    (memberOrOption) => {
+      const member = memberOrOption?.member || memberOrOption;
       const memberId = pickMemberIdForNavigation(member);
       if (!memberId) {
         return;

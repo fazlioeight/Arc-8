@@ -5,6 +5,7 @@ import { useCommandPalette } from '../context/CommandPaletteContext';
 import { useGuidedTour } from '../context/GuidedTourContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
 import { SAMPLE_CODING_MEMBERS, SAMPLE_ADMIN_APPLICATIONS } from '../utils/sampleData';
+import { ROUTES } from '../constants/routes';
 
 const CATEGORY_ORDER = ['Favorites', 'Records', 'Providers', 'Knowledge', 'Navigation', 'Workspace', 'Tenant', 'Data', 'Actions', 'Admin', 'Support'];
 
@@ -103,7 +104,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Navigation',
       keywords: 'home overview landing',
       shortcut: 'G H',
-      action: () => navigate('/portalPage'),
+      action: () => navigate(ROUTES.PORTAL.LANDING),
       disabled: !isNavItemEnabled('home'),
     });
     append({
@@ -112,7 +113,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       category: 'Navigation',
       keywords: 'metrics analytics raf',
       shortcut: 'G D',
-      action: () => navigate('/dashboard'),
+      action: () => navigate(ROUTES.DASHBOARD),
       disabled: !isAuthenticated || !isEnabled('dashboard') || !hasApplicationAccess?.('dashboard') || !isNavItemEnabled('analytics'),
     });
     append({
@@ -120,7 +121,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       label: 'Go to Coding Worklists',
       category: 'Navigation',
       keywords: 'coding charts members worklist',
-      action: () => navigate('/coding'),
+      action: () => navigate(ROUTES.CODING.LANDING),
       disabled: !isAuthenticated || !isEnabled('coding') || !hasApplicationAccess?.('coding') || !isNavItemEnabled('coding'),
     });
     append({
@@ -128,7 +129,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       label: 'Open Member 360',
       category: 'Navigation',
       keywords: 'member 360 chart search quick launch',
-      action: () => navigate('/member-360'),
+      action: () => navigate(ROUTES.MEMBER_360.LANDING),
       disabled: !isAuthenticated || !isEnabled('member360') || !hasApplicationAccess?.('member360'),
     });
     append({
@@ -136,7 +137,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       label: 'Open Ride Booking',
       category: 'Navigation',
       keywords: 'transport rides partners scheduling',
-      action: () => navigate('/rideBooking'),
+      action: () => navigate(ROUTES.RIDE_BOOKING.LANDING),
       disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking') || !isNavItemEnabled('rideBooking'),
     });
     append({
@@ -144,7 +145,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       label: 'Open Ride Payments and Billing',
       category: 'Navigation',
       keywords: 'payments billing invoices payouts ledger stripe',
-      action: () => navigate('/rideBooking/payments'),
+      action: () => navigate(ROUTES.RIDE_BOOKING.PAYMENTS),
       disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking') || !isNavItemEnabled('rideBooking'),
     });
     append({
@@ -154,7 +155,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       keywords: 'docs help knowledge base',
       shortcut: 'G ?'
 ,
-      action: () => navigate('/docs'),
+      action: () => navigate(ROUTES.DOCS),
       disabled: !isEnabled('docs') || !hasApplicationAccess?.('docs') || !isNavItemEnabled('resources'),
     });
     append({
@@ -185,7 +186,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       label: 'Open Settings',
       category: 'Workspace',
       keywords: 'profile preferences theme',
-      action: () => navigate('/settings'),
+      action: () => navigate(ROUTES.SETTINGS),
       disabled: !isAuthenticated || !isEnabled('settings') || !hasApplicationAccess?.('settings') || !isNavItemEnabled('settings'),
     });
     append({
@@ -193,7 +194,7 @@ const CommandPalette = ({ onThemeToggle }) => {
       label: 'View Job & Status Center',
       category: 'Navigation',
       keywords: 'jobs imports queue status logs',
-      action: () => navigate('/jobs/status-center'),
+      action: () => navigate(ROUTES.JOBS.STATUS_CENTER),
       disabled: !isAuthenticated || !isEnabled('job_center') || !hasApplicationAccess?.('job_center'),
     });
 
@@ -226,7 +227,7 @@ const CommandPalette = ({ onThemeToggle }) => {
         label: 'Open Master Admin Console',
         category: 'Admin',
         keywords: 'admin roles permissions',
-        action: () => navigate('/admin/master'),
+        action: () => navigate(ROUTES.ADMIN.MASTER),
       });
     }
 

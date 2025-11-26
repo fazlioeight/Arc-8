@@ -1,22 +1,23 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PortalNav from '../../../components/PortalNav';
+import { ROUTES } from '../../../constants/routes';
 
 const NAV_GROUPS = [
   {
     label: 'admin',
     items: [
-      { label: 'Assignments', href: '/admin/coding-assignments', match: (path) => path.startsWith('/admin/coding-assignments') },
-      { label: 'Dashboards', href: '/dashboard', match: (path) => path.startsWith('/dashboard') },
+      { label: 'Assignments', href: ROUTES.ADMIN.CODING_ASSIGNMENTS, match: (path) => path.startsWith(ROUTES.ADMIN.CODING_ASSIGNMENTS) },
+      { label: 'Dashboards', href: ROUTES.DASHBOARD, match: (path) => path.startsWith(ROUTES.DASHBOARD) },
     ],
   },
   {
     label: 'coders',
     items: [
-      { label: 'Overview', href: '/coding', match: (path) => path === '/coding' },
-      { label: 'Coder platform', href: '/coding/platform', match: (path) => path.startsWith('/coding/platform') },
-      { label: 'Review dashboard', href: '/coding/review-dashboard', match: (path) => path.startsWith('/coding/review-dashboard') },
-      { label: 'Group dashboard', href: '/coding/group-dashboard', match: (path) => path.startsWith('/coding/group-dashboard') },
+      { label: 'Overview', href: ROUTES.CODING.LANDING, match: (path) => path === ROUTES.CODING.LANDING },
+      { label: 'Coder platform', href: ROUTES.CODING.PLATFORM, match: (path) => path.startsWith(ROUTES.CODING.PLATFORM) },
+      { label: 'Review dashboard', href: ROUTES.CODING.REVIEW_DASHBOARD, match: (path) => path.startsWith(ROUTES.CODING.REVIEW_DASHBOARD) },
+      { label: 'Group dashboard', href: ROUTES.CODING.GROUP_DASHBOARD, match: (path) => path.startsWith(ROUTES.CODING.GROUP_DASHBOARD) },
     ],
   },
   {
@@ -24,10 +25,13 @@ const NAV_GROUPS = [
     items: [
       {
         label: 'Members',
-        href: '/coding/members',
-        match: (path) => path === '/coding/members' || path.startsWith('/coding/members/') || path.startsWith('/coding/member/'),
+        href: ROUTES.CODING.MEMBERS,
+        match: (path) =>
+          path === ROUTES.CODING.MEMBERS ||
+          path.startsWith(`${ROUTES.CODING.MEMBERS}/`) ||
+          path.startsWith(`${ROUTES.CODING.MEMBER_ROOT}/`),
       },
-      { label: 'Member details', href: '/coding/member-details', match: (path) => path.startsWith('/coding/member-details') },
+      { label: 'Member details', href: ROUTES.CODING.MEMBER_DETAILS, match: (path) => path.startsWith(ROUTES.CODING.MEMBER_DETAILS) },
     ],
   },
   {
@@ -35,10 +39,10 @@ const NAV_GROUPS = [
     items: [
       {
         label: 'Providers',
-        href: '/coding/providers',
-        match: (path) => path === '/coding/providers' || path.startsWith('/coding/providers/'),
+        href: ROUTES.CODING.PROVIDERS,
+        match: (path) => path === ROUTES.CODING.PROVIDERS || path.startsWith(`${ROUTES.CODING.PROVIDERS}/`),
       },
-      { label: 'Provider management', href: '/coding/provider-management', match: (path) => path.startsWith('/coding/provider-management') },
+      { label: 'Provider management', href: ROUTES.CODING.PROVIDER_MANAGEMENT, match: (path) => path.startsWith(ROUTES.CODING.PROVIDER_MANAGEMENT) },
     ],
   },
 ];

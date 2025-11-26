@@ -18,6 +18,8 @@ import { useCommandPalette } from '../../../context/CommandPaletteContext';
 import { fetchCodingMemberDetail, fetchCodingMembers } from '../../../services/codingService';
 import CodingPortalHeader from './CodingPortalHeader';
 
+const CODING_MEMBER_DETAILS_COMMAND_SCOPE = 'coding-member-details-commands';
+
 const CodingMemberDetailsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -79,15 +81,15 @@ const CodingMemberDetailsPage = () => {
   }, [selectedMemberId]);
 
   useEffect(() => {
-    registerCommands([
+    const unregister = registerCommands([
       {
         id: 'coding-member-details-refresh',
         label: 'Refresh member detail',
         category: 'Coding',
         action: () => { if (selectedMemberId) void loadDetail(selectedMemberId); },
       },
-    ]);
-    return () => registerCommands([]);
+    ], { id: CODING_MEMBER_DETAILS_COMMAND_SCOPE });
+    return unregister;
     // eslint-disable-next-line
   }, [registerCommands, selectedMemberId]);
 

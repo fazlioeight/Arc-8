@@ -54,6 +54,8 @@ const subtleButtonClasses =
 const linkButtonClasses =
   'inline-flex items-center justify-center rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-sky-200 dark:hover:text-sky-100 dark:focus-visible:ring-offset-slate-900';
 
+const CODER_PLATFORM_COMMAND_SCOPE = 'coding-coder-platform-commands';
+
 const SpinnerIcon = ({ className = 'h-4 w-4 text-sky-500' }) => (
   <svg
     className={`animate-spin ${className}`}
@@ -158,18 +160,8 @@ const CodingCoderPlatformPage = () => {
       },
     ];
 
-    registerCommands((existing = []) => {
-      const remaining = existing.filter(
-        (command) => !coderPlatformCommands.some((added) => added.id === command.id),
-      );
-      return [...remaining, ...coderPlatformCommands];
-    });
-
-    return () => {
-      registerCommands((existing = []) => existing.filter(
-        (command) => !coderPlatformCommands.some((added) => added.id === command.id),
-      ));
-    };
+    const unregister = registerCommands(coderPlatformCommands, { id: CODER_PLATFORM_COMMAND_SCOPE });
+    return unregister;
     // eslint-disable-next-line
   }, [registerCommands, user?.email]);
 

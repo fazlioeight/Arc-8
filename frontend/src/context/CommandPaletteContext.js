@@ -16,13 +16,37 @@ export const CommandPaletteProvider = ({ children }) => {
     setIsOpen(false);
   }, []);
 
-  const registerCommands = useCallback((commands = []) => {
-    setDynamicCommands((prev) => {
-      if (typeof commands === 'function') {
-        return commands(prev || []);
+  const registerCommands = useCallback((commands = [], options = {}) => {
+    const registrationId = options.id || options.ownerId || `cmd-${Date.now().toString(36)}-${Math.random().toString(16).slice(2)}`;
+    const normalize = (input, existing = []) => {
+      if (typeof input === 'function') {
+        return (input(existing) || []).filter(Boolean);
       }
-      return commands || [];
+      return (input || []).filter(Boolean);
+    };
+
+    setDynamicCommands((prev = []) => {
+      const resolved = normalize(commands, prev);
+      const withoutOwner = prev.filter((command) => command.__owner !== registrationId);
+      const withoutDuplicates = withoutOwner.filter(
+        (command) => !resolved.some((next) => next?.id && next.id === command.id),
+      );
+      const tagged = resolved.map((command) => ({
+        ...command,
+        __owner: registrationId,
+      }));
+      return [...withoutDuplicates, ...tagged];
     });
+
+    return () => {
+      setDynamicCommands((prev = []) => prev.filter((command) => command.__owner !== registrationId));
+    };
+  }, []);
+
+  const unregisterCommandsById = useCallback((ids = []) => {
+    const idSet = new Set(ids.filter(Boolean));
+    if (!idSet.size) return;
+    setDynamicCommands((prev = []) => prev.filter((command) => !idSet.has(command.id)));
   }, []);
 
   const value = useMemo(() => ({
@@ -33,7 +57,8 @@ export const CommandPaletteProvider = ({ children }) => {
     setQuery,
     dynamicCommands,
     registerCommands,
-  }), [isOpen, openPalette, closePalette, query, dynamicCommands, registerCommands]);
+    unregisterCommandsById,
+  }), [isOpen, openPalette, closePalette, query, dynamicCommands, registerCommands, unregisterCommandsById]);
 
   return (
     <CommandPaletteContext.Provider value={value}>
@@ -52,7 +77,8 @@ export const useCommandPalette = () => {
       query: '',
       setQuery: () => {},
       dynamicCommands: [],
-      registerCommands: () => {},
+      registerCommands: () => () => {},
+      unregisterCommandsById: () => {},
     };
   }
   return context;
