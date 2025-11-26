@@ -1,6 +1,6 @@
 import React, { useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import PortalUtilityBar from "../../../components/PortalUtilityBar";
+import PortalPageLayout from "../../../components/PortalPageLayout";
 import { AuthContext } from "../../../context/AuthContext";
 import { SectionHeader } from "../../../components/ehr/Primitives";
 import "../../../index.css";
@@ -8,6 +8,7 @@ import "../coding/member/memberWorkspace.css";
 import "./portalPage.sfdc.css";
 import { useMemberSearch } from "../../../hooks/useMemberSearch";
 import { usePortalOverview } from "../../../hooks/usePortalOverview";
+import { PORTAL_NAV_ITEMS } from "./portalNavItems";
 
 const formatRelativeTime = (value) => {
   try {
@@ -61,6 +62,23 @@ const PortalPage = () => {
     availableApplications = [],
     purchasedApplications = [],
   } = auth;
+  const displayName = useMemo(
+    () => user?.email?.split("@")[0] || "there",
+    [user?.email]
+  );
+
+  const layoutProps = useMemo(
+    () => ({
+      navItems: PORTAL_NAV_ITEMS,
+      currentNav: "portal",
+      navProps: { align: "center", tone: "surface" },
+      backgroundClassName:
+        "coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100",
+      maxWidthClassName: "max-w-6xl",
+      paddingClassName: "px-4",
+    }),
+    []
+  );
   const {
     memberQuery,
     memberOptions,
@@ -161,67 +179,74 @@ const PortalPage = () => {
     token,
   });
 
+  const cardClass = "rounded-xl p-4 portal-alert-shell";
+  const portalError = overview.error || overviewError;
+
+  const headerContent = (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-1">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.28em] coding-text-muted">
+          Portal Overview
+        </p>
+        <h1 className="text-2xl font-semibold coding-text-strong sm:text-3xl">
+          Welcome back, {displayName}
+        </h1>
+        <p className="coding-text-soft text-base">
+          Stay aligned with the same workspace feel as your chart view.
+        </p>
+      </div>
+      <div className="flex items-center gap-3 rounded-xl bg-white/60 px-4 py-3 shadow-sm ring-1 ring-gray-200 dark:bg-white/5 dark:ring-0">
+        <div className="flex flex-col text-right">
+          <span className="text-[11px] uppercase tracking-wide coding-text-muted">
+            Applications
+          </span>
+          <span className="text-lg font-semibold coding-text-strong">
+            {allowedApps.length || appsToRender.length}
+          </span>
+        </div>
+        <span className="h-10 w-px bg-gray-200 dark:bg-white/20" />
+        <div className="flex flex-col text-right">
+          <span className="text-[11px] uppercase tracking-wide coding-text-muted">
+            Open tasks
+          </span>
+          <span className="text-lg font-semibold coding-text-strong">
+            {overview.todos.length}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
   if (overviewLoading) {
     return (
-      <div className="coding-member-workspace portal-theme min-h-screen">
-        <PortalUtilityBar />
-        <section className="mx-auto flex max-w-3xl items-center justify-center px-4 py-24">
+      <PortalPageLayout
+        {...layoutProps}
+        title={`Welcome back, ${displayName}`}
+        subtitle="Stay aligned with the same workspace feel as your chart view."
+        eyebrow="Portal Overview"
+        align="center"
+        mainClassName="pt-10"
+      >
+        <section className="flex items-center justify-center py-16">
           <div className="coding-surface w-full rounded-2xl p-8 text-center shadow-sm">
             <p className="text-base font-medium coding-text-strong">
               Loading your Nexora workspace...
             </p>
           </div>
         </section>
-      </div>
+      </PortalPageLayout>
     );
   }
 
-  const displayName = user?.email?.split("@")[0] || "there";
-  const cardClass = "rounded-xl p-4 portal-alert-shell";
-  const portalError = overview.error || overviewError;
-
   return (
-    <div className="coding-member-workspace portal-theme min-h-screen">
-      <PortalUtilityBar />
-
-      <header className="coding-member-header">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] coding-text-muted">
-              Portal Overview
-            </p>
-            <h1 className="text-2xl font-semibold coding-text-strong sm:text-3xl">
-              Welcome back, {displayName}
-            </h1>
-            <p className="coding-text-soft text-base">
-              Stay aligned with the same workspace feel as your chart view.
-            </p>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl bg-white/60 px-4 py-3 shadow-sm ring-1 ring-gray-200 dark:bg-white/5 dark:ring-0">
-            <div className="flex flex-col text-right">
-              <span className="text-[11px] uppercase tracking-wide coding-text-muted">
-                Applications
-              </span>
-              <span className="text-lg font-semibold coding-text-strong">
-                {allowedApps.length || appsToRender.length}
-              </span>
-            </div>
-            <span className="h-10 w-px bg-gray-200 dark:bg-white/20" />
-            <div className="flex flex-col text-right">
-              <span className="text-[11px] uppercase tracking-wide coding-text-muted">
-                Open tasks
-              </span>
-              <span className="text-lg font-semibold coding-text-strong">
-                {overview.todos.length}
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <PortalPageLayout
+      {...layoutProps}
+      headerContent={headerContent}
+      mainClassName="space-y-6"
+    >
       <section className="coding-member-toolbar">
         <form
-          className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-end"
+          className="flex flex-col gap-4 sm:flex-row sm:items-end"
           onSubmit={handleMemberSearch}
           aria-label="Member quick search"
         >
@@ -239,9 +264,7 @@ const PortalPage = () => {
                 autoComplete="off"
                 placeholder="Search by member ID"
                 value={memberQuery}
-                onChange={(event) =>
-                  handleMemberQueryChange(event.target.value)
-                }
+                onChange={(event) => handleMemberQueryChange(event.target.value)}
                 list="portal-member-suggestions"
                 aria-describedby="portal-member-search-help"
                 className="coding-input w-full rounded-xl px-4 py-3 text-sm"
@@ -264,10 +287,8 @@ const PortalPage = () => {
           </button>
         </form>
         <p
-          className={`mx-auto max-w-6xl px-4 pb-5 text-sm ${
-            memberSearchError
-              ? "text-red-600"
-              : "coding-text-muted"
+          className={`text-sm ${
+            memberSearchError ? "text-red-600" : "coding-text-muted"
           }`}
           id="portal-member-search-help"
           role="status"
@@ -277,201 +298,197 @@ const PortalPage = () => {
       </section>
 
       {portalError && (
-        <div className="mx-auto max-w-6xl px-4 pt-4">
-          <div className="coding-surface-subtle flex items-start gap-3 rounded-xl px-4 py-3 text-amber-900 shadow-sm">
-            <span className="text-sm font-semibold coding-text-strong">Heads up</span>
-            <span className="text-sm coding-text-soft">{portalError}</span>
-          </div>
+        <div className="coding-surface-subtle flex items-start gap-3 rounded-xl px-4 py-3 text-amber-900 shadow-sm">
+          <span className="text-sm font-semibold coding-text-strong">Heads up</span>
+          <span className="text-sm coding-text-soft">{portalError}</span>
         </div>
       )}
 
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 lg:py-10">
-        <section className={cardClass} aria-label="User profile summary">
-          <SectionHeader title="Profile" subtitle="Your account at a glance" />
+      <section className={cardClass} aria-label="User profile summary">
+        <SectionHeader title="Profile" subtitle="Your account at a glance" />
+        <div className="mt-3 space-y-2">
+          <div className="ehr-alert ehr-alert--info portal-alert-card">
+            <div className="flex w-full items-start gap-3">
+              <span className="portal-alert-icon">
+                {user?.email?.slice(0, 1).toUpperCase() || "N"}
+              </span>
+              <div className="flex-1 space-y-1">
+                <div className="portal-alert-card__title">
+                  {overview.profile?.email || user?.email}
+                </div>
+                <div className="portal-alert-card__meta">
+                  Tenant {overview.profile?.tenant || user?.tenant || "Nexora"} |{" "}
+                  {formatRoleLabel(overview.profile?.role)} |{" "}
+                  {overview.profile?.lastLogin
+                    ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
+                    : "Last login just now"}{" "}
+                  | {allowedApps.length || appsToRender.length} applications
+                </div>
+              </div>
+              <button
+                className="portal-alert-button"
+                onClick={() => navigate("/settings")}
+                type="button"
+              >
+                Manage
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <section className={cardClass} aria-label="Applications">
+          <SectionHeader
+            title="Applications"
+            subtitle="Launch into the areas you use most."
+          />
           <div className="mt-3 space-y-2">
-            <div className="ehr-alert ehr-alert--info portal-alert-card">
-              <div className="flex w-full items-start gap-3">
-                <span className="portal-alert-icon">
-                  {user?.email?.slice(0, 1).toUpperCase() || "N"}
-                </span>
-                <div className="flex-1 space-y-1">
-                  <div className="portal-alert-card__title">
-                    {overview.profile?.email || user?.email}
-                  </div>
-                  <div className="portal-alert-card__meta">
-                    Tenant {overview.profile?.tenant || user?.tenant || "Nexora"} |{" "}
-                    {formatRoleLabel(overview.profile?.role)} |{" "}
-                    {overview.profile?.lastLogin
-                      ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
-                      : "Last login just now"}{" "}
-                    | {allowedApps.length || appsToRender.length} applications
+            {appsToRender.map((app) => {
+              const isLocked = !app.allowed;
+              const tone = isLocked ? "ehr-alert--warning" : "ehr-alert--info";
+              return (
+                <div
+                  key={app.key}
+                  className={`ehr-alert portal-alert-card ${tone}`}
+                  aria-disabled={isLocked}
+                >
+                  <div className="flex w-full items-start gap-3">
+                    <span
+                      className="portal-alert-icon"
+                      style={{ background: app.color }}
+                      aria-hidden
+                    >
+                      {app.icon}
+                    </span>
+                    <div className="flex-1">
+                      <div className="portal-alert-card__title">{app.label}</div>
+                      <p className="portal-alert-card__meta">{app.desc}</p>
+                      {isLocked && (
+                        <p className="portal-alert-card__meta">
+                          Request access from your admin.
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      className="portal-alert-button"
+                      onClick={() => !isLocked && navigate(app.path)}
+                      disabled={isLocked}
+                      type="button"
+                    >
+                      {isLocked ? "Locked" : "Open"}
+                    </button>
                   </div>
                 </div>
-                <button
-                  className="portal-alert-button"
-                  onClick={() => navigate("/settings")}
-                  type="button"
-                >
-                  Manage
-                </button>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <section className={cardClass} aria-label="Applications">
-            <SectionHeader
-              title="Applications"
-              subtitle="Launch into the areas you use most."
-            />
-            <div className="mt-3 space-y-2">
-              {appsToRender.map((app) => {
-                const isLocked = !app.allowed;
-                const tone = isLocked ? "ehr-alert--warning" : "ehr-alert--info";
-                return (
-                  <div
-                    key={app.key}
-                    className={`ehr-alert portal-alert-card ${tone}`}
-                    aria-disabled={isLocked}
-                  >
-                    <div className="flex w-full items-start gap-3">
-                      <span
-                        className="portal-alert-icon"
-                        style={{ background: app.color }}
-                        aria-hidden
-                      >
-                        {app.icon}
-                      </span>
-                      <div className="flex-1">
-                        <div className="portal-alert-card__title">{app.label}</div>
-                        <p className="portal-alert-card__meta">{app.desc}</p>
-                        {isLocked && (
-                          <p className="portal-alert-card__meta">
-                            Request access from your admin.
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        className="portal-alert-button"
-                        onClick={() => !isLocked && navigate(app.path)}
-                        disabled={isLocked}
-                        type="button"
-                      >
-                        {isLocked ? "Locked" : "Open"}
-                      </button>
-                    </div>
+        <section className={cardClass} aria-label="Last saved items">
+          <SectionHeader
+            title="Last saved"
+            subtitle="Recent items you have pinned or updated."
+          />
+          <ul className="mt-3 space-y-2">
+            {overview.lastSaved.map((item) => (
+              <li
+                key={item.id}
+                className="ehr-alert portal-alert-card ehr-alert--info"
+              >
+                <div className="flex w-full flex-col gap-2">
+                  <div>
+                    <div className="portal-alert-card__title">{item.title}</div>
+                    <p className="portal-alert-card__meta">{item.summary}</p>
+                    <p className="portal-alert-card__meta">
+                      Updated {formatRelativeTime(item.savedAt)}
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          </section>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {item.appKey && (
+                      <span className="portal-alert-pill">
+                        {item.appKey.replace(/_/g, " ")}
+                      </span>
+                    )}
+                    <button
+                      className="portal-alert-button"
+                      type="button"
+                      onClick={() => navigate(item.path || "/dashboard")}
+                    >
+                      Open
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+            {!overview.lastSaved.length && (
+              <li className="coding-empty-state">
+                No saved items yet. Try bookmarking a report from the
+                dashboard.
+              </li>
+            )}
+          </ul>
+        </section>
 
-          <section className={cardClass} aria-label="Last saved items">
-            <SectionHeader
-              title="Last saved"
-              subtitle="Recent items you have pinned or updated."
-            />
-            <ul className="mt-3 space-y-2">
-              {overview.lastSaved.map((item) => (
+        <section className={cardClass} aria-label="Assigned to-do items">
+          <SectionHeader
+            title="To-do"
+            subtitle="Assignments from your managers across applications."
+          />
+          <ul className="mt-3 space-y-2">
+            {overview.todos.map((todo) => {
+              const tone = PRIORITY_VARIANT[todo.priority] || PRIORITY_VARIANT.low;
+              return (
                 <li
-                  key={item.id}
-                  className="ehr-alert portal-alert-card ehr-alert--info"
+                  key={todo.id}
+                  className={`ehr-alert portal-alert-card ${tone}`}
                 >
                   <div className="flex w-full flex-col gap-2">
-                    <div>
-                      <div className="portal-alert-card__title">{item.title}</div>
-                      <p className="portal-alert-card__meta">{item.summary}</p>
-                      <p className="portal-alert-card__meta">
-                        Updated {formatRelativeTime(item.savedAt)}
-                      </p>
+                    <div className="portal-alert-card__title">
+                      {todo.title}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      {item.appKey && (
+                      <span className="portal-alert-pill">
+                        {todo.priority || "low"}
+                      </span>
+                      {todo.appKey && (
                         <span className="portal-alert-pill">
-                          {item.appKey.replace(/_/g, " ")}
+                          {todo.appKey.replace(/_/g, " ")}
                         </span>
                       )}
+                      {todo.dueAt && (
+                        <span className="portal-alert-pill portal-alert-pill--ghost">
+                          Due {formatRelativeTime(todo.dueAt)}
+                        </span>
+                      )}
+                      {todo.assignedBy && (
+                        <span className="portal-alert-pill portal-alert-pill--ghost">
+                          Assigned by {todo.assignedBy}
+                        </span>
+                      )}
+                    </div>
+                    <div>
                       <button
                         className="portal-alert-button"
                         type="button"
-                        onClick={() => navigate(item.path || "/dashboard")}
+                        onClick={() => navigate(todo.path || "/dashboard")}
                       >
-                        Open
+                        View task
                       </button>
                     </div>
                   </div>
                 </li>
-              ))}
-              {!overview.lastSaved.length && (
-                <li className="coding-empty-state">
-                  No saved items yet. Try bookmarking a report from the
-                  dashboard.
-                </li>
-              )}
-            </ul>
-          </section>
-
-          <section className={cardClass} aria-label="Assigned to-do items">
-            <SectionHeader
-              title="To-do"
-              subtitle="Assignments from your managers across applications."
-            />
-            <ul className="mt-3 space-y-2">
-              {overview.todos.map((todo) => {
-                const tone = PRIORITY_VARIANT[todo.priority] || PRIORITY_VARIANT.low;
-                return (
-                  <li
-                    key={todo.id}
-                    className={`ehr-alert portal-alert-card ${tone}`}
-                  >
-                    <div className="flex w-full flex-col gap-2">
-                      <div className="portal-alert-card__title">
-                        {todo.title}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="portal-alert-pill">
-                          {todo.priority || "low"}
-                        </span>
-                        {todo.appKey && (
-                          <span className="portal-alert-pill">
-                            {todo.appKey.replace(/_/g, " ")}
-                          </span>
-                        )}
-                        {todo.dueAt && (
-                          <span className="portal-alert-pill portal-alert-pill--ghost">
-                            Due {formatRelativeTime(todo.dueAt)}
-                          </span>
-                        )}
-                        {todo.assignedBy && (
-                          <span className="portal-alert-pill portal-alert-pill--ghost">
-                            Assigned by {todo.assignedBy}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <button
-                          className="portal-alert-button"
-                          type="button"
-                          onClick={() => navigate(todo.path || "/dashboard")}
-                        >
-                          View task
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-              {!overview.todos.length && (
-                <li className="coding-empty-state">
-                  No open tasks. Enjoy the clear slate!
-                </li>
-              )}
-            </ul>
-          </section>
-        </div>
+              );
+            })}
+            {!overview.todos.length && (
+              <li className="coding-empty-state">
+                No open tasks. Enjoy the clear slate!
+              </li>
+            )}
+          </ul>
+        </section>
       </div>
-    </div>
+    </PortalPageLayout>
   );
 };
 

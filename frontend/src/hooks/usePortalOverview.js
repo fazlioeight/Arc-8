@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { DEFAULT_APPLICATIONS } from "../context/AuthContext";
 import { createPortalOverview } from "../viewModels/common";
@@ -148,14 +148,31 @@ export const usePortalOverview = ({
     [filteredCatalog, effectiveAccessMap, hasResolvedAccess]
   );
 
-  const [overview, setOverview] = useState(() =>
-    createPortalOverview(
-      { loading: true, applications: resolvedApps, lastSaved: [], todos: [] },
-      { catalog: resolvedApps }
-    )
+  const buildLoadingView = useCallback(
+    () =>
+      createPortalOverview(
+        { loading: true, applications: resolvedApps, lastSaved: [], todos: [] },
+        { catalog: resolvedApps }
+      ),
+    [resolvedApps]
   );
+
+  const [overview, setOverview] = useState(() => buildLoadingView());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const abortControllerRef = useRef(null);
+  const requestIdRef = useRef(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(
+    () => () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    },
+    []
+  );
 
   const accessibleApps = useMemo(
     () => resolvedApps.filter((app) => app.allowed),
@@ -168,7 +185,28 @@ export const usePortalOverview = ({
   );
 
   const refresh = useCallback(
-    async (abortSignal) => {
+    async (options) => {
+      const opts =
+        options && typeof options === "object" && "signal" in options
+          ? options
+          : options && typeof options === "object" && "aborted" in options
+          ? { signal: options }
+          : {};
+
+      const externalSignal = opts.signal;
+      const controller = externalSignal ? null : new AbortController();
+      if (!externalSignal && controller) {
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = controller;
+      }
+
+      const signal = externalSignal || controller?.signal || null;
+      if (signal?.aborted) {
+        return null;
+      }
+
+      const requestId = Date.now();
+      requestIdRef.current = requestId;
       setIsLoading(true);
       setError(null);
 
@@ -178,12 +216,32 @@ export const usePortalOverview = ({
         { catalog: resolvedApps }
       );
 
-      if (!apiBaseUrl) {
-        if (!abortSignal?.aborted) {
-          setOverview(fallbackView);
+      const handleAbort = () => {
+        if (requestIdRef.current === requestId && isMountedRef.current) {
           setIsLoading(false);
         }
-        return fallbackView;
+        return null;
+      };
+
+      const applyResult = (nextOverview, nextError = null) => {
+        if (
+          requestIdRef.current !== requestId ||
+          signal?.aborted ||
+          !isMountedRef.current
+        ) {
+          return nextOverview;
+        }
+        setOverview(nextOverview);
+        setIsLoading(false);
+        setError(nextError);
+        return nextOverview;
+      };
+
+      if (!apiBaseUrl) {
+        if (signal?.aborted) {
+          return handleAbort();
+        }
+        return applyResult(fallbackView);
       }
 
       const authToken =
@@ -196,32 +254,27 @@ export const usePortalOverview = ({
       try {
         const response = await axios.get(`${apiBaseUrl}/api/portal/overview`, {
           headers,
-          signal: abortSignal,
+          signal,
         });
-        if (abortSignal?.aborted) {
-          return null;
+        if (signal?.aborted) {
+          return handleAbort();
         }
         const payload = response?.data || {};
         const nextOverview = createPortalOverview(
           { ...payload, loading: false, error: null },
           { catalog: resolvedApps, fallback: fallbackView }
         );
-        setOverview(nextOverview);
-        setIsLoading(false);
-        return nextOverview;
+        return applyResult(nextOverview);
       } catch (err) {
-        if (abortSignal?.aborted || err?.code === "ERR_CANCELED") {
-          return null;
+        if (signal?.aborted || err?.code === "ERR_CANCELED") {
+          return handleAbort();
         }
         console.warn("Falling back to mocked portal overview", err);
         const nextOverview = createPortalOverview(
           { ...fallbackData, loading: false, error: errorMessage },
           { catalog: resolvedApps, fallback: fallbackView }
         );
-        setOverview(nextOverview);
-        setIsLoading(false);
-        setError(errorMessage);
-        return nextOverview;
+        return applyResult(nextOverview, errorMessage);
       }
     },
     [apiBaseUrl, errorMessage, fallbackBuilder, resolvedApps, token, user]
@@ -229,17 +282,16 @@ export const usePortalOverview = ({
 
   useEffect(() => {
     const controller = new AbortController();
-    setOverview(
-      createPortalOverview(
-        { loading: true, applications: resolvedApps, lastSaved: [], todos: [] },
-        { catalog: resolvedApps }
-      )
-    );
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = controller;
+    setOverview(buildLoadingView());
     setIsLoading(true);
     setError(null);
-    void refresh(controller.signal);
+    void refresh({ signal: controller.signal });
     return () => controller.abort();
-  }, [refresh, resolvedApps]);
+  }, [buildLoadingView, refresh]);
 
   return {
     overview,

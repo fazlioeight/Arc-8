@@ -7,13 +7,9 @@ import {
   pickMemberIdForNavigation,
   useMemberSearch,
 } from "../../../hooks/useMemberSearch";
+import { PORTAL_NAV_ITEMS } from "../portal_page/portalNavItems";
 
 const MEMBER_CHART_BREADCRUMB = "Member chart";
-const MEMBER_NAV_ITEMS = [
-  { key: "member-search", label: "Member Search", href: "/member-360", disabled: true },
-  { key: "coding", label: "Coding Worklists", href: "/coding" },
-  { key: "portal", label: "Portal Overview", href: "/portalPage" },
-];
 
 const Member360LandingPage = () => {
   const navigate = useNavigate();
@@ -46,8 +42,8 @@ const Member360LandingPage = () => {
       title="Launch a member chart in seconds"
       subtitle="Search across your member roster and jump directly into the Coding chart view without leaving the workspace."
       eyebrow="Member 360"
-      navItems={MEMBER_NAV_ITEMS}
-      currentNav="member-search"
+      navItems={PORTAL_NAV_ITEMS}
+      currentNav="member-360"
       navProps={{ align: "center", tone: "inverted" }}
       align="center"
       headerTone="inverted"

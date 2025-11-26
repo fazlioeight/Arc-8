@@ -48,7 +48,7 @@ export const formatMemberLabel = (member) => {
     [member?.first_name, member?.last_name].filter(Boolean).join(" "),
     member?.dob ? `DOB ${member.dob}` : null,
   ].filter(Boolean);
-  return pieces.join(" • ");
+  return pieces.join(" | ");
 };
 
 export const buildMemberOption = (member) => {
