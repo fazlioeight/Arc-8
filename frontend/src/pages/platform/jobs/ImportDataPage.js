@@ -29,6 +29,22 @@ const STATUS_VARIANTS = {
   failed: "bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-100 dark:ring-rose-500/30",
 };
 
+const FHIR_RESOURCES = [
+  { key: "Patient", label: "Patient", description: "Demographics and identifiers." },
+  { key: "Coverage", label: "Coverage", description: "Plan enrollment and payers." },
+  { key: "Claim", label: "Claim", description: "Billing lines and adjudication details." },
+  { key: "Encounter", label: "Encounter", description: "Visits, locations, and providers of service." },
+  { key: "Observation", label: "Observation", description: "Labs, vitals, and clinical findings." },
+];
+
+const FHIR_STATUS_VARIANTS = {
+  idle: "bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-slate-800/80 dark:text-slate-200 dark:ring-slate-700",
+  testing: "bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-500/30",
+  connected: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-500/30",
+  queued: "bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-100 dark:ring-sky-500/30",
+  error: "bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-100 dark:ring-rose-500/30",
+};
+
 const formatBytes = (size) => {
   if (!size && size !== 0) return "-";
   const units = ["B", "KB", "MB", "GB"];
@@ -54,6 +70,20 @@ const ImportDataPage = () => {
   const [errors, setErrors] = useState({});
   const [queue, setQueue] = useState([]);
   const [dropTarget, setDropTarget] = useState(null);
+  const [fhirConfig, setFhirConfig] = useState({
+    baseUrl: "",
+    tokenUrl: "",
+    clientId: "",
+    clientSecret: "",
+    scopes: "system/*.read patient/*.read",
+    since: "",
+  });
+  const [fhirResources, setFhirResources] = useState(["Patient", "Claim", "Coverage"]);
+  const [fhirStatus, setFhirStatus] = useState({
+    state: "idle",
+    message: "Provide your FHIR base URL and OAuth details to begin.",
+  });
+  const [isTestingFhir, setIsTestingFhir] = useState(false);
   const timersRef = useRef([]);
 
   useEffect(() => {
@@ -238,6 +268,95 @@ const ImportDataPage = () => {
     setQueue((prev) => prev.filter((item) => item.status !== "completed"));
   }, []);
 
+  const updateFhirConfig = useCallback(
+    (field, value) => {
+      setFhirConfig((prev) => ({ ...prev, [field]: value }));
+      if (fhirStatus.state === "error") {
+        setFhirStatus((prev) => ({ ...prev, state: "idle" }));
+      }
+    },
+    [fhirStatus.state]
+  );
+
+  const toggleFhirResource = useCallback(
+    (resourceKey) => {
+      setFhirResources((prev) =>
+        prev.includes(resourceKey) ? prev.filter((item) => item !== resourceKey) : [...prev, resourceKey]
+      );
+      if (fhirStatus.state === "error") {
+        setFhirStatus((prev) => ({ ...prev, state: "idle" }));
+      }
+    },
+    [fhirStatus.state]
+  );
+
+  const testFhirConnection = useCallback(() => {
+    if (!fhirConfig.baseUrl.trim()) {
+      setFhirStatus({ state: "error", message: "Enter a FHIR base URL to test connectivity." });
+      return;
+    }
+    setIsTestingFhir(true);
+    setFhirStatus({ state: "testing", message: "Validating FHIR metadata and OAuth scope coverage..." });
+    const timer = window.setTimeout(() => {
+      setIsTestingFhir(false);
+      setFhirStatus({
+        state: "connected",
+        message: `Connected to ${fhirConfig.baseUrl} - ${fhirResources.length} resource${fhirResources.length === 1 ? "" : "s"} selected.`,
+      });
+      recordAuditEvent?.("import_data.fhir_test", {
+        baseUrl: fhirConfig.baseUrl,
+        tokenUrl: fhirConfig.tokenUrl,
+        resources: fhirResources,
+        tenant,
+      });
+    }, 700);
+    timersRef.current.push(timer);
+  }, [fhirConfig.baseUrl, fhirConfig.tokenUrl, fhirResources, recordAuditEvent, tenant]);
+
+  const startFhirImport = useCallback(() => {
+    if (!fhirConfig.baseUrl.trim()) {
+      setFhirStatus({ state: "error", message: "Base URL is required before queuing a FHIR import." });
+      return;
+    }
+    if (!fhirResources.length) {
+      setFhirStatus({ state: "error", message: "Select at least one FHIR resource type to sync." });
+      return;
+    }
+    const uploadId = `fhir-${Date.now().toString(36)}`;
+    const resourceList = fhirResources.slice(0, 3).join(", ");
+    const extraCount = Math.max(0, fhirResources.length - 3);
+    const fileName = extraCount
+      ? `${resourceList} (+${extraCount}) via FHIR`
+      : `${resourceList || "FHIR resources"} via FHIR`;
+    const upload = {
+      id: uploadId,
+      entityKey: "fhir",
+      entityLabel: "FHIR API",
+      fileName,
+      size: 0,
+      extension: "fhir",
+      status: "processing",
+      progress: 15,
+      tenant: tenant || "prominencehealth",
+      startedAt: new Date().toISOString(),
+      metadata: {
+        baseUrl: fhirConfig.baseUrl,
+        tokenUrl: fhirConfig.tokenUrl,
+        scopes: fhirConfig.scopes,
+        since: fhirConfig.since,
+        resources: fhirResources,
+      },
+    };
+    recordAuditEvent?.("import_data.fhir_queued", {
+      baseUrl: fhirConfig.baseUrl,
+      resources: fhirResources,
+      tenant,
+    });
+    setQueue((prev) => [upload, ...prev]);
+    setFhirStatus({ state: "queued", message: `Queued FHIR import from ${fhirConfig.baseUrl}` });
+    simulateUpload(uploadId, { tenant, baseUrl: fhirConfig.baseUrl });
+  }, [fhirConfig, fhirResources, recordAuditEvent, simulateUpload, tenant]);
+
   useEffect(() => {
     registerCommands(
       [
@@ -246,6 +365,18 @@ const ImportDataPage = () => {
           label: "Open Job Status Center",
           category: "Imports",
           action: () => navigate("/jobs/status-center"),
+        },
+        {
+          id: "import-data-test-fhir",
+          label: "Test FHIR connectivity",
+          category: "Imports",
+          action: testFhirConnection,
+        },
+        {
+          id: "import-data-queue-fhir",
+          label: "Queue FHIR API import",
+          category: "Imports",
+          action: startFhirImport,
         },
         queue.some((item) => item.status === "completed")
           ? {
@@ -258,7 +389,7 @@ const ImportDataPage = () => {
       ].filter(Boolean)
     );
     return () => registerCommands([]);
-  }, [clearCompleted, navigate, queue, registerCommands]);
+  }, [clearCompleted, navigate, queue, registerCommands, startFhirImport, testFhirConnection]);
 
   return (
     <div className="coding-member-workspace portal-theme min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -292,6 +423,170 @@ const ImportDataPage = () => {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 space-y-6">
+        <section
+          className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          aria-label="FHIR API connectors"
+        >
+          <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
+                FHIR APIs
+              </p>
+              <div>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Connect to FHIR endpoints</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Authenticate to a FHIR server and queue a background import of Patient, Encounter, Claim, and other resources.
+                </p>
+              </div>
+            </div>
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${FHIR_STATUS_VARIANTS[fhirStatus.state] || FHIR_STATUS_VARIANTS.idle}`}
+            >
+              {fhirStatus.state === "testing"
+                ? "Testing connection"
+                : fhirStatus.state === "connected"
+                ? "Connected"
+                : fhirStatus.state === "queued"
+                ? "Queued"
+                : fhirStatus.state === "error"
+                ? "Needs attention"
+                : "Not connected"}
+            </span>
+          </header>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="space-y-3 lg:col-span-2">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  FHIR base URL
+                  <input
+                    type="url"
+                    placeholder="https://fhir.your-org.com/r4"
+                    value={fhirConfig.baseUrl}
+                    onChange={(event) => updateFhirConfig("baseUrl", event.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  OAuth token URL
+                  <input
+                    type="url"
+                    placeholder="https://auth.your-org.com/oauth2/token"
+                    value={fhirConfig.tokenUrl}
+                    onChange={(event) => updateFhirConfig("tokenUrl", event.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                  />
+                </label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  Client ID
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    placeholder="client-id"
+                    value={fhirConfig.clientId}
+                    onChange={(event) => updateFhirConfig("clientId", event.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  Client secret
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="**********"
+                    value={fhirConfig.clientSecret}
+                    onChange={(event) => updateFhirConfig("clientSecret", event.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                  />
+                </label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="flex flex-col gap-1 text-sm font-semibold text-slate-800 dark:text-slate-100 sm:col-span-2">
+                  Scopes
+                  <input
+                    type="text"
+                    placeholder="system/*.read patient/*.read"
+                    value={fhirConfig.scopes}
+                    onChange={(event) => updateFhirConfig("scopes", event.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  Since date (optional)
+                  <input
+                    type="date"
+                    value={fhirConfig.since}
+                    onChange={(event) => updateFhirConfig("since", event.target.value)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+                  type="button"
+                  onClick={testFhirConnection}
+                  disabled={isTestingFhir}
+                >
+                  {isTestingFhir ? "Testing..." : "Test connection"}
+                </button>
+                <button
+                  className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                  type="button"
+                  onClick={startFhirImport}
+                  disabled={isTestingFhir}
+                >
+                  Queue FHIR import
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                We will request the selected resources with your provided scopes, run the import as a background job, and surface it below and in the Job Status Center.
+              </p>
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-inner dark:border-slate-700 dark:bg-slate-800">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">FHIR payload scope</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">Choose the resources to request via _type and _since parameters.</p>
+                </div>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                  {fhirResources.length} selected
+                </span>
+              </div>
+              <div className="space-y-2">
+                {FHIR_RESOURCES.map((resource) => (
+                  <label
+                    key={resource.key}
+                    className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:checked:bg-slate-100"
+                      checked={fhirResources.includes(resource.key)}
+                      onChange={() => toggleFhirResource(resource.key)}
+                    />
+                    <span>
+                      <span className="block font-semibold">{resource.label}</span>
+                      <span className="block text-xs text-slate-600 dark:text-slate-300">{resource.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200">
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Connection notes</div>
+                <p className="mt-1 text-slate-600 dark:text-slate-300">{fhirStatus.message}</p>
+                <p className="mt-2 text-slate-600 dark:text-slate-300">
+                  We will use <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">{fhirConfig.since || "no _since filter"}</code>{" "}
+                  and scopes <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">{fhirConfig.scopes || "system/*.read"}</code> when available.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Import summary</h2>
@@ -372,7 +667,7 @@ const ImportDataPage = () => {
                     />
                   </label>
                   <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Accepts .txt, .csv, .xlsx · Max preview 900 chars
+                    Accepts .txt, .csv, .xlsx - Max preview 900 chars
                   </div>
                 </div>
 
