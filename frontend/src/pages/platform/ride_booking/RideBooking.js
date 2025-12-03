@@ -1,14 +1,16 @@
 import React, { useContext, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import PortalPageLayout from "../../../components/PortalPageLayout";
+import PortalPageHeader from "../../../components/PortalPageHeader";
+import PortalCard from "../../../components/PortalCard";
+import PortalStat from "../../../components/PortalStat";
 import { AuthContext } from "../../../context/AuthContext";
-import PortalUtilityBar from "../../../components/PortalUtilityBar";
-import RideBookingHeader from "./RideBookingHeader";
 import "../coding/member/memberWorkspace.css";
-import "../../../styles/rideBooking.css";
 import { RideBookingService } from "../../../services/rideBookingService";
 import useGooglePlacesAutocomplete from "../../../hooks/useGooglePlacesAutocomplete";
 import { ErrorState } from "../../../components/ehr/Primitives";
 import { ROUTES } from "../../../constants/routes";
+import { RIDE_NAV_ITEMS } from "./rideNavItems";
 
 const getLocalDate = () => new Date().toISOString().slice(0, 10);
 const getLocalTime = () => new Date().toISOString().slice(11, 16);
@@ -38,6 +40,7 @@ const RideBooking = () => {
 
   const isPickupAutocompleteReady = useGooglePlacesAutocomplete(pickupAddressInputRef, setPickupAddress);
   const isDropoffAutocompleteReady = useGooglePlacesAutocomplete(dropoffAddressInputRef, setDropoffAddress);
+  const addressAutocompleteAvailable = isPickupAutocompleteReady || isDropoffAutocompleteReady;
 
   const refreshRideOptions = () => {
     const options = rideBookingService.getRideOptionsForDate(new Date());
@@ -83,17 +86,57 @@ const RideBooking = () => {
     }
   };
 
-  return (
-    <div className="ride-booking coding-member-workspace portal-theme min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      {isAuthenticated && <PortalUtilityBar />}
-      <RideBookingHeader
-        title="Book a ride"
-        subtitle="Enter member details and schedule transportation in a few quick steps."
-      />
+  const layoutProps = useMemo(
+    () => ({
+      backgroundClassName:
+        "coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100",
+      maxWidthClassName: "max-w-5xl",
+      paddingClassName: "px-4",
+      navItems: RIDE_NAV_ITEMS,
+      currentNav: "ride-book",
+      utilityBar: isAuthenticated,
+    }),
+    [isAuthenticated]
+  );
 
-      <div className="ride-booking__shell">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <form onSubmit={handleSubmit} className="space-y-4">
+  const headerContent = (
+    <PortalPageHeader
+      eyebrow="Ride booking"
+      title="Book a ride"
+      subtitle="Enter member details and schedule transportation in a few quick steps."
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <PortalStat label="Partners" value={rideOptions.length || 0} meta="Available today" tone="info" />
+          <PortalStat
+            label="Autocomplete"
+            value={addressAutocompleteAvailable ? "On" : "Off"}
+            meta="Address lookup"
+            tone={addressAutocompleteAvailable ? "success" : "warning"}
+          />
+        </div>
+      }
+    />
+  );
+
+  return (
+    <PortalPageLayout {...layoutProps} headerContent={headerContent}>
+      <PortalCard
+        title="Ride request"
+        subtitle="Member identity, pickup details, and partner selection."
+        footer={
+          <div className="flex w-full justify-end">
+            <button
+              type="button"
+              className="portal-ghost-button"
+              onClick={() => navigate(ROUTES.RIDE_BOOKING.LANDING)}
+            >
+              Back to overview
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="portal-section-grid">
             <div className="space-y-2">
               <label className="text-sm font-semibold" htmlFor="memberId">
                 Member ID
@@ -106,198 +149,185 @@ const RideBooking = () => {
                 required
               />
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold" htmlFor="firstName">
-                  First name
-                </label>
-                <input
-                  id="firstName"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                  value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold" htmlFor="lastName">
-                  Last name
-                </label>
-                <input
-                  id="lastName"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                  value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
             <div className="space-y-2">
-              <label className="text-sm font-semibold" htmlFor="pickup">
-                Pickup location (facility or name)
+              <label className="text-sm font-semibold" htmlFor="firstName">
+                First name
               </label>
               <input
-                id="pickup"
+                id="firstName"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                value={pickup}
-                onChange={(event) => setPickup(event.target.value)}
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold" htmlFor="pickupAddress">
-                Pickup address
+              <label className="text-sm font-semibold" htmlFor="lastName">
+                Last name
               </label>
               <input
-                id="pickupAddress"
-                ref={pickupAddressInputRef}
-                autoComplete="off"
+                id="lastName"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                value={pickupAddress}
-                onChange={(event) => setPickupAddress(event.target.value)}
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
                 required
               />
-              {isPickupAutocompleteReady && (
-                <p className="text-xs text-slate-500">Start typing to search for a verified address.</p>
-              )}
             </div>
+          </div>
 
+          <div className="space-y-2">
+            <label className="text-sm font-semibold" htmlFor="pickup">
+              Pickup location (facility or name)
+            </label>
+            <input
+              id="pickup"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+              value={pickup}
+              onChange={(event) => setPickup(event.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold" htmlFor="pickupAddress">
+              Pickup address
+            </label>
+            <input
+              id="pickupAddress"
+              ref={pickupAddressInputRef}
+              autoComplete="off"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+              value={pickupAddress}
+              onChange={(event) => setPickupAddress(event.target.value)}
+              required
+            />
+            {isPickupAutocompleteReady && (
+              <p className="text-xs text-slate-500">Start typing to search for a verified address.</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold" htmlFor="dropoff">
+              Dropoff location
+            </label>
+            <input
+              id="dropoff"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+              value={dropoff}
+              onChange={(event) => setDropoff(event.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold" htmlFor="dropoffAddress">
+              Dropoff address
+            </label>
+            <input
+              id="dropoffAddress"
+              ref={dropoffAddressInputRef}
+              autoComplete="off"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+              value={dropoffAddress}
+              onChange={(event) => setDropoffAddress(event.target.value)}
+              required
+            />
+            {isDropoffAutocompleteReady && (
+              <p className="text-xs text-slate-500">Start typing to search for a verified address.</p>
+            )}
+          </div>
+
+          <div className="portal-section-grid">
             <div className="space-y-2">
-              <label className="text-sm font-semibold" htmlFor="dropoff">
-                Dropoff location
+              <label className="text-sm font-semibold" htmlFor="rideDate">
+                Ride date
               </label>
               <input
-                id="dropoff"
+                id="rideDate"
+                type="date"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                value={dropoff}
-                onChange={(event) => setDropoff(event.target.value)}
+                value={rideDate}
+                onChange={(event) => setRideDate(event.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold" htmlFor="dropoffAddress">
-                Dropoff address
+              <label className="text-sm font-semibold" htmlFor="rideTime">
+                Pickup time
               </label>
               <input
-                id="dropoffAddress"
-                ref={dropoffAddressInputRef}
-                autoComplete="off"
+                id="rideTime"
+                type="time"
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                value={dropoffAddress}
-                onChange={(event) => setDropoffAddress(event.target.value)}
+                value={rideTime}
+                onChange={(event) => setRideTime(event.target.value)}
                 required
               />
-              {isDropoffAutocompleteReady && (
-                <p className="text-xs text-slate-500">Start typing to search for a verified address.</p>
-              )}
             </div>
+          </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold" htmlFor="rideDate">
-                  Ride date
-                </label>
-                <input
-                  id="rideDate"
-                  type="date"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                  value={rideDate}
-                  onChange={(event) => setRideDate(event.target.value)}
+          <div className="portal-section-grid">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold" htmlFor="rideType">
+                Ride partner
+              </label>
+              <div className="flex items-center gap-2">
+                <select
+                  id="rideType"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                  value={rideType}
+                  onChange={(event) => setRideType(event.target.value)}
                   required
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold" htmlFor="rideTime">
-                  Pickup time
-                </label>
-                <input
-                  id="rideTime"
-                  type="time"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                  value={rideTime}
-                  onChange={(event) => setRideTime(event.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold" htmlFor="rideType">
-                  Ride partner
-                </label>
-                <div className="flex items-center gap-2">
-                  <select
-                    id="rideType"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                    value={rideType}
-                    onChange={(event) => setRideType(event.target.value)}
-                    required
-                  >
-                    {rideOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-                    onClick={refreshRideOptions}
-                  >
-                    Refresh
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold" htmlFor="estimatedCost">
-                  Estimated cost (optional)
-                </label>
-                <input
-                  id="estimatedCost"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-                  value={estimatedCost}
-                  onChange={(event) => setEstimatedCost(event.target.value)}
-                />
+                >
+                  {rideOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="portal-ghost-button"
+                  onClick={refreshRideOptions}
+                >
+                  Refresh
+                </button>
               </div>
             </div>
-
-            <button
-              type="submit"
-              className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-            >
-              Book ride
-            </button>
-          </form>
-
-          {formError && (
-            <div className="mt-4">
-              <ErrorState description={formError} title="Ride booking failed" />
+            <div className="space-y-2">
+              <label className="text-sm font-semibold" htmlFor="estimatedCost">
+                Estimated cost (optional)
+              </label>
+              <input
+                id="estimatedCost"
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
+                value={estimatedCost}
+                onChange={(event) => setEstimatedCost(event.target.value)}
+              />
             </div>
-          )}
-          {formStatus && (
-            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100">
-              {formStatus}
-            </div>
-          )}
-        </section>
+          </div>
 
-        <div className="mt-4 text-right">
           <button
-            type="button"
-            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            onClick={() => navigate(ROUTES.RIDE_BOOKING.LANDING)}
+            type="submit"
+            className="mt-2 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
           >
-            Back to overview
+            Book ride
           </button>
-        </div>
-      </div>
-    </div>
+        </form>
+
+        {formError && (
+          <div className="mt-4">
+            <ErrorState description={formError} title="Ride booking failed" />
+          </div>
+        )}
+        {formStatus && (
+          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 shadow-sm dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100">
+            {formStatus}
+          </div>
+        )}
+      </PortalCard>
+    </PortalPageLayout>
   );
 };
 

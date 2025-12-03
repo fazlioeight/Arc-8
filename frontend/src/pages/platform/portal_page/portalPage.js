@@ -1,16 +1,17 @@
 import React, { useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
+import PortalCard from "../../../components/PortalCard";
+import PortalPageHeader from "../../../components/PortalPageHeader";
+import PortalStat from "../../../components/PortalStat";
 import { AuthContext } from "../../../context/AuthContext";
 import {
   EmptyState,
   ErrorState,
   LoadingState,
-  SectionHeader,
 } from "../../../components/ehr/Primitives";
 import "../../../index.css";
 import "../coding/member/memberWorkspace.css";
-import "./portalPage.sfdc.css";
 import { useMemberSearch } from "../../../hooks/useMemberSearch";
 import { usePortalOverview } from "../../../hooks/usePortalOverview";
 import { PORTAL_NAV_ITEMS } from "./portalNavItems";
@@ -51,10 +52,10 @@ const formatRoleLabel = (value) => {
   }
 };
 
-const PRIORITY_VARIANT = {
-  high: "ehr-alert--danger",
-  medium: "ehr-alert--warning",
-  low: "ehr-alert--success",
+const PRIORITY_TONE = {
+  high: "danger",
+  medium: "warning",
+  low: "success",
 };
 
 const PortalPage = () => {
@@ -186,42 +187,34 @@ const PortalPage = () => {
     token,
   });
 
-  const cardClass = "rounded-xl p-4 portal-alert-shell";
   const portalError = overview.error || overviewError;
+  const renderableApps = appsToRender || [];
+  const lastSavedItems = overview.lastSaved || [];
+  const todoItems = overview.todos || [];
+  const openTasks = todoItems.length;
 
   const headerContent = (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="space-y-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.28em] coding-text-muted">
-          Portal Overview
-        </p>
-        <h1 className="text-2xl font-semibold coding-text-strong sm:text-3xl">
-          Welcome back, {displayName}
-        </h1>
-        <p className="coding-text-soft text-base">
-          Stay aligned with the same workspace feel as your chart view.
-        </p>
-      </div>
-      <div className="flex items-center gap-3 rounded-xl bg-white/60 px-4 py-3 shadow-sm ring-1 ring-gray-200 dark:bg-white/5 dark:ring-0">
-        <div className="flex flex-col text-right">
-          <span className="text-[11px] uppercase tracking-wide coding-text-muted">
-            Applications
-          </span>
-          <span className="text-lg font-semibold coding-text-strong">
-            {allowedApps.length || appsToRender.length}
-          </span>
+    <PortalPageHeader
+      eyebrow="Portal Overview"
+      title={`Welcome back, ${displayName}`}
+      subtitle="Stay aligned with the same workspace feel as your chart view."
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <PortalStat
+            label="Applications"
+            value={allowedApps.length || renderableApps.length}
+            meta="Available"
+            tone="info"
+          />
+          <PortalStat
+            label="Open tasks"
+            value={openTasks}
+            meta="Across products"
+            tone="warning"
+          />
         </div>
-        <span className="h-10 w-px bg-gray-200 dark:bg-white/20" />
-        <div className="flex flex-col text-right">
-          <span className="text-[11px] uppercase tracking-wide coding-text-muted">
-            Open tasks
-          </span>
-          <span className="text-lg font-semibold coding-text-strong">
-            {overview.todos.length}
-          </span>
-        </div>
-      </div>
-    </div>
+      }
+    />
   );
 
   if (overviewLoading) {
@@ -251,7 +244,12 @@ const PortalPage = () => {
       headerContent={headerContent}
       mainClassName="space-y-6"
     >
-      <section className="coding-member-toolbar">
+      <PortalCard
+        compact
+        title="Member quick search"
+        subtitle="Open a chart without leaving the portal."
+        className="coding-member-toolbar"
+      >
         <form
           className="flex flex-col gap-4 sm:flex-row sm:items-end"
           onSubmit={handleMemberSearch}
@@ -302,7 +300,7 @@ const PortalPage = () => {
         >
           {memberSearchStatus}
         </p>
-      </section>
+      </PortalCard>
 
       {portalError && (
         <ErrorState
@@ -321,114 +319,121 @@ const PortalPage = () => {
         />
       )}
 
-      <section className={cardClass} aria-label="User profile summary">
-        <SectionHeader title="Profile" subtitle="Your account at a glance" />
-        <div className="mt-3 space-y-2">
-          <div className="ehr-alert ehr-alert--info portal-alert-card">
-            <div className="flex w-full items-start gap-3">
-              <span className="portal-alert-icon">
-                {user?.email?.slice(0, 1).toUpperCase() || "N"}
-              </span>
-              <div className="flex-1 space-y-1">
-                <div className="portal-alert-card__title">
-                  {overview.profile?.email || user?.email}
-                </div>
-                <div className="portal-alert-card__meta">
-                  Tenant {overview.profile?.tenant || user?.tenant || "Nexora"} |{" "}
-                  {formatRoleLabel(overview.profile?.role)} |{" "}
-                  {overview.profile?.lastLogin
-                    ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
-                    : "Last login just now"}{" "}
-                  | {allowedApps.length || appsToRender.length} applications
-                </div>
+      <PortalCard
+        title="Profile"
+        subtitle="Your account at a glance"
+        tone="info"
+        compact
+      >
+        <div className="portal-list">
+          <div className="portal-list-item portal-list-item--info">
+            <span className="portal-list-item__icon">
+              {user?.email?.slice(0, 1).toUpperCase() || "N"}
+            </span>
+            <div className="portal-list-item__body">
+              <div className="portal-list-item__title">
+                {overview.profile?.email || user?.email}
               </div>
-              <button
-                className="portal-alert-button"
-                onClick={() => navigate("/settings")}
-                type="button"
-              >
-                Manage
-              </button>
+              <p className="portal-list-item__meta">
+                Tenant {overview.profile?.tenant || user?.tenant || "Nexora"} |{" "}
+                {formatRoleLabel(overview.profile?.role)} |{" "}
+                {overview.profile?.lastLogin
+                  ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
+                  : "Last login just now"}{" "}
+                | {allowedApps.length || renderableApps.length} applications
+              </p>
+              <div className="portal-list-item__actions">
+                <span className="portal-pill portal-pill--ghost">
+                  Tenant {overview.profile?.tenant || tenant || "Nexora"}
+                </span>
+                <span className="portal-pill portal-pill--ghost">
+                  {formatRoleLabel(overview.profile?.role)}
+                </span>
+                <span className="portal-pill portal-pill--ghost">
+                  {allowedApps.length || renderableApps.length} apps
+                </span>
+              </div>
             </div>
+            <button
+              className="portal-ghost-button"
+              onClick={() => navigate("/settings")}
+              type="button"
+            >
+              Manage
+            </button>
           </div>
         </div>
-      </section>
+      </PortalCard>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <section className={cardClass} aria-label="Applications">
-          <SectionHeader
-            title="Applications"
-            subtitle="Launch into the areas you use most."
-          />
-          <div className="mt-3 space-y-2">
-            {appsToRender.map((app) => {
+      <div className="portal-section-grid">
+        <PortalCard
+          title="Applications"
+          subtitle="Launch into the areas you use most."
+          tone="info"
+        >
+          <div className="portal-list">
+            {renderableApps.map((app) => {
               const isLocked = !app.allowed;
-              const tone = isLocked ? "ehr-alert--warning" : "ehr-alert--info";
+              const itemTone = isLocked ? "warning" : "info";
               return (
                 <div
                   key={app.key}
-                  className={`ehr-alert portal-alert-card ${tone}`}
+                  className={["portal-list-item", `portal-list-item--${itemTone}`].join(
+                    " "
+                  )}
                   aria-disabled={isLocked}
                 >
-                  <div className="flex w-full items-start gap-3">
-                    <span
-                      className="portal-alert-icon"
-                      style={{ background: app.color }}
-                      aria-hidden
-                    >
-                      {app.icon}
-                    </span>
-                    <div className="flex-1">
-                      <div className="portal-alert-card__title">{app.label}</div>
-                      <p className="portal-alert-card__meta">{app.desc}</p>
-                      {isLocked && (
-                        <p className="portal-alert-card__meta">
-                          Request access from your admin.
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      className="portal-alert-button"
-                      onClick={() => !isLocked && navigate(app.path)}
-                      disabled={isLocked}
-                      type="button"
-                    >
-                      {isLocked ? "Locked" : "Open"}
-                    </button>
+                  <span
+                    className="portal-list-item__icon"
+                    style={{ background: app.color }}
+                    aria-hidden
+                  >
+                    {app.icon}
+                  </span>
+                  <div className="portal-list-item__body">
+                    <div className="portal-list-item__title">{app.label}</div>
+                    <p className="portal-list-item__meta">{app.desc}</p>
+                    {isLocked && (
+                      <p className="portal-list-item__meta">
+                        Request access from your admin.
+                      </p>
+                    )}
                   </div>
+                  <button
+                    className="portal-ghost-button"
+                    onClick={() => !isLocked && navigate(app.path)}
+                    disabled={isLocked}
+                    type="button"
+                  >
+                    {isLocked ? "Locked" : "Open"}
+                  </button>
                 </div>
               );
             })}
           </div>
-        </section>
+        </PortalCard>
 
-        <section className={cardClass} aria-label="Last saved items">
-          <SectionHeader
-            title="Last saved"
-            subtitle="Recent items you have pinned or updated."
-          />
-          <ul className="mt-3 space-y-2">
-            {overview.lastSaved.map((item) => (
-              <li
-                key={item.id}
-                className="ehr-alert portal-alert-card ehr-alert--info"
-              >
-                <div className="flex w-full flex-col gap-2">
-                  <div>
-                    <div className="portal-alert-card__title">{item.title}</div>
-                    <p className="portal-alert-card__meta">{item.summary}</p>
-                    <p className="portal-alert-card__meta">
-                      Updated {formatRelativeTime(item.savedAt)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
+        <PortalCard
+          title="Last saved"
+          subtitle="Recent items you have pinned or updated."
+        >
+          <div className="portal-list">
+            {lastSavedItems.map((item) => (
+              <div key={item.id} className="portal-list-item portal-list-item--info">
+                <div className="portal-list-item__body">
+                  <div className="portal-list-item__title">{item.title}</div>
+                  <p className="portal-list-item__meta">{item.summary}</p>
+                  <p className="portal-list-item__meta">
+                    Updated {formatRelativeTime(item.savedAt)}
+                  </p>
+                  <div className="portal-list-item__actions">
                     {item.appKey && (
-                      <span className="portal-alert-pill">
+                      <span className="portal-pill portal-pill--ghost">
                         {item.appKey.replace(/_/g, " ")}
                       </span>
                     )}
                     <button
-                      className="portal-alert-button"
+                      className="portal-ghost-button"
                       type="button"
                       onClick={() => navigate(item.path || "/dashboard")}
                     >
@@ -436,83 +441,78 @@ const PortalPage = () => {
                     </button>
                   </div>
                 </div>
-              </li>
+              </div>
             ))}
-            {!overview.lastSaved.length && (
-              <li>
-                <EmptyState
-                  title="No saved items yet"
-                  description="Bookmark a report from the dashboard to keep it handy here."
-                  size="sm"
-                  className="w-full"
-                />
-              </li>
+            {!lastSavedItems.length && (
+              <EmptyState
+                title="No saved items yet"
+                description="Bookmark a report from the dashboard to keep it handy here."
+                size="sm"
+                className="w-full"
+              />
             )}
-          </ul>
-        </section>
+          </div>
+        </PortalCard>
 
-        <section className={cardClass} aria-label="Assigned to-do items">
-          <SectionHeader
-            title="To-do"
-            subtitle="Assignments from your managers across applications."
-          />
-          <ul className="mt-3 space-y-2">
-            {overview.todos.map((todo) => {
-              const tone = PRIORITY_VARIANT[todo.priority] || PRIORITY_VARIANT.low;
+        <PortalCard
+          title="To-do"
+          subtitle="Assignments from your managers across applications."
+          tone="warning"
+        >
+          <div className="portal-list">
+            {todoItems.map((todo) => {
+              const tone = PRIORITY_TONE[todo.priority] || PRIORITY_TONE.low;
               return (
-                <li
+                <div
                   key={todo.id}
-                  className={`ehr-alert portal-alert-card ${tone}`}
+                  className={[
+                    "portal-list-item",
+                    `portal-list-item--${tone}`,
+                  ].join(" ")}
                 >
-                  <div className="flex w-full flex-col gap-2">
-                    <div className="portal-alert-card__title">
-                      {todo.title}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="portal-alert-pill">
+                  <div className="portal-list-item__body">
+                    <div className="portal-list-item__title">{todo.title}</div>
+                    <div className="portal-list-item__actions">
+                      <span className="portal-pill portal-pill--solid">
                         {todo.priority || "low"}
                       </span>
                       {todo.appKey && (
-                        <span className="portal-alert-pill">
+                        <span className="portal-pill portal-pill--ghost">
                           {todo.appKey.replace(/_/g, " ")}
                         </span>
                       )}
                       {todo.dueAt && (
-                        <span className="portal-alert-pill portal-alert-pill--ghost">
+                        <span className="portal-pill portal-pill--ghost">
                           Due {formatRelativeTime(todo.dueAt)}
                         </span>
                       )}
                       {todo.assignedBy && (
-                        <span className="portal-alert-pill portal-alert-pill--ghost">
+                        <span className="portal-pill portal-pill--ghost">
                           Assigned by {todo.assignedBy}
                         </span>
                       )}
                     </div>
-                    <div>
-                      <button
-                        className="portal-alert-button"
-                        type="button"
-                        onClick={() => navigate(todo.path || "/dashboard")}
-                      >
-                        View task
-                      </button>
-                    </div>
+                    <button
+                      className="portal-ghost-button"
+                      type="button"
+                      onClick={() => navigate(todo.path || "/dashboard")}
+                    >
+                      View task
+                    </button>
                   </div>
-                </li>
+                </div>
               );
             })}
-            {!overview.todos.length && (
-              <li>
-                <EmptyState
-                  title="No open tasks"
-                  description="Enjoy the clear slate—new assignments will appear here."
-                  size="sm"
-                  className="w-full"
-                />
-              </li>
+            {!todoItems.length && (
+              <EmptyState
+                title="No open tasks"
+                description="Enjoy the clear slate; new assignments will appear here."
+                size="sm"
+                className="w-full"
+              />
             )}
-          </ul>
-        </section>
+          </div>
+        </PortalCard>
       </div>
     </PortalPageLayout>
   );

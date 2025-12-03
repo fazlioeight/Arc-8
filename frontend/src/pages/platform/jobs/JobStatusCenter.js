@@ -1,11 +1,13 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import PortalUtilityBar from "../../../components/PortalUtilityBar";
+import PortalPageLayout from "../../../components/PortalPageLayout";
+import PortalPageHeader from "../../../components/PortalPageHeader";
+import PortalCard from "../../../components/PortalCard";
+import PortalStat from "../../../components/PortalStat";
 import { AuthContext } from "../../../context/AuthContext";
 import { useCommandPalette } from "../../../context/CommandPaletteContext";
 import { SAMPLE_JOBS, SAMPLE_JOB_LOGS, sampleDownload } from "../../../utils/sampleData";
 import "../coding/member/memberWorkspace.css";
-import "../../../styles/jobCenter.css";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -132,9 +134,9 @@ const JobStatusCenter = () => {
           ? {
               id: "job-center-download-logs",
               label: "Download logs for selected job",
-          category: "Job Center",
-          action: () => handleDownload(selectedJobId),
-        }
+              category: "Job Center",
+              action: () => handleDownload(selectedJobId),
+            }
           : null,
       ].filter(Boolean),
       { id: JOB_CENTER_COMMAND_SCOPE }
@@ -199,75 +201,62 @@ const JobStatusCenter = () => {
     setSelectedJobId(job.id);
   }, []);
 
+  const totalCount = filteredJobs.length;
+  const processingCount = filteredJobs.filter((job) => job.status === "running" || job.status === "queued").length;
+  const completedCount = filteredJobs.filter((job) => job.status === "completed").length;
+  const failedCount = filteredJobs.filter((job) => job.status === "failed").length;
+
+  const layoutProps = useMemo(
+    () => ({
+      backgroundClassName:
+        "coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100",
+      maxWidthClassName: "max-w-6xl",
+      paddingClassName: "px-4",
+    }),
+    []
+  );
+
+  const headerContent = (
+    <PortalPageHeader
+      eyebrow="Operations"
+      title="Job & Status Center"
+      subtitle="Track imports, model runs, and exports across tenants. Retry failures or download logs without leaving the page."
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <PortalStat label="Jobs" value={totalCount} meta="Filtered" tone="info" />
+          <PortalStat label="In flight" value={processingCount} meta="Running/queued" tone="warning" />
+          <PortalStat label="Completed" value={completedCount} meta="Done" tone="success" />
+          <PortalStat label="Failed" value={failedCount} meta="Attention" tone="danger" />
+        </div>
+      }
+    />
+  );
+
+  const detailTone = useMemo(() => {
+    if (!selectedJob) return "neutral";
+    if (selectedJob.status === "failed") return "danger";
+    if (selectedJob.status === "completed") return "success";
+    return "info";
+  }, [selectedJob]);
+
   return (
-    <div className="coding-member-workspace portal-theme min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <PortalUtilityBar />
-      <header className="border-b border-slate-200 bg-white/80 px-4 py-5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <PortalPageLayout {...layoutProps} headerContent={headerContent}>
+      <PortalCard
+        title="Filters & shortcuts"
+        subtitle="Narrow down jobs by status, tenant, or keyword."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <button className="portal-ghost-button" onClick={() => navigate("/jobs/import-data")}>
+              Go to Import Data
+            </button>
+            <button className="portal-ghost-button" onClick={handleRefresh} disabled={loading}>
+              {loading ? "Refreshing..." : "Manual refresh"}
+            </button>
+          </div>
+        }
+      >
+        <div className="portal-section-grid">
           <div className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
-              Operations
-            </p>
-            <div>
-              <h1 className="text-2xl font-semibold">Job & Status Center</h1>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                Track imports, model runs, and exports across tenants. Retry failures or download logs without leaving the page.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col items-start gap-2 sm:items-end">
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-                onClick={() => navigate("/jobs/import-data")}
-              >
-                Go to Import Data
-              </button>
-              <button
-                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-                onClick={handleRefresh}
-                disabled={loading}
-              >
-                {loading ? "Refreshing..." : "Manual refresh"}
-              </button>
-            </div>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : "-"}
-            </span>
-          </div>
-        </div>
-      </header>
-
-      <section className="mx-auto mt-4 max-w-6xl px-4">
-        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-4">
-          <div className="flex flex-col">
-            <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total jobs</span>
-            <span className="text-xl font-semibold text-slate-900 dark:text-slate-100">{filteredJobs.length}</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Processing</span>
-            <span className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              {filteredJobs.filter((job) => job.status === "running" || job.status === "queued").length}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Completed</span>
-            <span className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              {filteredJobs.filter((job) => job.status === "completed").length}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Failed</span>
-            <span className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              {filteredJobs.filter((job) => job.status === "failed").length}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto mt-4 max-w-6xl px-4">
-        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-4">
-          <div className="flex flex-col gap-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300" htmlFor="job-search">
               Search
             </label>
@@ -279,7 +268,7 @@ const JobStatusCenter = () => {
               onChange={(event) => setSearchTerm(event.target.value)}
             />
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Status</label>
             <select
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
@@ -293,7 +282,7 @@ const JobStatusCenter = () => {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Tenant</label>
             <select
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
@@ -308,51 +297,85 @@ const JobStatusCenter = () => {
               ))}
             </select>
           </div>
-          <div className="flex flex-col justify-end">
+          <div className="flex flex-col justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="portal-ghost-button"
+                onClick={() => {
+                  setStatusFilter("");
+                  setTenantFilter("");
+                  setSearchTerm("");
+                }}
+              >
+                Clear filters
+              </button>
+              <span className="portal-pill portal-pill--ghost">{filteredJobs.length} job(s) visible</span>
+            </div>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : "-"}
+            </span>
+          </div>
+        </div>
+      </PortalCard>
+
+      <PortalCard
+        title="Job feed"
+        subtitle="Select a row to preview logs, ownership, and retry options."
+        actions={<span className="portal-pill">{selectedRows.length} selected</span>}
+        footer={
+          <div className="flex w-full items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300">
+            <div>{filteredJobs.length} job(s)</div>
+            <div className="flex items-center gap-2">
+              <button
+                className="portal-ghost-button"
+                disabled={currentPage === 1}
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              >
+                Previous
+              </button>
+              <span>
+                Page {currentPage} / {totalPages}
+              </span>
+              <button
+                className="portal-ghost-button"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:checked:bg-slate-100"
+              checked={allVisibleSelected}
+              onChange={toggleSelectAll}
+            />
+            Select page
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-              onClick={() => {
-                setStatusFilter("");
-                setTenantFilter("");
-                setSearchTerm("");
-              }}
+              className="portal-ghost-button"
+              disabled={!selectedRows.length}
+              onClick={bulkRetry}
             >
-              Clear filters
+              Retry selected
+            </button>
+            <button
+              className="portal-ghost-button"
+              disabled={!selectedRows.length}
+              onClick={() => selectedRows.forEach(handleDownload)}
+            >
+              Download logs
             </button>
           </div>
         </div>
-      </section>
 
-      <div className="mx-auto mt-4 flex max-w-6xl items-center justify-between gap-3 px-4">
-        <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-800 dark:checked:bg-slate-100"
-            checked={allVisibleSelected}
-            onChange={toggleSelectAll}
-          />
-          Select page
-        </label>
-        <div className="flex items-center gap-2">
-          <button
-            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            disabled={!selectedRows.length}
-            onClick={bulkRetry}
-          >
-            Retry selected
-          </button>
-          <button
-            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            disabled={!selectedRows.length}
-            onClick={() => selectedRows.forEach(handleDownload)}
-          >
-            Download logs
-          </button>
-        </div>
-      </div>
-
-      <div className="mx-auto mt-4 max-w-6xl px-4">
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
               <thead className="bg-slate-50 dark:bg-slate-800/60">
@@ -392,7 +415,7 @@ const JobStatusCenter = () => {
                           Need data to explore? Load the sandbox tenant to view sample jobs.
                         </p>
                         <button
-                          className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+                          className="portal-ghost-button"
                           onClick={() => setTenantFilter(tenant || "prominencehealth")}
                         >
                           Show my tenant jobs
@@ -448,7 +471,7 @@ const JobStatusCenter = () => {
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
                         <button
-                          className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+                          className="portal-ghost-button"
                           onClick={(event) => {
                             event.stopPropagation();
                             handleDownload(job.id);
@@ -458,7 +481,7 @@ const JobStatusCenter = () => {
                         </button>
                         {job.status === "failed" && (
                           <button
-                            className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-rose-500/50 dark:bg-rose-500/10 dark:text-rose-100"
+                            className="portal-ghost-button"
                             onClick={(event) => {
                               event.stopPropagation();
                               handleRetry(job);
@@ -475,51 +498,28 @@ const JobStatusCenter = () => {
             </table>
           </div>
         </div>
-      </div>
+      </PortalCard>
 
-      <div className="mx-auto my-4 flex max-w-6xl items-center justify-between px-4 text-sm text-slate-700 dark:text-slate-300">
-        <div>{filteredJobs.length} job(s)</div>
-        <div className="flex items-center gap-3">
-          <button
-            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            disabled={currentPage === 1}
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-          >
-            Previous
-          </button>
-          <span>
-            Page {currentPage} / {totalPages}
-          </span>
-          <button
-            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            disabled={currentPage === totalPages}
-            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-          >
-            Next
-          </button>
-        </div>
-      </div>
-
-      <section className="mx-auto mb-8 max-w-6xl px-4" aria-live="polite">
+      <PortalCard
+        tone={detailTone}
+        title={selectedJob ? selectedJob.name : "Job details"}
+        subtitle={selectedJob ? selectedJob.id : "Select a job to view logs and retry options."}
+      >
         {selectedJob ? (
-          <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <header className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{selectedJob.name}</h2>
-                <div className="text-sm text-slate-500 dark:text-slate-300">{selectedJob.id}</div>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span className="portal-pill portal-pill--solid">{selectedJob.status}</span>
+                <span className="portal-pill portal-pill--ghost">{selectedJob.tenant}</span>
               </div>
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize ${badgeTone(selectedJob.status)}`}>
-                {selectedJob.status}
-              </span>
-            </header>
+              <div className="text-xs text-slate-500 dark:text-slate-300">
+                Last activity {selectedJob.finishedAt ? new Date(selectedJob.finishedAt).toLocaleTimeString() : "In progress"}
+              </div>
+            </div>
             <dl className="grid gap-4 text-sm text-slate-800 dark:text-slate-100 sm:grid-cols-2">
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Job ID</dt>
                 <dd>{selectedJob.id}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Tenant</dt>
-                <dd>{selectedJob.tenant}</dd>
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Submitted by</dt>
@@ -535,8 +535,13 @@ const JobStatusCenter = () => {
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Last activity</dt>
-                <dd>{selectedJob.finishedAt ? new Date(selectedJob.finishedAt).toLocaleTimeString() : "In progress"}</dd>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Progress</dt>
+                <dd className="flex items-center gap-2">
+                  <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800">
+                    <div className="h-full rounded-full bg-sky-500 transition" style={{ width: `${selectedJob.progress}%` }} />
+                  </div>
+                  <span className="text-xs text-slate-600 dark:text-slate-300">{selectedJob.progress}%</span>
+                </dd>
               </div>
             </dl>
             {selectedJob.error && (
@@ -545,17 +550,11 @@ const JobStatusCenter = () => {
               </div>
             )}
             <div className="flex flex-wrap gap-2">
-              <button
-                className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-                onClick={() => handleDownload(selectedJob.id)}
-              >
+              <button className="portal-ghost-button" onClick={() => handleDownload(selectedJob.id)}>
                 Download detailed logs
               </button>
               {selectedJob.status === "failed" && (
-                <button
-                  className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-rose-500/50 dark:bg-rose-500/10 dark:text-rose-100"
-                  onClick={() => handleRetry(selectedJob)}
-                >
+                <button className="portal-ghost-button" onClick={() => handleRetry(selectedJob)}>
                   Retry job
                 </button>
               )}
@@ -583,8 +582,8 @@ const JobStatusCenter = () => {
             </p>
           </div>
         )}
-      </section>
-    </div>
+      </PortalCard>
+    </PortalPageLayout>
   );
 };
 
