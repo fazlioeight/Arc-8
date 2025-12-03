@@ -47,6 +47,9 @@ const RideBookingLandingPage = () => {
       setRides(result || []);
       setLastUpdated(new Date());
     } catch (err) {
+      setRides([]);
+      setSelectedRideId(null);
+      setLastUpdated(null);
       setError(err.message || "Unable to load rides");
     } finally {
       setLoading(false);
@@ -237,106 +240,110 @@ const RideBookingLandingPage = () => {
             />
           )}
 
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-              <thead className="bg-slate-50 dark:bg-slate-800/60">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                    Member
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                    Partner
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                    Pickup
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                    From
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                    Cost
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                {loading && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-6">
-                      <LoadingState
-                        title="Loading rides"
-                        description="Fetching the latest ride manifest."
-                        size="sm"
-                        className="mx-auto max-w-xl"
-                      />
-                    </td>
-                  </tr>
-                )}
-                {!loading && !error && filteredRides.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-6">
-                      <EmptyState
-                        title="No rides match your filters"
-                        description="Adjust the filters or refresh to pull the latest data."
-                        size="sm"
-                        className="mx-auto max-w-xl"
-                      />
-                    </td>
-                  </tr>
-                )}
-                {filteredRides.map(renderRow)}
-              </tbody>
-            </table>
-          </div>
+          {!error ? (
+            <>
+              <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Member
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Partner
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Pickup
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        From
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                        Cost
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {loading && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-6">
+                          <LoadingState
+                            title="Loading rides"
+                            description="Fetching the latest ride manifest."
+                            size="sm"
+                            className="mx-auto max-w-xl"
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    {!loading && !error && filteredRides.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-6">
+                          <EmptyState
+                            title="No rides match your filters"
+                            description="Adjust the filters or refresh to pull the latest data."
+                            size="sm"
+                            className="mx-auto max-w-xl"
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    {filteredRides.map(renderRow)}
+                  </tbody>
+                </table>
+              </div>
 
-          <div className="mt-4 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-inner dark:border-slate-700 dark:bg-slate-800">
-            {selectedRide ? (
-              <div className="space-y-3 text-sm text-slate-800 dark:text-slate-100">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Member</div>
-                    <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                      {selectedRide.memberName} <span className="text-sm text-slate-500">({selectedRide.memberId})</span>
+              <div className="mt-4 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-inner dark:border-slate-700 dark:bg-slate-800">
+                {selectedRide ? (
+                  <div className="space-y-3 text-sm text-slate-800 dark:text-slate-100">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Member</div>
+                        <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                          {selectedRide.memberName} <span className="text-sm text-slate-500">({selectedRide.memberId})</span>
+                        </div>
+                      </div>
+                      <div className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusTone(selectedRide.status)}`}>
+                        {selectedRide.status}
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Partner</div>
+                        <div className="font-semibold">{selectedRide.rideType}</div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Pickup time</div>
+                        <div className="font-semibold">{formatDateTime(selectedRide.pickupAt)}</div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Pickup</div>
+                        <div className="font-semibold">{selectedRide.pickupAddress}</div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Dropoff</div>
+                        <div className="font-semibold">{selectedRide.dropoffAddress}</div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Cost</div>
+                        <div className="font-semibold">{selectedRide.costUsd ? `$${selectedRide.costUsd.toFixed(2)}` : EMPTY_VALUE}</div>
+                      </div>
                     </div>
                   </div>
-                  <div className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusTone(selectedRide.status)}`}>
-                    {selectedRide.status}
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Partner</div>
-                    <div className="font-semibold">{selectedRide.rideType}</div>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Pickup time</div>
-                    <div className="font-semibold">{formatDateTime(selectedRide.pickupAt)}</div>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Pickup</div>
-                    <div className="font-semibold">{selectedRide.pickupAddress}</div>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Dropoff</div>
-                    <div className="font-semibold">{selectedRide.dropoffAddress}</div>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                    <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Cost</div>
-                    <div className="font-semibold">{selectedRide.costUsd ? `$${selectedRide.costUsd.toFixed(2)}` : EMPTY_VALUE}</div>
-                  </div>
-                </div>
+                ) : (
+                  <EmptyState
+                    title="Select a ride"
+                    description="Choose a row above to preview ride details."
+                    size="sm"
+                    className="mx-auto max-w-md"
+                  />
+                )}
               </div>
-            ) : (
-              <EmptyState
-                title="Select a ride"
-                description="Choose a row above to preview ride details."
-                size="sm"
-                className="mx-auto max-w-md"
-              />
-            )}
-          </div>
+            </>
+          ) : null}
         </section>
       </div>
     </div>

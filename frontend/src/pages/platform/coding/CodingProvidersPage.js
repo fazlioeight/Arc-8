@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Alert, Button, Card, Col, Form, ListGroup, Row, Spinner, Table } from 'react-bootstrap';
+import { Button, Col, Form, ListGroup, Row, Spinner } from 'react-bootstrap';
 
 import PortalUtilityBar from '../../../components/PortalUtilityBar';
 import { AuthContext } from '../../../context/AuthContext';
@@ -12,6 +12,9 @@ import {
 import CodingPortalHeader from './CodingPortalHeader';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
 import EmptyState from '../../../components/ui/EmptyState';
+import SurfaceCard from '../../../components/ui/SurfaceCard';
+import DataTable from '../../../components/ui/DataTable';
+import AlertShell from '../../../components/ui/AlertShell';
 
 const CodingProvidersPage = () => {
   const navigate = useNavigate();
@@ -88,7 +91,11 @@ const CodingProvidersPage = () => {
         <PortalUtilityBar />
         {header}
         <div className="coding-content container py-5">
-          <Alert variant="warning">You must be logged in to view provider information.</Alert>
+          <AlertShell
+            tone="warning"
+            title="Authentication required"
+            description="You must be logged in to view provider information."
+          />
         </div>
       </div>
     );
@@ -135,11 +142,19 @@ const CodingProvidersPage = () => {
             </Col>
           </Row>
         </Form>
-        {error && <Alert variant="danger">{error}</Alert>}
+        {error && (
+          <AlertShell
+            tone="danger"
+            title="Unable to load providers"
+            description={error}
+            className="mb-3"
+          />
+        )}
         <Row className="g-4">
           <Col md={7}>
-            <Card>
-              <Card.Header className="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <SurfaceCard
+              padding="compact"
+              title={(
                 <div className="d-flex align-items-center gap-2">
                   <span className="fw-semibold">Providers</span>
                   <InfoTooltip
@@ -147,82 +162,83 @@ const CodingProvidersPage = () => {
                     placement="right"
                   />
                 </div>
-                <span className="text-muted small">Total {total}</span>
-              </Card.Header>
-              <Card.Body className="p-0">
-                <Table hover responsive className="mb-0">
-                  <thead>
+              )}
+              subtitle="Directory of contracted providers and quick links to manage their profiles."
+              actions={<span className="ds-card__meta">Total {total}</span>}
+            >
+              <DataTable density="compact" aria-label="Providers">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>NPI</th>
+                    <th>Tax ID</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading && (
                     <tr>
-                      <th>Name</th>
-                      <th>NPI</th>
-                      <th>Tax ID</th>
-                      <th></th>
+                      <td colSpan={4} className="text-center py-3">
+                        <Spinner animation="border" />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {loading && (
-                      <tr>
-                        <td colSpan={4} className="text-center py-3">
-                          <Spinner animation="border" />
-                        </td>
-                      </tr>
-                    )}
-                    {!loading && providers.length === 0 && (
-                      <tr>
-                        <td colSpan={4}>
-                          <EmptyState
-                            icon="search"
-                            title="No providers found"
-                            description="Adjust your search or sync a fresh provider roster to populate this list."
+                  )}
+                  {!loading && providers.length === 0 && (
+                    <tr>
+                      <td colSpan={4}>
+                        <EmptyState
+                          icon="search"
+                          title="No providers found"
+                          description="Adjust your search or sync a fresh provider roster to populate this list."
+                        >
+                          <Button variant="outline-primary" size="sm" onClick={() => void loadProviders()} disabled={loading}>
+                            Refresh list
+                          </Button>
+                          <Button variant="link" size="sm" href="/jobs/import-data">
+                            Open data imports
+                          </Button>
+                        </EmptyState>
+                      </td>
+                    </tr>
+                  )}
+                  {providers.map(provider => (
+                    <tr
+                      key={provider.id}
+                      onClick={() => void selectProvider(provider.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td>{provider.name}</td>
+                      <td>{provider.npi || '-'}</td>
+                      <td>{provider.tax_id || '-'}</td>
+                      <td className="text-end">
+                        <InfoTooltip content="Open the full provider workspace" placement="left">
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={event => {
+                              event.stopPropagation();
+                              navigate(`/coding/providers/${provider.id}`, {
+                                state: {
+                                  from: `${location.pathname}${location.search}`,
+                                  breadcrumb: provider.name || provider.npi,
+                                },
+                              });
+                            }}
                           >
-                            <Button variant="outline-primary" size="sm" onClick={() => void loadProviders()} disabled={loading}>
-                              Refresh list
-                            </Button>
-                            <Button variant="link" size="sm" href="/jobs/import-data">
-                              Open data imports
-                            </Button>
-                          </EmptyState>
-                        </td>
-                      </tr>
-                    )}
-                    {providers.map(provider => (
-                      <tr
-                        key={provider.id}
-                        onClick={() => void selectProvider(provider.id)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <td>{provider.name}</td>
-                        <td>{provider.npi || '-'}</td>
-                        <td>{provider.tax_id || '-'}</td>
-                        <td className="text-end">
-                          <InfoTooltip content="Open the full provider workspace" placement="left">
-                            <Button
-                              variant="link"
-                              size="sm"
-                              onClick={event => {
-                                event.stopPropagation();
-                                navigate(`/coding/providers/${provider.id}`, {
-                                  state: {
-                                    from: `${location.pathname}${location.search}`,
-                                    breadcrumb: provider.name || provider.npi,
-                                  },
-                                });
-                              }}
-                            >
-                              Open
-                            </Button>
-                          </InfoTooltip>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Card.Body>
-            </Card>
+                            Open
+                          </Button>
+                        </InfoTooltip>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DataTable>
+            </SurfaceCard>
           </Col>
           <Col md={5}>
-            <Card>
-              <Card.Header className="d-flex justify-content-between align-items-center">
+            <SurfaceCard
+              padding="compact"
+              title={(
                 <div className="d-flex align-items-center gap-2">
                   <span className="fw-semibold">Provider details</span>
                   <InfoTooltip
@@ -230,61 +246,61 @@ const CodingProvidersPage = () => {
                     placement="left"
                   />
                 </div>
-              </Card.Header>
-              <Card.Body>
-                {detailLoading && (
-                  <div className="text-center">
-                    <Spinner animation="border" />
-                  </div>
-                )}
-                {!detailLoading && !selectedProvider && (
-                  <EmptyState
-                    icon="info"
-                    title="Select a provider"
-                    description="Choose a provider from the table to view contact information and locations."
-                  >
-                    <Button variant="outline-primary" size="sm" onClick={() => void loadProviders()} disabled={loading}>
-                      Refresh list
-                    </Button>
-                  </EmptyState>
-                )}
-                {!detailLoading && selectedProvider && (
-                  <ListGroup variant="flush">
-                    <ListGroup.Item><strong>Name:</strong> {selectedProvider.name}</ListGroup.Item>
-                    <ListGroup.Item><strong>NPI:</strong> {selectedProvider.npi || '-'}</ListGroup.Item>
-                    <ListGroup.Item><strong>Tax ID:</strong> {selectedProvider.tax_id || '-'}</ListGroup.Item>
-                    <ListGroup.Item><strong>Phone:</strong> {selectedProvider.phone || '-'}</ListGroup.Item>
-                    <ListGroup.Item><strong>Email:</strong> {selectedProvider.email || '-'}</ListGroup.Item>
-                    <ListGroup.Item>
-                      <strong>Location:</strong>
-                      <div>
-                        {selectedProvider.location
-                          ? [
-                              selectedProvider.location.address_line1,
-                              selectedProvider.location.city,
-                              selectedProvider.location.state,
-                              selectedProvider.location.postal_code,
-                            ]
-                              .filter(Boolean)
-                              .join(', ')
-                          : '-'}
-                      </div>
-                    </ListGroup.Item>
-                    <ListGroup.Item className="d-flex justify-content-end">
-                      <InfoTooltip content="Open the full provider workspace" placement="left">
-                        <Button
-                          variant="outline-primary"
-                          size="sm"
-                          onClick={() => navigate(`/coding/providers/${selectedProvider.id}`)}
-                        >
-                          Open full page
-                        </Button>
-                      </InfoTooltip>
-                    </ListGroup.Item>
-                  </ListGroup>
-                )}
-              </Card.Body>
-            </Card>
+              )}
+              subtitle="Review key contact info, location, and quick links for the selected provider."
+            >
+              {detailLoading && (
+                <div className="text-center">
+                  <Spinner animation="border" />
+                </div>
+              )}
+              {!detailLoading && !selectedProvider && (
+                <EmptyState
+                  icon="info"
+                  title="Select a provider"
+                  description="Choose a provider from the table to view contact information and locations."
+                >
+                  <Button variant="outline-primary" size="sm" onClick={() => void loadProviders()} disabled={loading}>
+                    Refresh list
+                  </Button>
+                </EmptyState>
+              )}
+              {!detailLoading && selectedProvider && (
+                <ListGroup variant="flush">
+                  <ListGroup.Item><strong>Name:</strong> {selectedProvider.name}</ListGroup.Item>
+                  <ListGroup.Item><strong>NPI:</strong> {selectedProvider.npi || '-'}</ListGroup.Item>
+                  <ListGroup.Item><strong>Tax ID:</strong> {selectedProvider.tax_id || '-'}</ListGroup.Item>
+                  <ListGroup.Item><strong>Phone:</strong> {selectedProvider.phone || '-'}</ListGroup.Item>
+                  <ListGroup.Item><strong>Email:</strong> {selectedProvider.email || '-'}</ListGroup.Item>
+                  <ListGroup.Item>
+                    <strong>Location:</strong>
+                    <div>
+                      {selectedProvider.location
+                        ? [
+                            selectedProvider.location.address_line1,
+                            selectedProvider.location.city,
+                            selectedProvider.location.state,
+                            selectedProvider.location.postal_code,
+                          ]
+                            .filter(Boolean)
+                            .join(', ')
+                        : '-'}
+                    </div>
+                  </ListGroup.Item>
+                  <ListGroup.Item className="d-flex justify-content-end">
+                    <InfoTooltip content="Open the full provider workspace" placement="left">
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => navigate(`/coding/providers/${selectedProvider.id}`)}
+                      >
+                        Open full page
+                      </Button>
+                    </InfoTooltip>
+                  </ListGroup.Item>
+                </ListGroup>
+              )}
+            </SurfaceCard>
           </Col>
         </Row>
       </div>

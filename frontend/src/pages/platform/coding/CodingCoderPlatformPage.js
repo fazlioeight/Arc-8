@@ -52,7 +52,7 @@ const subtleButtonClasses =
   'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700 dark:focus-visible:ring-offset-slate-900';
 
 const linkButtonClasses =
-  'inline-flex items-center justify-center rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-sky-200 dark:hover:text-sky-100 dark:focus-visible:ring-offset-slate-900';
+  'inline-flex items-center justify-center rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:text-sky-200 dark:hover:text-sky-100 dark:focus-visible:ring-offset-slate-900';
 
 const CODER_PLATFORM_COMMAND_SCOPE = 'coding-coder-platform-commands';
 
@@ -110,6 +110,43 @@ const CodingCoderPlatformPage = () => {
     { label: 'Overdue', value: summary.overdue ?? 0, hint: 'Past due date' },
     { label: 'Total matches', value: total, hint: 'Records matching filters' },
   ]), [openTotal, summary, total]);
+
+  // Normalize incoming worklist payloads so the table renders predictable, guarded fields.
+  const viewWorklist = useMemo(
+    () =>
+      (worklist || []).map((item, index) => {
+        const record = item || {};
+        const chaseId = record.chaseId ?? record.chase_id ?? record.id ?? null;
+        const memberId = record.memberId ?? record.member_id ?? null;
+        const memberKey = record.memberKey ?? record.member_key ?? null;
+        const memberName = record.memberName ?? record.member_name ?? record.member ?? null;
+        const icd10Code = record.icd10Code ?? record.icd10_code ?? null;
+        const hccCode = record.hccCode ?? record.hcc_code ?? null;
+        const assignedCoderEmail = record.assignedCoderEmail ?? record.assigned_coder_email ?? null;
+        const dueDate = record.dueDate ?? record.due_date ?? null;
+        const serviceDateFrom = record.serviceDateFrom ?? record.service_date_from ?? null;
+        const serviceDateTo = record.serviceDateTo ?? record.service_date_to ?? null;
+        const status = record.status || 'open';
+        const priority = record.priority || null;
+
+        return {
+          id: chaseId || memberId || memberKey || `worklist-${index}`,
+          memberId,
+          memberName: memberName || 'Unknown member',
+          memberKey: memberKey || 'N/A',
+          status,
+          priority,
+          assignedCoderEmail,
+          dueDate,
+          serviceDateFrom,
+          serviceDateTo,
+          icd10Code,
+          hccCode,
+          hasMemberDetail: Boolean(memberId),
+        };
+      }),
+    [worklist],
+  );
 
   const loadWorklist = async (overrides = {}) => {
     setLoading(true);
@@ -392,7 +429,7 @@ const CodingCoderPlatformPage = () => {
                 </tr>
               )}
 
-              {!loading && worklist.length === 0 && (
+              {!loading && viewWorklist.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
                     No coder platform records found. Adjust filters or try loading sample data.
@@ -400,21 +437,21 @@ const CodingCoderPlatformPage = () => {
                 </tr>
               )}
 
-              {worklist.map((item) => (
-                <tr key={item.chaseId || item.chase_id || item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
+              {viewWorklist.map((item) => (
+                <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
                   <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
-                    <div className="font-semibold">{item.memberName || '-'}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-300">{item.memberKey || '-'}</div>
+                    <div className="font-semibold">{item.memberName}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-300">{item.memberKey}</div>
                   </td>
                   <td className="px-4 py-3">{renderStatusBadge(item.status)}</td>
                   <td className="px-4 py-3">{renderPriorityBadge(item.priority)}</td>
                   <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
-                    {item.assignedCoderEmail || (
+                    {item.assignedCoderEmail ?? (
                       <span className="text-slate-500 dark:text-slate-300">Unassigned</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
-                    {item.dueDate || <span className="text-slate-500 dark:text-slate-300">Not set</span>}
+                    {item.dueDate ?? <span className="text-slate-500 dark:text-slate-300">Not set</span>}
                   </td>
                   <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
                     <div>{item.serviceDateFrom || '-'}</div>
@@ -428,9 +465,10 @@ const CodingCoderPlatformPage = () => {
                     <button
                       type="button"
                       className={linkButtonClasses}
-                      onClick={() => navigate(`/coding/member/${item.memberId || item.member_id}`)}
+                      disabled={!item.hasMemberDetail}
+                      onClick={() => item.hasMemberDetail && navigate(`/coding/member/${item.memberId}`)}
                     >
-                      View member
+                      {item.hasMemberDetail ? 'View member' : 'Member unavailable'}
                     </button>
                   </td>
                 </tr>

@@ -1,15 +1,11 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
-  Badge,
   Button,
-  Card,
   Col,
   Form,
   Modal,
   Row,
   Spinner,
-  Table,
 } from 'react-bootstrap';
 
 import PortalUtilityBar from '../../../components/PortalUtilityBar';
@@ -22,6 +18,10 @@ import CodingPortalHeader from './CodingPortalHeader';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
 import EmptyState from '../../../components/ui/EmptyState';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import SurfaceCard from '../../../components/ui/SurfaceCard';
+import DataTable from '../../../components/ui/DataTable';
+import Pill from '../../../components/ui/Pill';
+import AlertShell from '../../../components/ui/AlertShell';
 
 const CODING_PROVIDER_MGMT_COMMAND_SCOPE = 'coding-provider-management-commands';
 
@@ -163,25 +163,25 @@ const CodingProviderManagementPage = () => {
   const renderTrendBadge = (openChases) => {
     const config = openChases === 0
       ? {
-        bg: 'success',
+        tone: 'success',
         label: 'Clear',
         info: 'No open chases remain for this provider.',
       }
       : openChases <= 3
         ? {
-          bg: 'warning',
+          tone: 'warning',
           label: 'Watch',
           info: 'A few chases remain. Plan outreach soon.',
         }
         : {
-          bg: 'danger',
+          tone: 'danger',
           label: 'Action',
           info: 'Immediate outreach recommended for outstanding chases.',
         };
 
     return (
       <InfoTooltip content={config.info} placement="top">
-        <Badge bg={config.bg}>{config.label}</Badge>
+        <Pill tone={config.tone} size="sm">{config.label}</Pill>
       </InfoTooltip>
     );
   };
@@ -195,166 +195,173 @@ const CodingProviderManagementPage = () => {
       />
 
       <main className="container my-4">
-        <Card className="ds-card ds-card--compact">
-          <Card.Header className="d-flex flex-column flex-lg-row gap-3 justify-content-between align-items-lg-center">
-            <div>
-              <div className="d-flex align-items-center gap-2">
-                <h2 className="h5 mb-0">Provider roster</h2>
-                <InfoTooltip
-                  content="Keep outreach information current so coding teams know who to contact for chart reviews."
-                  placement="right"
+        <SurfaceCard
+          padding="compact"
+          title={(
+            <div className="d-flex align-items-center gap-2">
+              <span>Provider roster</span>
+              <InfoTooltip
+                content="Keep outreach information current so coding teams know who to contact for chart reviews."
+                placement="right"
+              />
+            </div>
+          )}
+          subtitle="Filter providers by name, NPI, or location and update contact details without leaving the workspace."
+          actions={[
+            <Button
+              key="clear"
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => {
+                setSearch('');
+                void loadProviders('');
+              }}
+              disabled={loading}
+            >
+              Clear filters
+            </Button>,
+            <Button
+              key="refresh"
+              variant="outline-primary"
+              size="sm"
+              onClick={() => void loadProviders()}
+              disabled={loading}
+            >
+              {loading ? <Spinner animation="border" size="sm" /> : 'Refresh list'}
+            </Button>,
+          ]}
+        >
+          <Form onSubmit={handleSubmit} className="mb-3">
+            <Row className="g-2 align-items-end">
+              <Col lg={8}>
+                <Form.Label htmlFor="provider-search">Search providers</Form.Label>
+                <Form.Control
+                  id="provider-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Name, NPI, Tax ID, or city"
                 />
-              </div>
-              <div className="ds-card__meta mt-1">
-                Filter providers by name, NPI, or location and update contact details without leaving the workspace.
-              </div>
-            </div>
-            <div className="d-flex gap-2">
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                onClick={() => {
-                  setSearch('');
-                  void loadProviders('');
-                }}
-                disabled={loading}
-              >
-                Clear filters
-              </Button>
-              <Button variant="outline-primary" size="sm" onClick={() => void loadProviders()} disabled={loading}>
-                {loading ? <Spinner animation="border" size="sm" /> : 'Refresh list'}
-              </Button>
-            </div>
-          </Card.Header>
-          <Card.Body>
-            <Form onSubmit={handleSubmit} className="mb-3">
-              <Row className="g-2 align-items-end">
-                <Col lg={8}>
-                  <Form.Label htmlFor="provider-search">Search providers</Form.Label>
-                  <Form.Control
-                    id="provider-search"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Name, NPI, Tax ID, or city"
-                  />
-                  <Form.Text className="text-muted">
-                    Tip: search by tax ID or city to narrow down outreach lists.
-                  </Form.Text>
-                </Col>
-                <Col lg={4} className="d-flex gap-2 justify-content-lg-end mt-3 mt-lg-0">
-                  <Button type="submit" variant="primary" disabled={loading} className="flex-grow-1 flex-lg-grow-0">
-                    {loading ? <Spinner animation="border" size="sm" /> : 'Search roster'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline-secondary"
-                    disabled={loading}
-                    onClick={() => {
-                      setSearch('');
-                      void loadProviders('');
-                    }}
-                    className="flex-grow-1 flex-lg-grow-0"
-                  >
-                    Reset
-                  </Button>
-                </Col>
-              </Row>
-            </Form>
+                <Form.Text className="text-muted">
+                  Tip: search by tax ID or city to narrow down outreach lists.
+                </Form.Text>
+              </Col>
+              <Col lg={4} className="d-flex gap-2 justify-content-lg-end mt-3 mt-lg-0">
+                <Button type="submit" variant="primary" disabled={loading} className="flex-grow-1 flex-lg-grow-0">
+                  {loading ? <Spinner animation="border" size="sm" /> : 'Search roster'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline-secondary"
+                  disabled={loading}
+                  onClick={() => {
+                    setSearch('');
+                    void loadProviders('');
+                  }}
+                  className="flex-grow-1 flex-lg-grow-0"
+                >
+                  Reset
+                </Button>
+              </Col>
+            </Row>
+          </Form>
 
-            {error && <Alert variant="danger">{error}</Alert>}
+          {error && (
+            <AlertShell
+              tone="danger"
+              title="Unable to load providers"
+              description={error}
+            />
+          )}
 
-            <div className="table-responsive">
-              <Table hover responsive className="align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Provider</th>
-                    <th>Contact</th>
-                    <th>Location</th>
-                    <th>
-                      <div className="d-inline-flex align-items-center gap-1">
-                        Members
-                        <InfoTooltip content="Active attributed members assigned to this provider." placement="top" />
-                      </div>
-                    </th>
-                    <th>
-                      <div className="d-inline-flex align-items-center gap-1">
-                        Open gaps
-                        <InfoTooltip content="Outstanding coding chases tied to this provider." placement="top" />
-                      </div>
-                    </th>
-                    <th>Last updated</th>
-                    <th className="text-end">
-                      <span className="me-2">Actions</span>
-                      <InfoTooltip content="Edit provider outreach details." placement="top" />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading && (
-                    <tr>
-                      <td colSpan={7} className="text-center py-4">
-                        <Spinner animation="border" />
-                      </td>
-                    </tr>
-                  )}
-                  {!loading && items.length === 0 && (
-                    <tr>
-                      <td colSpan={7}>
-                        <EmptyState
-                          icon="spark"
-                          title="No providers match your filters"
-                          description="Try adjusting your search or sync a new provider roster."
-                        >
-                          <Button variant="outline-primary" size="sm" onClick={() => void loadProviders('')} disabled={loading}>
-                            Clear filters
-                          </Button>
-                          <Button variant="link" size="sm" href="/jobs/import-data">
-                            Open data imports
-                          </Button>
-                        </EmptyState>
-                      </td>
-                    </tr>
-                  )}
-                  {!loading && items.map((item) => (
-                    <tr key={item.provider_id}>
-                      <td>
-                        <div className="fw-semibold">{item.name || 'Unnamed provider'}</div>
-                        <div className="text-muted small">
-                          NPI {item.npi || 'N/A'} | Tax {item.tax_id || 'N/A'}
-                        </div>
-                      </td>
-                      <td>
-                        <div>{item.email || <span className="text-muted">No email on file</span>}</div>
-                        <div className="text-muted small">{item.phone || 'No phone listed'}</div>
-                      </td>
-                      <td>
-                        <div>{item.address_line1 || <span className="text-muted">Address unknown</span>}</div>
-                        <div className="text-muted small">
-                          {[item.city, item.state, item.postal_code].filter(Boolean).join(', ') || 'Not set'}
-                        </div>
-                      </td>
-                      <td>{item.member_count ?? 0}</td>
-                      <td>
-                        <div className="d-flex gap-2 align-items-center">
-                          {item.open_chases ?? 0}
-                          {renderTrendBadge(item.open_chases ?? 0)}
-                        </div>
-                      </td>
-                      <td>{item.last_updated_at ? new Date(item.last_updated_at).toLocaleString() : 'Not captured'}</td>
-                      <td className="text-end">
-                        <InfoTooltip content="Update provider contact details" placement="left">
-                          <Button variant="link" size="sm" onClick={() => openEditor(item)}>
-                            Edit
-                          </Button>
-                        </InfoTooltip>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          </Card.Body>
-        </Card>
+          <DataTable density="compact" aria-label="Provider roster" className="align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Contact</th>
+                <th>Location</th>
+                <th>
+                  <div className="d-inline-flex align-items-center gap-1">
+                    Members
+                    <InfoTooltip content="Active attributed members assigned to this provider." placement="top" />
+                  </div>
+                </th>
+                <th>
+                  <div className="d-inline-flex align-items-center gap-1">
+                    Open gaps
+                    <InfoTooltip content="Outstanding coding chases tied to this provider." placement="top" />
+                  </div>
+                </th>
+                <th>Last updated</th>
+                <th className="text-end">
+                  <span className="me-2">Actions</span>
+                  <InfoTooltip content="Edit provider outreach details." placement="top" />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="text-center py-4">
+                    <Spinner animation="border" />
+                  </td>
+                </tr>
+              )}
+              {!loading && items.length === 0 && (
+                <tr>
+                  <td colSpan={7}>
+                    <EmptyState
+                      icon="spark"
+                      title="No providers match your filters"
+                      description="Try adjusting your search or sync a new provider roster."
+                    >
+                      <Button variant="outline-primary" size="sm" onClick={() => void loadProviders('')} disabled={loading}>
+                        Clear filters
+                      </Button>
+                      <Button variant="link" size="sm" href="/jobs/import-data">
+                        Open data imports
+                      </Button>
+                    </EmptyState>
+                  </td>
+                </tr>
+              )}
+              {!loading && items.map((item) => (
+                <tr key={item.provider_id}>
+                  <td>
+                    <div className="fw-semibold">{item.name || 'Unnamed provider'}</div>
+                    <div className="text-muted small">
+                      NPI {item.npi || 'N/A'} | Tax {item.tax_id || 'N/A'}
+                    </div>
+                  </td>
+                  <td>
+                    <div>{item.email || <span className="text-muted">No email on file</span>}</div>
+                    <div className="text-muted small">{item.phone || 'No phone listed'}</div>
+                  </td>
+                  <td>
+                    <div>{item.address_line1 || <span className="text-muted">Address unknown</span>}</div>
+                    <div className="text-muted small">
+                      {[item.city, item.state, item.postal_code].filter(Boolean).join(', ') || 'Not set'}
+                    </div>
+                  </td>
+                  <td>{item.member_count ?? 0}</td>
+                  <td>
+                    <div className="d-flex gap-2 align-items-center">
+                      {item.open_chases ?? 0}
+                      {renderTrendBadge(item.open_chases ?? 0)}
+                    </div>
+                  </td>
+                  <td>{item.last_updated_at ? new Date(item.last_updated_at).toLocaleString() : 'Not captured'}</td>
+                  <td className="text-end">
+                    <InfoTooltip content="Update provider contact details" placement="left">
+                      <Button variant="link" size="sm" onClick={() => openEditor(item)}>
+                        Edit
+                      </Button>
+                    </InfoTooltip>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </DataTable>
+        </SurfaceCard>
       </main>
 
       <Modal show={Boolean(editingProvider)} onHide={() => setEditingProvider(null)} centered>
@@ -362,7 +369,14 @@ const CodingProviderManagementPage = () => {
           <Modal.Title>Edit provider contact</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {savingError && <Alert variant="danger">{savingError}</Alert>}
+          {savingError && (
+            <AlertShell
+              tone="danger"
+              title="Save failed"
+              description={savingError}
+              className="mb-3"
+            />
+          )}
           <p className="text-muted small mb-3">
             Updates save instantly so coding teams always have the latest outreach details.
           </p>

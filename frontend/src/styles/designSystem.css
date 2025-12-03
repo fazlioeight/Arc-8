@@ -155,6 +155,45 @@
   margin-top: var(--space-3xs);
 }
 
+.ds-card__heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+
+.ds-card__body {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.ds-card__body > * {
+  min-width: 0;
+}
+
+.ds-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.ds-card__action {
+  display: inline-flex;
+}
+
+.ds-card__footer {
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: var(--border-width) solid color-mix(in srgb, var(--border) 70%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
 .ds-chip {
   display: inline-flex;
   align-items: center;
@@ -211,6 +250,72 @@
   color: var(--state-critical);
 }
 
+.ds-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: var(--border-width) solid transparent;
+  background: color-mix(in srgb, var(--bg-light) 80%, transparent);
+  color: var(--text);
+}
+
+.ds-pill--sm {
+  padding: 0.25rem 0.55rem;
+}
+
+.ds-pill__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-pill--neutral {
+  border-color: color-mix(in srgb, var(--border) 85%, transparent);
+  color: var(--text);
+}
+
+.ds-pill--muted {
+  background: color-mix(in srgb, var(--bg-light) 90%, transparent);
+  color: var(--text-muted);
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.ds-pill--info {
+  background: color-mix(in srgb, var(--brand-primary) 16%, var(--bg));
+  border-color: color-mix(in srgb, var(--brand-primary) 32%, var(--border));
+  color: var(--brand-primary);
+}
+
+.ds-pill--success {
+  background: color-mix(in srgb, var(--state-positive) 18%, var(--bg));
+  border-color: color-mix(in srgb, var(--state-positive) 34%, var(--border));
+  color: var(--state-positive);
+}
+
+.ds-pill--warning {
+  background: color-mix(in srgb, var(--state-warning) 22%, var(--bg));
+  border-color: color-mix(in srgb, var(--state-warning) 36%, var(--border));
+  color: var(--state-warning);
+}
+
+.ds-pill--critical {
+  background: color-mix(in srgb, var(--state-critical) 18%, var(--bg));
+  border-color: color-mix(in srgb, var(--state-critical) 38%, var(--border));
+  color: var(--state-critical);
+}
+
+.ds-pill--accent {
+  background: color-mix(in srgb, var(--brand-accent) 20%, var(--bg));
+  border-color: color-mix(in srgb, var(--brand-accent) 34%, var(--border));
+  color: var(--brand-accent);
+}
+
 /* Iconography */
 .ds-icon {
   width: 1em;
@@ -227,6 +332,65 @@
   place-items: center;
   color: var(--brand-primary);
   background: color-mix(in srgb, var(--brand-primary) 12%, var(--bg));
+}
+
+.ds-table__wrapper {
+  width: 100%;
+  overflow: auto;
+  border-radius: var(--radius-md);
+}
+
+.ds-table__wrapper--bleed {
+  margin-inline: calc(-1 * var(--space-sm));
+}
+
+.ds-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+  min-width: 100%;
+}
+
+.ds-table thead th {
+  text-align: left;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.75rem 0.75rem;
+  color: var(--text-muted);
+  border-bottom: var(--border-width) solid var(--border);
+  background: color-mix(in srgb, var(--bg-light) 70%, transparent);
+}
+
+.ds-table tbody td {
+  padding: 0.85rem 0.75rem;
+  border-bottom: var(--border-width) solid color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.ds-table tbody tr:last-child td {
+  border-bottom-color: transparent;
+}
+
+.ds-table tbody tr:hover {
+  background: color-mix(in srgb, var(--brand-primary) 8%, var(--bg-light));
+}
+
+.ds-table--compact thead th,
+.ds-table--compact tbody td {
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+
+.ds-table__meta {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ds-table__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
 }
 
 /* Buttons */
@@ -345,6 +509,80 @@
   border-color: color-mix(in srgb, var(--brand-primary) 26%, var(--border));
   transform: translateY(-1px);
   outline: none;
+}
+
+.ds-alert {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  padding: clamp(var(--space-sm), 2vw, var(--space-md));
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--border);
+  background: color-mix(in srgb, var(--bg-light) 85%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.ds-alert__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  flex-shrink: 0;
+}
+
+.ds-alert__content {
+  display: grid;
+  gap: var(--space-2xs);
+}
+
+.ds-alert__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--font-size-md);
+}
+
+.ds-alert__description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ds-alert__actions {
+  display: inline-flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  margin-top: var(--space-2xs);
+}
+
+.ds-alert--info {
+  border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--border));
+  background: color-mix(in srgb, var(--brand-primary) 10%, var(--bg-light));
+  color: var(--brand-primary);
+}
+
+.ds-alert--success {
+  border-color: color-mix(in srgb, var(--state-positive) 35%, var(--border));
+  background: color-mix(in srgb, var(--state-positive) 10%, var(--bg-light));
+  color: var(--state-positive);
+}
+
+.ds-alert--warning {
+  border-color: color-mix(in srgb, var(--state-warning) 35%, var(--border));
+  background: color-mix(in srgb, var(--state-warning) 12%, var(--bg-light));
+  color: var(--state-warning);
+}
+
+.ds-alert--danger {
+  border-color: color-mix(in srgb, var(--state-critical) 35%, var(--border));
+  background: color-mix(in srgb, var(--state-critical) 12%, var(--bg-light));
+  color: var(--state-critical);
+}
+
+.ds-alert--neutral {
+  border-color: color-mix(in srgb, var(--border) 90%, transparent);
+  color: var(--text);
 }
 
 /* Skeleton + loading states */
