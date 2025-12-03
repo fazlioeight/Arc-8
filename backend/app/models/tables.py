@@ -46,6 +46,8 @@ class Tenant(ControlBase):
 
     users: Mapped[list["User"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
     audit_events: Mapped[list["TenantAuditEvent"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+    portal_saved_items: Mapped[list["PortalSavedItem"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+    portal_todos: Mapped[list["PortalTodo"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
 
 
 class TenantAuditEvent(ControlBase):
@@ -75,6 +77,7 @@ class User(ControlBase):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     tenant: Mapped[Tenant] = relationship(back_populates="users")
+    portal_saved_items: Mapped[list["PortalSavedItem"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class FhirConnector(ControlBase):
@@ -114,6 +117,62 @@ class FhirImportJob(ControlBase):
     last_log: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     tenant: Mapped[Tenant] = relationship()
+
+
+class PortalSavedItem(ControlBase):
+    __tablename__ = "portal_saved_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    saved_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    metadata: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    tenant: Mapped[Tenant] = relationship(back_populates="portal_saved_items")
+    user: Mapped["User"] | None = relationship(back_populates="portal_saved_items")
+
+
+class PortalTodo(ControlBase):
+    __tablename__ = "portal_todos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    assigned_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    assigned_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    priority: Mapped[str] = mapped_column(String(32), default="low", nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="open", nullable=False)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    metadata: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    tenant: Mapped[Tenant] = relationship(back_populates="portal_todos")
 
 
 class Member(TenantDataBase):
