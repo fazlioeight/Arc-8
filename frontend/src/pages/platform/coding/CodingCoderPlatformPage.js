@@ -2,17 +2,14 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import PortalPageLayout from '../../../components/PortalPageLayout';
+import PortalPageHeader from '../../../components/PortalPageHeader';
+import PortalCard from '../../../components/PortalCard';
+import PortalStat from '../../../components/PortalStat';
 import { AuthContext } from '../../../context/AuthContext';
 import { useCommandPalette } from '../../../context/CommandPaletteContext';
 import { CoderWorklistService } from '../../../services/codingService';
-import CodingPortalHeader from './CodingPortalHeader';
-
-const CODING_PORTAL_NAV = [
-  { key: 'overview', label: 'Overview', href: '/coding' },
-  { key: 'platform', label: 'Coder Platform', href: '/coding/platform' },
-  { key: 'review', label: 'Review Dashboard', href: '/coding/review-dashboard' },
-  { key: 'group', label: 'Group Dashboard', href: '/coding/group-dashboard' },
-];
+import { CODING_NAV_ITEMS } from './codingNavItems';
+import '../coding/member/memberWorkspace.css';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -111,7 +108,6 @@ const CodingCoderPlatformPage = () => {
     { label: 'Total matches', value: total, hint: 'Records matching filters' },
   ]), [openTotal, summary, total]);
 
-  // Normalize incoming worklist payloads so the table renders predictable, guarded fields.
   const viewWorklist = useMemo(
     () =>
       (worklist || []).map((item, index) => {
@@ -232,59 +228,74 @@ const CodingCoderPlatformPage = () => {
     );
   };
 
+  const layoutProps = useMemo(
+    () => ({
+      backgroundClassName:
+        'coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+      maxWidthClassName: 'max-w-6xl',
+      paddingClassName: 'px-4',
+      navItems: CODING_NAV_ITEMS,
+      currentNav: 'platform',
+      utilityBar: true,
+      navProps: { align: 'center' },
+    }),
+    []
+  );
+
+  const headerContent = (
+    <PortalPageHeader
+      eyebrow="Coding"
+      title="Coder platform"
+      subtitle="Review, triage, and assign member coding tasks in one workspace."
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <PortalStat label="Open queue" value={openTotal} meta="Open + in review" tone="info" />
+          <PortalStat label="Due 7d" value={summary.dueSoon ?? 0} meta="Upcoming" tone="warning" />
+          <PortalStat label="Overdue" value={summary.overdue ?? 0} meta="Attention" tone="danger" />
+        </div>
+      }
+    />
+  );
+
   return (
-    <PortalPageLayout
-      headerContent={(
-        <CodingPortalHeader
-          title="Coder platform"
-          subtitle="Review, triage, and assign member coding tasks in one workspace."
-        />
-      )}
-      navItems={CODING_PORTAL_NAV}
-      currentNav="platform"
-      navProps={{ align: 'center' }}
-    >
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {metrics.map((metric) => (
-          <div
-            key={metric.label}
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-              {metric.label}
-            </p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{metric.value}</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{metric.hint}</p>
-          </div>
-        ))}
-      </section>
+    <PortalPageLayout {...layoutProps} headerContent={headerContent}>
+      <PortalCard title="Queue metrics" subtitle="Snapshot of current workload.">
+        <div className="portal-section-grid">
+          {metrics.map((metric) => (
+            <PortalStat key={metric.label} label={metric.label} value={metric.value} meta={metric.hint} tone="info" />
+          ))}
+        </div>
+      </PortalCard>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Worklist</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              Filter by status, priority, or assignee. Showing up to 50 items.
-            </p>
+      <PortalCard
+        title="Worklist"
+        subtitle="Apply filters to slice the coder worklist."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={subtleButtonClasses}
+              onClick={() => {
+                const reset = { status: '', priority: '', assigned: user?.email || '', search: '' };
+                setFilters(reset);
+                void loadWorklist(reset);
+              }}
+              disabled={loading}
+            >
+              Clear filters
+            </button>
+            <button
+              type="button"
+              className={subtleButtonClasses}
+              onClick={() => void loadWorklist()}
+              disabled={loading}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
-          <button
-            type="button"
-            className={subtleButtonClasses}
-            onClick={() => void loadWorklist()}
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <SpinnerIcon />
-                Refreshing
-              </>
-            ) : (
-              'Refresh'
-            )}
-          </button>
-        </header>
-
-        <form onSubmit={handleSubmit} className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        }
+      >
+        <form className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <label
               htmlFor="coder-platform-status"
@@ -334,7 +345,7 @@ const CodingCoderPlatformPage = () => {
               htmlFor="coder-platform-assigned"
               className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200"
             >
-              Assigned to
+              Assigned coder
             </label>
             <input
               id="coder-platform-assigned"
@@ -387,7 +398,7 @@ const CodingCoderPlatformPage = () => {
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
             <thead className="bg-slate-50 dark:bg-slate-800/60">
               <tr>
@@ -476,15 +487,11 @@ const CodingCoderPlatformPage = () => {
             </tbody>
           </table>
         </div>
-      </section>
+      </PortalCard>
 
-      <section className="grid gap-3 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <header className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-900 dark:text-white">Status distribution</span>
-            <span className="text-xs text-slate-500 dark:text-slate-300">Live counts</span>
-          </header>
-          <div className="mt-3 space-y-2">
+      <div className="portal-section-grid">
+        <PortalCard title="Status distribution" subtitle="Live counts across results.">
+          <div className="space-y-2">
             {Object.keys(statusCounts).length === 0 && (
               <div className="text-sm text-slate-500 dark:text-slate-300">No status data yet.</div>
             )}
@@ -503,14 +510,10 @@ const CodingCoderPlatformPage = () => {
               );
             })}
           </div>
-        </div>
+        </PortalCard>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <header className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-900 dark:text-white">Priority mix</span>
-            <span className="text-xs text-slate-500 dark:text-slate-300">Across current results</span>
-          </header>
-          <div className="mt-3 space-y-2">
+        <PortalCard title="Priority mix" subtitle="Across current results.">
+          <div className="space-y-2">
             {Object.keys(priorityCounts).length === 0 && (
               <div className="text-sm text-slate-500 dark:text-slate-300">No priority data yet.</div>
             )}
@@ -529,8 +532,8 @@ const CodingCoderPlatformPage = () => {
               );
             })}
           </div>
-        </div>
-      </section>
+        </PortalCard>
+      </div>
     </PortalPageLayout>
   );
 };

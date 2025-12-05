@@ -8,20 +8,21 @@ import {
   Spinner,
 } from 'react-bootstrap';
 
-import PortalUtilityBar from '../../../components/PortalUtilityBar';
+import PortalPageLayout from '../../../components/PortalPageLayout';
+import PortalPageHeader from '../../../components/PortalPageHeader';
+import PortalCard from '../../../components/PortalCard';
+import PortalStat from '../../../components/PortalStat';
 import { AuthContext } from '../../../context/AuthContext';
 import { useCommandPalette } from '../../../context/CommandPaletteContext';
 import { useNotifications } from '../../../context/NotificationsContext';
 import { useUserPreferences } from '../../../context/UserPreferencesContext';
 import { fetchProviderManagement, updateProviderManagement } from '../../../services/codingService';
-import CodingPortalHeader from './CodingPortalHeader';
 import InfoTooltip from '../../../components/ui/InfoTooltip';
 import EmptyState from '../../../components/ui/EmptyState';
 import ConfirmDialog from '../../../components/ui/ConfirmDialog';
-import SurfaceCard from '../../../components/ui/SurfaceCard';
-import DataTable from '../../../components/ui/DataTable';
-import Pill from '../../../components/ui/Pill';
 import AlertShell from '../../../components/ui/AlertShell';
+import '../coding/member/memberWorkspace.css';
+import { CODING_NAV_ITEMS } from './codingNavItems';
 
 const CODING_PROVIDER_MGMT_COMMAND_SCOPE = 'coding-provider-management-commands';
 
@@ -38,415 +39,235 @@ const CodingProviderManagementPage = () => {
 
   const [editingProvider, setEditingProvider] = useState(null);
   const [formState, setFormState] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [savingError, setSavingError] = useState(null);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const searchRef = useRef(search);
-  useEffect(() => {
-    searchRef.current = search;
-  }, [search]);
+  const searchRef = useRef(null);
 
-  const effectiveToken = token || 'sample-provider-management';
-  const effectiveTenant = tenant || 'prominencehealth';
-
-  const loadProviders = async (term = search) => {
+  const loadManagement = async (term = search) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchProviderManagement(effectiveToken, effectiveTenant, { search: term });
+      const response = await fetchProviderManagement(token || 'sample-provider-mgmt', tenant || 'prominencehealth', { search: term });
       setItems(response.items || []);
+      recordViewPreference('coding-provider-management', { search: term });
       recordAuditEvent?.('coding.provider_management.load', { search: term });
-      const existingPref = getViewPreference('coding-provider-management') || {};
-      const normalizedExistingSearch = existingPref.search ?? '';
-      if (normalizedExistingSearch !== term) {
-        recordViewPreference('coding-provider-management', {
-          ...existingPref,
-          search: term,
-        });
-      }
     } catch (err) {
-      setError(err.message || 'Unable to load providers');
+      setError(err.message || 'Unable to load provider management');
     } finally {
       setLoading(false);
     }
   };
 
-  const openEditor = (provider) => {
-    setEditingProvider(provider);
-    setFormState({
-      name: provider.name || '',
-      email: provider.email || '',
-      phone: provider.phone || '',
-      tax_id: provider.tax_id || '',
-      address_line1: provider.address_line1 || '',
-      city: provider.city || '',
-      state: provider.state || '',
-      postal_code: provider.postal_code || '',
-    });
-    setSavingError(null);
-    recordViewPreference('coding-provider-management', {
-      search,
-      lastEdited: provider.provider_id,
-    });
-  };
-
-  const handleFormChange = (event) => {
-    const { name, value } = event.target;
-    setFormState((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const saveProvider = async () => {
-    if (!editingProvider) return;
-    setSaving(true);
-    setSavingError(null);
-    try {
-      await updateProviderManagement(effectiveToken, effectiveTenant, editingProvider.provider_id, formState);
-      setEditingProvider(null);
-      setFormState({});
-      await loadProviders(search);
-      recordAuditEvent?.('coding.provider_management.update', { providerId: editingProvider.provider_id });
-      notify({
-        title: 'Provider updated',
-        description: 'Contact details were saved successfully.',
-        variant: 'success',
-      });
-    } catch (err) {
-      setSavingError(err.message || 'Unable to update provider');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSave = () => {
-    setShowSaveConfirm(true);
-  };
-
-  const confirmSave = async () => {
-    setShowSaveConfirm(false);
-    await saveProvider();
-  };
-
-  const cancelSaveConfirmation = () => {
-    setShowSaveConfirm(false);
-  };
-
   useEffect(() => {
     const saved = getViewPreference('coding-provider-management');
-    const initialTerm = saved?.search ?? searchRef.current ?? '';
-    if (saved?.search) {
-      setSearch((current) => (current === saved.search ? current : saved.search));
-    }
-    void loadProviders(initialTerm);
-    // eslint-disable-next-line
-  }, [effectiveToken, effectiveTenant]);
+    const initialSearch = saved?.search || '';
+    setSearch(initialSearch);
+    void loadManagement(initialSearch);
+  }, [getViewPreference]);
 
   useEffect(() => {
     const unregister = registerCommands([
       {
-        id: 'coding-provider-management-refresh',
+        id: 'coding-provider-mgmt-refresh',
         label: 'Refresh provider management',
         category: 'Coding',
-        action: () => { void loadProviders(); },
+        action: () => void loadManagement(),
       },
     ], { id: CODING_PROVIDER_MGMT_COMMAND_SCOPE });
     return unregister;
-    // eslint-disable-next-line
   }, [registerCommands]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
     recordViewPreference('coding-provider-management', { search });
-    void loadProviders(search);
+    void loadManagement(search);
   };
 
-  const renderTrendBadge = (openChases) => {
-    const config = openChases === 0
-      ? {
-        tone: 'success',
-        label: 'Clear',
-        info: 'No open chases remain for this provider.',
+  const handleEdit = (provider) => {
+    setEditingProvider(provider);
+    setFormState({
+      payer_contract: provider.payer_contract,
+      enable_education: provider.enable_education,
+      notes: provider.notes,
+    });
+  };
+
+  const handleSave = async () => {
+    if (!editingProvider) return;
+    setLoading(true);
+    try {
+      await updateProviderManagement(token || 'sample-provider-mgmt', tenant || 'prominencehealth', editingProvider.id, formState);
+      notify({ title: 'Provider updated', tone: 'success' });
+      setShowConfirm(false);
+      setEditingProvider(null);
+      void loadManagement(search);
+    } catch (err) {
+      notify({ title: 'Unable to update provider', description: err.message, tone: 'danger' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const layoutProps = useMemo(
+    () => ({
+      backgroundClassName:
+        'coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+      maxWidthClassName: 'max-w-6xl',
+      paddingClassName: 'px-4',
+      navItems: CODING_NAV_ITEMS,
+      currentNav: 'providers',
+      utilityBar: true,
+    }),
+    []
+  );
+
+  const headerContent = (
+    <PortalPageHeader
+      eyebrow="Coding"
+      title="Provider management"
+      subtitle="Manage contracting, education flags, and notes for coding partners."
+      actions={
+        <PortalStat label="Providers" value={items.length} meta="Matching" tone="info" />
       }
-      : openChases <= 3
-        ? {
-          tone: 'warning',
-          label: 'Watch',
-          info: 'A few chases remain. Plan outreach soon.',
-        }
-        : {
-          tone: 'danger',
-          label: 'Action',
-          info: 'Immediate outreach recommended for outstanding chases.',
-        };
-
-    return (
-      <InfoTooltip content={config.info} placement="top">
-        <Pill tone={config.tone} size="sm">{config.label}</Pill>
-      </InfoTooltip>
-    );
-  };
+    />
+  );
 
   return (
-    <div className="sfdc-portal coding-portal">
-      <PortalUtilityBar />
-      <CodingPortalHeader
-        title="Provider management"
-        subtitle="Review provider contact data and update outreach information."
-      />
-
-      <main className="container my-4">
-        <SurfaceCard
-          padding="compact"
-          title={(
-            <div className="d-flex align-items-center gap-2">
-              <span>Provider roster</span>
-              <InfoTooltip
-                content="Keep outreach information current so coding teams know who to contact for chart reviews."
-                placement="right"
-              />
-            </div>
-          )}
-          subtitle="Filter providers by name, NPI, or location and update contact details without leaving the workspace."
-          actions={[
-            <Button
-              key="clear"
-              variant="outline-secondary"
-              size="sm"
-              onClick={() => {
-                setSearch('');
-                void loadProviders('');
-              }}
-              disabled={loading}
-            >
-              Clear filters
-            </Button>,
-            <Button
-              key="refresh"
-              variant="outline-primary"
-              size="sm"
-              onClick={() => void loadProviders()}
-              disabled={loading}
-            >
-              {loading ? <Spinner animation="border" size="sm" /> : 'Refresh list'}
-            </Button>,
-          ]}
-        >
-          <Form onSubmit={handleSubmit} className="mb-3">
-            <Row className="g-2 align-items-end">
-              <Col lg={8}>
-                <Form.Label htmlFor="provider-search">Search providers</Form.Label>
-                <Form.Control
-                  id="provider-search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Name, NPI, Tax ID, or city"
-                />
-                <Form.Text className="text-muted">
-                  Tip: search by tax ID or city to narrow down outreach lists.
-                </Form.Text>
-              </Col>
-              <Col lg={4} className="d-flex gap-2 justify-content-lg-end mt-3 mt-lg-0">
-                <Button type="submit" variant="primary" disabled={loading} className="flex-grow-1 flex-lg-grow-0">
-                  {loading ? <Spinner animation="border" size="sm" /> : 'Search roster'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline-secondary"
-                  disabled={loading}
-                  onClick={() => {
-                    setSearch('');
-                    void loadProviders('');
-                  }}
-                  className="flex-grow-1 flex-lg-grow-0"
-                >
-                  Reset
-                </Button>
-              </Col>
-            </Row>
-          </Form>
-
-          {error && (
-            <AlertShell
-              tone="danger"
-              title="Unable to load providers"
-              description={error}
+    <PortalPageLayout {...layoutProps} headerContent={headerContent}>
+      <PortalCard
+        title="Search & filters"
+        subtitle="Search by provider name, NPI, or tax ID."
+        actions={
+          <button className="portal-ghost-button" onClick={() => void loadManagement(search)} disabled={loading}>
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
+        }
+      >
+        <Form onSubmit={handleSubmit} className="portal-section-grid">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300" htmlFor="provider-mgmt-search">
+              Search providers
+            </label>
+            <Form.Control
+              id="provider-mgmt-search"
+              ref={searchRef}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Name, NPI, or tax ID"
             />
-          )}
+          </div>
+          <div className="flex items-end">
+            <Button type="submit" variant="primary" disabled={loading}>
+              {loading ? <Spinner animation="border" size="sm" /> : 'Search'}
+            </Button>
+          </div>
+        </Form>
+        {error && <AlertShell tone="danger" title="Unable to load provider management" description={error} className="mt-3" />}
+      </PortalCard>
 
-          <DataTable density="compact" aria-label="Provider roster" className="align-middle mb-0">
+      <PortalCard title="Providers" subtitle="Edit contracting and education flags." actions={<span className="portal-pill portal-pill--ghost">{items.length} result(s)</span>}>
+        <div className="table-responsive">
+          <table className="table align-middle">
             <thead>
               <tr>
                 <th>Provider</th>
-                <th>Contact</th>
-                <th>Location</th>
-                <th>
-                  <div className="d-inline-flex align-items-center gap-1">
-                    Members
-                    <InfoTooltip content="Active attributed members assigned to this provider." placement="top" />
-                  </div>
-                </th>
-                <th>
-                  <div className="d-inline-flex align-items-center gap-1">
-                    Open gaps
-                    <InfoTooltip content="Outstanding coding chases tied to this provider." placement="top" />
-                  </div>
-                </th>
-                <th>Last updated</th>
-                <th className="text-end">
-                  <span className="me-2">Actions</span>
-                  <InfoTooltip content="Edit provider outreach details." placement="top" />
-                </th>
+                <th>Contract</th>
+                <th>Education</th>
+                <th>Notes</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="text-center py-4">
+                  <td colSpan={5} className="text-center py-3">
                     <Spinner animation="border" />
                   </td>
                 </tr>
               )}
               {!loading && items.length === 0 && (
                 <tr>
-                  <td colSpan={7}>
-                    <EmptyState
-                      icon="spark"
-                      title="No providers match your filters"
-                      description="Try adjusting your search or sync a new provider roster."
-                    >
-                      <Button variant="outline-primary" size="sm" onClick={() => void loadProviders('')} disabled={loading}>
-                        Clear filters
-                      </Button>
-                      <Button variant="link" size="sm" href="/jobs/import-data">
-                        Open data imports
-                      </Button>
-                    </EmptyState>
+                  <td colSpan={5} className="text-center py-3">
+                    <EmptyState title="No providers match your search" description="Adjust filters or refresh." />
                   </td>
                 </tr>
               )}
-              {!loading && items.map((item) => (
-                <tr key={item.provider_id}>
+              {items.map((provider) => (
+                <tr key={provider.id}>
                   <td>
-                    <div className="fw-semibold">{item.name || 'Unnamed provider'}</div>
-                    <div className="text-muted small">
-                      NPI {item.npi || 'N/A'} | Tax {item.tax_id || 'N/A'}
-                    </div>
+                    <div className="fw-semibold">{provider.name}</div>
+                    <div className="text-muted small">NPI {provider.npi}</div>
                   </td>
-                  <td>
-                    <div>{item.email || <span className="text-muted">No email on file</span>}</div>
-                    <div className="text-muted small">{item.phone || 'No phone listed'}</div>
-                  </td>
-                  <td>
-                    <div>{item.address_line1 || <span className="text-muted">Address unknown</span>}</div>
-                    <div className="text-muted small">
-                      {[item.city, item.state, item.postal_code].filter(Boolean).join(', ') || 'Not set'}
-                    </div>
-                  </td>
-                  <td>{item.member_count ?? 0}</td>
-                  <td>
-                    <div className="d-flex gap-2 align-items-center">
-                      {item.open_chases ?? 0}
-                      {renderTrendBadge(item.open_chases ?? 0)}
-                    </div>
-                  </td>
-                  <td>{item.last_updated_at ? new Date(item.last_updated_at).toLocaleString() : 'Not captured'}</td>
+                  <td>{provider.payer_contract ? 'Yes' : 'No'}</td>
+                  <td>{provider.enable_education ? 'Enabled' : 'Disabled'}</td>
+                  <td className="text-muted small">{provider.notes || 'None'}</td>
                   <td className="text-end">
-                    <InfoTooltip content="Update provider contact details" placement="left">
-                      <Button variant="link" size="sm" onClick={() => openEditor(item)}>
-                        Edit
-                      </Button>
-                    </InfoTooltip>
+                    <Button size="sm" variant="link" onClick={() => handleEdit(provider)}>
+                      Edit
+                    </Button>
                   </td>
                 </tr>
               ))}
             </tbody>
-          </DataTable>
-        </SurfaceCard>
-      </main>
+          </table>
+        </div>
+      </PortalCard>
+
+      <ConfirmDialog
+        show={showConfirm}
+        onHide={() => setShowConfirm(false)}
+        onConfirm={handleSave}
+        title="Save provider changes"
+        confirmText={loading ? 'Saving...' : 'Save changes'}
+      >
+        Apply these changes to {editingProvider?.name}?
+      </ConfirmDialog>
 
       <Modal show={Boolean(editingProvider)} onHide={() => setEditingProvider(null)} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Edit provider contact</Modal.Title>
+          <Modal.Title>Edit provider</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {savingError && (
-            <AlertShell
-              tone="danger"
-              title="Save failed"
-              description={savingError}
-              className="mb-3"
-            />
-          )}
-          <p className="text-muted small mb-3">
-            Updates save instantly so coding teams always have the latest outreach details.
-          </p>
-          <Form>
-            <Form.Group className="mb-3" controlId="provider-name">
-              <Form.Label>Name</Form.Label>
-              <Form.Control name="name" value={formState.name || ''} onChange={handleFormChange} />
+          <Form className="space-y-3">
+            <Form.Group controlId="payer_contract">
+              <Form.Check
+                type="switch"
+                label="Payer contract"
+                checked={!!formState.payer_contract}
+                onChange={(event) => setFormState((prev) => ({ ...prev, payer_contract: event.target.checked }))}
+              />
             </Form.Group>
-            <Form.Group className="mb-3" controlId="provider-email">
-              <Form.Label>Email</Form.Label>
-              <Form.Control type="email" name="email" value={formState.email || ''} onChange={handleFormChange} />
-              <Form.Text className="text-muted small">Use a monitored inbox so outreach replies are not missed.</Form.Text>
+            <Form.Group controlId="enable_education">
+              <Form.Check
+                type="switch"
+                label="Enable education"
+                checked={!!formState.enable_education}
+                onChange={(event) => setFormState((prev) => ({ ...prev, enable_education: event.target.checked }))}
+              />
             </Form.Group>
-            <Form.Group className="mb-3" controlId="provider-phone">
-              <Form.Label>Phone</Form.Label>
-              <Form.Control name="phone" value={formState.phone || ''} onChange={handleFormChange} />
-              <Form.Text className="text-muted small">Include an extension if callers should route through a desk.</Form.Text>
+            <Form.Group controlId="notes">
+              <Form.Label>
+                Notes <InfoTooltip id="provider-notes" text="Internal notes for this provider." />
+              </Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={formState.notes || ''}
+                onChange={(event) => setFormState((prev) => ({ ...prev, notes: event.target.value }))}
+              />
             </Form.Group>
-            <Form.Group className="mb-3" controlId="provider-tax">
-              <Form.Label>Tax ID</Form.Label>
-              <Form.Control name="tax_id" value={formState.tax_id || ''} onChange={handleFormChange} />
-              <Form.Text className="text-muted small">Used when matching claims and roster updates.</Form.Text>
-            </Form.Group>
-            <Form.Group className="mb-3" controlId="provider-address">
-              <Form.Label>Address</Form.Label>
-              <Form.Control name="address_line1" value={formState.address_line1 || ''} onChange={handleFormChange} />
-            </Form.Group>
-            <Row className="g-2">
-              <Col md={6}>
-                <Form.Group controlId="provider-city">
-                  <Form.Label>City</Form.Label>
-                  <Form.Control name="city" value={formState.city || ''} onChange={handleFormChange} />
-                </Form.Group>
-              </Col>
-              <Col md={3}>
-                <Form.Group controlId="provider-state">
-                  <Form.Label>State</Form.Label>
-                  <Form.Control name="state" value={formState.state || ''} onChange={handleFormChange} />
-                </Form.Group>
-              </Col>
-              <Col md={3}>
-                <Form.Group controlId="provider-postal">
-                  <Form.Label>Postal</Form.Label>
-                  <Form.Control name="postal_code" value={formState.postal_code || ''} onChange={handleFormChange} />
-                </Form.Group>
-              </Col>
-            </Row>
           </Form>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setEditingProvider(null)} disabled={saving}>
+        <Modal.Footer className="d-flex justify-content-between">
+          <Button variant="outline-secondary" onClick={() => setEditingProvider(null)}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? <Spinner animation="border" size="sm" /> : 'Save & Close'}
+          <Button variant="primary" onClick={() => setShowConfirm(true)} disabled={loading}>
+            Save
           </Button>
         </Modal.Footer>
       </Modal>
-
-      <ConfirmDialog
-        show={showSaveConfirm}
-        title="Save provider changes?"
-        description="We will update this provider's contact details immediately."
-        confirmLabel={saving ? 'Saving…' : 'Save changes'}
-        confirmVariant="primary"
-        confirmDisabled={saving}
-        onConfirm={() => { void confirmSave(); }}
-        onCancel={cancelSaveConfirmation}
-      />
-    </div>
+    </PortalPageLayout>
   );
 };
 

@@ -4,7 +4,6 @@ import {
   Alert,
   Badge,
   Button,
-  Card,
   Col,
   Form,
   Row,
@@ -12,11 +11,15 @@ import {
   Table,
 } from 'react-bootstrap';
 
-import PortalUtilityBar from '../../../components/PortalUtilityBar';
+import PortalPageLayout from '../../../components/PortalPageLayout';
+import PortalPageHeader from '../../../components/PortalPageHeader';
+import PortalCard from '../../../components/PortalCard';
+import PortalStat from '../../../components/PortalStat';
 import { AuthContext } from '../../../context/AuthContext';
 import { useCommandPalette } from '../../../context/CommandPaletteContext';
 import { fetchCoderReviewDashboard } from '../../../services/codingService';
-import CodingPortalHeader from './CodingPortalHeader';
+import { CODING_NAV_ITEMS } from './codingNavItems';
+import '../coding/member/memberWorkspace.css';
 
 const STATUS_VARIANTS = {
   open: 'primary',
@@ -63,8 +66,7 @@ const CodingReviewDashboardPage = () => {
 
   useEffect(() => {
     void loadDashboard();
-    // eslint-disable-next-line
-  }, [effectiveToken, effectiveTenant]);
+  }, [effectiveToken, effectiveTenant, loadDashboard]);
 
   useEffect(() => {
     const unregister = registerCommands([
@@ -88,13 +90,11 @@ const CodingReviewDashboardPage = () => {
       },
     ], { id: CODING_REVIEW_COMMAND_SCOPE });
     return unregister;
-    // eslint-disable-next-line
-  }, [registerCommands, currentEmail]);
+  }, [registerCommands, currentEmail, loadDashboard]);
 
   useEffect(() => {
     void loadDashboard({ mineOnly });
-    // eslint-disable-next-line
-  }, [mineOnly]);
+  }, [mineOnly, loadDashboard]);
 
   const statusBadge = (status) => {
     if (!status) return '-';
@@ -111,114 +111,123 @@ const CodingReviewDashboardPage = () => {
   const metricCards = useMemo(() => {
     if (!Array.isArray(metrics)) return [];
     return metrics.map((metric) => (
-      <Col md={3} sm={6} xs={12} key={metric.label}>
-        <Card className="h-100 shadow-sm">
-          <Card.Body>
-            <div className="text-muted small">{metric.label}</div>
-            <div className="display-6 fw-semibold">{metric.value}</div>
-            {metric.hint && <div className="small text-muted">{metric.hint}</div>}
-          </Card.Body>
-        </Card>
-      </Col>
+      <PortalStat key={metric.label} label={metric.label} value={metric.value} meta={metric.hint} tone="info" />
     ));
   }, [metrics]);
 
+  const layoutProps = useMemo(
+    () => ({
+      backgroundClassName:
+        'coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+      maxWidthClassName: 'max-w-6xl',
+      paddingClassName: 'px-4',
+      navItems: CODING_NAV_ITEMS,
+      currentNav: 'review',
+      utilityBar: true,
+    }),
+    []
+  );
+
+  const headerContent = (
+    <PortalPageHeader
+      eyebrow="Coding"
+      title="Coder review dashboard"
+      subtitle="Monitor queue health, overdue items, and high-priority follow ups."
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <PortalStat label="Queue" value={queue.length} meta="Items" tone="info" />
+          <PortalStat label="Mine only" value={mineOnly ? 'On' : 'Off'} meta="Filter" tone={mineOnly ? 'warning' : 'success'} />
+          <PortalStat label="Metrics" value={metrics.length} meta="Signals" tone="success" />
+        </div>
+      }
+    />
+  );
+
   return (
-    <div className="sfdc-portal coding-portal">
-      <PortalUtilityBar />
-      <CodingPortalHeader
-        title="Coder review dashboard"
-        subtitle="Monitor queue health, overdue items, and high-priority follow ups."
-      />
+    <PortalPageLayout {...layoutProps} headerContent={headerContent}>
+      <PortalCard title="Signals" subtitle="Queue health, overdue items, and throughput.">
+        <div className="portal-section-grid">
+          {metricCards.length ? metricCards : <div className="text-sm text-slate-500 dark:text-slate-300">No metrics yet.</div>}
+        </div>
+      </PortalCard>
 
-      <main className="container my-4">
-        <Row className="gy-3">
-          {metricCards}
-        </Row>
-
-        <Card className="mt-4 shadow-sm">
-          <Card.Header>
-            <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
-              <div>
-                <h2 className="h5 mb-1">Review queue</h2>
-                <div className="text-muted">Latest items ordered by most recently updated.</div>
-              </div>
-              <div className="mt-2 mt-md-0 d-flex align-items-center gap-3">
-                <Form.Check
-                  type="switch"
-                  id="review-mine-only"
-                  label="Mine only"
-                  checked={mineOnly}
-                  onChange={(event) => setMineOnly(event.target.checked)}
-                />
-                <Button variant="outline-primary" size="sm" onClick={() => void loadDashboard()} disabled={loading}>
-                  {loading ? <Spinner animation="border" size="sm" /> : 'Refresh'}
-                </Button>
-              </div>
-            </div>
-          </Card.Header>
-          <Card.Body>
-            {error && <Alert variant="danger">{error}</Alert>}
-            <div className="table-responsive">
-              <Table hover responsive className="align-middle">
-                <thead>
-                  <tr>
-                    <th>Member</th>
-                    <th>Status</th>
-                    <th>Priority</th>
-                    <th>Assigned</th>
-                    <th>Next action</th>
-                    <th>Notes</th>
-                    <th>Due date</th>
-                    <th className="text-end">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading && (
-                    <tr>
-                      <td colSpan={8} className="text-center py-4">
-                        <Spinner animation="border" />
-                      </td>
-                    </tr>
-                  )}
-                  {!loading && queue.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="text-center text-muted py-4">
-                        No queue items match the current view.
-                      </td>
-                    </tr>
-                  )}
-                  {queue.map((item) => (
-                    <tr key={item.chase_id}>
-                      <td>
-                        <div className="fw-semibold">{item.member_name || '-'}</div>
-                        <div className="text-muted small">{item.member_key}</div>
-                      </td>
-                      <td>{statusBadge(item.status)}</td>
-                      <td>{priorityBadge(item.priority)}</td>
-                      <td>{item.assigned_coder_email || <span className="text-muted">Unassigned</span>}</td>
-                      <td>{item.next_action ? item.next_action.replace(/_/g, ' ') : <span className="text-muted">None</span>}</td>
-                      <td>
-                        <div>{item.note_count || 0} note(s)</div>
-                        <div className="text-muted small">
-                          {item.last_note_at ? new Date(item.last_note_at).toLocaleString() : 'No notes'}
-                        </div>
-                      </td>
-                      <td>{item.due_date || <span className="text-muted">Not set</span>}</td>
-                      <td className="text-end">
-                        <Button variant="link" size="sm" onClick={() => navigate(`/coding/member/${item.member_id}`)}>
-                          View member
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </div>
-          </Card.Body>
-        </Card>
-      </main>
-    </div>
+      <PortalCard
+        title="Review queue"
+        subtitle="Latest items ordered by most recently updated."
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            <Form.Check
+              type="switch"
+              id="review-mine-only"
+              label="Mine only"
+              checked={mineOnly}
+              onChange={(event) => setMineOnly(event.target.checked)}
+            />
+            <Button variant="outline-primary" size="sm" onClick={() => void loadDashboard()} disabled={loading}>
+              {loading ? <Spinner animation="border" size="sm" /> : 'Refresh'}
+            </Button>
+          </div>
+        }
+      >
+        {error && <Alert variant="danger">{error}</Alert>}
+        <div className="table-responsive">
+          <Table hover responsive className="align-middle">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Assigned</th>
+                <th>Next action</th>
+                <th>Notes</th>
+                <th>Due date</th>
+                <th className="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={8} className="text-center py-4">
+                    <Spinner animation="border" />
+                  </td>
+                </tr>
+              )}
+              {!loading && queue.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="text-center text-muted py-4">
+                    No queue items match the current view.
+                  </td>
+                </tr>
+              )}
+              {queue.map((item) => (
+                <tr key={item.chase_id}>
+                  <td>
+                    <div className="fw-semibold">{item.member_name || '-'}</div>
+                    <div className="text-muted small">{item.member_key}</div>
+                  </td>
+                  <td>{statusBadge(item.status)}</td>
+                  <td>{priorityBadge(item.priority)}</td>
+                  <td>{item.assigned_coder_email || <span className="text-muted">Unassigned</span>}</td>
+                  <td>{item.next_action ? item.next_action.replace(/_/g, ' ') : <span className="text-muted">None</span>}</td>
+                  <td>
+                    <div>{item.note_count || 0} note(s)</div>
+                    <div className="text-muted small">
+                      {item.last_note_at ? new Date(item.last_note_at).toLocaleString() : 'No notes'}
+                    </div>
+                  </td>
+                  <td>{item.due_date || <span className="text-muted">Not set</span>}</td>
+                  <td className="text-end">
+                    <Button variant="link" size="sm" onClick={() => navigate(`/coding/member/${item.member_id}`)}>
+                      View member
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      </PortalCard>
+    </PortalPageLayout>
   );
 };
 

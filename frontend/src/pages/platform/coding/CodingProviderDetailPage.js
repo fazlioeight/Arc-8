@@ -1,24 +1,22 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Alert, Badge, Button, Card, Col, ListGroup, Row, Spinner } from 'react-bootstrap';
-
-import PortalUtilityBar from '../../../components/PortalUtilityBar';
+import PortalPageLayout from '../../../components/PortalPageLayout';
+import PortalPageHeader from '../../../components/PortalPageHeader';
+import PortalCard from '../../../components/PortalCard';
+import PortalStat from '../../../components/PortalStat';
 import { AuthContext } from '../../../context/AuthContext';
 import { fetchCodingProviderDetail, fetchCodingProviders } from '../../../services/codingService';
-import CodingPortalHeader from './CodingPortalHeader';
 import BackLink from '../../../components/BackLink';
+import AlertShell from '../../../components/ui/AlertShell';
+import '../coding/member/memberWorkspace.css';
+import { CODING_NAV_ITEMS } from './codingNavItems';
 
 const CodingProviderDetailPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Obtain route params via the hook (rules-of-hooks require calling hooks
-  // unconditionally at the top level). Fall back to extracting the id from
-  // the pathname when params are not present (e.g., some test shims).
   let params = {};
   try {
-    // some test environments may replace react-router-dom with a mock
-    // that doesn't provide hooks. Guard the call so tests don't crash.
     params = useParams();
   } catch (err) {
     params = {};
@@ -35,17 +33,16 @@ const CodingProviderDetailPage = () => {
   const [error, setError] = useState(null);
 
   const canQuery = useMemo(() => Boolean(token && tenant && providerId), [token, tenant, providerId]);
-  // location.state is preferred, but some test/navigation setups don't
-  // populate it. Fall back to query params so the referral alert is
-  // displayed in tests that navigate using URL only.
   const referralFromState = location.state;
   const query = new URLSearchParams(location.search);
   const referral = referralFromState || (
-    query.has('fromMemberId') ? {
-      fromMemberId: Number(query.get('fromMemberId')),
-      providerName: query.get('providerName') || undefined,
-      providerNpi: query.get('providerNpi') || undefined,
-    } : undefined
+    query.has('fromMemberId')
+      ? {
+          fromMemberId: Number(query.get('fromMemberId')),
+          providerName: query.get('providerName') || undefined,
+          providerNpi: query.get('providerNpi') || undefined,
+        }
+      : undefined
   );
 
   const loadProvider = async () => {
@@ -62,11 +59,12 @@ const CodingProviderDetailPage = () => {
           throw new Error('Provider not found');
         }
         const normalizedKey = decodedKey.toLowerCase();
-        const best = items.find(item => {
-          const npiMatch = item.npi && item.npi.toLowerCase() === normalizedKey;
-          const nameMatch = item.name && item.name.toLowerCase() === normalizedKey;
-          return npiMatch || nameMatch;
-        }) || items[0];
+        const best =
+          items.find((item) => {
+            const npiMatch = item.npi && item.npi.toLowerCase() === normalizedKey;
+            const nameMatch = item.name && item.name.toLowerCase() === normalizedKey;
+            return npiMatch || nameMatch;
+          }) || items[0];
         lookupId = best.id;
       }
       const detail = await fetchCodingProviderDetail(token, tenant, lookupId);
@@ -85,118 +83,121 @@ const CodingProviderDetailPage = () => {
     // eslint-disable-next-line
   }, [isAuthenticated, canQuery]);
 
-  const header = (
-    <CodingPortalHeader
-      title="Provider workspace"
+  const layoutProps = useMemo(
+    () => ({
+      backgroundClassName:
+        'coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+      maxWidthClassName: 'max-w-5xl',
+      paddingClassName: 'px-4',
+      navItems: CODING_NAV_ITEMS,
+      currentNav: 'providers',
+      utilityBar: true,
+    }),
+    []
+  );
+
+  const headerContent = (
+    <PortalPageHeader
+      eyebrow="Coding"
+      title={provider?.name || 'Provider workspace'}
       subtitle="Review coding partner profiles, locations, and contact information."
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <PortalStat label="Members" value={provider?.member_count ?? 0} meta="Panel" tone="info" />
+          <PortalStat label="Open gaps" value={provider?.open_gaps ?? 0} meta="Pending" tone="warning" />
+          <PortalStat label="ID" value={provider ? provider.id : '—'} meta="Provider" tone="success" />
+        </div>
+      }
     />
   );
 
-  if (!isAuthenticated) {
-    return (
-      <div className="sfdc-portal coding-portal">
-        <PortalUtilityBar />
-        {header}
-        <div className="coding-content container py-5">
-          <Alert variant="warning">You must be logged in to view provider information.</Alert>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="sfdc-portal coding-portal">
-      <PortalUtilityBar />
-      {header}
-      <div className="coding-content container py-4">
-        <div className="mb-3">
-          <BackLink fallback="/coding/providers">Back to care team directory</BackLink>
-        </div>
-        <Row className="align-items-center mb-3 g-3">
-          <Col>
-            <h1 className="h3 mb-1">Provider Details</h1>
-            <div className="text-muted">
-              Full profile for coding partners and medical groups.
-            </div>
-          </Col>
-          <Col md="auto">
-            <Button variant="outline-secondary" onClick={() => navigate('/coding/providers')}>
-              Back to provider list
-            </Button>
-          </Col>
-        </Row>
-        <div className="d-flex gap-2 mb-3">
-          <Button variant="link" onClick={() => navigate(-1)}>&larr; Back</Button>
-          <Button variant="outline-primary" size="sm" onClick={() => navigate('/coding/providers')}>
-            Browse providers
-          </Button>
-        </div>
-        {referral?.fromMemberId && (
-          <Alert variant="info" className="mb-3">
-            Linked from member #{referral.fromMemberId}
-            {referral.providerName ? ` (${referral.providerName})` : ''}
-          </Alert>
-        )}
-        {error && (
-          <Alert variant="danger" className="mb-3">
-            {error}
-          </Alert>
-        )}
-        {loading && (
-          <div className="text-center py-5">
-            <Spinner animation="border" />
+    <PortalPageLayout {...layoutProps} headerContent={headerContent}>
+      {!isAuthenticated ? (
+        <PortalCard tone="warning" title="Authentication required" subtitle="You must be logged in to view provider information." />
+      ) : null}
+
+      <PortalCard
+        title="Navigation"
+        subtitle="Jump back to the provider directory or previous page."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <button className="portal-ghost-button" onClick={() => navigate(-1)}>&larr; Back</button>
+            <button className="portal-ghost-button" onClick={() => navigate('/coding/providers')}>
+              Browse providers
+            </button>
           </div>
-        )}
-        {!loading && provider && (
-          <Card>
-            <Card.Header className="d-flex justify-content-between align-items-center">
-              <div>
-                <div className="h5 mb-0">{provider.name}</div>
-                {provider.npi && <div className="text-muted">NPI {provider.npi}</div>}
+        }
+      >
+        <BackLink fallback="/coding/providers">Back to care team directory</BackLink>
+        {referral?.fromMemberId ? (
+          <AlertShell
+            tone="info"
+            title="Linked from member"
+            description={`Member #${referral.fromMemberId}${referral.providerName ? ` (${referral.providerName})` : ''}`}
+            className="mt-3"
+          />
+        ) : null}
+      </PortalCard>
+
+      {error ? (
+        <PortalCard tone="danger" title="Unable to load provider" subtitle={error} />
+      ) : null}
+
+      <PortalCard
+        title={provider?.name || 'Provider details'}
+        subtitle={provider ? provider.npi || provider.tax_id || provider.id : 'Select a provider'}
+      >
+        {loading && <div className="text-sm text-slate-500 dark:text-slate-300">Loading provider detail...</div>}
+        {!loading && !provider && !error ? (
+          <AlertShell tone="warning" title="Provider details are unavailable." />
+        ) : null}
+        {!loading && provider ? (
+          <div className="space-y-4 text-sm text-slate-800 dark:text-slate-100">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Tax ID</div>
+                <div className="font-semibold">{provider.tax_id || 'Not provided'}</div>
               </div>
-              <Badge bg="primary">Provider #{provider.id}</Badge>
-            </Card.Header>
-            <Card.Body>
-              <Row className="g-4">
-                <Col md={6}>
-                  <ListGroup variant="flush">
-                    <ListGroup.Item><strong>Tax ID:</strong> {provider.tax_id || '-'}</ListGroup.Item>
-                    <ListGroup.Item><strong>Phone:</strong> {provider.phone || '-'}</ListGroup.Item>
-                    <ListGroup.Item><strong>Email:</strong> {provider.email || '-'}</ListGroup.Item>
-                  </ListGroup>
-                </Col>
-                <Col md={6}>
-                  <ListGroup variant="flush">
-                    <ListGroup.Item>
-                      <strong>Location:</strong>
-                      <div>
-                        {provider.location
-                          ? [
-                              provider.location.address_line1,
-                              provider.location.city,
-                              provider.location.state,
-                              provider.location.postal_code,
-                            ]
-                              .filter(Boolean)
-                              .join(', ')
-                          : '-'}
-                      </div>
-                    </ListGroup.Item>
-                    <ListGroup.Item>
-                      <strong>Contacts:</strong>
-                      <div className="text-muted">Coming soon</div>
-                    </ListGroup.Item>
-                  </ListGroup>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-        )}
-        {!loading && !provider && !error && (
-          <Alert variant="warning">Provider details are unavailable.</Alert>
-        )}
-      </div>
-    </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">NPI</div>
+                <div className="font-semibold">{provider.npi || 'Not provided'}</div>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Members</div>
+                <div className="font-semibold">{provider.member_count ?? '-'}</div>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Assigned queue</div>
+                <div className="font-semibold">{provider.queue_name || 'Not assigned'}</div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Location</div>
+              <div className="font-semibold">
+                {provider.location
+                  ? [
+                      provider.location.address_line1,
+                      provider.location.city,
+                      provider.location.state,
+                      provider.location.postal_code,
+                    ]
+                      .filter(Boolean)
+                      .join(', ')
+                  : 'Not provided'}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button className="portal-ghost-button" onClick={() => navigate('/coding/providers')}>
+                Back to provider list
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </PortalCard>
+    </PortalPageLayout>
   );
 };
 

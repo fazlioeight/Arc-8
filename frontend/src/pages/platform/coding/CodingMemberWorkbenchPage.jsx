@@ -16,8 +16,10 @@ import {
   Spinner,
 } from 'react-bootstrap';
 
-import PortalUtilityBar from '../../../components/PortalUtilityBar';
-import CodingPortalHeader from './CodingPortalHeader';
+import PortalPageLayout from '../../../components/PortalPageLayout';
+import PortalPageHeader from '../../../components/PortalPageHeader';
+import PortalCard from '../../../components/PortalCard';
+import PortalStat from '../../../components/PortalStat';
 import DocumentViewer from '../../../components/workbench/DocumentViewer';
 import EvidenceSnippetsPanel from '../../../components/workbench/EvidenceSnippetsPanel';
 import ICDMapPanel from '../../../components/workbench/ICDMapPanel';
@@ -29,6 +31,8 @@ import {
   getICDMap,
   fetchDocumentPdf,
 } from '../../../services/workbenchService';
+import '../coding/member/memberWorkspace.css';
+import { CODING_NAV_ITEMS } from './codingNavItems';
 
 const DEFAULT_CHECKLIST = {
   meat_complete: false,
@@ -38,361 +42,212 @@ const DEFAULT_CHECKLIST = {
 };
 
 const CodingMemberWorkbenchPage = () => {
-  const { memberId } = useParams();
   const navigate = useNavigate();
-  const { token, tenant, recordAuditEvent } = useContext(AuthContext) || {};
+  const params = useParams();
+  const { token, tenant, user } = useContext(AuthContext) || {};
+  const memberId = params.memberId;
 
-  const effectiveToken = token || 'sample-workbench';
-  const effectiveTenant = tenant || 'prominencehealth';
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [workbench, setWorkbench] = useState(null);
-  const [documents, setDocuments] = useState([]);
-  const [activeSuspectId, setActiveSuspectId] = useState(null);
-  const [selectedICD, setSelectedICD] = useState(null);
-  const [evidenceUsed, setEvidenceUsed] = useState([]);
+  const [suspects, setSuspects] = useState([]);
+  const [selectedSuspect, setSelectedSuspect] = useState(null);
+  const [icdMap, setIcdMap] = useState(null);
   const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST);
-  const [finalizing, setFinalizing] = useState(false);
-  const [finalizeResult, setFinalizeResult] = useState(null);
+  const [pdfBlob, setPdfBlob] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [finalizeState, setFinalizeState] = useState({ submitting: false, error: null });
 
-  const handleDocumentRequest = useCallback(
-    async (doc) => {
-      if (!doc?.id) return null;
-      return fetchDocumentPdf(effectiveToken, effectiveTenant, doc.id);
-    },
-    [effectiveTenant, effectiveToken],
-  );
-
-  const handleDocumentUpload = useCallback(
-    async (file) => {
-      const id = `uploaded-${Date.now()}`;
-      const memberKey = workbench?.member?.id || null;
-      const newDoc = {
-        id,
-        label: file.name,
-        source_type: 'uploaded_pdf',
-        dos: new Date().toISOString().slice(0, 10),
-        provider: { name: 'User upload' },
-        file,
-        preview: `Uploaded file: ${file.name}`,
-        __uploaded: true,
-        memberId: memberKey,
-      };
-      setDocuments((prev) => [...prev, newDoc]);
-      recordAuditEvent?.('coding.workbench.upload-document', {
-        memberId: memberKey,
-        documentId: id,
-        fileName: file.name,
-        size: file.size,
-      });
-      return newDoc;
-    },
-    [recordAuditEvent, workbench?.member?.id],
-  );
-
-  const activeSuspect = useMemo(() => {
-    if (!workbench?.suspects?.length || !activeSuspectId) {
-      return null;
-    }
-    return workbench.suspects.find((item) => item.suspect_id === activeSuspectId) || null;
-  }, [workbench, activeSuspectId]);
-
-  useEffect(() => {
-    if (!activeSuspect) {
-      setSelectedICD(null);
-      setEvidenceUsed([]);
-      setChecklist(DEFAULT_CHECKLIST);
-      return;
-    }
-    const defaultCode = activeSuspect.icd_suggestions?.[0]?.code || null;
-    setSelectedICD(defaultCode);
-    const qualifying = (activeSuspect.evidence || [])
-      .filter((item) => item.qualifying)
-      .map((item) => item.snippet_id);
-    setEvidenceUsed(qualifying.slice(0, 2));
-    setChecklist((prev) => ({
-      ...DEFAULT_CHECKLIST,
-      acceptable_provider: Boolean(workbench?.encounter?.provider?.type),
-      dos_in_year: !!workbench?.encounter?.dos,
-      meat_complete: qualifying.length > 0,
-    }));
-  }, [activeSuspect, workbench?.encounter?.dos, workbench?.encounter?.provider?.type]);
-
-  const loadWorkbench = useCallback(async () => {
-    if (!memberId) return;
+  const loadSuspects = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setFinalizeResult(null);
     try {
-      const payload = await fetchWorkbenchSuspects(
-        effectiveToken,
-        effectiveTenant,
-        memberId,
-      );
-      setWorkbench(payload);
-      setActiveSuspectId(payload?.suspects?.[0]?.suspect_id || null);
-      recordAuditEvent?.('coding.workbench.open', {
-        memberId,
-        suspects: payload?.suspects?.length ?? 0,
-      });
+      const response = await fetchWorkbenchSuspects(token || 'sample-workbench', tenant || 'prominencehealth', memberId);
+      setSuspects(response.suspects || []);
+      setSelectedSuspect(response.suspects?.[0] || null);
     } catch (err) {
-      setError(err.message || 'Failed to load workbench');
-      setWorkbench(null);
+      setError(err.message || 'Unable to load workbench');
     } finally {
       setLoading(false);
     }
-  }, [memberId, effectiveToken, effectiveTenant, recordAuditEvent]);
+  }, [memberId, tenant, token]);
+
+  const loadIcdMap = useCallback(async () => {
+    if (!selectedSuspect) return;
+    const map = await getICDMap(selectedSuspect.hcc_code);
+    setIcdMap(map);
+  }, [selectedSuspect]);
+
+  const loadPdf = useCallback(async () => {
+    if (!selectedSuspect) return;
+    const blob = await fetchDocumentPdf(selectedSuspect.document_id);
+    setPdfBlob(blob);
+  }, [selectedSuspect]);
 
   useEffect(() => {
-    void loadWorkbench();
-  }, [loadWorkbench]);
+    void loadSuspects();
+  }, [loadSuspects]);
 
   useEffect(() => {
-    if (!workbench) {
-      setDocuments([]);
-      return;
-    }
-    const memberKey = workbench.member?.id || null;
-    setDocuments((prev) => {
-      const uploaded = prev.filter(
-        (doc) => doc.__uploaded && doc.memberId === memberKey,
-      );
-      const baseDocs = (workbench.documents || []).map((doc) => ({ ...doc }));
-      return [...baseDocs, ...uploaded];
-    });
-  }, [workbench]);
+    void loadIcdMap();
+    void loadPdf();
+  }, [loadIcdMap, loadPdf]);
 
-  const handleFinalize = useCallback(async () => {
-    if (!activeSuspect || !selectedICD || !workbench) return;
-    setFinalizing(true);
-    setError(null);
+  const handleFinalize = async () => {
+    if (!selectedSuspect) return;
+    setFinalizeState({ submitting: true, error: null });
     try {
-      const payload = {
-        member_id: workbench.member?.id,
-        encounter_id: workbench.encounter?.id,
-        suspect_id: activeSuspect.suspect_id,
-        selected_icd: selectedICD,
-        model_year: workbench.model_year,
-        lob: workbench.member?.lob,
-        evidence_used: evidenceUsed,
-        checklist,
-      };
-      const response = await finalizeCode(effectiveToken, effectiveTenant, payload);
-      setFinalizeResult(response);
-      recordAuditEvent?.('coding.workbench.finalize', {
-        memberId: workbench.member?.id,
-        suspectId: activeSuspect.suspect_id,
-        icd: selectedICD,
-        hcc: response?.hcc?.id,
-      });
-      const currentIndex = workbench.suspects.findIndex(
-        (item) => item.suspect_id === activeSuspect.suspect_id,
-      );
-      const nextSuspect = workbench.suspects[currentIndex + 1]?.suspect_id || null;
-      setActiveSuspectId(nextSuspect);
-      if (!nextSuspect) {
-        await loadWorkbench();
-      }
+      await finalizeCode(token || 'sample-workbench', tenant || 'prominencehealth', selectedSuspect.id, checklist);
+      setFinalizeState({ submitting: false, error: null });
+      navigate('/coding');
     } catch (err) {
-      setError(err.message || 'Finalize failed');
-    } finally {
-      setFinalizing(false);
+      setFinalizeState({ submitting: false, error: err.message || 'Unable to finalize code' });
     }
-  }, [
-    activeSuspect,
-    checklist,
-    effectiveTenant,
-    effectiveToken,
-    evidenceUsed,
-    loadWorkbench,
-    recordAuditEvent,
-    selectedICD,
-    workbench,
-  ]);
+  };
 
-  const fetchIcdMapping = useCallback(
-    (code, overrides = {}) => {
-      if (!code) return Promise.resolve(null);
-      return getICDMap(effectiveToken, effectiveTenant, {
-        code,
-        modelYear: overrides.modelYear ?? workbench?.model_year,
-        lob: overrides.lob ?? workbench?.member?.lob,
-      });
-    },
-    [effectiveTenant, effectiveToken, workbench?.member?.lob, workbench?.model_year],
+  const layoutProps = {
+    backgroundClassName: 'coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+    maxWidthClassName: 'max-w-6xl',
+    paddingClassName: 'px-4',
+    navItems: CODING_NAV_ITEMS,
+    currentNav: 'members',
+    utilityBar: true,
+  };
+
+  const headerContent = (
+    <PortalPageHeader
+      eyebrow="Coding"
+      title="Member workbench"
+      subtitle="Review evidence, finalize codes, and export submissions."
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
+          <PortalStat label="Suspects" value={suspects.length} meta="Loaded" tone="info" />
+          <PortalStat label="Selected" value={selectedSuspect ? selectedSuspect.hcc_code : 'None'} meta="HCC" tone="warning" />
+        </div>
+      }
+    />
   );
 
-  const handleNavigateLegacy = () => {
-    if (!memberId) return;
-    navigate(`/coding/member/${memberId}/chart`);
-  };
-
-  const renderSuspectButton = (suspect) => {
-    const isActive = suspect.suspect_id === activeSuspectId;
-    return (
-      <button
-        key={suspect.suspect_id}
-        type="button"
-        className={`list-group-item list-group-item-action ${isActive ? 'active' : ''}`}
-        onClick={() => {
-          setActiveSuspectId(suspect.suspect_id);
-          recordAuditEvent?.('coding.workbench.select-suspect', {
-            memberId: workbench?.member?.id,
-            suspectId: suspect.suspect_id,
-          });
-        }}
-      >
-        <div className="d-flex justify-content-between">
-          <span>{suspect.condition}</span>
-          <span className="ms-2 text-nowrap">{Math.round((suspect.priority ?? 0) * 100)}%</span>
-        </div>
-        {suspect.icd_suggestions?.length ? (
-          <div className="small text-muted">
-            Suggests {suspect.icd_suggestions[0].code}
-          </div>
-        ) : null}
-      </button>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="container my-4 text-center">
-        <Spinner animation="border" />
-      </div>
-    );
-  }
-
-  if (error && !workbench) {
-    return (
-      <div className="container my-4">
-        <Alert variant="danger">{error}</Alert>
-        <Button variant="primary" onClick={() => void loadWorkbench()}>
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  if (!workbench) {
-    return null;
-  }
-
   return (
-    <div className="sfdc-portal coding-portal">
-      <PortalUtilityBar />
-      <CodingPortalHeader
-        title={`Coder workbench – ${workbench.member?.name || workbench.member?.id || ''}`}
-        subtitle={`DOS: ${workbench.encounter?.dos || '—'} • LOB: ${workbench.member?.lob || '—'} • Model Year: ${
-          workbench.model_year || '—'
-        }`}
-        showViewChart
-        onViewChart={handleNavigateLegacy}
-      />
+    <PortalPageLayout {...layoutProps} headerContent={headerContent}>
+      <PortalCard title="Workbench queue" subtitle="Select a suspect to review evidence and finalize.">
+        {error && <Alert variant="danger">{error}</Alert>}
+        <div className="table-responsive">
+          <table className="table align-middle">
+            <thead>
+              <tr>
+                <th>HCC</th>
+                <th>ICD-10</th>
+                <th>Status</th>
+                <th>Evidence</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={5} className="text-center py-3"><Spinner animation="border" /></td>
+                </tr>
+              )}
+              {!loading && suspects.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="text-center text-muted py-3">No suspects.</td>
+                </tr>
+              )}
+              {suspects.map((suspect) => (
+                <tr key={suspect.id}>
+                  <td>{suspect.hcc_code}</td>
+                  <td>{suspect.icd10_code}</td>
+                  <td>{suspect.status}</td>
+                  <td>{suspect.evidence?.length || 0} snippets</td>
+                  <td className="text-end">
+                    <Button size="sm" variant="link" onClick={() => setSelectedSuspect(suspect)}>Open</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </PortalCard>
 
-      <main className="container my-3">
-        {error ? <Alert variant="warning">{error}</Alert> : null}
-        {finalizeResult ? (
-          <Alert variant="success" className="mb-3">
-            Submitted to HCC {finalizeResult.hcc?.id} ({finalizeResult.hcc?.label}) — audit{' '}
-            {finalizeResult.audit_id}
-          </Alert>
-        ) : null}
-        <Row className="g-3">
-          <Col lg={7} md={12}>
-            <Card className="shadow-sm h-100">
-              <Card.Header className="d-flex justify-content-between align-items-center">
-                <span>Document viewer</span>
-                <Badge bg="light" text="dark">
-                  {documents.length || 0} source(s)
-                </Badge>
-              </Card.Header>
-              <Card.Body>
-                <DocumentViewer
-                  documents={documents}
-                  activeSnippet={
-                    activeSuspect?.evidence?.find((item) => item.snippet_id === evidenceUsed?.[0]) || null
-                  }
-                  onRequestDocument={handleDocumentRequest}
-                  onUploadDocument={handleDocumentUpload}
-                />
-              </Card.Body>
-            </Card>
-          </Col>
+      <PortalCard
+        title={selectedSuspect ? `Suspect ${selectedSuspect.hcc_code}` : 'Suspect detail'}
+        subtitle={selectedSuspect ? selectedSuspect.icd10_code : 'Select a suspect to view evidence.'}
+      >
+        {selectedSuspect ? (
+          <Row className="g-3">
+            <Col lg={6}>
+              <Card className="h-100">
+                <Card.Header className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <div className="fw-semibold">Evidence</div>
+                    <div className="text-muted small">{selectedSuspect.evidence?.length || 0} snippets</div>
+                  </div>
+                  <Badge bg="secondary">{selectedSuspect.status}</Badge>
+                </Card.Header>
+                <Card.Body>
+                  <EvidenceSnippetsPanel evidence={selectedSuspect.evidence || []} />
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col lg={6} className="d-flex flex-column gap-3">
+              <Card>
+                <Card.Header className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <div className="fw-semibold">ICD mapping</div>
+                    <div className="text-muted small">Suggested codes</div>
+                  </div>
+                  <Badge bg="info">{selectedSuspect.hcc_code}</Badge>
+                </Card.Header>
+                <Card.Body>
+                  <ICDMapPanel map={icdMap} />
+                </Card.Body>
+              </Card>
+              <Card>
+                <Card.Header className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <div className="fw-semibold">MEAT checklist</div>
+                    <div className="text-muted small">Document review</div>
+                  </div>
+                  <Badge bg="secondary">{user?.email || 'Coder'}</Badge>
+                </Card.Header>
+                <Card.Body>
+                  <MEATChecklist checklist={checklist} onChange={setChecklist} />
+                </Card.Body>
+              </Card>
+              <Card className="flex-fill">
+                <Card.Header className="d-flex justify-content-between align-items-center">
+                  <div>
+                    <div className="fw-semibold">Source document</div>
+                    <div className="text-muted small">PDF preview</div>
+                  </div>
+                  <Badge bg="secondary">{selectedSuspect.document_id}</Badge>
+                </Card.Header>
+                <Card.Body className="p-0" style={{ minHeight: 240 }}>
+                  <DocumentViewer pdfBlob={pdfBlob} isLoading={!pdfBlob} />
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        ) : (
+          <Alert variant="info">Select a suspect from the queue above.</Alert>
+        )}
+      </PortalCard>
 
-          <Col lg={5} md={12}>
-            <Card className="shadow-sm mb-3">
-              <Card.Header className="d-flex justify-content-between align-items-center">
-                <span>Suspects</span>
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => void loadWorkbench()}
-                  disabled={loading}
-                >
-                  Refresh
-                </Button>
-              </Card.Header>
-              <Card.Body>
-                <div className="list-group small">
-                  {workbench.suspects?.length
-                    ? workbench.suspects.map(renderSuspectButton)
-                    : 'No suspects available.'}
-                </div>
-              </Card.Body>
-            </Card>
-
-            <Card className="shadow-sm mb-3">
-              <Card.Header>Evidence (MEAT)</Card.Header>
-              <Card.Body>
-                <EvidenceSnippetsPanel
-                  suspect={activeSuspect}
-                  evidenceUsed={evidenceUsed}
-                  onChange={setEvidenceUsed}
-                />
-              </Card.Body>
-            </Card>
-
-            <Card className="shadow-sm mb-3">
-              <Card.Header>ICD search & mapping</Card.Header>
-              <Card.Body>
-                <ICDMapPanel
-                  selectedICD={selectedICD}
-                  onSelectICD={setSelectedICD}
-                  modelYear={workbench.model_year}
-                  lob={workbench.member?.lob}
-                  fetchMap={workbench ? fetchIcdMapping : null}
-                />
-              </Card.Body>
-            </Card>
-
-            <Card className="shadow-sm">
-              <Card.Header>Checklist & finalize</Card.Header>
-              <Card.Body>
-                <MEATChecklist value={checklist} onChange={setChecklist} />
-                <div className="d-flex gap-2 mt-3">
-                  <Button
-                    variant="primary"
-                    onClick={() => void handleFinalize()}
-                    disabled={!selectedICD || finalizing || !evidenceUsed.length}
-                  >
-                    {finalizing ? <Spinner animation="border" size="sm" /> : 'Finalize'}
-                  </Button>
-                  <Button variant="outline-secondary" disabled>
-                    Create provider query
-                  </Button>
-                </div>
-                <div className="mt-2 small text-muted">
-                  Need the richer chart?{' '}
-                  <Link to={`/coding/member/${memberId}/chart`}>Open legacy member workspace</Link>.
-                </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      </main>
-    </div>
+      <PortalCard title="Finalize" subtitle="Submit codes and export submissions.">
+        {finalizeState.error && <Alert variant="danger">{finalizeState.error}</Alert>}
+        <div className="d-flex flex-wrap gap-2">
+          <Button
+            variant="primary"
+            disabled={!selectedSuspect || finalizeState.submitting}
+            onClick={handleFinalize}
+          >
+            {finalizeState.submitting ? <Spinner animation="border" size="sm" /> : 'Finalize code'}
+          </Button>
+          <Button variant="outline-secondary" onClick={() => navigate('/coding')}>
+            Back to dashboard
+          </Button>
+        </div>
+      </PortalCard>
+    </PortalPageLayout>
   );
 };
 
