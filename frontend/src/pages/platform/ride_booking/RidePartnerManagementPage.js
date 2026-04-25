@@ -1,17 +1,18 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalPageHeader from "../../../components/PortalPageHeader";
 import PortalCard from "../../../components/PortalCard";
 import PortalStat from "../../../components/PortalStat";
 import {
-  addPartner,
-  addPartnerSchedule,
-  getAvailablePartnersForDate,
-  getPartners,
-  upsertPartnerBillingProfile,
+  createPartner,
+  createPartnerSchedule,
+  fetchAvailablePartners,
+  fetchPartners,
+  updatePartnerBillingProfile,
 } from "../../../services/ridePartnerService";
 import { RideBookingService } from "../../../services/rideBookingService";
+import { AuthContext } from "../../../context/AuthContext";
 import "../coding/member/memberWorkspace.css";
 import { RIDE_NAV_ITEMS } from "./rideNavItems";
 
@@ -47,22 +48,28 @@ const formatRecurrence = (schedule) => {
 
 const RidePartnerManagementPage = () => {
   const navigate = useNavigate();
-  const rideBookingService = useMemo(() => new RideBookingService(), []);
+  const { token, tenant } = useContext(AuthContext) || {};
+  const rideBookingService = useMemo(() => new RideBookingService({ token, tenant }), [tenant, token]);
   const [partners, setPartners] = useState([]);
   const [availableToday, setAvailableToday] = useState([]);
   const [rides, setRides] = useState([]);
   const [feedback, setFeedback] = useState(null);
   const [scheduleState, setScheduleState] = useState({});
 
-  const refreshPartners = () => {
-    setPartners(getPartners());
-    setAvailableToday(getAvailablePartnersForDate(new Date()));
-    setRides(rideBookingService.getRecentRides());
+  const refreshPartners = async () => {
+    const [partnerItems, availableItems, rideItems] = await Promise.all([
+      fetchPartners({ token, tenant }),
+      fetchAvailablePartners({ token, tenant, date: new Date() }),
+      rideBookingService.getRecentRides(),
+    ]);
+    setPartners(partnerItems);
+    setAvailableToday(availableItems);
+    setRides(rideItems);
   };
 
   useEffect(() => {
-    refreshPartners();
-  }, [rideBookingService]);
+    void refreshPartners();
+  }, [rideBookingService, tenant, token]);
 
   const scheduleStateFor = (partnerId) => scheduleState[partnerId] || defaultSchedule;
 
@@ -80,7 +87,7 @@ const RidePartnerManagementPage = () => {
     }));
   };
 
-  const handleAddPartner = (event) => {
+  const handleAddPartner = async (event) => {
     event.preventDefault();
     const form = new FormData(event.target);
     const name = form.get("partnerName");
@@ -90,23 +97,31 @@ const RidePartnerManagementPage = () => {
       return;
     }
     try {
-      addPartner({ companyName: name, contactEmail: contact, contactName: name });
+      await createPartner({
+        token,
+        tenant,
+        payload: { companyName: name, contactEmail: contact, contactName: name },
+      });
       setFeedback({ type: "success", message: "Partner added." });
       event.target.reset();
-      refreshPartners();
+      await refreshPartners();
     } catch (error) {
       setFeedback({ type: "danger", message: error?.message || "Unable to add partner." });
     }
   };
 
-  const handleBillingInputChange = (partner, field, value) => {
+  const handleBillingInputChange = async (partner, field, value) => {
     const updated = { ...(partner.billingProfile || {}), [field]: value };
-    upsertPartnerBillingProfile(partner.id, updated);
-    setFeedback({ type: "success", message: "Billing profile updated." });
-    refreshPartners();
+    try {
+      await updatePartnerBillingProfile({ token, tenant, partnerId: partner.id, payload: updated });
+      setFeedback({ type: "success", message: "Billing profile updated." });
+      await refreshPartners();
+    } catch (error) {
+      setFeedback({ type: "danger", message: error?.message || "Unable to update billing profile." });
+    }
   };
 
-  const handleAddSchedule = (partnerId, event) => {
+  const handleAddSchedule = async (partnerId, event) => {
     event.preventDefault();
     const form = scheduleStateFor(partnerId);
     const { frequency, startDate, endDate } = form;
@@ -119,10 +134,14 @@ const RidePartnerManagementPage = () => {
       setFeedback({ type: "danger", message: "Start and end dates are required." });
       return;
     }
-    addPartnerSchedule(partnerId, form);
-    setFeedback({ type: "success", message: "Availability added to the partner calendar." });
-    refreshPartners();
-    resetScheduleForm(partnerId, form.frequency);
+    try {
+      await createPartnerSchedule({ token, tenant, partnerId, payload: form });
+      setFeedback({ type: "success", message: "Availability added to the partner calendar." });
+      await refreshPartners();
+      resetScheduleForm(partnerId, form.frequency);
+    } catch (error) {
+      setFeedback({ type: "danger", message: error?.message || "Unable to publish availability." });
+    }
   };
 
   const ridesByPartner = useMemo(() => {
@@ -215,7 +234,7 @@ const RidePartnerManagementPage = () => {
       </PortalCard>
 
       <PortalCard
-        title="Today’s availability"
+        title="Todayâ€™s availability"
         subtitle="Partners with open slots for rides."
         actions={<button className="portal-ghost-button" onClick={refreshPartners}>Refresh</button>}
       >
@@ -478,3 +497,4 @@ const RidePartnerManagementPage = () => {
 };
 
 export default RidePartnerManagementPage;
+

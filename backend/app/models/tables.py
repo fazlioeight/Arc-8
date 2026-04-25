@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Dict
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.sql import func
 import uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -48,6 +48,8 @@ class Tenant(ControlBase):
     audit_events: Mapped[list["TenantAuditEvent"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
     portal_saved_items: Mapped[list["PortalSavedItem"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
     portal_todos: Mapped[list["PortalTodo"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+    user_preferences: Mapped[list["UserPreference"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+    docs_articles: Mapped[list["DocsArticle"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
 
 
 class TenantAuditEvent(ControlBase):
@@ -78,6 +80,7 @@ class User(ControlBase):
 
     tenant: Mapped[Tenant] = relationship(back_populates="users")
     portal_saved_items: Mapped[list["PortalSavedItem"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    preferences: Mapped[list["UserPreference"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class FhirConnector(ControlBase):
@@ -136,7 +139,7 @@ class PortalSavedItem(ControlBase):
     saved_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
-    metadata: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
+    item_metadata: Mapped[Dict[str, str]] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -145,7 +148,7 @@ class PortalSavedItem(ControlBase):
     )
 
     tenant: Mapped[Tenant] = relationship(back_populates="portal_saved_items")
-    user: Mapped["User"] | None = relationship(back_populates="portal_saved_items")
+    user: Mapped["User | None"] = relationship(back_populates="portal_saved_items")
 
 
 class PortalTodo(ControlBase):
@@ -164,7 +167,7 @@ class PortalTodo(ControlBase):
     status: Mapped[str] = mapped_column(String(32), default="open", nullable=False)
     due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     path: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    metadata: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
+    item_metadata: Mapped[Dict[str, str]] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -173,6 +176,56 @@ class PortalTodo(ControlBase):
     )
 
     tenant: Mapped[Tenant] = relationship(back_populates="portal_todos")
+
+
+class UserPreference(ControlBase):
+    __tablename__ = "user_preferences"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "user_id", "preference_key", name="uq_user_preference_key"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    preference_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    value: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    tenant: Mapped[Tenant] = relationship(back_populates="user_preferences")
+    user: Mapped[User] = relationship(back_populates="preferences")
+
+
+class DocsArticle(ControlBase):
+    __tablename__ = "docs_articles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    app_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(32), default="published", nullable=False, index=True)
+    created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
+    )
+
+    tenant: Mapped[Tenant] = relationship(back_populates="docs_articles")
 
 
 class Member(TenantDataBase):

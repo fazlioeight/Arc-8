@@ -1,4 +1,5 @@
 ﻿const STORAGE_KEY = 'rideSharePartners';
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 
 const DEFAULT_PARTNERS = [
   {
@@ -67,6 +68,27 @@ const WEEKDAY_INDEX = {
 
 const hasBrowserStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
+const shouldUseApi = (token) => {
+  if (!token) return false;
+  return !String(token).toLowerCase().startsWith('sample');
+};
+
+const buildHeaders = (token, tenant) => ({
+  'Content-Type': 'application/json',
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  ...(tenant ? { 'X-Tenant-Key': tenant } : {}),
+});
+
+const handleResponse = async (response) => {
+  const raw = await response.text();
+  const body = raw ? JSON.parse(raw) : null;
+  if (!response.ok) {
+    const detail = body?.detail || response.statusText || 'Request failed';
+    throw new Error(detail);
+  }
+  return body;
+};
+
 const toCloned = (value) => JSON.parse(JSON.stringify(value));
 
 const startOfDay = (value) => {
@@ -74,13 +96,47 @@ const startOfDay = (value) => {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 };
 
-const normalizePartner = (partner) => ({
-  ...partner,
-  schedules: Array.isArray(partner.schedules) ? partner.schedules : [],
-  billingProfile: partner.billingProfile
-    ? { ...partner.billingProfile }
-    : null,
+const normalizeSchedule = (schedule = {}) => ({
+  id: schedule.id,
+  frequency: schedule.frequency,
+  startDate: schedule.startDate || schedule.start_date,
+  endDate: schedule.endDate || schedule.end_date,
+  openSlots: schedule.openSlots ?? schedule.open_slots ?? 0,
+  daysOfWeek: schedule.daysOfWeek || schedule.days_of_week || [],
+  daysOfMonth: schedule.daysOfMonth || schedule.days_of_month || [],
+  notes: schedule.notes || '',
 });
+
+const normalizeBillingProfile = (profile) => {
+  if (!profile) return null;
+  return {
+    payToName: profile.payToName || profile.pay_to_name || '',
+    paymentEmail: profile.paymentEmail || profile.payment_email || '',
+    paymentMethod: profile.paymentMethod || profile.payment_method || 'ach',
+    remitAddress: profile.remitAddress || profile.remit_address || '',
+    taxId: profile.taxId || profile.tax_id || '',
+    updatedAt: profile.updatedAt || profile.updated_at || null,
+  };
+};
+
+const normalizePartner = (partner) => {
+  const companyName = partner.companyName || partner.company_name || partner.name || '';
+  const contactName = partner.contactName || partner.contact_name || '';
+  const contactEmail = partner.contactEmail || partner.contact_email || partner.contact || '';
+  return {
+    ...partner,
+    id: partner.id,
+    name: companyName,
+    contact: contactEmail || contactName,
+    companyName,
+    contactName,
+    contactEmail,
+    contactPhone: partner.contactPhone || partner.contact_phone || '',
+    createdAt: partner.createdAt || partner.created_at || null,
+    schedules: Array.isArray(partner.schedules) ? partner.schedules.map(normalizeSchedule) : [],
+    billingProfile: normalizeBillingProfile(partner.billingProfile || partner.billing_profile),
+  };
+};
 
 const readPartners = () => {
   if (!hasBrowserStorage()) {
@@ -218,12 +274,111 @@ export const getAvailablePartnersForDate = (date = new Date()) => {
       return activeSchedules.length > 0
         ? {
             id: partner.id,
+            name: partner.companyName,
             companyName: partner.companyName,
+            contact: partner.contactEmail || partner.contactName || '',
+            openSlots: activeSchedules.reduce((sum, schedule) => sum + (schedule.openSlots || 0), 0),
             schedules: activeSchedules,
           }
         : null;
     })
     .filter(Boolean);
+};
+
+const toApiPartnerPayload = ({ companyName, contactName, contactEmail, contactPhone }) => ({
+  company_name: companyName,
+  contact_name: contactName,
+  contact_email: contactEmail,
+  contact_phone: contactPhone,
+});
+
+const toApiSchedulePayload = (scheduleInput = {}) => ({
+  frequency: scheduleInput.frequency,
+  start_date: scheduleInput.startDate || scheduleInput.start_date,
+  end_date: scheduleInput.endDate || scheduleInput.end_date,
+  open_slots: Number.parseInt(scheduleInput.openSlots ?? scheduleInput.open_slots, 10) || 0,
+  days_of_week: scheduleInput.daysOfWeek || scheduleInput.days_of_week || [],
+  days_of_month: scheduleInput.daysOfMonth || scheduleInput.days_of_month || [],
+  notes: scheduleInput.notes?.trim() || '',
+});
+
+const toApiBillingPayload = (profileInput = {}) => ({
+  pay_to_name: profileInput.payToName ?? profileInput.pay_to_name ?? '',
+  payment_email: profileInput.paymentEmail ?? profileInput.payment_email ?? '',
+  payment_method: profileInput.paymentMethod ?? profileInput.payment_method ?? 'ach',
+  remit_address: profileInput.remitAddress ?? profileInput.remit_address ?? '',
+  tax_id: profileInput.taxId ?? profileInput.tax_id ?? '',
+});
+
+const dateParam = (date = new Date()) => {
+  const value = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(value.getTime())) return new Date().toISOString().slice(0, 10);
+  return value.toISOString().slice(0, 10);
+};
+
+export const fetchPartners = async ({ token, tenant } = {}) => {
+  if (!shouldUseApi(token)) {
+    return getPartners();
+  }
+  const response = await fetch(`${API_BASE}/api/ride-booking/partners`, {
+    headers: buildHeaders(token, tenant),
+  });
+  const data = await handleResponse(response);
+  return (data?.items || []).map(normalizePartner);
+};
+
+export const createPartner = async ({ token, tenant, payload }) => {
+  if (!shouldUseApi(token)) {
+    return addPartner(payload);
+  }
+  const response = await fetch(`${API_BASE}/api/ride-booking/partners`, {
+    method: 'POST',
+    headers: buildHeaders(token, tenant),
+    body: JSON.stringify(toApiPartnerPayload(payload)),
+  });
+  return normalizePartner(await handleResponse(response));
+};
+
+export const createPartnerSchedule = async ({ token, tenant, partnerId, payload }) => {
+  if (!shouldUseApi(token)) {
+    return addPartnerSchedule(partnerId, payload);
+  }
+  const response = await fetch(`${API_BASE}/api/ride-booking/partners/${partnerId}/schedules`, {
+    method: 'POST',
+    headers: buildHeaders(token, tenant),
+    body: JSON.stringify(toApiSchedulePayload(payload)),
+  });
+  return normalizeSchedule(await handleResponse(response));
+};
+
+export const updatePartnerBillingProfile = async ({ token, tenant, partnerId, payload }) => {
+  if (!shouldUseApi(token)) {
+    return upsertPartnerBillingProfile(partnerId, payload);
+  }
+  const response = await fetch(`${API_BASE}/api/ride-booking/partners/${partnerId}/billing-profile`, {
+    method: 'PATCH',
+    headers: buildHeaders(token, tenant),
+    body: JSON.stringify(toApiBillingPayload(payload)),
+  });
+  return normalizeBillingProfile(await handleResponse(response));
+};
+
+export const fetchAvailablePartners = async ({ token, tenant, date = new Date() } = {}) => {
+  if (!shouldUseApi(token)) {
+    return getAvailablePartnersForDate(date);
+  }
+  const response = await fetch(`${API_BASE}/api/ride-booking/partners/available?date=${encodeURIComponent(dateParam(date))}`, {
+    headers: buildHeaders(token, tenant),
+  });
+  const data = await handleResponse(response);
+  return (data?.items || []).map((partner) => ({
+    id: partner.id,
+    name: partner.company_name,
+    companyName: partner.company_name,
+    contact: '',
+    openSlots: partner.open_slots || 0,
+    schedules: (partner.schedules || []).map(normalizeSchedule),
+  }));
 };
 
 export const clearPartners = () => {

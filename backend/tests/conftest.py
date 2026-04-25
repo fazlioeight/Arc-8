@@ -1,6 +1,7 @@
 ﻿import asyncio
 import os
 import sys
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -16,6 +17,7 @@ if BACKEND_ROOT not in sys.path:
 
 from app.core import config as config_module
 from app.core.config import get_settings
+from app.models import load_all_models
 from app.models.tables import (
     Claim,
     ControlBase,
@@ -31,6 +33,7 @@ from app.models.coding import (
     CodingProvider,
     CodingProviderLocation,
 )
+from app.models.ride_booking import RidePartner, RidePartnerSchedule
 
 TEST_CONTROL_DB = "sqlite+aiosqlite:///./tests/test_control.db"
 TEST_TENANT_DB_TEMPLATE = "sqlite+aiosqlite:///./tests/tenants/{tenant_key}.db"
@@ -82,6 +85,7 @@ async def _bootstrap_async():
     from app.core import config as config_reload
     config_reload.settings = settings
 
+    load_all_models()
     control_engine = create_async_engine(settings.CONTROL_DATABASE_URL, future=True, echo=False)
 
     async with control_engine.begin() as conn:
@@ -97,7 +101,14 @@ async def _bootstrap_async():
             db_connection_uri=TEST_TENANT_DB_TEMPLATE.format(tenant_key=TEST_TENANT_KEY),
             billing_plan="standard",
             phi_data_classification="restricted",
-            purchased_applications={"coding": True, "dashboard": True, "docs": True},
+            purchased_applications={
+                "coding": True,
+                "dashboard": True,
+                "docs": True,
+                "member360": True,
+                "ride_booking": True,
+                "job_center": True,
+            },
         )
         session.add(tenant)
         await session.flush()
@@ -106,7 +117,16 @@ async def _bootstrap_async():
             email="user@example.com",
             password_hash=bcrypt.hashpw(b"password", bcrypt.gensalt()).decode(),
             role="analyst",
-            app_permissions={"coding": "user", "dashboard": "user"},
+            app_permissions={
+                "portal": "user",
+                "coding": "user",
+                "dashboard": "user",
+                "docs": "user",
+                "member360": "user",
+                "ride_booking": "user",
+                "job_center": "user",
+                "settings": "user",
+            },
         )
         session.add(user)
         await session.commit()
@@ -160,6 +180,22 @@ async def _bootstrap_async():
                 city="Austin",
                 state="TX",
                 postal_code="73301",
+            )
+        )
+        ride_partner = RidePartner(
+            company_name="TransitEase Test",
+            contact_name="Transit Ops",
+            contact_email="ops@example.com",
+        )
+        session.add(ride_partner)
+        await session.flush()
+        session.add(
+            RidePartnerSchedule(
+                partner_id=ride_partner.id,
+                frequency="daily",
+                start_date=date(2025, 1, 1),
+                end_date=date(2027, 12, 31),
+                open_slots=4,
             )
         )
         await session.commit()

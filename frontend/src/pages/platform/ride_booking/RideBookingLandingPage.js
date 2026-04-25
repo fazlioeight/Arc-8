@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalPageHeader from "../../../components/PortalPageHeader";
@@ -6,6 +6,7 @@ import PortalCard from "../../../components/PortalCard";
 import PortalStat from "../../../components/PortalStat";
 import { EmptyState, ErrorState, LoadingState } from "../../../components/ehr/Primitives";
 import { RideBookingService } from "../../../services/rideBookingService";
+import { AuthContext } from "../../../context/AuthContext";
 import "../coding/member/memberWorkspace.css";
 import { ROUTES } from "../../../constants/routes";
 import { RIDE_NAV_ITEMS } from "./rideNavItems";
@@ -41,7 +42,8 @@ const statusTone = (status) => {
 
 const RideBookingLandingPage = () => {
   const navigate = useNavigate();
-  const rideBookingService = useMemo(() => new RideBookingService(), []);
+  const { token, tenant } = useContext(AuthContext) || {};
+  const rideBookingService = useMemo(() => new RideBookingService({ token, tenant }), [tenant, token]);
   const [rides, setRides] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

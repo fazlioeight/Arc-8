@@ -135,7 +135,7 @@ const PortalPage = () => {
         color: "#2563eb",
       },
       {
-        key: "jobs/import-data",
+        key: "job_center",
         label: "Jobs / Import Data",
         desc: "Kick off and monitor bulk data imports",
         path: ROUTES.JOBS.IMPORT_DATA,
@@ -185,6 +185,7 @@ const PortalPage = () => {
     purchasedApplications,
     appCatalog,
     token,
+    tenant,
   });
 
   const portalError = overview.error || overviewError;

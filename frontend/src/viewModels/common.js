@@ -230,7 +230,11 @@ export const createPortalOverview = (payload = {}, { catalog = [], fallback } = 
   const applicationsSource = apiApplications.length ? apiApplications : fallbackApplications;
   const applications = applicationsSource.map((app) => createPortalApplication(app, catalog));
 
-  const apiLastSaved = Array.isArray(payload.lastSaved) ? payload.lastSaved : [];
+  const apiLastSaved = Array.isArray(payload.lastSaved)
+    ? payload.lastSaved
+    : Array.isArray(payload.last_saved)
+    ? payload.last_saved
+    : [];
   const fallbackLastSaved = Array.isArray(fallback?.lastSaved) ? fallback.lastSaved : [];
   const lastSavedSource = apiLastSaved.length ? apiLastSaved : fallbackLastSaved;
   const lastSaved = lastSavedSource.map(createPortalSavedItem);

@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from ..core.config import settings
+from ..models import load_all_models
 from ..models.tables import Tenant, TenantDataBase
 
 
@@ -74,6 +75,7 @@ def _resolve_schema(*, slug: str) -> Optional[str]:
 
 
 async def _ensure_tenant_datastore(connection_uri: str, schema: Optional[str]) -> None:
+    load_all_models()
     engine = create_async_engine(connection_uri, future=True, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(TenantDataBase.metadata.create_all)

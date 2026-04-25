@@ -1,5 +1,6 @@
 import { getAvailablePartnersForDate } from './ridePartnerService';
 
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 const STORAGE_KEY = 'rideBookingHistory';
 
 const DEFAULT_RIDES = [
@@ -51,6 +52,27 @@ const DEFAULT_RIDES = [
 ];
 
 const hasBrowserStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+
+const shouldUseApi = (token) => {
+  if (!token) return false;
+  return !String(token).toLowerCase().startsWith('sample');
+};
+
+const buildHeaders = (token, tenant) => ({
+  'Content-Type': 'application/json',
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  ...(tenant ? { 'X-Tenant-Key': tenant } : {}),
+});
+
+const handleResponse = async (response) => {
+  const raw = await response.text();
+  const body = raw ? JSON.parse(raw) : null;
+  if (!response.ok) {
+    const detail = body?.detail || response.statusText || 'Request failed';
+    throw new Error(detail);
+  }
+  return body;
+};
 
 const computeStatus = (scheduledPickup, estimatedDropoff, explicitStatus) => {
   if (explicitStatus) {
@@ -156,22 +178,22 @@ export class RideBookingViewModel {
 
   static fromRecord(record) {
     if (!record) return null;
-    const pickupAt = record.pickupAt || record.scheduledPickup || record.createdAt || new Date().toISOString();
-    const dropoffAt = record.dropoffAt || record.estimatedDropoff || null;
+    const pickupAt = record.pickupAt || record.scheduledPickup || record.scheduled_pickup || record.createdAt || record.created_at || new Date().toISOString();
+    const dropoffAt = record.dropoffAt || record.estimatedDropoff || record.estimated_dropoff || null;
     return new RideBookingViewModel({
       id: record.id,
-      memberId: record.memberId,
-      firstName: record.firstName,
-      lastName: record.lastName,
-      rideType: record.rideType,
+      memberId: record.memberId || record.member_id,
+      firstName: record.firstName || record.first_name,
+      lastName: record.lastName || record.last_name,
+      rideType: record.rideType || record.ride_type,
       pickup: record.pickup,
-      pickupAddress: record.pickupAddress,
+      pickupAddress: record.pickupAddress || record.pickup_address,
       dropoff: record.dropoff,
-      dropoffAddress: record.dropoffAddress,
+      dropoffAddress: record.dropoffAddress || record.dropoff_address,
       pickupAt,
       dropoffAt,
-      createdAt: record.createdAt || pickupAt,
-      costUsd: record.costUsd,
+      createdAt: record.createdAt || record.created_at || pickupAt,
+      costUsd: record.costUsd ?? record.cost_usd,
       status: record.status,
     });
   }
@@ -208,22 +230,77 @@ export const getRideCompaniesForDate = (date = new Date()) => {
   return Array.from(new Set(combined));
 };
 
+const toApiRidePayload = (input = {}) => ({
+  member_id: input.memberId || input.member_id,
+  first_name: input.firstName || input.first_name,
+  last_name: input.lastName || input.last_name,
+  ride_type: input.rideType || input.ride_type,
+  pickup: input.pickup,
+  pickup_address: input.pickupAddress || input.pickup_address,
+  dropoff: input.dropoff,
+  dropoff_address: input.dropoffAddress || input.dropoff_address,
+  scheduled_pickup: input.scheduledPickup || input.scheduled_pickup || input.pickupAt,
+  estimated_dropoff: input.estimatedDropoff || input.estimated_dropoff || input.dropoffAt || null,
+  cost_usd: input.costUsd ?? input.cost_usd,
+  status: input.status,
+});
+
+const dateParam = (date = new Date()) => {
+  const value = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(value.getTime())) return new Date().toISOString().slice(0, 10);
+  return value.toISOString().slice(0, 10);
+};
+
 export class RideBookingService {
   constructor({ token, tenant } = {}) {
     this.token = token;
     this.tenant = tenant;
   }
 
-  getRideOptionsForDate(date = new Date()) {
+  async getRideOptionsForDate(date = new Date()) {
+    if (shouldUseApi(this.token)) {
+      const response = await fetch(`${API_BASE}/api/ride-booking/ride-options?date=${encodeURIComponent(dateParam(date))}`, {
+        headers: buildHeaders(this.token, this.tenant),
+      });
+      const data = await handleResponse(response);
+      return Array.isArray(data?.options) ? data.options : BASE_RIDE_COMPANIES;
+    }
     return getRideCompaniesForDate(date);
   }
 
-  getRecentRides(limit) {
+  async getRecentRides(limit) {
+    if (shouldUseApi(this.token)) {
+      const query = limit ? `?limit=${encodeURIComponent(limit)}` : '';
+      const response = await fetch(`${API_BASE}/api/ride-booking/rides${query}`, {
+        headers: buildHeaders(this.token, this.tenant),
+      });
+      const data = await handleResponse(response);
+      return (data?.items || []).map((record) => RideBookingViewModel.fromRecord(record)).filter(Boolean);
+    }
     return getRecentRides(limit);
   }
 
-  bookRide(input) {
+  async bookRide(input) {
+    if (shouldUseApi(this.token)) {
+      const response = await fetch(`${API_BASE}/api/ride-booking/rides`, {
+        method: 'POST',
+        headers: buildHeaders(this.token, this.tenant),
+        body: JSON.stringify(toApiRidePayload(input)),
+      });
+      const data = await handleResponse(response);
+      return RideBookingViewModel.fromRecord(data);
+    }
     return addRideRecord({ ...input, token: this.token, tenant: this.tenant });
+  }
+
+  async getPayments() {
+    if (shouldUseApi(this.token)) {
+      const response = await fetch(`${API_BASE}/api/ride-booking/payments`, {
+        headers: buildHeaders(this.token, this.tenant),
+      });
+      return handleResponse(response);
+    }
+    return null;
   }
 
   clearHistory() {

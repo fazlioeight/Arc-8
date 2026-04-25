@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useRef, useState } from "react";
+import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalPageHeader from "../../../components/PortalPageHeader";
@@ -27,8 +27,8 @@ const RideBooking = () => {
   const [dropoff, setDropoff] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [dropoffAddress, setDropoffAddress] = useState("");
-  const [rideOptions, setRideOptions] = useState(() => rideBookingService.getRideOptionsForDate(new Date()));
-  const [rideType, setRideType] = useState(() => rideBookingService.getRideOptionsForDate(new Date())[0] || "Other");
+  const [rideOptions, setRideOptions] = useState(["Uber Health", "Lyft Assist", "Other"]);
+  const [rideType, setRideType] = useState("Uber Health");
   const [rideDate, setRideDate] = useState(getLocalDate());
   const [rideTime, setRideTime] = useState(getLocalTime());
   const [estimatedCost, setEstimatedCost] = useState("");
@@ -42,11 +42,30 @@ const RideBooking = () => {
   const isDropoffAutocompleteReady = useGooglePlacesAutocomplete(dropoffAddressInputRef, setDropoffAddress);
   const addressAutocompleteAvailable = isPickupAutocompleteReady || isDropoffAutocompleteReady;
 
-  const refreshRideOptions = () => {
-    const options = rideBookingService.getRideOptionsForDate(new Date());
+  const refreshRideOptions = async () => {
+    const options = await rideBookingService.getRideOptionsForDate(new Date());
     setRideOptions(options);
     setRideType((current) => (current && options.includes(current) ? current : options[0] || "Other"));
   };
+
+  useEffect(() => {
+    let active = true;
+    rideBookingService
+      .getRideOptionsForDate(new Date())
+      .then((options) => {
+        if (!active) return;
+        setRideOptions(options);
+        setRideType((current) => (current && options.includes(current) ? current : options[0] || "Other"));
+      })
+      .catch(() => {
+        if (!active) return;
+        setRideOptions(["Uber Health", "Lyft Assist", "Other"]);
+        setRideType((current) => current || "Uber Health");
+      });
+    return () => {
+      active = false;
+    };
+  }, [rideBookingService]);
 
   const resetForm = () => {
     setMemberId("");
@@ -61,13 +80,13 @@ const RideBooking = () => {
     setEstimatedCost("");
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setFormStatus(null);
     setFormError(null);
     try {
       const scheduledPickupIso = new Date(`${rideDate}T${rideTime || "08:00"}`).toISOString();
-      const record = rideBookingService.bookRide({
+      const record = await rideBookingService.bookRide({
         memberId,
         firstName,
         lastName,

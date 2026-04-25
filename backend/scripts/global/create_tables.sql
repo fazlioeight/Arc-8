@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     db_schema            VARCHAR(128),
     billing_plan         VARCHAR(64)  NOT NULL DEFAULT 'standard',
     feature_flags        JSON         NOT NULL DEFAULT '{}',
+    purchased_applications JSON      NOT NULL DEFAULT '{}',
     sso_metadata         TEXT,
     phi_data_classification VARCHAR(64) NOT NULL DEFAULT 'restricted',
     data_residency       VARCHAR(64),
@@ -49,6 +50,37 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS ix_users_tenant_id ON users(tenant_id);
 CREATE INDEX IF NOT EXISTS ix_users_email     ON users(email);
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+    id             INTEGER PRIMARY KEY,
+    tenant_id      INTEGER      NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id        INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    preference_key VARCHAR(128) NOT NULL,
+    value          JSON         NOT NULL DEFAULT '{}',
+    created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_preference_key UNIQUE (tenant_id, user_id, preference_key)
+);
+
+CREATE INDEX IF NOT EXISTS ix_user_preferences_tenant_id ON user_preferences(tenant_id);
+CREATE INDEX IF NOT EXISTS ix_user_preferences_user_id ON user_preferences(user_id);
+
+CREATE TABLE IF NOT EXISTS docs_articles (
+    id         INTEGER PRIMARY KEY,
+    tenant_id  INTEGER      NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    title      VARCHAR(255) NOT NULL,
+    summary    TEXT,
+    content    TEXT,
+    app_key    VARCHAR(64),
+    tags       JSON         NOT NULL DEFAULT '[]',
+    status     VARCHAR(32)  NOT NULL DEFAULT 'published',
+    created_by VARCHAR(255),
+    created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_docs_articles_tenant_id ON docs_articles(tenant_id);
+CREATE INDEX IF NOT EXISTS ix_docs_articles_status ON docs_articles(status);
 
 CREATE TABLE IF NOT EXISTS usage_counters (
     id        INTEGER PRIMARY KEY,

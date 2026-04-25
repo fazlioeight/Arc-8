@@ -1,9 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Accordion } from "react-bootstrap";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalPageHeader from "../../../components/PortalPageHeader";
 import PortalCard from "../../../components/PortalCard";
 import PortalStat from "../../../components/PortalStat";
+import { AuthContext } from "../../../context/AuthContext";
+import { RideBookingService } from "../../../services/rideBookingService";
 import "../coding/member/memberWorkspace.css";
 import { RIDE_NAV_ITEMS } from "./rideNavItems";
 
@@ -69,15 +71,50 @@ const SAMPLE_PAYMENTS = {
   ],
 };
 
-const getRecentPayments = (filters) => {
+const getRecentPayments = (filters, source = SAMPLE_PAYMENTS) => {
   const matchProvider = (row) => !filters.provider || row.provider === filters.provider;
   const matchSubscriber = (row) => !filters.subscriber || row.subscriber === filters.subscriber;
 
   return {
-    providers: SAMPLE_PAYMENTS.providers.filter(matchProvider),
-    subscribers: SAMPLE_PAYMENTS.subscribers.filter(matchSubscriber),
-    reconciliation: SAMPLE_PAYMENTS.reconciliation,
-    diagrams: SAMPLE_PAYMENTS.diagrams,
+    providers: (source.providers || []).filter(matchProvider),
+    subscribers: (source.subscribers || []).filter(matchSubscriber),
+    reconciliation: source.reconciliation || [],
+    diagrams: source.diagrams || SAMPLE_PAYMENTS.diagrams,
+  };
+};
+
+const mapApiPayments = (payload) => {
+  if (!payload) return null;
+  return {
+    metrics: payload.metrics,
+    payments: {
+      providers: (payload.provider_records || []).map((row) => ({
+        provider: row.counterparty_name,
+        invoice: row.invoice_number,
+        amount: row.amount_usd,
+        status: row.status,
+      })),
+      subscribers: (payload.subscriber_records || []).map((row) => ({
+        subscriber: row.counterparty_name,
+        invoice: row.invoice_number,
+        amount: row.amount_usd,
+        status: row.status,
+      })),
+      reconciliation: (payload.reconciliation || []).map((item) => ({
+        id: item.id,
+        title: item.title,
+        detail: item.detail,
+        date: item.created_at ? new Date(item.created_at).toLocaleDateString() : "Open",
+      })),
+      diagrams: SAMPLE_PAYMENTS.diagrams,
+    },
+    webhookFeed: (payload.events || []).map((entry) => ({
+      id: entry.id,
+      source: entry.source,
+      event: entry.event_type,
+      detail: entry.detail,
+      ts: entry.event_at ? new Date(entry.event_at).toLocaleString() : "",
+    })),
   };
 };
 
@@ -97,13 +134,36 @@ const toneForStatus = (status) => {
 };
 
 const RideBookingPaymentsPage = () => {
+  const { token, tenant } = useContext(AuthContext) || {};
+  const rideBookingService = useMemo(() => new RideBookingService({ token, tenant }), [tenant, token]);
   const [filters, setFilters] = useState({
     timeframe: "last_30_days",
     provider: "",
     subscriber: "",
   });
+  const [apiPayments, setApiPayments] = useState(null);
 
-  const payments = useMemo(() => getRecentPayments(filters), [filters]);
+  useEffect(() => {
+    let active = true;
+    rideBookingService
+      .getPayments()
+      .then((payload) => {
+        if (active) setApiPayments(mapApiPayments(payload));
+      })
+      .catch(() => {
+        if (active) setApiPayments(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [rideBookingService]);
+
+  const payments = useMemo(
+    () => getRecentPayments(filters, apiPayments?.payments || SAMPLE_PAYMENTS),
+    [apiPayments, filters]
+  );
+  const paymentMetrics = apiPayments?.metrics || PAYMENT_METRICS;
+  const webhookFeed = apiPayments?.webhookFeed?.length ? apiPayments.webhookFeed : WEBHOOK_FEED;
   const layoutProps = useMemo(
     () => ({
       backgroundClassName:
@@ -195,7 +255,7 @@ const RideBookingPaymentsPage = () => {
 
       <PortalCard title="Billing overview" subtitle="High-level payout, invoice, and dispute signals." compact>
         <div className="portal-section-grid">
-          {PAYMENT_METRICS.map((metric) => (
+          {paymentMetrics.map((metric) => (
             <PortalStat
               key={metric.id}
               label={metric.label}
@@ -310,7 +370,7 @@ const RideBookingPaymentsPage = () => {
 
         <PortalCard title="Webhook feed" subtitle="Recent webhook events for payments.">
           <ul className="space-y-3">
-            {WEBHOOK_FEED.map((entry) => (
+            {webhookFeed.map((entry) => (
               <li key={entry.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-inner dark:border-slate-700 dark:bg-slate-800">
                 <div className="flex items-center justify-between text-sm text-slate-800 dark:text-slate-100">
                   <span className="font-semibold">{entry.source}</span>

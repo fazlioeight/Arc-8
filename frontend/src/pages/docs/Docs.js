@@ -1,10 +1,11 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
 import PortalHero from '../../components/PortalHero';
 import { AuthContext } from '../../context/AuthContext';
 import { ROUTES } from '../../constants/routes';
+import { searchDocsArticles } from '../../services/docsService';
 import '../platform/coding/member/memberWorkspace.css';
 
 const useQuery = () => {
@@ -14,10 +15,41 @@ const useQuery = () => {
 
 const Docs = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useContext(AuthContext) || {};
+  const { isAuthenticated, token, tenant } = useContext(AuthContext) || {};
   const query = useQuery();
   const qParam = query.get('q') || '';
   const [q, setQ] = useState(qParam);
+  const [articles, setArticles] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+
+  useEffect(() => {
+    setQ(qParam);
+    if (!qParam) {
+      setArticles([]);
+      setSearchError(null);
+      return undefined;
+    }
+    let active = true;
+    setIsLoading(true);
+    setSearchError(null);
+    searchDocsArticles({ token, tenant, query: qParam })
+      .then((payload) => {
+        if (!active) return;
+        setArticles(payload?.articles || []);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setArticles([]);
+        setSearchError(error?.message || 'Unable to search documentation.');
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [qParam, tenant, token]);
 
   const onSubmit = (event) => {
     event.preventDefault();
@@ -66,11 +98,45 @@ const Docs = () => {
         {qParam ? (
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
             <div className="mb-2 text-sm text-slate-600 dark:text-slate-300">
-              Showing placeholder results for: <strong>{qParam}</strong>
+              Showing results for: <strong>{qParam}</strong>
             </div>
-            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-              <em>No indexed docs yet. Connect your docs to enable search.</em>
-            </div>
+            {isLoading && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                Searching documentation...
+              </div>
+            )}
+            {!isLoading && searchError && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+                {searchError}
+              </div>
+            )}
+            {!isLoading && !searchError && articles.length > 0 && (
+              <div className="space-y-3">
+                {articles.map((article) => (
+                  <article
+                    key={article.id}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{article.title}</h2>
+                    {article.summary && <p className="mt-1">{article.summary}</p>}
+                    {Array.isArray(article.tags) && article.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {article.tags.map((tag) => (
+                          <span key={tag} className="rounded-full bg-white px-2 py-1 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+            {!isLoading && !searchError && articles.length === 0 && (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                <em>No indexed docs match this search yet.</em>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-sm text-slate-600 dark:text-slate-300">

@@ -48,8 +48,10 @@ class Settings(BaseSettings):
     PORTAL_APPLICATIONS: Dict[str, Dict[str, str]] = {
         "portal": {"label": "Nexora Portal", "description": "Metrics & insights"},
         "coding": {"label": "Coding Worklists", "description": "Member reviews"},
+        "member360": {"label": "Member 360", "description": "Unified member search"},
         "ride_booking": {"label": "Ride Booking", "description": "Transportation"},
         "dashboard": {"label": "Dashboard", "description": "Analytics view"},
+        "job_center": {"label": "Job Center", "description": "Imports and background jobs"},
         "docs": {"label": "Docs Library", "description": "Knowledge base"},
         "settings": {"label": "Settings", "description": "Preferences"},
         "admin_console": {"label": "Master Admin", "description": "Roles & access"},

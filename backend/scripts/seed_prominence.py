@@ -6,6 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.config import settings
+from app.models import load_all_models
 from app.models.tables import ControlBase, Tenant, TenantDataBase, User
 
 
@@ -15,10 +16,29 @@ TENANT_NAME = "ProminenceHealth"
 TENANT_BILLING_PLAN = "enterprise"
 DEFAULT_ADMIN_EMAIL = "admin@prominencehealth.com"
 DEFAULT_ADMIN_PASSWORD = "admin"
-DEFAULT_APPLICATION_PERMISSIONS = {"coding": "admin", "dashboard": "admin", "docs": "admin"}
+DEFAULT_APPLICATION_PERMISSIONS = {
+    "portal": "admin",
+    "coding": "admin",
+    "dashboard": "admin",
+    "member360": "admin",
+    "ride_booking": "admin",
+    "job_center": "admin",
+    "docs": "admin",
+    "settings": "admin",
+    "admin_console": "admin",
+}
+DEFAULT_PURCHASED_APPLICATIONS = {
+    "coding": True,
+    "dashboard": True,
+    "member360": True,
+    "ride_booking": True,
+    "job_center": True,
+    "docs": True,
+}
 
 
 async def ensure_control_plane() -> str:
+    load_all_models()
     engine = create_async_engine(settings.CONTROL_DATABASE_URL, future=True, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(ControlBase.metadata.create_all)
@@ -40,6 +60,7 @@ async def ensure_control_plane() -> str:
                 billing_plan=TENANT_BILLING_PLAN,
                 db_connection_uri=connection_uri,
                 db_schema=None,
+                purchased_applications=DEFAULT_PURCHASED_APPLICATIONS,
                 phi_data_classification="restricted",
                 data_residency="us-east-1",
                 created_by="seed_prominence",
@@ -52,6 +73,7 @@ async def ensure_control_plane() -> str:
             tenant.billing_plan = TENANT_BILLING_PLAN
             tenant.db_connection_uri = connection_uri
             tenant.db_schema = None
+            tenant.purchased_applications = DEFAULT_PURCHASED_APPLICATIONS
 
         admin = await session.scalar(
             select(User).where(User.email == DEFAULT_ADMIN_EMAIL, User.tenant_id == tenant.id)
@@ -75,6 +97,7 @@ async def ensure_control_plane() -> str:
 
 
 async def ensure_tenant_database(uri: str) -> None:
+    load_all_models()
     engine = create_async_engine(uri, future=True, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(TenantDataBase.metadata.create_all)

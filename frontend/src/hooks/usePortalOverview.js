@@ -114,8 +114,9 @@ export const usePortalOverview = ({
   availableApplications = [],
   purchasedApplications = [],
   appCatalog = [],
-  apiBaseUrl = process.env.REACT_APP_API_URL,
+  apiBaseUrl = process.env.REACT_APP_API_BASE || process.env.REACT_APP_API_URL || "http://localhost:8000",
   token,
+  tenant,
   fallbackBuilder = buildFallbackOverview,
   errorMessage = DEFAULT_ERROR_MESSAGE,
 } = {}) => {
@@ -266,7 +267,10 @@ export const usePortalOverview = ({
         (typeof localStorage !== "undefined"
           ? localStorage.getItem("authToken") || localStorage.getItem("token")
           : null);
-      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const headers = {
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...(tenant ? { "X-Tenant-Key": tenant } : {}),
+      };
 
       try {
         const response = await axios.get(
@@ -300,7 +304,7 @@ export const usePortalOverview = ({
         return applyResult(nextOverview, errorMessage);
       }
     },
-    [apiBaseUrl, errorMessage, fallbackBuilder, resolvedApps, token, user]
+    [apiBaseUrl, errorMessage, fallbackBuilder, resolvedApps, tenant, token, user]
   );
 
   useEffect(() => {

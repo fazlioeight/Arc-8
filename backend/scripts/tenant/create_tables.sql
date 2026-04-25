@@ -101,3 +101,105 @@ CREATE TABLE IF NOT EXISTS coding_provider_locations (
     state         VARCHAR(2),
     postal_code   VARCHAR(10)
 );
+
+CREATE TABLE IF NOT EXISTS ride_partners (
+    id            INTEGER PRIMARY KEY,
+    company_name  VARCHAR(255) NOT NULL,
+    contact_name  VARCHAR(255),
+    contact_email VARCHAR(255),
+    contact_phone VARCHAR(32),
+    status        VARCHAR(32)  NOT NULL DEFAULT 'active',
+    created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_ride_partners_company_name ON ride_partners(company_name);
+
+CREATE TABLE IF NOT EXISTS ride_partner_schedules (
+    id            INTEGER PRIMARY KEY,
+    partner_id    INTEGER     NOT NULL REFERENCES ride_partners(id) ON DELETE CASCADE,
+    frequency     VARCHAR(32) NOT NULL,
+    start_date    DATE        NOT NULL,
+    end_date      DATE        NOT NULL,
+    open_slots    INTEGER     NOT NULL DEFAULT 0,
+    days_of_week  JSON        NOT NULL DEFAULT '[]',
+    days_of_month JSON        NOT NULL DEFAULT '[]',
+    notes         TEXT,
+    created_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_ride_partner_schedules_partner_id ON ride_partner_schedules(partner_id);
+
+CREATE TABLE IF NOT EXISTS ride_partner_billing_profiles (
+    id             INTEGER PRIMARY KEY,
+    partner_id     INTEGER     NOT NULL UNIQUE REFERENCES ride_partners(id) ON DELETE CASCADE,
+    pay_to_name    VARCHAR(255),
+    payment_email  VARCHAR(255),
+    payment_method VARCHAR(64) NOT NULL DEFAULT 'ach',
+    remit_address  TEXT,
+    tax_id         VARCHAR(32),
+    updated_at     TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_ride_partner_billing_profiles_partner_id ON ride_partner_billing_profiles(partner_id);
+
+CREATE TABLE IF NOT EXISTS ride_bookings (
+    id                VARCHAR(36) PRIMARY KEY,
+    partner_id        INTEGER REFERENCES ride_partners(id) ON DELETE SET NULL,
+    member_id         VARCHAR(64)  NOT NULL,
+    first_name        VARCHAR(128) NOT NULL,
+    last_name         VARCHAR(128) NOT NULL,
+    ride_type         VARCHAR(128) NOT NULL,
+    pickup            VARCHAR(255) NOT NULL,
+    pickup_address    VARCHAR(512) NOT NULL,
+    dropoff           VARCHAR(255) NOT NULL,
+    dropoff_address   VARCHAR(512) NOT NULL,
+    scheduled_pickup  TIMESTAMP    NOT NULL,
+    estimated_dropoff TIMESTAMP,
+    cost_usd          FLOAT,
+    status            VARCHAR(32)  NOT NULL DEFAULT 'queued',
+    created_by        VARCHAR(255),
+    created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_ride_bookings_partner_id ON ride_bookings(partner_id);
+CREATE INDEX IF NOT EXISTS ix_ride_bookings_member_id ON ride_bookings(member_id);
+CREATE INDEX IF NOT EXISTS ix_ride_bookings_scheduled_pickup ON ride_bookings(scheduled_pickup);
+CREATE INDEX IF NOT EXISTS ix_ride_bookings_status ON ride_bookings(status);
+
+CREATE TABLE IF NOT EXISTS ride_payment_records (
+    id                VARCHAR(36) PRIMARY KEY,
+    ride_id           VARCHAR(36) REFERENCES ride_bookings(id) ON DELETE SET NULL,
+    payer_type        VARCHAR(32)  NOT NULL,
+    counterparty_name VARCHAR(255) NOT NULL,
+    invoice_number    VARCHAR(64)  NOT NULL,
+    amount_usd        FLOAT        NOT NULL DEFAULT 0,
+    status            VARCHAR(32)  NOT NULL DEFAULT 'open',
+    created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_ride_payment_records_ride_id ON ride_payment_records(ride_id);
+CREATE INDEX IF NOT EXISTS ix_ride_payment_records_invoice_number ON ride_payment_records(invoice_number);
+CREATE INDEX IF NOT EXISTS ix_ride_payment_records_status ON ride_payment_records(status);
+
+CREATE TABLE IF NOT EXISTS ride_reconciliation_items (
+    id         VARCHAR(36) PRIMARY KEY,
+    title      VARCHAR(255) NOT NULL,
+    detail     TEXT,
+    status     VARCHAR(32)  NOT NULL DEFAULT 'open',
+    priority   VARCHAR(32)  NOT NULL DEFAULT 'medium',
+    created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_ride_reconciliation_items_status ON ride_reconciliation_items(status);
+
+CREATE TABLE IF NOT EXISTS ride_payment_events (
+    id         VARCHAR(36) PRIMARY KEY,
+    source     VARCHAR(64)  NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    detail     TEXT,
+    payload    JSON         NOT NULL DEFAULT '{}',
+    event_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

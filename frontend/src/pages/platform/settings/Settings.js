@@ -10,6 +10,7 @@ import DarkModeToggle from "../../../components/DarkModeToggle";
 import ToggleSwitch from "../../../components/ToggleSwitch";
 import { AuthContext } from "../../../context/AuthContext";
 import { useUserPreferences } from "../../../context/UserPreferencesContext";
+import { fetchUserPreferences, updateUserPreferences } from "../../../services/settingsService";
 
 const NAV_ITEMS = [
   { key: "home", label: "Home & Landing" },
@@ -31,7 +32,7 @@ const NAV_ITEMS = [
 
 const Settings = ({ themePreference, setThemePreference }) => {
   const navigate = useNavigate();
-  const { isAuthenticated, role } = useContext(AuthContext) || {};
+  const { isAuthenticated, role, token, tenant } = useContext(AuthContext) || {};
   const { roleMenus, setNavVisibility } = useUserPreferences();
   const [active, setActive] = useState("general");
   const [menuRole, setMenuRole] = useState(() => role || "admin");
@@ -86,6 +87,32 @@ const Settings = ({ themePreference, setThemePreference }) => {
   useEffect(() => {
     localStorage.setItem("liMemories", JSON.stringify(memories));
   }, [memories]);
+
+  useEffect(() => {
+    let active = true;
+    fetchUserPreferences({ token, tenant })
+      .then((payload) => {
+        if (!active || !payload) return;
+        if (payload.settings && Object.keys(payload.settings).length) {
+          setPrefs((current) => ({ ...current, ...payload.settings }));
+        }
+        if (Array.isArray(payload.memories)) {
+          setMemories(payload.memories);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [tenant, token]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    const timer = window.setTimeout(() => {
+      updateUserPreferences({ token, tenant, settings: prefs, memories }).catch(() => {});
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [memories, prefs, tenant, token]);
 
   const exportData = () => {
     const payload = {

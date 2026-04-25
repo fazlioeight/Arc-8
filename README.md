@@ -204,7 +204,7 @@ nexora-platform/
 - `backend/scripts/generate_synthetic_data.py` can populate dev-friendly member, claim, and coding datasets inside a tenant database.
 
 ### Portal Applications & Feature Flags
-- `settings.PORTAL_APPLICATIONS` defines the modules exposed in the React shell (`portal`, `dashboard`, `coding`, `ride_booking`, `docs`, `settings`, `admin_console`). Override it via a JSON `PORTAL_APPLICATIONS` env variable to relabel or hide surfaces.
+- `settings.PORTAL_APPLICATIONS` defines the modules exposed in the React shell (`portal`, `dashboard`, `coding`, `member360`, `ride_booking`, `job_center`, `docs`, `settings`, `admin_console`). Override it via a JSON `PORTAL_APPLICATIONS` env variable to relabel or hide surfaces.
 - Tenant purchase state (`tenant.purchased_applications`) is added during migrations, hydrated by seed scripts, and returned by `/api/tenant/self`; the frontend gates navigation based on these flags.
 - The new `ride_booking` application unlocks transportation scheduling, partner availability, payment reconciliation, and knowledge articles in the portal.
 
@@ -269,6 +269,13 @@ nexora-platform/
 
 **Member analytics & risk**
 - `GET /api/member/{member_id}/costs`, `GET /api/member/{member_id}/risk` - member deep dives and risk scoring detail.
+
+**Portal, ride booking, docs & settings**
+- `GET /api/portal/overview` - tenant-aware application registry, profile summary, saved items, and open to-dos.
+- `GET/POST /api/ride-booking/rides`, `GET/POST /api/ride-booking/partners`, `POST /api/ride-booking/partners/{partner_id}/schedules`, `PATCH /api/ride-booking/partners/{partner_id}/billing-profile` - persisted transportation scheduling and partner management.
+- `GET /api/ride-booking/ride-options`, `GET /api/ride-booking/partners/available`, `GET /api/ride-booking/payments` - ride dropdown options, availability, and payment/reconciliation summaries.
+- `GET/POST /api/docs/articles` - tenant-scoped docs search and admin article creation.
+- `GET/PATCH /api/settings/preferences` - user-scoped workspace preferences and memories.
 
 **Terminology & reference**
 - `GET /api/terminology/icd-map` - ICD code normalization, alternative suggestions, and note prompts for workbench suggestions.
