@@ -5,7 +5,6 @@ import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { UserPreferencesProvider } from './context/UserPreferencesContext';
 import { GuidedTourProvider } from './context/GuidedTourContext';
 import { NotificationsProvider } from './context/NotificationsContext';
-import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles/commandPalette.css';
 import './pages/platform/coding/member/memberWorkspace.css';
 import Navbar from './components/Navbar';
@@ -263,14 +262,13 @@ function App() {
 
       root.classList.toggle('dark-mode', useDark);
       root.classList.toggle('light-mode', !useDark);
+      root.classList.toggle('dark', useDark); // Tailwind dark mode
       root.dataset.theme = resolvedTheme;
-      root.setAttribute('data-bs-theme', resolvedTheme);
 
       if (document.body) {
         document.body.classList.toggle('dark-mode', useDark);
         document.body.classList.toggle('light-mode', !useDark);
         document.body.dataset.theme = resolvedTheme;
-        document.body.setAttribute('data-bs-theme', resolvedTheme);
       }
     };
 

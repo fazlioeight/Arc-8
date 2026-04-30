@@ -2,129 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Optional: match the wireframe surface */
-html, body, #root { height: 100%; }
-body { background: #f3f4f6; color: #111827; }
-
-/* Base reset and modern defaults */
+/* ─── Base reset ─────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
 html:focus-within { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-/* Token palettes and Bootstrap variable hooks */
+/* ─── Design Tokens ──────────────────────────────────────────────────────── */
 :root {
   color-scheme: light dark;
-  --font-sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 
-  /* LinkedIn-inspired Dark tokens */
-  --dm-bg: #1d2226;            /* page background */
-  --dm-bg-light: #21262b;      /* surfaces, inputs */
-  --dm-bg-card: #22262a;       /* cards */
-  --dm-text: #e6e9ec;          /* primary text */
-  --dm-border: #2b3338;        /* borders */
-  --dm-shadow: 0 1px 2px rgba(0,0,0,0.45); /* subtler elevation */
-  --dm-accent: #2a2f34;        /* subtle accents */
-  --dm-input: #262c31;         /* inputs slightly lighter than cards */
+  /* Dark mode surface tokens */
+  --dm-bg:        #1d2226;
+  --dm-bg-light:  #21262b;
+  --dm-bg-card:   #22262a;
+  --dm-text:      #e6e9ec;
+  --dm-border:    #2b3338;
+  --dm-shadow:    0 1px 2px rgba(0,0,0,0.45);
+  --dm-accent:    #2a2f34;
+  --dm-input:     #262c31;
 
-  /* LinkedIn-inspired Light tokens */
-  --lm-bg: #f3f2ef;            /* page background */
-  --lm-bg-light: #ffffff;      /* surfaces, inputs */
-  --lm-bg-card: #ffffff;       /* cards */
-  --lm-text: #1d2226;          /* primary text */
-  --lm-text-muted: #6f7780;    /* secondary text */
-  --lm-border: #e0e0e0;        /* borders */
-  --lm-shadow: 0 1px 3px rgba(0,0,0,0.08); /* subtler elevation */
-  --lm-accent: #eef3f8;        /* subtle accents */
+  /* Light mode surface tokens */
+  --lm-bg:        #f3f2ef;
+  --lm-bg-light:  #ffffff;
+  --lm-bg-card:   #ffffff;
+  --lm-text:      #1d2226;
+  --lm-text-muted:#6f7780;
+  --lm-border:    #e0e0e0;
+  --lm-shadow:    0 1px 3px rgba(0,0,0,0.08);
+  --lm-accent:    #eef3f8;
 
-  /* Semantic mapping (default to light) */
-  --bg: var(--lm-bg);
-  --bg-light: var(--lm-bg-light);
-  --bg-card: var(--lm-bg-card);
-  --text: var(--lm-text);
-  --text-muted: var(--lm-text-muted);
-  --border: var(--lm-border);
-  --shadow: var(--shadow-sm);
-  --accent: var(--lm-accent);
-  --input-bg: var(--lm-bg-light);
+  /* Semantic aliases (default → light) */
+  --bg:        var(--lm-bg);
+  --bg-light:  var(--lm-bg-light);
+  --bg-card:   var(--lm-bg-card);
+  --text:      var(--lm-text);
+  --text-muted:var(--lm-text-muted);
+  --border:    var(--lm-border);
+  --shadow:    var(--shadow-sm);
+  --accent:    var(--lm-accent);
+  --input-bg:  var(--lm-bg-light);
 
-  /* Bootstrap variable hooks for consistent theming */
-  --bs-body-bg: var(--bg);
-  --bs-body-color: var(--text);
-  --bs-card-bg: var(--bg-card);
-  --bs-card-color: var(--text);
-  --bs-border-color: var(--border);
-  --bs-link-color: #0a66c2;
-  --bs-link-hover-color: #084c8a;
-  --bs-navbar-bg: var(--bg-light);
-  --bs-navbar-color: var(--text);
-  --bs-btn-bg: var(--accent);
-  --bs-btn-color: var(--text);
-  --bs-btn-border-color: var(--border);
+  /* Brand */
+  --brand-primary:    #0a66c2;
+  --brand-accent:     #22c55e;
+  --tier-free:        #64748b;
+  --tier-team:        #06b6d4;
+  --tier-enterprise:  #a855f7;
 
-  /* Brand + tier accents */
-  --brand-primary: #0a66c2;   /* LinkedIn blue */
-  --brand-accent: #22c55e;    /* success green */
-  --tier-free: #64748b;       /* slate */
-  --tier-team: #06b6d4;       /* cyan */
-  --tier-enterprise: #a855f7; /* purple */
-
-  /* Motion tokens */
+  /* Motion */
   --easing-standard: cubic-bezier(0.2, 0, 0, 1);
-  --dur-fast: 120ms;
-  --dur-med: 200ms;
-  --dur-slow: 320ms;
+  --dur-fast:   120ms;
+  --dur-med:    200ms;
+  --dur-slow:   320ms;
 
-  /* Layout & spacing scale */
+  /* Spacing */
   --space-3xs: 0.125rem;
   --space-2xs: 0.25rem;
-  --space-xs: 0.5rem;
-  --space-sm: 0.75rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
+  --space-xs:  0.5rem;
+  --space-sm:  0.75rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2rem;
   --space-2xl: 3rem;
   --space-3xl: 4.5rem;
   --content-max-width: 1120px;
 
-  /* Radius & borders */
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
+  /* Radii */
+  --radius-xs:   6px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   18px;
+  --radius-xl:   24px;
   --radius-pill: 999px;
-  --border-width: 1px;
+  --border-width:1px;
 
-  /* Elevation system */
+  /* Elevation */
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
   --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.12);
   --shadow-lg: 0 24px 48px rgba(15, 23, 42, 0.18);
 
-  /* Typography helpers */
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
-  --font-size-md: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.25rem;
+  /* Typography */
+  --font-size-xs:  0.75rem;
+  --font-size-sm:  0.875rem;
+  --font-size-md:  1rem;
+  --font-size-lg:  1.125rem;
+  --font-size-xl:  1.25rem;
   --font-size-2xl: 1.5rem;
   --font-size-3xl: clamp(2.25rem, 2rem + 1vw, 3rem);
-  --line-height-tight: 1.25;
-  --line-height-regular: 1.5;
 
   /* Interaction */
   --transition-quick: 140ms var(--easing-standard);
-  --transition-base: 200ms var(--easing-standard);
-  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 30%, transparent);
-  --focus-ring-strong: 0 0 0 4px color-mix(in srgb, var(--brand-primary) 45%, transparent);
+  --transition-base:  200ms var(--easing-standard);
+  --focus-ring:       0 0 0 3px color-mix(in srgb, var(--brand-primary) 30%, transparent);
 
   /* Semantic states */
   --state-positive: #16a34a;
-  --state-warning: #f59e0b;
+  --state-warning:  #f59e0b;
   --state-critical: #dc2626;
 
-  /* Utility gradients */
+  /* Sheen gradient for skeleton/loading */
   --sheen-gradient: linear-gradient(
     90deg,
     transparent 0%,
@@ -134,188 +119,27 @@ html:focus-within { scroll-behavior: smooth; }
   );
 }
 
-.dark-mode {
-  /* Switch semantic tokens to dark */
-  --bg: var(--dm-bg);
-  --bg-light: var(--dm-bg-light);
-  --bg-card: var(--dm-bg-card);
-  --text: var(--dm-text);
-  --text-muted: #a8b3bd;
-  --border: var(--dm-border);
-  --shadow: var(--dm-shadow);
+/* ─── Dark mode ──────────────────────────────────────────────────────────── */
+/* Both .dark-mode (legacy) and .dark (Tailwind) trigger dark tokens */
+.dark-mode,
+.dark {
+  --bg:        var(--dm-bg);
+  --bg-light:  var(--dm-bg-light);
+  --bg-card:   var(--dm-bg-card);
+  --text:      var(--dm-text);
+  --text-muted:#a8b3bd;
+  --border:    var(--dm-border);
+  --shadow:    var(--dm-shadow);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.45);
   --shadow-md: 0 16px 36px rgba(0,0,0,0.45);
   --shadow-lg: 0 28px 56px rgba(0,0,0,0.58);
-  --accent: var(--dm-accent);
-  --input-bg: var(--dm-input);
-  --focus-ring: 0 0 0 3px rgba(112, 181, 249, 0.45);
-
+  --accent:    var(--dm-accent);
+  --input-bg:  var(--dm-input);
+  --focus-ring:0 0 0 3px rgba(112, 181, 249, 0.45);
   color-scheme: dark;
-  background-color: var(--bg) !important;
-  color: var(--text) !important;
-  min-height: 100vh;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  transition: background-color 0.3s, color 0.3s;
 }
 
-/* Animation utilities */
-.fade-in { opacity: 0; transform: translateY(4px); animation: fadeIn var(--dur-med) var(--easing-standard) forwards; }
-.slide-up { opacity: 0; transform: translateY(12px); animation: slideUp var(--dur-slow) var(--easing-standard) forwards; }
-@keyframes fadeIn { to { opacity: 1; transform: none; } }
-@keyframes slideUp { to { opacity: 1; transform: none; } }
-
-.dark-mode .bg-light {
-  background-color: var(--bg-light) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border);
-  transition: background-color 0.3s, color 0.3s;
-}
-
-.dark-mode .navbar,
-.dark-mode .navbar.bg-primary {
-  background-color: var(--bg-light) !important;
-  color: var(--text) !important;
-  box-shadow: var(--shadow);
-  border-bottom: 1px solid var(--border);
-  transition: background-color 0.3s, color 0.3s;
-}
-
-.dark-mode .card {
-  background-color: var(--bg-card) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  border-radius: 8px;
-  transition: background-color 0.3s, color 0.3s;
-}
-
-/* Dark mode form improvements */
-.dark-mode :where(input, textarea, select) {
-  background-color: var(--input-bg) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
-  box-shadow: none;
-  transition: background-color 0.3s, color 0.3s;
-}
-
-.dark-mode :where(input, textarea)::placeholder { color: var(--text-muted) !important; opacity: 1; }
-
-.dark-mode :where(.form-label, label) {
-  color: var(--text) !important;
-}
-
-/* Optional: Add a subtle highlight on focus */
-.dark-mode :where(input:focus-visible, textarea:focus-visible, select:focus-visible) {
-  border-color: #8ab4f8 !important;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.35);
-}
-
-/* Interactive states */
-.dark-mode :where(button, .btn) {
-  background-color: var(--accent);
-  color: var(--text);
-  border: 1px solid var(--border);
-  transition: background-color 0.2s, color 0.2s;
-}
-
-.dark-mode :where(button:hover, .btn:hover) {
-  background-color: var(--bg-light);
-  color: var(--text);
-}
-
-/* Links */
-.dark-mode a {
-  color: #70b5f9;
-  transition: color 0.2s;
-}
-
-.dark-mode a:hover {
-  color: #9ec9ff;
-  text-decoration: underline;
-}
-
-/* Light mode color palette */
-
-/* Optional light-mode class (default is light via :root mapping) */
-.light-mode {
-  color-scheme: light;
-  background-color: var(--bg) !important;
-  color: var(--text) !important;
-  min-height: 100vh;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  transition: background-color 0.3s, color 0.3s;
-}
-
-.light-mode .bg-light {
-  background-color: var(--bg-light) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border);
-  transition: background-color 0.3s, color 0.3s;
-}
-
-.light-mode .navbar,
-.light-mode .navbar.bg-primary {
-  background-color: var(--bg-light) !important;
-  color: var(--text) !important;
-  box-shadow: var(--shadow);
-  border-bottom: 1px solid var(--border);
-  transition: background-color 0.3s, color 0.3s;
-}
-
-.light-mode .card {
-  background-color: var(--bg-card) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  border-radius: 8px;
-  transition: background-color 0.3s, color 0.3s;
-}
-
-/* Light mode form improvements (tokenized) */
-.light-mode :where(input, textarea, select) {
-  background-color: var(--input-bg) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
-  box-shadow: none;
-  transition: background-color 0.3s, color 0.3s;
-}
-
-.light-mode :where(input, textarea)::placeholder { color: var(--text-muted) !important; opacity: 1; }
-
-.light-mode :where(input:focus-visible, textarea:focus-visible, select:focus-visible) {
-  border-color: color-mix(in oklab, var(--bs-link-color) 60%, var(--border)) !important;
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--bs-link-color) 25%, transparent);
-}
-
-/* Interactive states */
-.light-mode :where(button, .btn) {
-  background-color: var(--accent);
-  color: var(--text);
-  border: 1px solid var(--border);
-  transition: background-color 0.2s, color 0.2s;
-}
-
-.light-mode :where(button:hover, .btn:hover) {
-  background-color: var(--bg-light);
-  color: var(--text);
-}
-
-/* Links */
-.light-mode a {
-  color: var(--bs-link-color);
-  transition: color 0.2s;
-}
-
-.light-mode a:hover {
-  color: var(--bs-link-hover-color);
-  text-decoration: underline;
-}
-
-/* Global typography scale */
+/* ─── Global body ────────────────────────────────────────────────────────── */
 body {
   font-family: var(--font-sans);
   line-height: 1.6;
@@ -323,12 +147,13 @@ body {
   background-color: var(--bg);
   color: var(--text);
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
+
 h1 { font-size: clamp(1.8rem, 1.2rem + 2.2vw, 2.5rem); }
 h2 { font-size: clamp(1.5rem, 1rem + 1.5vw, 2rem); }
 h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
 
-/* Improve focus visibility */
 :focus-visible {
   outline: 2px solid transparent;
   box-shadow: var(--focus-ring);
@@ -336,27 +161,48 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
   border-radius: var(--radius-xs);
 }
 
-/* Form accent color */
 :root { accent-color: #0a66c2; }
 
-/* PortalDashboard.css - Basic styling for the dashboard */
+/* ─── Animation utilities ────────────────────────────────────────────────── */
+.fade-in  { opacity: 0; transform: translateY(4px);  animation: fadeIn  var(--dur-med) var(--easing-standard) forwards; }
+.slide-up { opacity: 0; transform: translateY(12px); animation: slideUp var(--dur-slow) var(--easing-standard) forwards; }
+@keyframes fadeIn  { to { opacity: 1; transform: none; } }
+@keyframes slideUp { to { opacity: 1; transform: none; } }
+
+/* ─── Light mode explicit class (default matches :root) ──────────────────── */
+.light-mode {
+  color-scheme: light;
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+/* ─── Dark mode form + element overrides ────────────────────────────────── */
+.dark-mode :where(input, textarea, select),
+.dark   :where(input, textarea, select) {
+  background-color: var(--input-bg) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+.dark-mode :where(input, textarea)::placeholder,
+.dark   :where(input, textarea)::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 1;
+}
+.dark-mode :where(input:focus-visible, textarea:focus-visible, select:focus-visible),
+.dark   :where(input:focus-visible, textarea:focus-visible, select:focus-visible) {
+  border-color: #8ab4f8 !important;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.35);
+}
+.dark-mode a, .dark a { color: #70b5f9; }
+.dark-mode a:hover, .dark a:hover { color: #9ec9ff; text-decoration: underline; }
+
+/* ─── Portal dashboard legacy ────────────────────────────────────────────── */
 .portal-dashboard {
   font-family: var(--font-sans);
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-  background-color: var(--bg);
-}
-
-.dashboard-header {
-  text-align: center;
-  margin-bottom: 30px;
-  color: var(--text);
-}
-
-.dashboard-header h1 {
-  margin: 0;
-  font-size: 2.5em;
 }
 
 .metrics-grid {
@@ -374,12 +220,6 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
   text-align: center;
 }
 
-.metric-card h2 {
-  margin: 0 0 10px;
-  font-size: 1.5em;
-  color: var(--bs-link-color);
-}
-
 .metric-value {
   font-size: 2em;
   font-weight: bold;
@@ -387,63 +227,13 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
   margin: 10px 0;
 }
 
-.metric-card small {
-  color: var(--text-muted);
-  font-style: italic;
-}
+/* ─── Breadcrumbs ─────────────────────────────────────────────────────────── */
+.global-breadcrumbs { font-size: 0.875rem; }
+.global-breadcrumbs .breadcrumb { margin-bottom: 0; }
 
-.details-section {
-  grid-column: 1 / -1;
-  background: var(--bg-card);
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-}
+.back-link { color: var(--brand-primary); text-decoration: none; font-weight: 500; }
+.back-link:hover, .back-link:focus { text-decoration: underline; }
 
-.loading, .error {
-  text-align: center;
-  font-size: 1.2em;
-  padding: 40px;
-}
-
-.error {
-  color: red;
-}
-
-.dashboard-footer {
-  text-align: center;
-  color: #999;
-  border-top: 1px solid #ddd;
-  padding-top: 20px;
-}
-
-.coding-empty {
-  display: grid;
-  gap: 8px;
-  justify-items: center;
-}
-
-.coding-empty p {
-  margin-bottom: 0;
-}
-
-.global-breadcrumbs {
-  font-size: 0.875rem;
-}
-
-.global-breadcrumbs .breadcrumb {
-  margin-bottom: 0;
-}
-
-.back-link {
-  color: #0d6efd;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.back-link:hover,
-.back-link:focus {
-  color: #0a58ca;
-  text-decoration: underline;
-}
-
+/* ─── Coding empty state ─────────────────────────────────────────────────── */
+.coding-empty { display: grid; gap: 8px; justify-items: center; }
+.coding-empty p { margin-bottom: 0; }

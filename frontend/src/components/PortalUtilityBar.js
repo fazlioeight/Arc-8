@@ -1,4 +1,4 @@
-﻿// components/PortalUtilityBar.js - Shared top utility bar used across portal apps
+// components/PortalUtilityBar.js
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
@@ -6,7 +6,6 @@ import { useCommandPalette } from '../context/CommandPaletteContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
 import { SAMPLE_TENANT_COMMENTS } from '../utils/sampleData';
 import { ROUTES } from '../constants/routes';
-import '../pages/platform/portal_page/portalPage.sfdc.css';
 import Icon from './ui/Icon';
 
 const ROUTE_LABELS = {
@@ -23,36 +22,78 @@ const ROUTE_LABELS = {
   [ROUTES.SETTINGS]: 'Settings',
 };
 
-const PortalUtilityBar = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const {
-    user,
-    logout,
-    hasApplicationAccess,
-    availableApplications = [],
-    purchasedApplications = [],
-    availableTenants = [],
-    tenant,
-    tenantInfo,
-    setTenant,
-    isImpersonating,
-    impersonation,
-    endImpersonation,
-    auditTrail = [],
-    recordAuditEvent,
-  } = useContext(AuthContext) || {};
-  const { openPalette } = useCommandPalette();
-  const {
-    favorites,
-    toggleFavorite,
-    isFavorite,
-    isNavItemEnabled,
-  } = useUserPreferences();
+/* ─── Icon buttons ─────────────────────────────────────────────────────── */
+const iconBtn =
+  'inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white cursor-pointer';
 
-  const [showWaffle, setShowWaffle] = useState(false);
-  const [showNotif, setShowNotif] = useState(false);
-  const [showUser, setShowUser] = useState(false);
+/* ─── Dropdown shell ───────────────────────────────────────────────────── */
+const DropdownShell = ({ children, alignRight = false, className = '' }) => (
+  <div
+    className={[
+      'absolute top-full z-50 mt-1.5 min-w-[260px] rounded-xl border border-slate-200 bg-white py-2 shadow-dropdown',
+      'dark:border-slate-700 dark:bg-slate-900',
+      alignRight ? 'right-0' : 'left-0',
+      className,
+    ].join(' ')}
+  >
+    {children}
+  </div>
+);
+
+const DropdownHeader = ({ children }) => (
+  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+    {children}
+  </div>
+);
+
+const DropdownItem = ({ onClick, children, className = '', statusVariant = '' }) => {
+  const variantMap = {
+    error:   'bg-red-50/60 dark:bg-red-950/30',
+    warning: 'bg-amber-50/60 dark:bg-amber-950/30',
+    info:    'bg-sky-50/60 dark:bg-sky-950/30',
+    '':      '',
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/60',
+        variantMap[statusVariant] || '',
+        className,
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+};
+
+/* ─── SVGs ─────────────────────────────────────────────────────────────── */
+const WaffleIcon  = () => <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z"/></svg>;
+const HomeIcon    = () => <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M12 3l9 7h-2v9h-5v-6H10v6H5v-9H3l9-7z"/></svg>;
+const CmdIcon     = () => <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M5 4h14a1 1 0 011 1v3H4V5a1 1 0 011-1zm-1 7h16a1 1 0 011 1v7H3v-7a1 1 0 011-1zm4 2v2h2v-2H8zm4 0v2h2v-2h-2z"/></svg>;
+const BellIcon    = () => <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V9a6 6 0 10-12 0v7L4 18v1h16v-1l-2-2z"/></svg>;
+const JobsIcon    = () => <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M5 4h14l1 4H4l1-4zm-1 6h16v9H4v-9zm4 2v5h2v-5H8zm4 0v5h2v-5h-2z"/></svg>;
+const ChevronDown = () => <svg className="h-3.5 w-3.5 fill-current opacity-60" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg>;
+
+/* ─── Component ────────────────────────────────────────────────────────── */
+const PortalUtilityBar = () => {
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const {
+    user, logout, hasApplicationAccess,
+    availableApplications = [], availableTenants = [],
+    tenant, tenantInfo, setTenant,
+    isImpersonating, impersonation, endImpersonation,
+    auditTrail = [], recordAuditEvent,
+  } = useContext(AuthContext) || {};
+
+  const { openPalette } = useCommandPalette();
+  const { favorites, toggleFavorite, isFavorite, isNavItemEnabled } = useUserPreferences();
+
+  const [showWaffle,     setShowWaffle]     = useState(false);
+  const [showNotif,      setShowNotif]      = useState(false);
+  const [showUser,       setShowUser]       = useState(false);
   const [showTenantMenu, setShowTenantMenu] = useState(false);
   const barRef = useRef(null);
 
@@ -64,42 +105,31 @@ const PortalUtilityBar = () => {
   };
 
   useEffect(() => {
-    const onDocClick = (event) => {
-      if (!barRef.current) return;
-      if (!barRef.current.contains(event.target)) {
-        closeAll();
-      }
+    const onDocClick = (e) => {
+      if (barRef.current && !barRef.current.contains(e.target)) closeAll();
     };
     document.addEventListener('click', onDocClick);
     return () => document.removeEventListener('click', onDocClick);
   }, []);
 
-  const applicationTiles = useMemo(
-    () => [
-      { key: 'portal', label: 'Nexora Portal', desc: 'Metrics & insights', icon: 'NP', color: '#0176d3', path: ROUTES.PORTAL.LANDING },
-      // { key: 'dashboard', label: 'Analytics Dashboard', desc: 'KPIs & RAF', icon: 'DB', color: '#a855f7', path: '/dashboard' },
-      { key: 'coding', label: 'Coding Worklists', desc: 'Member reviews', icon: 'CD', color: '#0f172a', path: ROUTES.CODING.LANDING },
-      { key: 'member360', label: 'Member 360', desc: 'Chart launchpad', icon: 'M3', color: '#0891b2', path: ROUTES.MEMBER_360.LANDING },
-      { key: 'ride_booking', label: 'Ride Booking', desc: 'Transportation', icon: 'RB', color: '#0ea5e9', path: ROUTES.RIDE_BOOKING.LANDING },
-      { key: 'docs', label: 'Docs Library', desc: 'Knowledge base', icon: 'DL', color: '#6366f1', path: ROUTES.DOCS },
-      //{ key: 'settings', label: 'Settings', desc: 'Preferences', icon: 'ST', color: '#64748b', path: ROUTES.SETTINGS },
-      { key: 'job_center', label: 'Job Center', desc: 'Logs & retry', icon: 'JC', color: '#0f766e', path: ROUTES.JOBS.STATUS_CENTER },
-      { key: 'admin_console', label: 'Master Admin', desc: 'Roles & access', icon: 'MA', color: '#dc2626', path: ROUTES.ADMIN.MASTER, requiredLevel: 'admin' },
-    ],
-    []
-  );
+  const applicationTiles = useMemo(() => [
+    { key: 'portal',       label: 'Nexora Portal',    desc: 'Metrics & insights',  icon: 'NP', color: '#0176d3', path: ROUTES.PORTAL.LANDING },
+    { key: 'coding',       label: 'Coding Worklists', desc: 'Member reviews',      icon: 'CD', color: '#0f172a', path: ROUTES.CODING.LANDING },
+    { key: 'member360',    label: 'Member 360',       desc: 'Chart launchpad',     icon: 'M3', color: '#0891b2', path: ROUTES.MEMBER_360.LANDING },
+    { key: 'ride_booking', label: 'Ride Booking',     desc: 'Transportation',      icon: 'RB', color: '#0ea5e9', path: ROUTES.RIDE_BOOKING.LANDING },
+    { key: 'docs',         label: 'Docs Library',     desc: 'Knowledge base',      icon: 'DL', color: '#6366f1', path: ROUTES.DOCS },
+    { key: 'job_center',   label: 'Job Center',       desc: 'Logs & retry',        icon: 'JC', color: '#0f766e', path: ROUTES.JOBS.STATUS_CENTER },
+    { key: 'admin_console',label: 'Master Admin',     desc: 'Roles & access',      icon: 'MA', color: '#dc2626', path: ROUTES.ADMIN.MASTER, requiredLevel: 'admin' },
+  ], []);
 
   const accessibleApps = useMemo(() => {
     if (!hasApplicationAccess) return [];
     const enabledKeys = new Set(
-      (availableApplications && availableApplications.length)
-        ? availableApplications
-        : applicationTiles.map((app) => app.key)
+      availableApplications?.length ? availableApplications : applicationTiles.map((a) => a.key)
     );
     return applicationTiles.filter((app) => {
       if (!enabledKeys.has(app.key)) return false;
-      const level = app.requiredLevel || 'user';
-      if (!hasApplicationAccess(app.key, level)) return false;
+      if (!hasApplicationAccess(app.key, app.requiredLevel || 'user')) return false;
       if (app.key !== 'portal' && !isNavItemEnabled(app.key)) return false;
       return true;
     });
@@ -109,34 +139,17 @@ const PortalUtilityBar = () => {
 
   const jobAlerts = useMemo(() => {
     const items = [];
-    const failedJob = recentEvents.find((event) => event.action === 'job.failed');
-    if (failedJob) {
-      items.push({
-        id: failedJob.id,
-        title: 'A job needs attention',
-        hint: failedJob.metadata?.jobName || 'Review in Job Center',
-        status: 'error',
-      });
-    }
-    if (!failedJob && hasApplicationAccess?.('job_center')) {
-      items.push({
-        id: 'job-center',
-        title: 'Monitor long-running jobs',
-        hint: 'Check progress or download logs',
-        status: 'info',
-      });
-    }
-    const impersonationEvent = isImpersonating
-      ? { id: 'impersonation', title: `Impersonating ${impersonation?.name || impersonation?.email}`, hint: 'All actions are audit logged.', status: 'warning' }
-      : null;
-    if (impersonationEvent) items.unshift(impersonationEvent);
+    const failedJob = recentEvents.find((e) => e.action === 'job.failed');
+    if (failedJob) items.push({ id: failedJob.id, title: 'A job needs attention', hint: failedJob.metadata?.jobName || 'Review in Job Center', status: 'error' });
+    else if (hasApplicationAccess?.('job_center')) items.push({ id: 'job-center', title: 'Monitor long-running jobs', hint: 'Check progress or download logs', status: 'info' });
+    if (isImpersonating) items.unshift({ id: 'impersonation', title: `Impersonating ${impersonation?.name || impersonation?.email}`, hint: 'All actions are audit logged.', status: 'warning' });
     return items;
   }, [recentEvents, hasApplicationAccess, isImpersonating, impersonation]);
 
-  const handleTenantSelect = (tenantKey) => {
-    setTenant?.(tenantKey);
+  const handleTenantSelect = (key) => {
+    setTenant?.(key);
     setShowTenantMenu(false);
-    recordAuditEvent?.('tenant.switch.via_utility', { tenant: tenantKey });
+    recordAuditEvent?.('tenant.switch.via_utility', { tenant: key });
   };
 
   const handleCommandPalette = () => {
@@ -145,257 +158,256 @@ const PortalUtilityBar = () => {
     openPalette();
   };
 
-  const initials = (user?.email || '?').slice(0, 1).toUpperCase();
+  const initials = (user?.email || '?')[0].toUpperCase();
   const currentPath = location.pathname;
   const resolvedFavoriteLabel = useMemo(() => {
     if (ROUTE_LABELS[currentPath]) return ROUTE_LABELS[currentPath];
-    const matchingTile = applicationTiles.find((app) => currentPath.startsWith(app.path));
-    if (matchingTile) return matchingTile.label;
-    return document.title || currentPath;
+    const tile = applicationTiles.find((a) => currentPath.startsWith(a.path));
+    return tile ? tile.label : document.title || currentPath;
   }, [currentPath, applicationTiles]);
+
   const isCurrentFavorite = isFavorite(currentPath);
   const handleFavoriteToggle = () => {
-    const nextPinned = !isCurrentFavorite;
     toggleFavorite({ path: currentPath, label: resolvedFavoriteLabel });
-    recordAuditEvent?.('navigation.favorite.toggle', {
-      path: currentPath,
-      label: resolvedFavoriteLabel,
-      pinned: nextPinned,
-    });
+    recordAuditEvent?.('navigation.favorite.toggle', { path: currentPath, label: resolvedFavoriteLabel, pinned: !isCurrentFavorite });
   };
 
   return (
     <>
+      {/* Impersonation banner */}
       {isImpersonating && (
-        <div className="portal-impersonation" role="status">
-          <div>
+        <div className="flex items-center justify-between gap-3 border-b border-sky-200/60 bg-sky-50/80 px-4 py-1.5 text-sm text-sky-800 dark:border-sky-700/40 dark:bg-sky-950/40 dark:text-sky-200">
+          <span>
             Acting as <strong>{impersonation?.name || impersonation?.email}</strong>
-            <span> ? all actions are recorded.</span>
-          </div>
+            {' '}&mdash; all actions are recorded.
+          </span>
           <button
             type="button"
-            onClick={() => {
-              recordAuditEvent?.('impersonation.banner_exit');
-              endImpersonation?.();
-            }}
+            className="rounded-md bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-900 hover:bg-sky-200 dark:bg-sky-900/50 dark:text-sky-100 dark:hover:bg-sky-800/60"
+            onClick={() => { recordAuditEvent?.('impersonation.banner_exit'); endImpersonation?.(); }}
           >
             Return to self
           </button>
         </div>
       )}
-      <div className="sfdc-utilitybar" ref={barRef}>
-        <div className="sfdc-utilitybar__content">
-          <div className="sfdc-utilitybar__left">
+
+      {/* Bar */}
+      <div
+        ref={barRef}
+        className="relative z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/90"
+      >
+        <div className="mx-auto flex max-w-content items-center justify-between gap-3 px-4 py-2">
+
+          {/* ── Left cluster ────────────────────────── */}
+          <div className="flex items-center gap-1.5">
+            {/* Waffle */}
+            <div className="relative">
+              <button
+                className={iconBtn}
+                title="App launcher"
+                aria-haspopup="true"
+                aria-expanded={showWaffle}
+                onClick={(e) => { e.stopPropagation(); setShowWaffle((v) => !v); setShowNotif(false); setShowUser(false); setShowTenantMenu(false); }}
+              >
+                <WaffleIcon />
+              </button>
+              {showWaffle && (
+                <div
+                  className="absolute left-0 top-full z-50 mt-1.5 w-[min(90vw,560px)] rounded-xl border border-slate-200 bg-white p-3 shadow-dropdown dark:border-slate-700 dark:bg-slate-900"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <DropdownHeader>Quick links</DropdownHeader>
+                  <div className="mt-1.5 grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2">
+                    {accessibleApps.map((app) => (
+                      <button
+                        key={app.key}
+                        type="button"
+                        className="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60"
+                        onClick={() => { closeAll(); navigate(app.path); }}
+                      >
+                        <span
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm"
+                          style={{ background: app.color }}
+                        >
+                          {app.icon}
+                        </span>
+                        <span>
+                          <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">{app.label}</span>
+                          <span className="block text-xs text-slate-500 dark:text-slate-400">{app.desc}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Home */}
             <button
-              className="sfdc-iconbutton"
-              title="App launcher"
-              aria-haspopup="true"
-              aria-expanded={showWaffle}
-              onClick={(event) => {
-                event.stopPropagation();
-                setShowWaffle((value) => !value);
-                setShowNotif(false);
-                setShowUser(false);
-                setShowTenantMenu(false);
-              }}
+              className={iconBtn}
+              title="Portal home"
+              onClick={(e) => { e.stopPropagation(); closeAll(); navigate(ROUTES.PORTAL.LANDING); }}
             >
-              <svg viewBox="0 0 24 24"><path d="M4 4h4v4H4V4zm6 0h4v4h-4V4zm6 0h4v4h-4V4zM4 10h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4zM4 16h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z"/></svg>
+              <HomeIcon />
             </button>
+
+            {/* Command palette */}
             <button
-              className="sfdc-iconbutton"
-              title="Home"
-              aria-label="Home"
-              onClick={(event) => {
-                event.stopPropagation();
-                closeAll();
-                navigate(ROUTES.PORTAL.LANDING);
-              }}
-            >
-              <svg viewBox="0 0 24 24"><path d="M12 3l9 7h-2v9h-5v-6H10v6H5v-9H3l9-7z"/></svg>
-            </button>
-            <button
-              className="sfdc-iconbutton"
+              className={iconBtn}
               title="Command palette"
-              aria-label="Command palette"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleCommandPalette();
-              }}
+              onClick={(e) => { e.stopPropagation(); handleCommandPalette(); }}
             >
-              <svg viewBox="0 0 24 24"><path d="M5 4h14a1 1 0 011 1v3H4V5a1 1 0 011-1zm-1 7h16a1 1 0 011 1v7H3v-7a1 1 0 011-1zm4 2v2h2v-2H8zm4 0v2h2v-2h-2z"/></svg>
-              <span className="sfdc-badge">Ctrl+K</span>
+              <CmdIcon />
+              <span className="ml-0.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                Ctrl+K
+              </span>
             </button>
+
+            {/* Favorite toggle */}
             <button
-              className={`sfdc-iconbutton favorite-toggle${isCurrentFavorite ? ' is-active' : ''}`}
+              className={[iconBtn, isCurrentFavorite ? 'text-amber-500 dark:text-amber-400' : ''].join(' ')}
               aria-pressed={isCurrentFavorite}
-              type="button"
               title={isCurrentFavorite ? 'Unpin from favorites' : 'Pin this page'}
-              onClick={(event) => {
-                event.stopPropagation();
-                handleFavoriteToggle();
-              }}
+              onClick={(e) => { e.stopPropagation(); handleFavoriteToggle(); }}
             >
               <Icon name={isCurrentFavorite ? 'starFilled' : 'star'} size={16} aria-hidden="true" />
             </button>
-            <button
-              className="sfdc-tenantbutton"
-              aria-haspopup="true"
-              aria-expanded={showTenantMenu}
-              onClick={(event) => {
-                event.stopPropagation();
-                setShowTenantMenu((value) => !value);
-                setShowWaffle(false);
-                setShowNotif(false);
-                setShowUser(false);
-              }}
-            >
-              <span className="sfdc-tenantbutton__label">{tenantInfo?.name || tenant}</span>
-              <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg>
-            </button>
+
+            {/* Tenant switcher */}
+            <div className="relative">
+              <button
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-sky-600"
+                aria-haspopup="true"
+                aria-expanded={showTenantMenu}
+                onClick={(e) => { e.stopPropagation(); setShowTenantMenu((v) => !v); setShowWaffle(false); setShowNotif(false); setShowUser(false); }}
+              >
+                <span>{tenantInfo?.name || tenant}</span>
+                <ChevronDown />
+              </button>
+              {showTenantMenu && (
+                <DropdownShell className="min-w-[320px]" onClick={(e) => e.stopPropagation()}>
+                  <DropdownHeader>Switch tenant</DropdownHeader>
+                  <div className="mt-1 space-y-1 px-2">
+                    {availableTenants.map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        className={[
+                          'w-full rounded-lg border px-3 py-2.5 text-left text-sm transition',
+                          opt.key === tenant
+                            ? 'border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-950/40'
+                            : 'border-slate-200/80 hover:border-sky-200 hover:bg-slate-50 dark:border-slate-700/60 dark:hover:border-sky-700 dark:hover:bg-slate-800/50',
+                        ].join(' ')}
+                        onClick={() => handleTenantSelect(opt.key)}
+                      >
+                        <div className="font-semibold text-slate-800 dark:text-slate-100">{opt.name}</div>
+                        <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                          {opt.region || 'Unknown region'} &middot; {opt.timezone || 'Timezone TBD'}
+                        </div>
+                        {SAMPLE_TENANT_COMMENTS[opt.key] && (
+                          <div className="mt-0.5 text-xs text-sky-600 dark:text-sky-400">{SAMPLE_TENANT_COMMENTS[opt.key]}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-2 border-t border-slate-200 px-3 pt-2 pb-1 text-xs text-slate-400 dark:border-slate-700 dark:text-slate-500">
+                    Need a sandbox reset? Contact support.
+                  </div>
+                </DropdownShell>
+              )}
+            </div>
           </div>
-          <div className="sfdc-utilitybar__right">
+
+          {/* ── Right cluster ───────────────────────── */}
+          <div className="flex items-center gap-1.5">
+            {/* Jobs */}
             {hasApplicationAccess?.('job_center') && (
               <button
-                className="sfdc-iconbutton"
+                className={iconBtn}
                 title="Job & Status Center"
-                aria-label="Job and status center"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  closeAll();
-                  navigate(ROUTES.JOBS.STATUS_CENTER);
-                }}
+                onClick={(e) => { e.stopPropagation(); closeAll(); navigate(ROUTES.JOBS.STATUS_CENTER); }}
               >
-                <svg viewBox="0 0 24 24"><path d="M5 4h14l1 4H4l1-4zm-1 6h16v9H4v-9zm4 2v5h2v-5H8zm4 0v5h2v-5h-2z"/></svg>
+                <JobsIcon />
               </button>
             )}
-            <button
-              className="sfdc-iconbutton"
-              title="Notifications"
-              aria-haspopup="true"
-              aria-expanded={showNotif}
-              onClick={(event) => {
-                event.stopPropagation();
-                setShowNotif((value) => !value);
-                setShowWaffle(false);
-                setShowUser(false);
-                setShowTenantMenu(false);
-              }}
-            >
-              <svg viewBox="0 0 24 24"><path d="M12 22a2 2 0 002-2H10a2 2 0 002 2zm6-6V9a6 6 0 10-12 0v7L4 18v1h16v-1l-2-2z"/></svg>
-            </button>
-            <button
-              className="sfdc-avatar"
-              title="Account"
-              aria-haspopup="true"
-              aria-expanded={showUser}
-              onClick={(event) => {
-                event.stopPropagation();
-                setShowUser((value) => !value);
-                setShowWaffle(false);
-                setShowNotif(false);
-                setShowTenantMenu(false);
-              }}
-            >
-              {initials}
-            </button>
+
+            {/* Notifications */}
+            <div className="relative">
+              <button
+                className={iconBtn}
+                title="Notifications"
+                aria-haspopup="true"
+                aria-expanded={showNotif}
+                onClick={(e) => { e.stopPropagation(); setShowNotif((v) => !v); setShowWaffle(false); setShowUser(false); setShowTenantMenu(false); }}
+              >
+                <BellIcon />
+              </button>
+              {showNotif && (
+                <DropdownShell alignRight onClick={(e) => e.stopPropagation()}>
+                  <DropdownHeader>Notifications</DropdownHeader>
+                  {jobAlerts.length === 0 && (
+                    <p className="px-3 py-2 text-sm text-slate-400 dark:text-slate-500">
+                      No alerts &mdash; you&rsquo;re all caught up!
+                    </p>
+                  )}
+                  {jobAlerts.map((alert) => (
+                    <DropdownItem key={alert.id} statusVariant={alert.status}>
+                      <div>
+                        <div className="text-sm font-medium">{alert.title}</div>
+                        <div className="text-xs text-slate-400 dark:text-slate-500">{alert.hint}</div>
+                      </div>
+                    </DropdownItem>
+                  ))}
+                  {recentEvents.length > 0 && (
+                    <>
+                      <div className="my-1.5 border-t border-slate-200 dark:border-slate-700" />
+                      <DropdownHeader>Recent activity</DropdownHeader>
+                      {recentEvents.map((evt) => (
+                        <DropdownItem key={evt.id}>
+                          <div>
+                            <div className="text-sm font-medium">{evt.action}</div>
+                            <div className="text-xs text-slate-400 dark:text-slate-500">{new Date(evt.timestamp).toLocaleString()}</div>
+                          </div>
+                        </DropdownItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownShell>
+              )}
+            </div>
+
+            {/* Avatar / User menu */}
+            <div className="relative">
+              <button
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-brand-800 text-[13px] font-bold text-white shadow-sm transition hover:brightness-110"
+                title="Account"
+                aria-haspopup="true"
+                aria-expanded={showUser}
+                onClick={(e) => { e.stopPropagation(); setShowUser((v) => !v); setShowWaffle(false); setShowNotif(false); setShowTenantMenu(false); }}
+              >
+                {initials}
+              </button>
+              {showUser && (
+                <DropdownShell alignRight onClick={(e) => e.stopPropagation()}>
+                  <DropdownItem onClick={() => { closeAll(); navigate(ROUTES.SETTINGS); }}>
+                    <span className="text-sm font-medium">Profile &amp; preferences</span>
+                  </DropdownItem>
+                  <DropdownItem onClick={() => { closeAll(); handleCommandPalette(); }}>
+                    <span className="flex-1 text-sm font-medium">Open command palette</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">⌘K</span>
+                  </DropdownItem>
+                  <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
+                  <DropdownItem onClick={() => { closeAll(); logout?.(); navigate('/login'); }}>
+                    <span className="text-sm font-medium text-red-600 dark:text-red-400">Log out</span>
+                  </DropdownItem>
+                </DropdownShell>
+              )}
+            </div>
           </div>
         </div>
-
-        {showWaffle && (
-          <div className="sfdc-waffle" onClick={(event) => event.stopPropagation()}>
-            <div className="sfdc-dropdown__header">Quick Links</div>
-            <div className="sfdc-waffle__grid">
-              {accessibleApps.map((app) => (
-                <div key={app.key} className="sfdc-app" onClick={() => { closeAll(); navigate(app.path); }}>
-                  <div className="sfdc-app__icon" style={{ background: app.color }}>{app.icon}</div>
-                  <div>
-                    <div className="sfdc-app__name">{app.label}</div>
-                    <div className="sfdc-app__desc">{app.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {showTenantMenu && (
-          <div className="sfdc-dropdown sfdc-dropdown--tenant" onClick={(event) => event.stopPropagation()}>
-            <div className="sfdc-dropdown__header">Switch tenant</div>
-            <div className="sfdc-dropdown__body">
-              {availableTenants.map((option) => (
-                <button
-                  key={option.key}
-                  type="button"
-                  className={`sfdc-tenantoption${option.key === tenant ? ' is-active' : ''}`}
-                  onClick={() => handleTenantSelect(option.key)}
-                >
-                  <div className="sfdc-tenantoption__title">{option.name}</div>
-                  <div className="sfdc-tenantoption__meta">{option.region || 'Unknown region'} ? {option.timezone || 'Timezone TBD'}</div>
-                  {SAMPLE_TENANT_COMMENTS[option.key] && (
-                    <div className="sfdc-tenantoption__hint">{SAMPLE_TENANT_COMMENTS[option.key]}</div>
-                  )}
-                </button>
-              ))}
-            </div>
-            <div className="sfdc-dropdown__footer">
-              Need a sandbox reset? Contact support.
-            </div>
-          </div>
-        )}
-
-        {showNotif && (
-          <div className="sfdc-dropdown sfdc-dropdown--right" onClick={(event) => event.stopPropagation()}>
-            <div className="sfdc-dropdown__header">Notifications</div>
-            {jobAlerts.length === 0 && (
-              <div className="sfdc-dropdown__empty">No alerts. You're all caught up!</div>
-            )}
-            {jobAlerts.map((alert) => (
-              <div key={alert.id} className={`sfdc-dropdown__item sfdc-dropdown__item--${alert.status || 'info'}`}>
-                <div>
-                  <div>{alert.title}</div>
-                  <div className="sfdc-dropdown__hint">{alert.hint}</div>
-                </div>
-              </div>
-            ))}
-            {recentEvents.length > 0 && (
-              <div className="sfdc-dropdown__section">
-                <div className="sfdc-dropdown__header">Recent activity</div>
-                {recentEvents.map((event) => (
-                  <div key={event.id} className="sfdc-dropdown__item">
-                    <div>
-                      <div>{event.action}</div>
-                      <div className="sfdc-dropdown__hint">{new Date(event.timestamp).toLocaleString()}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {showUser && (
-          <div className="sfdc-dropdown sfdc-dropdown--right" onClick={(event) => event.stopPropagation()}>
-            <div className="sfdc-dropdown__item" onClick={() => { closeAll(); navigate(ROUTES.SETTINGS); }}>
-              <div>Profile & preferences</div>
-            </div>
-            <div className="sfdc-dropdown__item" onClick={() => { closeAll(); handleCommandPalette(); }}>
-              <div>Open command palette</div>
-              <div className="sfdc-dropdown__hint">?K</div>
-            </div>
-            <div className="sfdc-dropdown__item" onClick={() => { closeAll(); logout?.(); navigate('/login'); }}>
-              <div>Logout</div>
-            </div>
-          </div>
-        )}
       </div>
     </>
   );
 };
 
 export default PortalUtilityBar;
-
-
-
-
-
-

@@ -1,10 +1,15 @@
-import React, { useMemo } from "react";
-import "../styles/portalPattern.css";
+import React from "react";
 
-const ALIGNMENT = {
-  left: { stack: "items-start text-left", actions: "justify-start" },
-  center: { stack: "items-center text-center", actions: "justify-center" },
-  right: { stack: "items-end text-right", actions: "justify-end" },
+const ALIGN = {
+  left:   "items-start text-left",
+  center: "items-center text-center",
+  right:  "items-end text-right",
+};
+
+const ACTIONS_ALIGN = {
+  left:   "justify-start",
+  center: "justify-center",
+  right:  "justify-end",
 };
 
 const PortalPageHeader = ({
@@ -15,61 +20,46 @@ const PortalPageHeader = ({
   align = "left",
   className = "",
 }) => {
-  const alignment = useMemo(() => ALIGNMENT[align] || ALIGNMENT.left, [align]);
+  const stack = ALIGN[align] || ALIGN.left;
+  const actionsAlign = ACTIONS_ALIGN[align] || ACTIONS_ALIGN.left;
+
   return (
     <div
       className={[
-        "portal-page-header",
         "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
         className,
       ]
         .filter(Boolean)
         .join(" ")}
     >
-      <div className={["flex flex-col gap-1", alignment.stack].join(" ")}>
-        {eyebrow ? (
-          <p className="portal-page-header__eyebrow">{eyebrow}</p>
-        ) : null}
-        {title ? (
-          <h1
-            className={[
-              "portal-page-header__title",
-              alignment.stack.includes("text-center")
-                ? "text-center"
-                : alignment.stack.includes("text-right")
-                ? "text-right"
-                : "text-left",
-            ].join(" ")}
-          >
+      <div className={["flex flex-col gap-1", stack].join(" ")}>
+        {eyebrow && (
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            {eyebrow}
+          </p>
+        )}
+        {title && (
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">
             {title}
           </h1>
-        ) : null}
-        {subtitle ? (
-          <p
-            className={[
-              "portal-page-header__subtitle",
-              alignment.stack.includes("text-center")
-                ? "text-center"
-                : alignment.stack.includes("text-right")
-                ? "text-right"
-                : "text-left",
-            ].join(" ")}
-          >
+        )}
+        {subtitle && (
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             {subtitle}
           </p>
-        ) : null}
+        )}
       </div>
-      {actions ? (
+
+      {actions && (
         <div
           className={[
-            "portal-page-header__actions",
-            alignment.actions,
             "flex flex-wrap items-center gap-3",
+            actionsAlign,
           ].join(" ")}
         >
           {actions}
         </div>
-      ) : null}
+      )}
     </div>
   );
 };
