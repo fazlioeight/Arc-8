@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+﻿import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
   Button,
   Col,
@@ -111,7 +111,7 @@ const CodingProviderManagementPage = () => {
   const layoutProps = useMemo(
     () => ({
       backgroundClassName:
-        'coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+        '',
       maxWidthClassName: 'max-w-6xl',
       paddingClassName: 'px-4',
       navItems: CODING_NAV_ITEMS,

@@ -19,9 +19,9 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: List[AnyHttpUrl] = ["http://localhost:3000"]
 
-    CONTROL_DATABASE_URL: str = "postgresql+asyncpg://nexora_control:nexora_control@host:5432/nexora_control"
+    CONTROL_DATABASE_URL: str = "postgresql+asyncpg://nexora_control:nexora_control@localhost:5432/nexora_control"
     TENANT_DATABASE_URL_TEMPLATE: Optional[str] = None
-    DEFAULT_TENANT_DATABASE_URL: Optional[str] = "postgresql+asyncpg://nexora_control:nexora_control@host:5432/prominence_tenant"
+    DEFAULT_TENANT_DATABASE_URL: Optional[str] = "postgresql+asyncpg://nexora_control:nexora_control@localhost:5432/prominence_tenant"
     TENANT_DATABASE_SCHEMA_TEMPLATE: Optional[str] = None
     TENANT_CONNECTION_CACHE_SIZE: int = 32
 

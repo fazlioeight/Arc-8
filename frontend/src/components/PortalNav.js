@@ -14,9 +14,9 @@ const SIZE_CLASSES = {
 
 const TONE_STYLES = {
   surface: {
-    container: 'rounded-2xl border border-slate-200 bg-white/80 px-2 py-2 shadow-sm backdrop-blur dark:border-slate-800/60 dark:bg-slate-900/70',
-    active: 'border-sky-400/60 bg-sky-500/10 text-sky-900 shadow-sm dark:border-sky-400/40 dark:bg-sky-500/15 dark:text-sky-50',
-    inactive: 'border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-100/80 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-800/70',
+    container: 'rounded-2xl px-2 py-2 shadow-sm coding-surface backdrop-blur',
+    active: 'border-sky-400/60 bg-sky-500/10 coding-text-strong shadow-sm dark:border-sky-400/40 dark:bg-sky-500/15',
+    inactive: 'border-transparent coding-text-soft hover:border-[var(--coding-border)] hover:bg-[var(--coding-hover)]',
   },
   inverted: {
     container: 'rounded-2xl border border-white/12 bg-white/10 px-2 py-2 shadow-sm backdrop-blur text-white',

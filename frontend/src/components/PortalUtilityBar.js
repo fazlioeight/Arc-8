@@ -24,14 +24,13 @@ const ROUTE_LABELS = {
 
 /* ─── Icon buttons ─────────────────────────────────────────────────────── */
 const iconBtn =
-  'inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-transparent px-2 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white cursor-pointer';
+  'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition cursor-pointer coding-ghost-button';
 
 /* ─── Dropdown shell ───────────────────────────────────────────────────── */
 const DropdownShell = ({ children, alignRight = false, className = '' }) => (
   <div
     className={[
-      'absolute top-full z-50 mt-1.5 min-w-[260px] rounded-xl border border-slate-200 bg-white py-2 shadow-dropdown',
-      'dark:border-slate-700 dark:bg-slate-900',
+      'absolute top-full z-50 mt-1.5 min-w-[260px] rounded-xl py-2 shadow-dropdown coding-surface',
       alignRight ? 'right-0' : 'left-0',
       className,
     ].join(' ')}
@@ -41,7 +40,7 @@ const DropdownShell = ({ children, alignRight = false, className = '' }) => (
 );
 
 const DropdownHeader = ({ children }) => (
-  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest coding-text-muted">
     {children}
   </div>
 );
@@ -58,7 +57,7 @@ const DropdownItem = ({ onClick, children, className = '', statusVariant = '' })
       type="button"
       onClick={onClick}
       className={[
-        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/60',
+        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition coding-text-strong coding-nav-link',
         variantMap[statusVariant] || '',
         className,
       ].join(' ')}
@@ -194,7 +193,7 @@ const PortalUtilityBar = () => {
       {/* Bar */}
       <div
         ref={barRef}
-        className="relative z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/90"
+        className="relative z-40 border-b backdrop-blur-md coding-member-header"
       >
         <div className="mx-auto flex max-w-content items-center justify-between gap-3 px-4 py-2">
 
@@ -213,7 +212,7 @@ const PortalUtilityBar = () => {
               </button>
               {showWaffle && (
                 <div
-                  className="absolute left-0 top-full z-50 mt-1.5 w-[min(90vw,560px)] rounded-xl border border-slate-200 bg-white p-3 shadow-dropdown dark:border-slate-700 dark:bg-slate-900"
+                  className="absolute left-0 top-full z-50 mt-1.5 w-[min(90vw,560px)] rounded-xl p-3 shadow-dropdown coding-surface"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <DropdownHeader>Quick links</DropdownHeader>
@@ -222,7 +221,7 @@ const PortalUtilityBar = () => {
                       <button
                         key={app.key}
                         type="button"
-                        className="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5 text-left transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60"
+                        className="flex items-center gap-2.5 rounded-xl p-2.5 text-left transition coding-surface-subtle coding-hoverable"
                         onClick={() => { closeAll(); navigate(app.path); }}
                       >
                         <span
@@ -232,8 +231,8 @@ const PortalUtilityBar = () => {
                           {app.icon}
                         </span>
                         <span>
-                          <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">{app.label}</span>
-                          <span className="block text-xs text-slate-500 dark:text-slate-400">{app.desc}</span>
+                          <span className="block text-sm font-semibold coding-text-strong">{app.label}</span>
+                          <span className="block text-xs coding-text-muted">{app.desc}</span>
                         </span>
                       </button>
                     ))}
@@ -258,7 +257,7 @@ const PortalUtilityBar = () => {
               onClick={(e) => { e.stopPropagation(); handleCommandPalette(); }}
             >
               <CmdIcon />
-              <span className="ml-0.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+              <span className="ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold coding-surface-subtle coding-text-muted">
                 Ctrl+K
               </span>
             </button>
@@ -276,7 +275,7 @@ const PortalUtilityBar = () => {
             {/* Tenant switcher */}
             <div className="relative">
               <button
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 dark:border-slate-700/60 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-sky-600"
+                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition coding-ghost-button"
                 aria-haspopup="true"
                 aria-expanded={showTenantMenu}
                 onClick={(e) => { e.stopPropagation(); setShowTenantMenu((v) => !v); setShowWaffle(false); setShowNotif(false); setShowUser(false); }}
@@ -295,13 +294,13 @@ const PortalUtilityBar = () => {
                         className={[
                           'w-full rounded-lg border px-3 py-2.5 text-left text-sm transition',
                           opt.key === tenant
-                            ? 'border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-950/40'
-                            : 'border-slate-200/80 hover:border-sky-200 hover:bg-slate-50 dark:border-slate-700/60 dark:hover:border-sky-700 dark:hover:bg-slate-800/50',
+                            ? 'border-sky-400/60 bg-sky-500/10 dark:border-sky-400/40 dark:bg-sky-500/15'
+                            : 'coding-ghost-button',
                         ].join(' ')}
                         onClick={() => handleTenantSelect(opt.key)}
                       >
-                        <div className="font-semibold text-slate-800 dark:text-slate-100">{opt.name}</div>
-                        <div className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                        <div className="font-semibold coding-text-strong">{opt.name}</div>
+                        <div className="mt-0.5 text-xs coding-text-muted">
                           {opt.region || 'Unknown region'} &middot; {opt.timezone || 'Timezone TBD'}
                         </div>
                         {SAMPLE_TENANT_COMMENTS[opt.key] && (
@@ -310,7 +309,7 @@ const PortalUtilityBar = () => {
                       </button>
                     ))}
                   </div>
-                  <div className="mt-2 border-t border-slate-200 px-3 pt-2 pb-1 text-xs text-slate-400 dark:border-slate-700 dark:text-slate-500">
+                  <div className="mt-2 border-t coding-divider px-3 pt-2 pb-1 text-xs coding-text-muted">
                     Need a sandbox reset? Contact support.
                   </div>
                 </DropdownShell>
@@ -346,7 +345,7 @@ const PortalUtilityBar = () => {
                 <DropdownShell alignRight onClick={(e) => e.stopPropagation()}>
                   <DropdownHeader>Notifications</DropdownHeader>
                   {jobAlerts.length === 0 && (
-                    <p className="px-3 py-2 text-sm text-slate-400 dark:text-slate-500">
+                    <p className="px-3 py-2 text-sm coding-text-muted">
                       No alerts &mdash; you&rsquo;re all caught up!
                     </p>
                   )}
@@ -354,19 +353,19 @@ const PortalUtilityBar = () => {
                     <DropdownItem key={alert.id} statusVariant={alert.status}>
                       <div>
                         <div className="text-sm font-medium">{alert.title}</div>
-                        <div className="text-xs text-slate-400 dark:text-slate-500">{alert.hint}</div>
+                        <div className="text-xs coding-text-muted">{alert.hint}</div>
                       </div>
                     </DropdownItem>
                   ))}
                   {recentEvents.length > 0 && (
                     <>
-                      <div className="my-1.5 border-t border-slate-200 dark:border-slate-700" />
+                      <div className="my-1.5 border-t coding-divider" />
                       <DropdownHeader>Recent activity</DropdownHeader>
                       {recentEvents.map((evt) => (
                         <DropdownItem key={evt.id}>
                           <div>
                             <div className="text-sm font-medium">{evt.action}</div>
-                            <div className="text-xs text-slate-400 dark:text-slate-500">{new Date(evt.timestamp).toLocaleString()}</div>
+                            <div className="text-xs coding-text-muted">{new Date(evt.timestamp).toLocaleString()}</div>
                           </div>
                         </DropdownItem>
                       ))}
@@ -394,9 +393,9 @@ const PortalUtilityBar = () => {
                   </DropdownItem>
                   <DropdownItem onClick={() => { closeAll(); handleCommandPalette(); }}>
                     <span className="flex-1 text-sm font-medium">Open command palette</span>
-                    <span className="text-xs text-slate-400 dark:text-slate-500">⌘K</span>
+                    <span className="text-xs coding-text-muted">⌘K</span>
                   </DropdownItem>
-                  <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
+                  <div className="my-1 border-t coding-divider" />
                   <DropdownItem onClick={() => { closeAll(); logout?.(); navigate('/login'); }}>
                     <span className="text-sm font-medium text-red-600 dark:text-red-400">Log out</span>
                   </DropdownItem>

@@ -386,7 +386,7 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="coding-member-workspace portal-theme min-h-screen">
       <PortalUtilityBar />
       <div className="mx-auto max-w-7xl px-4 pb-12 pt-6 sm:px-6 lg:px-8">
         <CodingPortalHeader

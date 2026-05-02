@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalPageHeader from "../../../components/PortalPageHeader";
@@ -161,7 +161,7 @@ const CodingMembersPage = () => {
   const layoutProps = useMemo(
     () => ({
       backgroundClassName:
-        "coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100",
+        "",
       maxWidthClassName: "max-w-6xl",
       paddingClassName: "px-4",
       navItems: CODING_NAV_ITEMS,

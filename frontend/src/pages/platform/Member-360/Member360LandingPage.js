@@ -4,6 +4,7 @@ import PortalPageLayout from "../../../components/PortalPageLayout";
 import { AuthContext } from "../../../context/AuthContext";
 import { useMemberSearch } from "../../../hooks/useMemberSearch";
 import { PORTAL_NAV_ITEMS } from "../portal_page/portalNavItems";
+import "../coding/member/memberWorkspace.css";
 
 const MEMBER_CHART_BREADCRUMB = "Member chart";
 
@@ -30,7 +31,7 @@ const Member360LandingPage = () => {
       }),
   });
 
-  const statusTone = memberSearchError ? "text-rose-400" : "text-slate-400";
+  const statusTone = memberSearchError ? "text-rose-600 dark:text-rose-400" : "coding-text-muted";
 
   return (
     <PortalPageLayout
@@ -39,19 +40,17 @@ const Member360LandingPage = () => {
       eyebrow="Member 360"
       navItems={PORTAL_NAV_ITEMS}
       currentNav="member-360"
-      navProps={{ align: "center", tone: "inverted" }}
+      navProps={{ align: "center", tone: "surface" }}
       align="center"
-      headerTone="inverted"
-      backgroundClassName="bg-slate-950 text-white"
       maxWidthClassName="max-w-4xl"
       mainClassName="space-y-6"
     >
-      <section className="rounded-3xl border border-white/5 bg-slate-900/70 p-10 shadow-2xl shadow-slate-950/40 backdrop-blur">
+      <section className="rounded-2xl p-8 coding-surface">
         <form onSubmit={handleMemberSearch} className="space-y-6">
           <div className="space-y-3">
             <label
               htmlFor="member-360-search-input"
-              className="block text-sm font-medium text-slate-200"
+              className="block text-sm font-medium coding-text-strong"
             >
               Member ID
             </label>
@@ -68,10 +67,10 @@ const Member360LandingPage = () => {
                   }}
                   list="member-360-suggestions"
                   aria-describedby="member-360-search-status"
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-base text-white placeholder-slate-500 shadow-inner focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                  className="coding-input w-full rounded-xl px-4 py-3 text-base"
                 />
                 {isSearchingMembers && (
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-sky-400">
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-sky-500">
                     <svg
                       className="h-5 w-5 animate-spin"
                       viewBox="0 0 24 24"
@@ -88,7 +87,7 @@ const Member360LandingPage = () => {
               <button
                 type="submit"
                 disabled={isLaunchingMember}
-                className="inline-flex items-center justify-center rounded-2xl bg-sky-500 px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-lg shadow-sky-500/30 transition hover:bg-sky-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+                className="inline-flex items-center justify-center rounded-xl bg-[var(--brand-primary)] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isLaunchingMember ? "Opening..." : "Open member chart"}
               </button>
@@ -111,19 +110,19 @@ const Member360LandingPage = () => {
             </p>
 
             {memberOptions.length > 0 && (
-              <ul className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/5 bg-slate-950/40">
+              <ul className="divide-y coding-divider overflow-hidden rounded-xl coding-surface-subtle">
                 {memberOptions.map((option) => (
                   <li key={option.key}>
                     <button
                       type="button"
                       onClick={() => handleSuggestionSelect(option)}
-                      className="flex w-full flex-col items-start gap-1 px-4 py-3 text-left transition hover:bg-sky-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                      className="flex w-full flex-col items-start gap-1 px-4 py-3 text-left transition coding-hoverable focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
                     >
-                      <span className="text-sm font-semibold text-white">
+                      <span className="text-sm font-semibold coding-text-strong">
                         {option.label || "Unknown member"}
                       </span>
                       {option.memberId && (
-                        <span className="text-xs uppercase tracking-wide text-slate-400">
+                        <span className="text-xs uppercase tracking-wide coding-text-muted">
                           Member ID: {option.memberId}
                         </span>
                       )}

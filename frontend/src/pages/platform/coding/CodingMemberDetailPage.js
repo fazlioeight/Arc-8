@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+ï»¿import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Alert, Badge, Button, Card, Col, Form, ListGroup, Row, Spinner, Table } from 'react-bootstrap';
 
@@ -180,7 +180,7 @@ const CodingMemberDetailPage = () => {
   if (!isAuthenticated) {
     return (
       <PortalPageLayout
-        backgroundClassName="coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+        backgroundClassName=""
         maxWidthClassName="max-w-5xl"
         paddingClassName="px-4"
         navItems={CODING_NAV_ITEMS}
@@ -196,7 +196,7 @@ const CodingMemberDetailPage = () => {
   if (loading && !detail) {
     return (
       <PortalPageLayout
-        backgroundClassName="coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+        backgroundClassName=""
         maxWidthClassName="max-w-5xl"
         paddingClassName="px-4"
         navItems={CODING_NAV_ITEMS}
@@ -212,7 +212,7 @@ const CodingMemberDetailPage = () => {
   if (error && !detail) {
     return (
       <PortalPageLayout
-        backgroundClassName="coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+        backgroundClassName=""
         maxWidthClassName="max-w-5xl"
         paddingClassName="px-4"
         navItems={CODING_NAV_ITEMS}
@@ -228,7 +228,7 @@ const CodingMemberDetailPage = () => {
   if (!member) {
     return (
       <PortalPageLayout
-        backgroundClassName="coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
+        backgroundClassName=""
         maxWidthClassName="max-w-5xl"
         paddingClassName="px-4"
         navItems={CODING_NAV_ITEMS}
@@ -244,7 +244,7 @@ const CodingMemberDetailPage = () => {
   const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.member_key;
 
   const layoutProps = {
-    backgroundClassName: 'coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+    backgroundClassName: '',
     maxWidthClassName: 'max-w-6xl',
     paddingClassName: 'px-4',
     navItems: CODING_NAV_ITEMS,
@@ -303,7 +303,7 @@ const CodingMemberDetailPage = () => {
                       disabled={chaseUpdating === chase.id}
                       onClick={() => void handleAdvanceChase(chase)}
                     >
-                      {chaseUpdating === chase.id ? 'Updating…' : 'Advance'}
+                      {chaseUpdating === chase.id ? 'Updatingï¿½' : 'Advance'}
                     </Button>
                   </td>
                 </tr>

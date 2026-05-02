@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useCallback,
   useContext,
   useEffect,
@@ -72,15 +72,15 @@ const CodingMemberWorkbenchPage = () => {
 
   const loadIcdMap = useCallback(async () => {
     if (!selectedSuspect) return;
-    const map = await getICDMap(selectedSuspect.hcc_code);
+    const map = await getICDMap(token || 'sample-workbench', tenant || 'prominencehealth', { code: selectedSuspect.hcc_code });
     setIcdMap(map);
-  }, [selectedSuspect]);
+  }, [selectedSuspect, token, tenant]);
 
   const loadPdf = useCallback(async () => {
     if (!selectedSuspect) return;
-    const blob = await fetchDocumentPdf(selectedSuspect.document_id);
+    const blob = await fetchDocumentPdf(token || 'sample-workbench', tenant || 'prominencehealth', selectedSuspect.document_id);
     setPdfBlob(blob);
-  }, [selectedSuspect]);
+  }, [selectedSuspect, token, tenant]);
 
   useEffect(() => {
     void loadSuspects();
@@ -95,7 +95,7 @@ const CodingMemberWorkbenchPage = () => {
     if (!selectedSuspect) return;
     setFinalizeState({ submitting: true, error: null });
     try {
-      await finalizeCode(token || 'sample-workbench', tenant || 'prominencehealth', selectedSuspect.id, checklist);
+      await finalizeCode(token || 'sample-workbench', tenant || 'prominencehealth', { suspect_id: selectedSuspect.id, ...checklist });
       setFinalizeState({ submitting: false, error: null });
       navigate('/coding');
     } catch (err) {
@@ -104,7 +104,7 @@ const CodingMemberWorkbenchPage = () => {
   };
 
   const layoutProps = {
-    backgroundClassName: 'coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+    backgroundClassName: '',
     maxWidthClassName: 'max-w-6xl',
     paddingClassName: 'px-4',
     navItems: CODING_NAV_ITEMS,

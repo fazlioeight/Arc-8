@@ -25,6 +25,8 @@
   --text-muted: var(--lm-text-muted);
   --brand-primary: var(--brand-primary);
   --shadow: var(--shadow-sm);
+  background: var(--bg);
+  color: var(--text);
 }
 
 .dark-mode .portal-theme,

@@ -18,7 +18,7 @@ const PortalPageLayout = ({
   navProps = {},
   align = 'left',
   headerTone = 'default',
-  backgroundClassName = 'bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+  backgroundClassName = '',
   maxWidthClassName = 'max-w-6xl',
   paddingClassName = 'px-4',
   headerContent = null,
@@ -29,13 +29,13 @@ const PortalPageLayout = ({
   const alignment = useMemo(() => ALIGNMENT[align] || ALIGNMENT.left, [align]);
   const { className: navClassName = '', ...restNavProps } = navProps || {};
   const isInvertedHeader = headerTone === 'inverted';
-  const eyebrowClass = isInvertedHeader ? 'text-slate-200' : 'text-slate-500 dark:text-slate-300';
+  const eyebrowClass = isInvertedHeader ? 'text-slate-200' : 'coding-text-muted';
   const titleClass = isInvertedHeader
     ? 'text-3xl font-semibold leading-tight text-white'
-    : 'text-3xl font-semibold leading-tight text-slate-900 dark:text-white';
+    : 'text-3xl font-semibold leading-tight coding-text-strong';
   const subtitleClass = isInvertedHeader
     ? 'text-base text-slate-200'
-    : 'text-base text-slate-600 dark:text-slate-300';
+    : 'text-base coding-text-soft';
 
   const header = headerContent ?? (
     <div className={['flex flex-col gap-3', alignment.stack].join(' ')}>
@@ -63,7 +63,7 @@ const PortalPageLayout = ({
   );
 
   return (
-    <div className={['portal-theme min-h-screen', backgroundClassName].join(' ')}>
+    <div className={['coding-member-workspace portal-theme min-h-screen', backgroundClassName].filter(Boolean).join(' ')}>
       {utilityBar ? <PortalUtilityBar /> : null}
       <div className={['mx-auto w-full', maxWidthClassName, paddingClassName, 'pb-10'].join(' ')}>
         <header className="pt-6 space-y-4">

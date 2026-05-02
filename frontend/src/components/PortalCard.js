@@ -4,7 +4,7 @@ import React from "react";
 import "../styles/portalPattern.css";
 
 const TONE = {
-  neutral: "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900",
+  neutral: "coding-surface",
   info:    "border-blue-200/80 bg-blue-50/60 dark:border-blue-800/40 dark:bg-blue-950/30",
   success: "border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-800/40 dark:bg-emerald-950/30",
   warning: "border-amber-200/80 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-950/30",
@@ -44,12 +44,12 @@ const PortalCard = ({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
             {title && (
-              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              <h3 className="text-base font-semibold coding-text-strong">
                 {title}
               </h3>
             )}
             {subtitle && (
-              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 text-sm coding-text-soft">
                 {subtitle}
               </p>
             )}
@@ -65,7 +65,7 @@ const PortalCard = ({
       <div className="space-y-3">{children}</div>
 
       {footer && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t coding-divider pt-4">
           {footer}
         </div>
       )}

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+ï»¿import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
 import PortalPageHeader from '../../../components/PortalPageHeader';
@@ -86,7 +86,7 @@ const CodingProviderDetailPage = () => {
   const layoutProps = useMemo(
     () => ({
       backgroundClassName:
-        'coding-member-workspace portal-theme bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100',
+        '',
       maxWidthClassName: 'max-w-5xl',
       paddingClassName: 'px-4',
       navItems: CODING_NAV_ITEMS,
@@ -105,7 +105,7 @@ const CodingProviderDetailPage = () => {
         <div className="flex flex-wrap items-center gap-3">
           <PortalStat label="Members" value={provider?.member_count ?? 0} meta="Panel" tone="info" />
           <PortalStat label="Open gaps" value={provider?.open_gaps ?? 0} meta="Pending" tone="warning" />
-          <PortalStat label="ID" value={provider ? provider.id : '—'} meta="Provider" tone="success" />
+          <PortalStat label="ID" value={provider ? provider.id : 'ï¿½'} meta="Provider" tone="success" />
         </div>
       }
     />
