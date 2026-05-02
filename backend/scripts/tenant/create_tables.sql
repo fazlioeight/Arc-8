@@ -1,7 +1,12 @@
-﻿-- Per-tenant (TenantDataBase) tables. Run within each tenant schema/database.
+-- Per-tenant (TenantDataBase) tables.
+-- Run within each tenant schema/database when a new tenant is provisioned.
+
+-- ─────────────────────────────────────────────
+-- Generic member / claims (legacy)
+-- ─────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS members (
-    id         INTEGER PRIMARY KEY,
+    id         INTEGER      PRIMARY KEY,
     member_key VARCHAR(64)  NOT NULL,
     name       VARCHAR(255)
 );
@@ -9,22 +14,50 @@ CREATE TABLE IF NOT EXISTS members (
 CREATE INDEX IF NOT EXISTS ix_members_member_key ON members(member_key);
 
 CREATE TABLE IF NOT EXISTS claims (
-    id           INTEGER PRIMARY KEY,
-    member_key   VARCHAR(64) NOT NULL,
+    id           INTEGER        PRIMARY KEY,
+    member_key   VARCHAR(64)    NOT NULL,
     service_date DATE,
     cost         NUMERIC(12, 2) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS ix_claims_member_key ON claims(member_key);
 
+-- ─────────────────────────────────────────────
+-- Coding domain — providers
+-- ─────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS coding_providers (
+    id     INTEGER      PRIMARY KEY,
+    npi    VARCHAR(15)  UNIQUE,
+    tax_id VARCHAR(15),
+    name   VARCHAR(128) NOT NULL,
+    phone  VARCHAR(20),
+    email  VARCHAR(255)
+);
+
+CREATE INDEX IF NOT EXISTS ix_coding_providers_npi ON coding_providers(npi);
+
+CREATE TABLE IF NOT EXISTS coding_provider_locations (
+    id            INTEGER     PRIMARY KEY,
+    provider_id   INTEGER     NOT NULL UNIQUE REFERENCES coding_providers(id) ON DELETE CASCADE,
+    address_line1 VARCHAR(120),
+    city          VARCHAR(64),
+    state         VARCHAR(2),
+    postal_code   VARCHAR(10)
+);
+
+-- ─────────────────────────────────────────────
+-- Coding domain — members
+-- ─────────────────────────────────────────────
+
 CREATE TABLE IF NOT EXISTS coding_members (
-    id                INTEGER PRIMARY KEY,
-    member_key        VARCHAR(64)  NOT NULL UNIQUE,
+    id                INTEGER        PRIMARY KEY,
+    member_key        VARCHAR(64)    NOT NULL UNIQUE,
     first_name        VARCHAR(80),
     last_name         VARCHAR(80),
     date_of_birth     DATE,
     gender            VARCHAR(1),
-    status            VARCHAR(32)  NOT NULL DEFAULT 'active',
+    status            VARCHAR(32)    NOT NULL DEFAULT 'active',
     line_of_business  VARCHAR(32),
     primary_language  VARCHAR(64),
     risk_score        NUMERIC(6, 2),
@@ -38,8 +71,21 @@ CREATE TABLE IF NOT EXISTS coding_members (
 
 CREATE INDEX IF NOT EXISTS ix_coding_members_member_key ON coding_members(member_key);
 
+CREATE TABLE IF NOT EXISTS coding_member_eligibility (
+    id                     INTEGER  PRIMARY KEY,
+    member_id              INTEGER  NOT NULL UNIQUE REFERENCES coding_members(id) ON DELETE CASCADE,
+    plan_start             DATE,
+    plan_end               DATE,
+    medicare_effective_date DATE,
+    joined_at              DATE,
+    is_new_to_medicare     BOOLEAN  NOT NULL DEFAULT FALSE,
+    is_dual_eligible       BOOLEAN  NOT NULL DEFAULT FALSE,
+    risk_tier              VARCHAR(32),
+    last_synced_at         TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS coding_member_chases (
-    id                   INTEGER PRIMARY KEY,
+    id                   INTEGER      PRIMARY KEY,
     member_id            INTEGER      NOT NULL REFERENCES coding_members(id) ON DELETE CASCADE,
     chase_code           VARCHAR(64)  NOT NULL,
     status               VARCHAR(32)  NOT NULL DEFAULT 'open',
@@ -52,14 +98,14 @@ CREATE TABLE IF NOT EXISTS coding_member_chases (
     icd10_code           VARCHAR(12),
     hcc_code             VARCHAR(12),
     notes                TEXT,
-    created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS ix_coding_member_chases_member_id ON coding_member_chases(member_id);
 
 CREATE TABLE IF NOT EXISTS coding_member_notes (
-    id           INTEGER PRIMARY KEY,
+    id           INTEGER      PRIMARY KEY,
     member_id    INTEGER      NOT NULL REFERENCES coding_members(id) ON DELETE CASCADE,
     author_email VARCHAR(255) NOT NULL,
     author_name  VARCHAR(255),
@@ -70,7 +116,7 @@ CREATE TABLE IF NOT EXISTS coding_member_notes (
 CREATE INDEX IF NOT EXISTS ix_coding_member_notes_member_id ON coding_member_notes(member_id);
 
 CREATE TABLE IF NOT EXISTS coding_member_attachments (
-    id           INTEGER PRIMARY KEY,
+    id           INTEGER      PRIMARY KEY,
     member_id    INTEGER      NOT NULL REFERENCES coding_members(id) ON DELETE CASCADE,
     filename     VARCHAR(255) NOT NULL,
     content_type VARCHAR(100) NOT NULL,
@@ -82,28 +128,92 @@ CREATE TABLE IF NOT EXISTS coding_member_attachments (
 
 CREATE INDEX IF NOT EXISTS ix_coding_member_attachments_member_id ON coding_member_attachments(member_id);
 
-CREATE TABLE IF NOT EXISTS coding_providers (
-    id     INTEGER PRIMARY KEY,
-    npi    VARCHAR(15) UNIQUE,
-    tax_id VARCHAR(15),
-    name   VARCHAR(128) NOT NULL,
-    phone  VARCHAR(20),
-    email  VARCHAR(255)
+CREATE TABLE IF NOT EXISTS coding_member_priorities (
+    id                   INTEGER   PRIMARY KEY,
+    member_id            INTEGER   NOT NULL UNIQUE REFERENCES coding_members(id) ON DELETE CASCADE,
+    priority_score       FLOAT     NOT NULL,
+    priority_tier        VARCHAR(16) NOT NULL,
+    hcc_opportunity_count INTEGER  NOT NULL DEFAULT 0,
+    next_action          VARCHAR(64),
+    next_action_due      DATE,
+    justification        TEXT,
+    computed_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS ix_coding_providers_npi ON coding_providers(npi);
+-- ─────────────────────────────────────────────
+-- Coding domain — claims & coding activity
+-- ─────────────────────────────────────────────
 
-CREATE TABLE IF NOT EXISTS coding_provider_locations (
-    id            INTEGER PRIMARY KEY,
-    provider_id   INTEGER NOT NULL UNIQUE REFERENCES coding_providers(id) ON DELETE CASCADE,
-    address_line1 VARCHAR(120),
-    city          VARCHAR(64),
-    state         VARCHAR(2),
-    postal_code   VARCHAR(10)
+CREATE TABLE IF NOT EXISTS coding_claims (
+    id               INTEGER      PRIMARY KEY,
+    member_id        INTEGER      NOT NULL REFERENCES coding_members(id) ON DELETE CASCADE,
+    provider_id      INTEGER      REFERENCES coding_providers(id) ON DELETE SET NULL,
+    claim_number     VARCHAR(64)  NOT NULL,
+    claim_type       VARCHAR(32)  NOT NULL DEFAULT 'professional',
+    service_date     DATE,
+    diagnosis_codes  JSON,
+    procedure_codes  JSON,
+    hcc_codes        JSON,
+    total_paid       FLOAT,
+    source           VARCHAR(64),
+    chart_required   BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS ix_coding_claims_member_id    ON coding_claims(member_id);
+CREATE INDEX IF NOT EXISTS ix_coding_claims_claim_number ON coding_claims(claim_number);
+
+CREATE TABLE IF NOT EXISTS coding_mao004_records (
+    id                  INTEGER     PRIMARY KEY,
+    member_id           INTEGER     NOT NULL REFERENCES coding_members(id) ON DELETE CASCADE,
+    submission_year     INTEGER     NOT NULL,
+    hcc_code            VARCHAR(12) NOT NULL,
+    icd10_code          VARCHAR(12),
+    service_start       DATE,
+    service_end         DATE,
+    source_claim_number VARCHAR(64),
+    status              VARCHAR(16) NOT NULL DEFAULT 'open',
+    last_received_at    TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_coding_mao004_records_member_id        ON coding_mao004_records(member_id);
+CREATE INDEX IF NOT EXISTS ix_coding_mao004_records_submission_year  ON coding_mao004_records(submission_year);
+
+CREATE TABLE IF NOT EXISTS coding_health_assessments (
+    id                INTEGER     PRIMARY KEY,
+    member_id         INTEGER     NOT NULL REFERENCES coding_members(id) ON DELETE CASCADE,
+    assessment_date   DATE        NOT NULL,
+    assessment_type   VARCHAR(64) NOT NULL,
+    provider_id       INTEGER     REFERENCES coding_providers(id) ON DELETE SET NULL,
+    icd10_codes       JSON,
+    hcc_codes         JSON,
+    completion_status VARCHAR(32) NOT NULL DEFAULT 'pending_submission',
+    notes             TEXT,
+    created_at        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_coding_health_assessments_member_id   ON coding_health_assessments(member_id);
+CREATE INDEX IF NOT EXISTS ix_coding_health_assessments_provider_id ON coding_health_assessments(provider_id);
+
+CREATE TABLE IF NOT EXISTS coding_submission_batches (
+    id              INTEGER      PRIMARY KEY,
+    submission_year INTEGER      NOT NULL,
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by      VARCHAR(255) NOT NULL,
+    status          VARCHAR(32)  NOT NULL DEFAULT 'draft',
+    record_count    INTEGER      NOT NULL DEFAULT 0,
+    payload_path    VARCHAR(512)
+);
+
+CREATE INDEX IF NOT EXISTS ix_coding_submission_batches_submission_year ON coding_submission_batches(submission_year);
+
+-- ─────────────────────────────────────────────
+-- Ride booking domain
+-- ─────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS ride_partners (
-    id            INTEGER PRIMARY KEY,
+    id            INTEGER      PRIMARY KEY,
     company_name  VARCHAR(255) NOT NULL,
     contact_name  VARCHAR(255),
     contact_email VARCHAR(255),
@@ -116,7 +226,7 @@ CREATE TABLE IF NOT EXISTS ride_partners (
 CREATE INDEX IF NOT EXISTS ix_ride_partners_company_name ON ride_partners(company_name);
 
 CREATE TABLE IF NOT EXISTS ride_partner_schedules (
-    id            INTEGER PRIMARY KEY,
+    id            INTEGER     PRIMARY KEY,
     partner_id    INTEGER     NOT NULL REFERENCES ride_partners(id) ON DELETE CASCADE,
     frequency     VARCHAR(32) NOT NULL,
     start_date    DATE        NOT NULL,
@@ -132,7 +242,7 @@ CREATE TABLE IF NOT EXISTS ride_partner_schedules (
 CREATE INDEX IF NOT EXISTS ix_ride_partner_schedules_partner_id ON ride_partner_schedules(partner_id);
 
 CREATE TABLE IF NOT EXISTS ride_partner_billing_profiles (
-    id             INTEGER PRIMARY KEY,
+    id             INTEGER     PRIMARY KEY,
     partner_id     INTEGER     NOT NULL UNIQUE REFERENCES ride_partners(id) ON DELETE CASCADE,
     pay_to_name    VARCHAR(255),
     payment_email  VARCHAR(255),
@@ -145,8 +255,8 @@ CREATE TABLE IF NOT EXISTS ride_partner_billing_profiles (
 CREATE INDEX IF NOT EXISTS ix_ride_partner_billing_profiles_partner_id ON ride_partner_billing_profiles(partner_id);
 
 CREATE TABLE IF NOT EXISTS ride_bookings (
-    id                VARCHAR(36) PRIMARY KEY,
-    partner_id        INTEGER REFERENCES ride_partners(id) ON DELETE SET NULL,
+    id                VARCHAR(36)  PRIMARY KEY,
+    partner_id        INTEGER      REFERENCES ride_partners(id) ON DELETE SET NULL,
     member_id         VARCHAR(64)  NOT NULL,
     first_name        VARCHAR(128) NOT NULL,
     last_name         VARCHAR(128) NOT NULL,
@@ -164,14 +274,14 @@ CREATE TABLE IF NOT EXISTS ride_bookings (
     updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS ix_ride_bookings_partner_id ON ride_bookings(partner_id);
-CREATE INDEX IF NOT EXISTS ix_ride_bookings_member_id ON ride_bookings(member_id);
+CREATE INDEX IF NOT EXISTS ix_ride_bookings_partner_id       ON ride_bookings(partner_id);
+CREATE INDEX IF NOT EXISTS ix_ride_bookings_member_id        ON ride_bookings(member_id);
 CREATE INDEX IF NOT EXISTS ix_ride_bookings_scheduled_pickup ON ride_bookings(scheduled_pickup);
-CREATE INDEX IF NOT EXISTS ix_ride_bookings_status ON ride_bookings(status);
+CREATE INDEX IF NOT EXISTS ix_ride_bookings_status           ON ride_bookings(status);
 
 CREATE TABLE IF NOT EXISTS ride_payment_records (
-    id                VARCHAR(36) PRIMARY KEY,
-    ride_id           VARCHAR(36) REFERENCES ride_bookings(id) ON DELETE SET NULL,
+    id                VARCHAR(36)  PRIMARY KEY,
+    ride_id           VARCHAR(36)  REFERENCES ride_bookings(id) ON DELETE SET NULL,
     payer_type        VARCHAR(32)  NOT NULL,
     counterparty_name VARCHAR(255) NOT NULL,
     invoice_number    VARCHAR(64)  NOT NULL,
@@ -180,9 +290,9 @@ CREATE TABLE IF NOT EXISTS ride_payment_records (
     created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS ix_ride_payment_records_ride_id ON ride_payment_records(ride_id);
-CREATE INDEX IF NOT EXISTS ix_ride_payment_records_invoice_number ON ride_payment_records(invoice_number);
-CREATE INDEX IF NOT EXISTS ix_ride_payment_records_status ON ride_payment_records(status);
+CREATE INDEX IF NOT EXISTS ix_ride_payment_records_ride_id         ON ride_payment_records(ride_id);
+CREATE INDEX IF NOT EXISTS ix_ride_payment_records_invoice_number  ON ride_payment_records(invoice_number);
+CREATE INDEX IF NOT EXISTS ix_ride_payment_records_status          ON ride_payment_records(status);
 
 CREATE TABLE IF NOT EXISTS ride_reconciliation_items (
     id         VARCHAR(36) PRIMARY KEY,
@@ -196,10 +306,13 @@ CREATE TABLE IF NOT EXISTS ride_reconciliation_items (
 CREATE INDEX IF NOT EXISTS ix_ride_reconciliation_items_status ON ride_reconciliation_items(status);
 
 CREATE TABLE IF NOT EXISTS ride_payment_events (
-    id         VARCHAR(36) PRIMARY KEY,
+    id         VARCHAR(36)  PRIMARY KEY,
     source     VARCHAR(64)  NOT NULL,
     event_type VARCHAR(128) NOT NULL,
     detail     TEXT,
     payload    JSON         NOT NULL DEFAULT '{}',
     event_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS ix_ride_payment_events_source   ON ride_payment_events(source);
+CREATE INDEX IF NOT EXISTS ix_ride_payment_events_event_at ON ride_payment_events(event_at);

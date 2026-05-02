@@ -27,6 +27,11 @@ class TenantMiddleware(BaseHTTPMiddleware):
         self.require_known_tenant = require_known_tenant
 
     async def dispatch(self, request: Request, call_next):
+        if request.url.path.startswith("/health/"):
+            request.state.tenant = None
+            request.state.tenant_key = None
+            return await call_next(request)
+
         tenant_header = request.headers.get("x-tenant-key") or request.headers.get("x-tenant")
         host = request.headers.get("host")
         tenant_key = tenant_header or self.default_tenant

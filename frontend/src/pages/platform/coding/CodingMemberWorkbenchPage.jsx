@@ -95,7 +95,15 @@ const CodingMemberWorkbenchPage = () => {
     if (!selectedSuspect) return;
     setFinalizeState({ submitting: true, error: null });
     try {
-      await finalizeCode(token || 'sample-workbench', tenant || 'prominencehealth', { suspect_id: selectedSuspect.id, ...checklist });
+      await finalizeCode(token || 'sample-workbench', tenant || 'prominencehealth', {
+        member_id: memberId,
+        suspect_id: selectedSuspect.suspect_id || String(selectedSuspect.id || ''),
+        selected_icd: selectedSuspect.icd_suggestions?.[0]?.code || '',
+        model_year: new Date().getFullYear(),
+        lob: 'MA',
+        evidence_used: (selectedSuspect.evidence || []).map((e) => e.snippet_id),
+        checklist,
+      });
       setFinalizeState({ submitting: false, error: null });
       navigate('/coding');
     } catch (err) {

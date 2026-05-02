@@ -2,9 +2,9 @@
 
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Dict
+from typing import Dict, Optional
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, JSON, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.sql import func
 import uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -226,6 +226,22 @@ class DocsArticle(ControlBase):
     )
 
     tenant: Mapped[Tenant] = relationship(back_populates="docs_articles")
+
+
+class IcdCode(ControlBase):
+    """Reference table mapping ICD-10 codes to HCC model categories."""
+
+    __tablename__ = "icd_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(12), unique=True, nullable=False, index=True)
+    description: Mapped[str] = mapped_column(String(512), nullable=False)
+    hcc_code: Mapped[Optional[str]] = mapped_column(String(12), nullable=True, index=True)
+    hcc_label: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    alternatives: Mapped[list] = mapped_column(JSON, default=list)
+    notes: Mapped[list] = mapped_column(JSON, default=list)
+    is_valid: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
 class Member(TenantDataBase):

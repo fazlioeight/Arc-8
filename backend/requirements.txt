@@ -1,4 +1,5 @@
-﻿fastapi
+fastapi
+gunicorn
 uvicorn[standard]
 pydantic
 pydantic-settings
@@ -11,6 +12,10 @@ asyncpg
 aiosqlite
 psycopg2-binary
 redis>=4.6.0
+azure-identity
+azure-keyvault-secrets
+azure-servicebus
+azure-storage-blob
 pandas
 requests
 streamlit

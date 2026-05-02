@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .core.config import settings
@@ -80,6 +80,17 @@ class LoginRequest(BaseModel):
 @app.get("/")
 async def read_root():
     return {"message": "Nexora Analytics Backend"}
+
+
+@app.get("/health/live", tags=["health"])
+async def health_live():
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", tags=["health"])
+async def health_ready(session: AsyncSession = Depends(get_control_session)):
+    await session.execute(text("SELECT 1"))
+    return {"status": "ready"}
 
 
 @app.post("/api/login")

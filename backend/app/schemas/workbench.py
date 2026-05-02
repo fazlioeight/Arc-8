@@ -69,11 +69,11 @@ class WorkbenchPayload(BaseModel):
 
 class FinalizeRequest(BaseModel):
     member_id: str
-    encounter_id: str
+    encounter_id: Optional[str] = None
     suspect_id: str
-    selected_icd: str
-    model_year: int
-    lob: str
+    selected_icd: Optional[str] = None
+    model_year: int = 2025
+    lob: str = "MA"
     evidence_used: List[str] = Field(default_factory=list)
     checklist: Dict[str, bool] = Field(default_factory=dict)
 
