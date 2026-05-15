@@ -3,9 +3,8 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import Chart from 'chart.js/auto';
 
-import PortalPageLayout from '../../../components/PortalPageLayout';
+import PortalUtilityBar from '../../../components/PortalUtilityBar';
 import { AuthContext } from '../../../context/AuthContext';
-import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import {
   chatWithFile,
   deleteWorkbook,
@@ -393,20 +392,10 @@ const ChatPage = () => {
     "transition hover:border-[#d97706] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40";
 
   return (
-    <PortalPageLayout
-      eyebrow="Nexora Chat"
-      title="Claude-powered AI assistant"
-      subtitle="Ask anything, upload a document, query a workbook, or run the shared analytics dataset."
-      navItems={PORTAL_NAV_ITEMS}
-      currentNav="chat"
-      navProps={{ align: "center", tone: "surface" }}
-      align="left"
-      maxWidthClassName="max-w-6xl"
-      mainClassName="pt-4"
-    >
+    <div className="coding-member-workspace portal-theme flex h-screen min-h-screen flex-col">
+      <PortalUtilityBar />
       <div
-        className="nx-chat-root grid min-h-[640px] grid-cols-[200px_1fr] overflow-hidden rounded-2xl border border-[#1e1e1e] bg-[#0a0a0a] text-[13px] text-[#d4d4d4]"
-        style={{ height: 'calc(100vh - 280px)' }}
+        className="nx-chat-root grid min-h-0 flex-1 grid-cols-[200px_1fr] overflow-hidden bg-[#0a0a0a] text-[13px] text-[#d4d4d4]"
       >
         {/* ─ Sidebar ────────────────────────────────────────────────── */}
         <aside
@@ -774,7 +763,7 @@ const ChatPage = () => {
           </div>
         </div>
       )}
-    </PortalPageLayout>
+    </div>
   );
 };
 
