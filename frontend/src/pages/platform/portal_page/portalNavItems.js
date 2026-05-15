@@ -20,4 +20,10 @@ export const PORTAL_NAV_ITEMS = [
     match: (path) =>
       path === ROUTES.CODING.LANDING || path.startsWith(`${ROUTES.CODING.LANDING}/`),
   },
+  {
+    key: "chat",
+    label: "Nexora Chat",
+    href: ROUTES.CHAT,
+    match: (path) => path === ROUTES.CHAT,
+  },
 ];
