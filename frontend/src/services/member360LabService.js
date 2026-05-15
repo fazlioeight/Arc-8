@@ -659,3 +659,129 @@ export const fetchMember360JourneyTemplates = async (token, tenant) => {
   const res = await fetch(`${API_BASE}/api/member360/care-journey-templates`, { headers: buildHeaders(token, tenant) });
   return handleResponse(res);
 };
+
+// ------------------- Aggregate (multi-member) helpers -------------------
+// Used by the lab index pages. In sample mode they read straight from the
+// in-memory store. With a real backend they fan out across the members list
+// and per-member detail endpoint — fine for a lab-scale tenant, deliberately
+// not paginated because there is no aggregate endpoint server-side yet.
+
+const memberLookup = (members) => {
+  const map = new Map();
+  members.forEach((m) => map.set(m.id, m));
+  return map;
+};
+
+const attachMemberSummary = (row, member) => ({
+  ...row,
+  member_id: row.member_id ?? member?.id,
+  member_name: member ? `${member.first_name || ''} ${member.last_name || ''}`.trim() : row.member_name,
+  member_key: member?.member_key || null,
+  risk_tier: member?.risk_tier || row.risk_tier || null,
+  plan_name: member?.plan_name || null,
+  preferred_channel: member?.preferred_channel || null,
+});
+
+const fanOutDetails = async (token, tenant) => {
+  const { items: members } = await fetchMember360Members(token, tenant, { limit: 500 });
+  const details = await Promise.all(
+    members.map((m) =>
+      fetchMember360MemberDetail(token, tenant, m.id).catch(() => null)
+    )
+  );
+  return { members, details: details.filter(Boolean) };
+};
+
+export const fetchMember360AllTasks = async (token, tenant) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const lookup = memberLookup(store.members);
+    const rows = Object.values(store.tasks).flat().map((t) => attachMemberSummary(t, lookup.get(t.member_id)));
+    return deepClone(rows);
+  }
+  const { details } = await fanOutDetails(token, tenant);
+  const rows = [];
+  details.forEach((d) => {
+    (d.tasks || []).forEach((t) => rows.push(attachMemberSummary(t, d.member)));
+  });
+  return rows;
+};
+
+export const fetchMember360AllMessages = async (token, tenant) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const lookup = memberLookup(store.members);
+    const rows = Object.values(store.messages).flat().map((m) => attachMemberSummary(m, lookup.get(m.member_id)));
+    return deepClone(rows);
+  }
+  const { details } = await fanOutDetails(token, tenant);
+  const rows = [];
+  details.forEach((d) => {
+    (d.messages || []).forEach((m) => rows.push(attachMemberSummary(m, d.member)));
+  });
+  return rows;
+};
+
+export const fetchMember360AllCareOptions = async (token, tenant) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const lookup = memberLookup(store.members);
+    const rows = Object.values(store.careOptions).flat().map((o) => attachMemberSummary(o, lookup.get(o.member_id)));
+    return deepClone(rows);
+  }
+  const { details } = await fanOutDetails(token, tenant);
+  const rows = [];
+  details.forEach((d) => {
+    (d.care_options || []).forEach((o) => rows.push(attachMemberSummary(o, d.member)));
+  });
+  return rows;
+};
+
+export const fetchMember360AllDocuments = async (token, tenant) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const lookup = memberLookup(store.members);
+    const rows = Object.values(store.documents).flat().map((d) => attachMemberSummary(d, lookup.get(d.member_id)));
+    return deepClone(rows);
+  }
+  const { details } = await fanOutDetails(token, tenant);
+  const rows = [];
+  details.forEach((d) => {
+    (d.documents || []).forEach((doc) => rows.push(attachMemberSummary(doc, d.member)));
+  });
+  return rows;
+};
+
+export const fetchMember360AllJourneys = async (token, tenant) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const lookup = memberLookup(store.members);
+    const rows = Object.values(store.careJourneys).flat().map((j) => attachMemberSummary(j, lookup.get(j.member_id)));
+    return deepClone(rows);
+  }
+  const { details } = await fanOutDetails(token, tenant);
+  const rows = [];
+  details.forEach((d) => {
+    (d.care_journeys || []).forEach((j) => rows.push(attachMemberSummary(j, d.member)));
+  });
+  return rows;
+};
+
+export const fetchMember360AllRiskInsights = async (token, tenant) => {
+  if (shouldUseSample(token)) {
+    const store = getSampleStore(tenant);
+    const lookup = memberLookup(store.members);
+    const rows = [];
+    Object.entries(store.riskInsights).forEach(([memberId, insights]) => {
+      const member = lookup.get(Number(memberId));
+      insights.forEach((insight) => rows.push(attachMemberSummary(insight, member)));
+    });
+    return deepClone(rows);
+  }
+  const { details } = await fanOutDetails(token, tenant);
+  const rows = [];
+  details.forEach((d) => {
+    (d.risk_insights || []).forEach((i) => rows.push(attachMemberSummary(i, d.member)));
+  });
+  return rows;
+};

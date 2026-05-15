@@ -6,7 +6,7 @@ import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { fetchMember360Dashboard } from '../../../services/member360LabService';
-import { MetricCard, RiskBadge, SectionCard } from './components';
+import { LabSubNav, MetricCard, RiskBadge, SectionCard } from './components';
 
 const currencyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
@@ -48,6 +48,8 @@ const Member360LabDashboard = () => {
       maxWidthClassName="max-w-7xl"
       mainClassName="space-y-6"
     >
+      <LabSubNav />
+
       {loading && <LoadingState title="Loading dashboard" description="Building the population view" />}
       {error && <ErrorState title="Dashboard unavailable" description={error} />}
 

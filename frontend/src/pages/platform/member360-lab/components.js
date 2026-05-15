@@ -1,6 +1,48 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { ROUTES } from '../../../constants/routes';
 
 const joinClass = (...parts) => parts.filter(Boolean).join(' ');
+
+export const LAB_SUB_NAV = [
+  { key: 'dashboard', label: 'Dashboard', href: ROUTES.MEMBER360_LAB.DASHBOARD, exact: true },
+  { key: 'members', label: 'Members', href: ROUTES.MEMBER360_LAB.MEMBERS, prefix: ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT },
+  { key: 'tasks', label: 'Tasks', href: ROUTES.MEMBER360_LAB.TASKS },
+  { key: 'care_journeys', label: 'Care Journeys', href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS },
+  { key: 'risk', label: 'Risk Intelligence', href: ROUTES.MEMBER360_LAB.RISK_INTELLIGENCE },
+  { key: 'care_options', label: 'Care Options', href: ROUTES.MEMBER360_LAB.CARE_OPTIONS },
+  { key: 'messages', label: 'Messages', href: ROUTES.MEMBER360_LAB.MESSAGES },
+  { key: 'documents', label: 'Documents', href: ROUTES.MEMBER360_LAB.DOCUMENTS },
+  { key: 'admin', label: 'Admin', href: ROUTES.MEMBER360_LAB.ADMIN },
+];
+
+export function LabSubNav() {
+  const { pathname } = useLocation();
+  return (
+    <nav className="flex flex-wrap items-center gap-1 coding-surface rounded-2xl p-1.5 shadow-sm">
+      {LAB_SUB_NAV.map((item) => {
+        const active = item.exact
+          ? pathname === item.href
+          : pathname === item.href || pathname.startsWith(`${item.href}/`) ||
+            (item.prefix && (pathname === item.prefix || pathname.startsWith(`${item.prefix}/`)));
+        return (
+          <Link
+            key={item.key}
+            to={item.href}
+            className={joinClass(
+              'rounded-xl px-3 py-1.5 text-xs font-semibold transition',
+              active
+                ? 'bg-[var(--brand-primary)] text-white'
+                : 'coding-text-strong hover:opacity-80'
+            )}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 const RISK_TIER_STYLES = {
   Critical: 'bg-rose-100 text-rose-800 ring-rose-200 dark:bg-rose-900/30 dark:text-rose-200 dark:ring-rose-700/50',

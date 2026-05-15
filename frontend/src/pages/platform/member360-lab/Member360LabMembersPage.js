@@ -6,7 +6,7 @@ import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { fetchMember360Members } from '../../../services/member360LabService';
-import { RiskBadge } from './components';
+import { LabSubNav, RiskBadge } from './components';
 
 const RISK_TIERS = ['Critical', 'High', 'Moderate', 'Low'];
 const SORT_OPTIONS = [
@@ -73,6 +73,8 @@ const Member360LabMembersPage = () => {
       maxWidthClassName="max-w-7xl"
       mainClassName="space-y-4"
     >
+      <LabSubNav />
+
       <section className="coding-surface rounded-2xl p-4 shadow-sm space-y-3">
         <div className="flex flex-col lg:flex-row gap-3">
           <input
