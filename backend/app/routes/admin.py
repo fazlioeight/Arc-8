@@ -189,8 +189,7 @@ async def create_user(
     session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(require_admin),
 ) -> AdminUser:
-    email = payload.email.lower().strip()
-    existing_stmt = select(User).where(User.email == email, User.tenant_id == tenant.id)
+    existing_stmt = select(User).where(User.email == payload.email, User.tenant_id == tenant.id)
     existing_user = await session.scalar(existing_stmt)
     if existing_user:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists for this tenant")
@@ -202,7 +201,7 @@ async def create_user(
 
     new_user = User(
         tenant_id=tenant.id,
-        email=email,
+        email=payload.email,
         password_hash=password_hash,
         role=payload.role,
         is_active=payload.is_active,

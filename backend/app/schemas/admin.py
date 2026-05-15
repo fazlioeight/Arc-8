@@ -5,6 +5,8 @@ from typing import Dict, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from .types import NormalizedEmail
+
 PortalAccessLevel = Literal["admin", "manager", "user"]
 UserRole = Literal["admin", "user", "platform_admin"]
 
@@ -17,13 +19,8 @@ class ApplicationDefinition(BaseModel):
     core: bool = False
 
 
-# Email is intentionally a plain str (not EmailStr): pydantic's email-validator
-# rejects special-use TLDs like .local, which blocks both serializing the
-# seeded admin@nexora.local and adding *.local/*.test demo accounts. The DB
-# has a unique index, the route normalizes via .lower().strip(), and the
-# frontend uses <input type="email">.
 class AdminUserBase(BaseModel):
-    email: str
+    email: NormalizedEmail
     role: UserRole
     is_active: bool
     applications: Dict[str, PortalAccessLevel]
@@ -35,7 +32,7 @@ class AdminUser(AdminUserBase):
 
 
 class AdminUserCreate(BaseModel):
-    email: str
+    email: NormalizedEmail
     password: str = Field(min_length=8)
     role: UserRole = "user"
     is_active: bool = True

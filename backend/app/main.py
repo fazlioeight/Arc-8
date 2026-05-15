@@ -34,6 +34,7 @@ from .routes import ride_booking as ride_booking_router
 from .routes import settings as settings_router
 from .routes import workbench as workbench_router
 from .routes import utilization as utilization_router
+from .schemas.types import NormalizedEmail
 from .services.azure_auth import exchange_code_for_id_token, resolve_email_from_claims, validate_id_token
 from .utils.audit_logger import record_audit_event
 from .utils.security import (
@@ -75,7 +76,7 @@ async def shutdown_connections() -> None:
 
 
 class LoginRequest(BaseModel):
-    email: str
+    email: NormalizedEmail
     password: str
     tenant: str | None = None
 
