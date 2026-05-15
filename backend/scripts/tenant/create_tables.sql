@@ -2,6 +2,30 @@
 -- Run within each tenant schema/database when a new tenant is provisioned.
 
 -- ─────────────────────────────────────────────
+-- Shadow of the control-plane audit table.
+--
+-- ControlBase defines tenant_audit_events, but route handlers across the
+-- platform (coding, member360, etc.) call record_audit_event(session=...)
+-- using the **tenant** AsyncSession rather than the control AsyncSession.
+-- Without a copy of this table in each tenant DB, every audited write
+-- 500s with UndefinedTableError. Creating it here keeps the existing
+-- handler pattern working. A proper architectural fix would thread a
+-- control_session into each handler instead.
+-- ─────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS tenant_audit_events (
+    id         SERIAL       PRIMARY KEY,
+    tenant_id  INTEGER      NOT NULL,
+    actor      VARCHAR(255) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    payload    JSON         NOT NULL DEFAULT '{}',
+    created_at TIMESTAMPTZ  NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_tenant_audit_events_tenant_id  ON tenant_audit_events(tenant_id);
+CREATE INDEX IF NOT EXISTS ix_tenant_audit_events_created_at ON tenant_audit_events(created_at);
+
+-- ─────────────────────────────────────────────
 -- Generic member / claims (legacy)
 -- ─────────────────────────────────────────────
 
@@ -475,3 +499,234 @@ CREATE TABLE IF NOT EXISTS medication_adherence (
 
 CREATE INDEX IF NOT EXISTS ix_medication_adherence_member_id    ON medication_adherence(member_id);
 CREATE INDEX IF NOT EXISTS ix_medication_adherence_measure_year ON medication_adherence(measure_year);
+
+-- ─────────────────────────────────────────────
+-- Nexora Lab Member360 domain
+-- ─────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS m360_members (
+    id                       SERIAL        PRIMARY KEY,
+    member_key               VARCHAR(64)   NOT NULL UNIQUE,
+    first_name               VARCHAR(80),
+    last_name                VARCHAR(80),
+    date_of_birth            DATE,
+    gender                   VARCHAR(16),
+    plan_name                VARCHAR(128),
+    line_of_business         VARCHAR(64),
+    phone                    VARCHAR(32),
+    email                    VARCHAR(255),
+    address_line1            VARCHAR(160),
+    address_city             VARCHAR(64),
+    address_state            VARCHAR(2),
+    address_zip              VARCHAR(10),
+    preferred_language       VARCHAR(48),
+    preferred_channel        VARCHAR(32),
+    primary_care_provider    VARCHAR(128),
+    risk_score_composite     NUMERIC(6, 2),
+    risk_tier                VARCHAR(16),
+    clinical_risk_score      NUMERIC(6, 2),
+    utilization_risk_score   NUMERIC(6, 2),
+    cost_risk_score          NUMERIC(6, 2),
+    engagement_risk_score    NUMERIC(6, 2),
+    open_care_gaps           INTEGER       NOT NULL DEFAULT 0,
+    next_best_action         VARCHAR(255),
+    last_interaction_at      TIMESTAMP,
+    created_at               TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at               TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_members_member_key ON m360_members(member_key);
+CREATE INDEX IF NOT EXISTS ix_m360_members_risk_tier  ON m360_members(risk_tier);
+
+CREATE TABLE IF NOT EXISTS m360_care_journey_templates (
+    id                          SERIAL        PRIMARY KEY,
+    name                        VARCHAR(160)  NOT NULL,
+    description                 TEXT,
+    category                    VARCHAR(64),
+    recommended_for_risk_tier   VARCHAR(16),
+    default_stages              JSON,
+    default_tasks               JSON,
+    created_by                  VARCHAR(255),
+    created_at                  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS m360_risk_insights (
+    id              SERIAL        PRIMARY KEY,
+    member_id       INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    domain          VARCHAR(32)   NOT NULL,
+    score           FLOAT         NOT NULL,
+    driver          VARCHAR(255),
+    recommendation  TEXT,
+    confidence      FLOAT,
+    last_updated_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_risk_insights_member_id ON m360_risk_insights(member_id);
+
+CREATE TABLE IF NOT EXISTS m360_care_journeys (
+    id                      SERIAL        PRIMARY KEY,
+    member_id               INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    template_id             INTEGER       REFERENCES m360_care_journey_templates(id) ON DELETE SET NULL,
+    name                    VARCHAR(160)  NOT NULL,
+    description             TEXT,
+    status                  VARCHAR(16)   NOT NULL DEFAULT 'active',
+    created_by              VARCHAR(255),
+    assigned_to             VARCHAR(255),
+    start_date              DATE,
+    target_completion_date  DATE,
+    source                  VARCHAR(64),
+    template_name           VARCHAR(160),
+    created_at              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_care_journeys_member_id ON m360_care_journeys(member_id);
+CREATE INDEX IF NOT EXISTS ix_m360_care_journeys_status    ON m360_care_journeys(status);
+
+CREATE TABLE IF NOT EXISTS m360_care_journey_stages (
+    id           SERIAL        PRIMARY KEY,
+    journey_id   INTEGER       NOT NULL REFERENCES m360_care_journeys(id) ON DELETE CASCADE,
+    sequence     INTEGER       NOT NULL DEFAULT 0,
+    name         VARCHAR(160)  NOT NULL,
+    description  TEXT,
+    status       VARCHAR(16)   NOT NULL DEFAULT 'pending',
+    completed_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_care_journey_stages_journey_id ON m360_care_journey_stages(journey_id);
+
+CREATE TABLE IF NOT EXISTS m360_tasks (
+    id                      SERIAL        PRIMARY KEY,
+    member_id               INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    journey_id              INTEGER       REFERENCES m360_care_journeys(id) ON DELETE SET NULL,
+    title                   VARCHAR(255)  NOT NULL,
+    description             TEXT,
+    assigned_user           VARCHAR(255),
+    assigned_queue          VARCHAR(64),
+    priority                VARCHAR(16)   NOT NULL DEFAULT 'medium',
+    status                  VARCHAR(16)   NOT NULL DEFAULT 'open',
+    due_date                DATE,
+    sbar_situation          TEXT,
+    sbar_background         TEXT,
+    sbar_assessment         TEXT,
+    sbar_recommendation     TEXT,
+    recommended_next_action VARCHAR(255),
+    auto_generated_reason   VARCHAR(255),
+    notes                   TEXT,
+    created_at              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_tasks_member_id  ON m360_tasks(member_id);
+CREATE INDEX IF NOT EXISTS ix_m360_tasks_journey_id ON m360_tasks(journey_id);
+CREATE INDEX IF NOT EXISTS ix_m360_tasks_status    ON m360_tasks(status);
+CREATE INDEX IF NOT EXISTS ix_m360_tasks_priority  ON m360_tasks(priority);
+
+CREATE TABLE IF NOT EXISTS m360_notes (
+    id                  SERIAL        PRIMARY KEY,
+    member_id           INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    author_email        VARCHAR(255)  NOT NULL,
+    author_name         VARCHAR(255),
+    channel             VARCHAR(32)   NOT NULL DEFAULT 'internal',
+    note_type           VARCHAR(64),
+    body                TEXT          NOT NULL,
+    related_task_id     INTEGER       REFERENCES m360_tasks(id) ON DELETE SET NULL,
+    related_journey_id  INTEGER       REFERENCES m360_care_journeys(id) ON DELETE SET NULL,
+    created_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_notes_member_id  ON m360_notes(member_id);
+CREATE INDEX IF NOT EXISTS ix_m360_notes_created_at ON m360_notes(created_at);
+
+CREATE TABLE IF NOT EXISTS m360_messages (
+    id         SERIAL        PRIMARY KEY,
+    member_id  INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    channel    VARCHAR(32)   NOT NULL DEFAULT 'chat',
+    direction  VARCHAR(16)   NOT NULL DEFAULT 'outbound',
+    sender     VARCHAR(255),
+    recipient  VARCHAR(255),
+    body       TEXT          NOT NULL,
+    status     VARCHAR(16)   NOT NULL DEFAULT 'sent',
+    timestamp  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_messages_member_id ON m360_messages(member_id);
+CREATE INDEX IF NOT EXISTS ix_m360_messages_timestamp ON m360_messages(timestamp);
+
+CREATE TABLE IF NOT EXISTS m360_claims (
+    id                      SERIAL          PRIMARY KEY,
+    member_id               INTEGER         NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    claim_number            VARCHAR(64)     NOT NULL,
+    service_date            DATE,
+    provider                VARCHAR(160),
+    category                VARCHAR(64),
+    status                  VARCHAR(32)     NOT NULL DEFAULT 'paid',
+    billed_amount           NUMERIC(12, 2),
+    paid_amount             NUMERIC(12, 2),
+    member_responsibility   NUMERIC(12, 2)
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_claims_member_id    ON m360_claims(member_id);
+CREATE INDEX IF NOT EXISTS ix_m360_claims_claim_number ON m360_claims(claim_number);
+
+CREATE TABLE IF NOT EXISTS m360_accumulators (
+    id                  SERIAL          PRIMARY KEY,
+    member_id           INTEGER         NOT NULL UNIQUE REFERENCES m360_members(id) ON DELETE CASCADE,
+    deductible          NUMERIC(12, 2),
+    deductible_met      NUMERIC(12, 2),
+    out_of_pocket_max   NUMERIC(12, 2),
+    out_of_pocket_met   NUMERIC(12, 2),
+    plan_year_start     DATE,
+    updated_at          TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_accumulators_member_id ON m360_accumulators(member_id);
+
+CREATE TABLE IF NOT EXISTS m360_care_options (
+    id                          SERIAL          PRIMARY KEY,
+    member_id                   INTEGER         NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    service_type                VARCHAR(160)    NOT NULL,
+    recommended_provider        VARCHAR(160),
+    facility_name               VARCHAR(160),
+    cost_estimate               NUMERIC(12, 2),
+    quality_score               FLOAT,
+    distance_miles              FLOAT,
+    network_status              VARCHAR(32),
+    potential_savings           NUMERIC(12, 2),
+    rationale                   TEXT,
+    member_facing_explanation   TEXT,
+    status                      VARCHAR(32)     NOT NULL DEFAULT 'recommended',
+    created_at                  TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                  TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_care_options_member_id ON m360_care_options(member_id);
+CREATE INDEX IF NOT EXISTS ix_m360_care_options_status    ON m360_care_options(status);
+
+CREATE TABLE IF NOT EXISTS m360_savings (
+    id                      SERIAL          PRIMARY KEY,
+    member_id               INTEGER         NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    care_option_id          INTEGER         REFERENCES m360_care_options(id) ON DELETE SET NULL,
+    original_expected_cost  NUMERIC(12, 2),
+    steered_option_cost     NUMERIC(12, 2),
+    estimated_savings       NUMERIC(12, 2),
+    claim_received          BOOLEAN         NOT NULL DEFAULT FALSE,
+    savings_validated       BOOLEAN         NOT NULL DEFAULT FALSE,
+    validation_status       VARCHAR(32)     NOT NULL DEFAULT 'pending',
+    created_at              TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_savings_member_id ON m360_savings(member_id);
+
+CREATE TABLE IF NOT EXISTS m360_documents (
+    id              SERIAL        PRIMARY KEY,
+    member_id       INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    file_name       VARCHAR(255)  NOT NULL,
+    document_type   VARCHAR(64),
+    uploaded_by     VARCHAR(255),
+    uploaded_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status          VARCHAR(32)   NOT NULL DEFAULT 'active'
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_documents_member_id ON m360_documents(member_id);
