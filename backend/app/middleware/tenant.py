@@ -2,10 +2,10 @@
 
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlalchemy.exc import NoResultFound
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
 from ..core.config import settings
@@ -45,7 +45,13 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 )
             except NoResultFound:
                 if self.require_known_tenant or settings.HIPAA_MODE:
-                    raise HTTPException(status_code=404, detail="Unknown tenant")
+                    # Return a Response rather than raising. Raising HTTPException
+                    # from BaseHTTPMiddleware bubbles to uvicorn as a bare 500
+                    # without CORS headers, which the browser surfaces as
+                    # "Failed to fetch" on the frontend.
+                    return JSONResponse(
+                        {"detail": "Unknown tenant"}, status_code=404
+                    )
                 tenant_context = None
 
         request.state.tenant = tenant_context
