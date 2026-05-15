@@ -395,7 +395,7 @@ const ChatPage = () => {
     <div className="coding-member-workspace portal-theme flex h-screen min-h-screen flex-col">
       <PortalUtilityBar />
       <div
-        className="nx-chat-root grid min-h-0 flex-1 grid-cols-[200px_1fr] overflow-hidden bg-[#0a0a0a] text-[13px] text-[#d4d4d4]"
+        className="nx-chat-root grid min-h-0 flex-1 grid-cols-[200px_1fr] grid-rows-1 overflow-hidden bg-[#0a0a0a] text-[13px] text-[#d4d4d4]"
       >
         {/* ─ Sidebar ────────────────────────────────────────────────── */}
         <aside
@@ -498,7 +498,7 @@ const ChatPage = () => {
         </aside>
 
         {/* ─ Main ───────────────────────────────────────────────────── */}
-        <main className="flex h-full min-w-0 flex-col" style={{ background: bg }}>
+        <main className="flex h-full min-h-0 min-w-0 flex-col" style={{ background: bg }}>
           {/* Inner topbar (light) — gives Status + signed-in user without
               duplicating the portal nav above. */}
           <header className="flex h-[44px] flex-none items-center justify-between border-b border-[#1e1e1e] bg-[#0f0f0f] px-4">

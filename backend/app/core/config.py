@@ -3,10 +3,10 @@
 import json
 import secrets
 from functools import lru_cache
-from typing import Dict, List, Optional
+from typing import Annotated, Dict, List, Optional
 
 from pydantic import AnyHttpUrl, field_validator, ValidationInfo
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRES_MINUTES: int = 60
 
-    CORS_ORIGINS: List[AnyHttpUrl] = ["http://localhost:3000"]
+    CORS_ORIGINS: Annotated[List[AnyHttpUrl], NoDecode] = ["http://localhost:3000"]
 
     CONTROL_DATABASE_URL: str = "postgresql+asyncpg://nexora_control:nexora_control@localhost:5432/nexora_control"
     TENANT_DATABASE_URL_TEMPLATE: Optional[str] = None
@@ -130,6 +130,32 @@ class Settings(BaseSettings):
         if value and value.startswith("sqlite") and env == "production":
             raise ValueError("SQLite storage is not supported for production workloads; configure a managed database")
         return value
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        # Accept JSON arrays, comma-separated strings, and bare URLs (with or
+        # without stray surrounding brackets). PowerShell + az.exe argument
+        # splitting eats inner double quotes, so a JSON env-var of the form
+        # ["https://..."] can land in the container as [https://...], which
+        # is not valid JSON. Be permissive here so deploy quoting quirks
+        # don't crash the worker on boot.
+        if v in (None, "", []):
+            return []
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            stripped = v.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                try:
+                    return json.loads(stripped)
+                except ValueError:
+                    inner = stripped[1:-1].strip()
+                    if not inner:
+                        return []
+                    return [item.strip().strip('"').strip("'") for item in inner.split(",") if item.strip()]
+            return [item.strip() for item in stripped.split(",") if item.strip()]
+        raise ValueError("Unsupported CORS_ORIGINS value")
 
     @field_validator("ALLOWED_TENANT_HOSTS", mode="before")
     @classmethod

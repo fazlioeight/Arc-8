@@ -191,9 +191,25 @@ if (-not $SkipBackend) {
     # Verify the image actually landed in ACR. The CLI log streamer can crash
     # mid-build (encoding issues on Windows) while the build itself succeeds
     # server-side, so we check the registry rather than trust the exit code.
+    # If the image isn't there yet, the build may still be running on the
+    # server -- poll the most recent task run until it reaches a terminal state
+    # before giving up.
     $pushed = Invoke-AzQuiet { az acr repository show -n $AcrName --image "${ImageName}:$Tag" --query name -o tsv }
     if (-not $pushed) {
-        throw "ACR build did not push '${ImageName}:$Tag' (CLI exit $buildExit). Check 'az acr task list-runs -r $AcrName --top 5'."
+        Write-Host "Image not yet in ACR; polling task run to completion..."
+        $deadline = (Get-Date).AddMinutes(15)
+        do {
+            Start-Sleep -Seconds 10
+            $runStatus = Invoke-AzQuiet { az acr task list-runs -r $AcrName --top 1 --query "[0].status" -o tsv }
+            Write-Host "  task run status: $runStatus"
+            if ((Get-Date) -gt $deadline) {
+                throw "Timed out waiting for ACR build of '${ImageName}:$Tag' (last status: $runStatus)."
+            }
+        } while ($runStatus -eq "Running" -or $runStatus -eq "Queued")
+        $pushed = Invoke-AzQuiet { az acr repository show -n $AcrName --image "${ImageName}:$Tag" --query name -o tsv }
+    }
+    if (-not $pushed) {
+        throw "ACR build did not push '${ImageName}:$Tag' (CLI exit $buildExit, run status $runStatus). Check 'az acr task list-runs -r $AcrName --top 5'."
     }
     Write-Host "Image built and pushed: $FullImage"
     $env:NEXORA_PLATFORM_IMAGE = $FullImage
@@ -491,11 +507,15 @@ if (-not $SkipFrontend) {
 # == Phase 6: CORS update ====================================================-
 if ($FrontendUrl) {
     Write-Phase "Phase 6: Update backend CORS for SWA origin"
-    $CorsJson = ConvertTo-Json @($FrontendUrl) -Compress
+    # Pass the URL bare. PowerShell + az.exe argument splitting eats inner
+    # double quotes, so a JSON array like ["https://..."] arrives as
+    # [https://...] in the container. The backend's parse_cors_origins
+    # validator (config.py) accepts JSON arrays, comma-separated strings,
+    # and bare URLs alike, so a bare URL is the simplest robust form.
     az containerapp update -n $AppName -g $ResourceGroup `
-        --set-env-vars "CORS_ORIGINS=$CorsJson" `
+        --set-env-vars "CORS_ORIGINS=$FrontendUrl" `
         --output none
-    Write-Host "CORS updated: $CorsJson"
+    Write-Host "CORS updated: $FrontendUrl"
 }
 
 # == Final summary ==========================================================─-
