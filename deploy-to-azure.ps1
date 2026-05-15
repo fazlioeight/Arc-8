@@ -46,6 +46,11 @@ Set-StrictMode -Version Latest
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
 $env:PYTHONIOENCODING = "utf-8"
 
+# Suppress containerapp extension WARNING lines on stderr — under PS 5.1 with
+# $ErrorActionPreference="Stop", those warnings get wrapped as ErrorRecords
+# and abort the script even on exit code 0.
+$env:AZURE_CORE_ONLY_SHOW_ERRORS = "true"
+
 function Write-Phase([string]$Title) {
     Write-Host ""
     Write-Host "== $Title ==================================" -ForegroundColor Cyan
