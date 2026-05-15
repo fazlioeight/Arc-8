@@ -151,6 +151,14 @@ const PortalPage = () => {
         color: "#6366f1",
       },
       {
+        key: "chat",
+        label: "Nexora Chat",
+        desc: "Claude assistant, files, workbooks, dataset",
+        path: ROUTES.CHAT,
+        icon: "AI",
+        color: "#7c3aed",
+      },
+      {
         key: "settings",
         label: "Settings",
         desc: "Preferences and integrations",
@@ -230,7 +238,7 @@ const PortalPage = () => {
       >
         <section className="flex items-center justify-center py-16">
           <LoadingState
-            title="Loading your Nexora workspace"
+            title="Loading your Nexora Lab workspace"
             description="Pulling recent tasks, saved items, and applications."
             className="w-full max-w-2xl"
           />
@@ -336,7 +344,7 @@ const PortalPage = () => {
                 {overview.profile?.email || user?.email}
               </div>
               <p className="portal-list-item__meta">
-                Tenant {overview.profile?.tenant || user?.tenant || "Nexora"} |{" "}
+                Tenant {overview.profile?.tenant || user?.tenant || "Nexora Lab"} |{" "}
                 {formatRoleLabel(overview.profile?.role)} |{" "}
                 {overview.profile?.lastLogin
                   ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
@@ -345,7 +353,7 @@ const PortalPage = () => {
               </p>
               <div className="portal-list-item__actions">
                 <span className="portal-pill portal-pill--ghost">
-                  Tenant {overview.profile?.tenant || tenant || "Nexora"}
+                  Tenant {overview.profile?.tenant || tenant || "Nexora Lab"}
                 </span>
                 <span className="portal-pill portal-pill--ghost">
                   {formatRoleLabel(overview.profile?.role)}

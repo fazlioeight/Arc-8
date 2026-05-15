@@ -509,7 +509,7 @@ const Dashboard = () => {
         </main>
 
         <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-          <p>&copy; 2025 Nexora - Multi-tenant Analytics Platform</p>
+          <p>&copy; 2025 Nexora Lab</p>
         </footer>
       </div>
     </div>

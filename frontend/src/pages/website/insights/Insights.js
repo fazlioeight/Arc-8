@@ -27,7 +27,7 @@ const Insights = () => {
     <div className="blog-post" id="predictive-modeling" style={{ borderBottom: '1px solid #ddd', padding: '20px 0' }}>
       <h3>Reducing Risks with Predictive Modeling</h3>
       <p>Published: July 25, 2025</p>
-      <p>Learn how AI-driven tools identify high-risk members early...</p>
+      <p>Learn how data-driven tools identify high-risk members early...</p>
       <a href="#">Read More</a>
     </div>
     
@@ -39,7 +39,7 @@ const Insights = () => {
     </div>
 
     <footer className="bg-dark text-white text-center py-3 mt-5">
-      <p>&copy; 2025 Nexora Analytics. All rights reserved. | <a href="#" className="text-white">Privacy Policy</a> | <a href="#" className="text-white">Terms of Service</a></p>
+      <p>&copy; 2025 Nexora Lab. All rights reserved. | <a href="#" className="text-white">Privacy Policy</a> | <a href="#" className="text-white">Terms of Service</a></p>
     </footer>
   </div>
   );

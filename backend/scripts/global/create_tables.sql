@@ -1,4 +1,4 @@
--- Nexora control-plane (global) tables
+-- Nexora Lab control-plane (global) tables
 -- Run once against the shared control database.
 
 -- ─────────────────────────────────────────────

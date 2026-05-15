@@ -1,0 +1,80 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure containerapp extension
+        run: az extension add --name containerapp --upgrade --only-show-errors
+
+      - name: Build + push image to ACR
+        id: build
+        working-directory: backend
+        env:
+          ACR: ${{ vars.AZURE_ACR }}
+          IMAGE: ${{ vars.AZURE_BACKEND_IMAGE }}
+          TAG: ${{ github.sha }}
+        run: |
+          az acr build \
+            --registry "$ACR" \
+            --image "$IMAGE:$TAG" \
+            --image "$IMAGE:latest" \
+            --output none .
+          echo "image=${ACR}.azurecr.io/${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Roll out Container App
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          APP: ${{ vars.AZURE_CONTAINER_APP }}
+          IMAGE_FULL: ${{ steps.build.outputs.image }}
+        run: |
+          az containerapp update \
+            --name "$APP" \
+            --resource-group "$RG" \
+            --image "$IMAGE_FULL" \
+            --output none
+          # Wait for the new revision to go Healthy before considering deploy done.
+          for i in $(seq 1 30); do
+            state=$(az containerapp revision list \
+              --name "$APP" --resource-group "$RG" \
+              --query "sort_by([], &properties.createdTime)[-1].properties.healthState" -o tsv)
+            echo "  attempt $i: healthState=$state"
+            if [ "$state" = "Healthy" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::New revision did not reach Healthy within 5 minutes."
+          exit 1
+
+      - name: Smoke test
+        env:
+          URL: ${{ vars.AZURE_BACKEND_URL }}
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health/live")
+          echo "health/live: $status"
+          test "$status" = "200"

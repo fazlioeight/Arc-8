@@ -11,6 +11,7 @@ sqlalchemy[asyncio]
 asyncpg
 aiosqlite
 psycopg2-binary
+psycopg[binary]
 redis>=4.6.0
 azure-identity
 azure-keyvault-secrets
@@ -24,3 +25,13 @@ httpx
 pytest
 pytest-asyncio
 requests_mock
+
+# ── Chat module (merged from nexora-chat) ─────────────────────────────────────
+anthropic
+python-multipart
+slowapi
+python-docx
+openpyxl
+python-pptx
+pillow
+duckdb

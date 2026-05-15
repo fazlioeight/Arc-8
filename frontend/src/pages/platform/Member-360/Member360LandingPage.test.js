@@ -41,7 +41,7 @@ const renderPage = (overrides = {}) => {
   const authValue = {
     token: "sample-token",
     tenant: "sample-tenant",
-    user: { email: "test@nexora.ai", role: "admin" },
+    user: { email: "test@nexoralab.test", role: "admin" },
     hasApplicationAccess: () => true,
     availableApplications: ["portal", "coding"],
     purchasedApplications: ["portal", "coding"],

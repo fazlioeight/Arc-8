@@ -14,18 +14,21 @@ jest.mock("react-router-dom", () => {
 }, { virtual: true });
 
 const mockLogin = jest.fn();
+const { MemoryRouter } = jest.requireActual("react-router-dom");
 
 function renderLoginToString() {
   return ReactDOMServer.renderToString(
-    <AuthContext.Provider value={{ login: mockLogin }}>
-      <Login />
-    </AuthContext.Provider>
+    <MemoryRouter>
+      <AuthContext.Provider value={{ login: mockLogin }}>
+        <Login />
+      </AuthContext.Provider>
+    </MemoryRouter>
   );
 }
 
 test("renders login form heading", () => {
   const html = renderLoginToString();
   expect(html).toContain("Sign in");
-  expect(html).toContain("Email address");
-  expect(html).toContain("Password");
+  expect(html).toContain("Workspace");
+  expect(html).toContain("Continue with Microsoft");
 });

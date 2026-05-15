@@ -26,7 +26,7 @@ const SessionLockOverlay = () => {
         <div className="session-lock__meta">
           <div>
             <span>Signed in as</span>
-            <strong>{user?.email || 'user@nexora.ai'}</strong>
+            <strong>{user?.email || 'user@nexoralab.test'}</strong>
           </div>
         </div>
         <div className="session-lock__actions">

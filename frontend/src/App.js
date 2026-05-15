@@ -31,6 +31,7 @@ const RidePartnerManagementPage = lazy(() => import('./pages/platform/ride_booki
 const RideBookingPaymentsPage = lazy(() => import('./pages/platform/ride_booking/RideBookingPaymentsPage'));
 const Settings = lazy(() => import('./pages/platform/settings/Settings'));
 const Dashboard = lazy(() => import('./pages/platform/coding/admin/Dashboard'));
+const ChatPage = lazy(() => import('./pages/platform/chat/ChatPage'));
 const Docs = lazy(() => import('./pages/docs/Docs'));
 const CodingMembersPage = lazy(() => import('./pages/platform/coding/CodingMembersPage'));
 const CodingProvidersPage = lazy(() => import('./pages/platform/coding/CodingProvidersPage'));
@@ -79,7 +80,7 @@ const RouteFallback = () => (
   <div className="py-12">
     <LoadingState
       title="Loading"
-      description="Preparing your Nexora workspace..."
+      description="Preparing your Nexora Lab workspace..."
       className="mx-auto max-w-md"
     />
   </div>
@@ -91,6 +92,11 @@ const LegacyMemberDetailRedirect = () => {
     return <Navigate to="/coding/members" replace />;
   }
   return <Navigate to={`/coding/member/${memberId}/chart`} replace />;
+};
+
+const LoginOnlySessionLockOverlay = () => {
+  const location = useLocation();
+  return location.pathname === '/login' ? <SessionLockOverlay /> : null;
 };
 
 const Shell = ({ themePreference, setThemePreference }) => {
@@ -106,6 +112,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
     ROUTES.CODING.LANDING,
     "/admin",
     "/jobs",
+    ROUTES.CHAT,
   ];
   const hideNavbar = hideNavbarOn.some((p) => location.pathname.startsWith(p));
 
@@ -139,6 +146,11 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/rideBooking/payments" element={<Navigate to={ROUTES.RIDE_BOOKING.PAYMENTS} replace />} />
           <Route path={ROUTES.SETTINGS} element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
           <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
+          <Route path={ROUTES.CHAT} element={(
+            <ErrorBoundary title="Chat workspace failed to load" description="We couldn't open the chat workspace. Retry to attempt loading again.">
+              <ChatPage />
+            </ErrorBoundary>
+          )} />
           <Route path={ROUTES.DOCS} element={<Docs />} />
           {/* Section routes */}
           <Route path="/about/mission" element={<Mission />} />
@@ -298,7 +310,7 @@ function App() {
                 <Shell themePreference={themePreference} setThemePreference={setThemePreference} />
                 <CommandPalette onThemeToggle={handleThemeToggle} />
                 <GuidedTourOverlay />
-                <SessionLockOverlay />
+                <LoginOnlySessionLockOverlay />
               </Router>
             </NotificationsProvider>
           </GuidedTourProvider>

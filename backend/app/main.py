@@ -19,6 +19,7 @@ from .middleware.tenant import TenantMiddleware
 from .models.tables import User
 from .routes import admin as admin_router
 from .routes import analytics as analytics_router
+from .routes import chat as chat_router
 from .routes import coding as coding_router
 from .routes import coding_dashboards as coding_dashboards_router
 from .routes import dashboard as dashboard_router
@@ -32,6 +33,7 @@ from .routes import ride_booking as ride_booking_router
 from .routes import settings as settings_router
 from .routes import workbench as workbench_router
 from .routes import utilization as utilization_router
+from .services.azure_auth import exchange_code_for_id_token, resolve_email_from_claims, validate_id_token
 from .utils.audit_logger import record_audit_event
 from .utils.security import (
     AuthenticatedUser,
@@ -46,7 +48,7 @@ setup_logging()
 
 
 
-app = FastAPI(title="Nexora Analytics API", version="2.0.0")
+app = FastAPI(title="Nexora Lab API", version="2.0.0")
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
@@ -77,9 +79,44 @@ class LoginRequest(BaseModel):
     tenant: str | None = None
 
 
+class AzureAuthCodeRequest(BaseModel):
+    code: str
+    code_verifier: str
+    redirect_uri: str
+    nonce: str | None = None
+    tenant: str | None = None
+
+
+def _build_login_response(user: User, tenant: TenantContext) -> dict:
+    raw_permissions = dict(user.app_permissions or {})
+    applications = filter_application_permissions(raw_permissions, tenant)
+    available_app_keys = tenant_application_keys(tenant)
+    purchased_applications = sorted(
+        key for key, enabled in (tenant.purchased_applications or {}).items() if enabled
+    )
+    token = create_access_token(
+        {
+            "sub": user.email,
+            "tid": tenant.key,
+            "uid": user.id,
+            "role": user.role or "user",
+            "scp": sorted(applications.keys()),
+        }
+    )
+    return {
+        "token": token,
+        "email": user.email,
+        "tenant": tenant.key,
+        "role": user.role or "user",
+        "applications": applications,
+        "purchased_applications": purchased_applications,
+        "available_applications": sorted(available_app_keys),
+    }
+
+
 @app.get("/")
 async def read_root():
-    return {"message": "Nexora Analytics Backend"}
+    return {"message": "Nexora Lab Backend"}
 
 
 @app.get("/health/live", tags=["health"])
@@ -145,22 +182,69 @@ async def login(
     )
     await session.commit()
 
-    raw_permissions = dict(user.app_permissions or {})
-    applications = filter_application_permissions(raw_permissions, tenant)
-    available_app_keys = tenant_application_keys(tenant)
-    purchased_applications = sorted(
-        key for key, enabled in (tenant.purchased_applications or {}).items() if enabled
-    )
-    token = create_access_token({"sub": credentials.email, "tid": tenant.key, "uid": user.id, "role": user.role or "user", "scp": sorted(applications.keys())})
+    return _build_login_response(user, tenant)
+
+
+@app.get("/api/auth/azure/config")
+async def azure_auth_config():
     return {
-        "token": token,
-        "email": credentials.email,
-        "tenant": tenant.key,
-        "role": user.role or "user",
-        "applications": applications,
-        "purchased_applications": purchased_applications,
-        "available_applications": sorted(available_app_keys),
+        "enabled": settings.AZURE_AUTH_ENABLED and bool(settings.AZURE_TENANT_ID and settings.AZURE_CLIENT_ID),
+        "tenant_id": settings.AZURE_TENANT_ID,
+        "client_id": settings.AZURE_CLIENT_ID,
+        "authority_host": settings.AZURE_AUTHORITY_HOST.rstrip("/"),
+        "scopes": settings.AZURE_AUTH_SCOPES,
     }
+
+
+@app.post("/api/auth/azure/exchange")
+async def azure_auth_exchange(
+    payload: AzureAuthCodeRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_control_session),
+):
+    if payload.tenant and payload.tenant != tenant.key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant mismatch")
+
+    id_token = await exchange_code_for_id_token(
+        code=payload.code,
+        code_verifier=payload.code_verifier,
+        redirect_uri=payload.redirect_uri,
+    )
+    claims = validate_id_token(id_token, nonce=payload.nonce)
+    email = resolve_email_from_claims(claims)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Azure login did not include an email address",
+        )
+
+    user_stmt = (
+        select(User)
+        .where(
+            User.email == email,
+            User.tenant_id == tenant.id,
+            User.is_active.is_(True),
+        )
+        .limit(1)
+    )
+    user = await session.scalar(user_stmt)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Azure user is not provisioned for this tenant",
+        )
+
+    user.last_login_at = datetime.now(timezone.utc)
+    await record_audit_event(
+        session,
+        tenant_id=tenant.id,
+        actor=email,
+        event_type="login.azure.success",
+        payload={"tenant": tenant.key, "azure_oid": claims.get("oid", "")},
+    )
+    await session.commit()
+
+    return _build_login_response(user, tenant)
 
 
 @app.get("/api/tenant/self")
@@ -198,4 +282,5 @@ app.include_router(imports_router.router)
 app.include_router(ride_booking_router.router)
 app.include_router(docs_router.router)
 app.include_router(settings_router.router)
+app.include_router(chat_router.router)
 

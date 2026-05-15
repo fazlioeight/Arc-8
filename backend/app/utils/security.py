@@ -53,7 +53,7 @@ class AuthenticatedUser:
     app_permissions: Dict[str, str]
 
 
-_BASE_TENANT_APPS = {"portal", "admin_console", "settings"}
+_BASE_TENANT_APPS = {"portal", "admin_console", "settings", "chat"}
 
 
 def tenant_application_keys(tenant: TenantContext) -> set[str]:
