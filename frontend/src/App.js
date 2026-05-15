@@ -25,6 +25,9 @@ const Pricing = lazy(() => import('./pages/website/Pricing'));
 const Login = lazy(() => import('./pages/website/Login'));
 const PortalPage = lazy(() => import('./pages/platform/portal_page/portalPage'));
 const Member360LandingPage = lazy(() => import('./pages/platform/Member-360/Member360LandingPage'));
+const Member360LabDashboard = lazy(() => import('./pages/platform/member360-lab/Member360LabDashboard'));
+const Member360LabMembersPage = lazy(() => import('./pages/platform/member360-lab/Member360LabMembersPage'));
+const Member360LabWorkspace = lazy(() => import('./pages/platform/member360-lab/Member360LabWorkspace'));
 const RideBookingLandingPage = lazy(() => import('./pages/platform/ride_booking/RideBookingLandingPage'));
 const RideBooking = lazy(() => import('./pages/platform/ride_booking/RideBooking'));
 const RidePartnerManagementPage = lazy(() => import('./pages/platform/ride_booking/RidePartnerManagementPage'));
@@ -105,6 +108,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
     ROUTES.PORTAL.LANDING,
     "/portalPage",
     ROUTES.MEMBER_360.LANDING,
+    ROUTES.MEMBER360_LAB.DASHBOARD,
     ROUTES.RIDE_BOOKING.LANDING,
     "/rideBooking",
     ROUTES.DASHBOARD,
@@ -136,6 +140,21 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path={ROUTES.PORTAL.LANDING} element={<PortalPage />} />
           <Route path="/portalPage" element={<Navigate to={ROUTES.PORTAL.LANDING} replace />} />
           <Route path={ROUTES.MEMBER_360.LANDING} element={<Member360LandingPage />} />
+          <Route path={ROUTES.MEMBER360_LAB.DASHBOARD} element={(
+            <ErrorBoundary title="Nexora Lab Member360 failed to load" description="Try again to reload the care intelligence workspace.">
+              <Member360LabDashboard />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.MEMBER360_LAB.MEMBERS} element={(
+            <ErrorBoundary title="Member360 members failed to load">
+              <Member360LabMembersPage />
+            </ErrorBoundary>
+          )} />
+          <Route path={`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/:memberId`} element={(
+            <ErrorBoundary title="Member360 workspace failed to load">
+              <Member360LabWorkspace />
+            </ErrorBoundary>
+          )} />
           <Route path={ROUTES.RIDE_BOOKING.LANDING} element={<RideBookingLandingPage />} />
           <Route path={ROUTES.RIDE_BOOKING.BOOK} element={<RideBooking />} />
           <Route path={ROUTES.RIDE_BOOKING.PARTNERS} element={<RidePartnerManagementPage />} />

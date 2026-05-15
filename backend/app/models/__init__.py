@@ -3,6 +3,7 @@
 from . import coding as coding  # noqa: F401
 from . import ride_booking as ride_booking  # noqa: F401
 from . import chat as chat  # noqa: F401
+from . import member360 as member360  # noqa: F401
 from .tables import ControlBase, TenantDataBase
 
 
