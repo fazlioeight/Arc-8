@@ -254,7 +254,7 @@ async def update_user(
 
     if payload.applications is not None:
         new_permissions = _validate_applications_payload(tenant, payload.applications)
-        if new_permissions != _clean_permissions(user.app_permissions):
+        if new_permissions != _clean_permissions(tenant, user.app_permissions):
             user.app_permissions = new_permissions
             changed = True
 
