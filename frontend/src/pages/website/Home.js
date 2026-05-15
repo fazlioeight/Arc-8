@@ -4,11 +4,11 @@ import "./home.landing.css";
 
 const Home = () => {
   const trustLogos = [
-    { src: "/images/nexoraAnalyticsLogo.png", alt: "HealthCo" },
-    { src: "/images/nexoraAnalyticsNavBarLogo.png", alt: "PayerOne" },
-    { src: "/images/nexoraAnalyticsLogo.png", alt: "CarePlus" },
-    { src: "/images/nexoraAnalyticsNavBarLogo.png", alt: "Optiview" },
-    { src: "/images/nexoraAnalyticsLogo.png", alt: "WellMetrics" },
+    "HealthCo",
+    "PayerOne",
+    "CarePlus",
+    "Optiview",
+    "WellMetrics",
   ];
 
   return (
@@ -17,8 +17,8 @@ const Home = () => {
     <section className="nx-hero">
       <div className="nx-hero__wrap">
         <div className="fade-in" style={{ animationDelay: '40ms' }}>
-          <div className="nx-hero__eyebrow">Nexora Analytics Platform</div>
-          <h1 className="nx-hero__title">AI-powered analytics for payers and providers</h1>
+          <div className="nx-hero__eyebrow">Nexora Lab</div>
+          <h1 className="nx-hero__title">Healthcare analytics for payers and providers</h1>
           <p className="nx-hero__desc">Modernize decisions across risk, capitation, and member outcomes with an end-to-end analytics stack that your teams actually enjoy using.</p>
           <div className="nx-hero__ctas">
             <a className="nx-btn_primary" href="/contact">Request a demo</a>
@@ -26,13 +26,10 @@ const Home = () => {
           </div>
         </div>
         <div className="nx-hero__media fade-in" style={{ animationDelay: '120ms' }}>
-          <img
-            src="/images/nexoraAnalyticsLogo.png"
-            alt="Nexora platform branding"
-            loading="lazy"
-            decoding="async"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px' }}
-          />
+          <div className="nx-brand-panel" aria-label="Nexora Lab">
+            <span className="nx-brand-panel__mark">N</span>
+            <span className="nx-brand-panel__name">Nexora Lab</span>
+          </div>
         </div>
       </div>
       <div className="nx-trust">
@@ -40,16 +37,16 @@ const Home = () => {
         <div className="nx-carousel" aria-label="Trusted logos carousel">
           <div className="nx-carousel__track" role="list">
             <div className="nx-logos" aria-hidden="false">
-              {trustLogos.map((l, idx) => (
+              {trustLogos.map((label, idx) => (
                 <div className="nx-logo" role="listitem" key={`logo-a-${idx}`}>
-                  <img src={l.src} alt={l.alt} width="120" height="36" loading="lazy" decoding="async" />
+                  {label}
                 </div>
               ))}
             </div>
             <div className="nx-logos" aria-hidden="true">
-              {trustLogos.map((l, idx) => (
+              {trustLogos.map((label, idx) => (
                 <div className="nx-logo" role="listitem" key={`logo-b-${idx}`}>
-                  <img src={l.src} alt="" aria-hidden="true" width="120" height="36" loading="lazy" decoding="async" />
+                  {label}
                 </div>
               ))}
             </div>
@@ -102,7 +99,7 @@ const Home = () => {
 
     {/* Testimonial */}
     <section className="nx-testimonial fade-in" style={{ animationDelay: '120ms' }}>
-      <div className="nx-quote">“Nexora helped us cut PMPM by double digits while improving member outcomes.”<small>VP Analytics, Regional Payer</small></div>
+      <div className="nx-quote">“Nexora Lab helped us cut PMPM by double digits while improving member outcomes.”<small>VP Analytics, Regional Payer</small></div>
     </section>
 
     {/* Resources */}
@@ -129,7 +126,7 @@ const Home = () => {
       <div className="nx-cta__wrap">
         <div>
           <div className="nx-cta__title">Ready to modernize your analytics?</div>
-          <div style={{ color: 'var(--text-muted)' }}>See Nexora in action with a tailored demo for your data.</div>
+          <div style={{ color: 'var(--text-muted)' }}>See Nexora Lab in action with a tailored demo for your data.</div>
         </div>
         <div className="nx-cta__actions">
           <a className="nx-btn_primary" href="/contact">Request a demo</a>
@@ -176,7 +173,7 @@ const Home = () => {
           </div>
         </div>
         <div className="nx-footer__bottom">
-          <div>© {new Date().getFullYear()} Nexora Analytics</div>
+          <div>© {new Date().getFullYear()} Nexora Lab</div>
           <div className="nx-social" aria-label="Social links">
             <a className="nx-social__link" href="#" aria-label="LinkedIn" title="LinkedIn">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1 4.98 2.12 4.98 3.5zM0 8h5v16H0V8zm7.5 0h4.8v2.2h.1c.7-1.3 2.4-2.7 5-2.7 5.4 0 6.4 3.6 6.4 8.3V24h-5v-7.1c0-1.7 0-3.9-2.4-3.9-2.4 0-2.8 1.8-2.8 3.8V24h-5V8z"/></svg>

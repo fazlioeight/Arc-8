@@ -115,7 +115,7 @@ def upgrade() -> None:
         sa.Column("category", sa.String(64), nullable=True),
         sa.Column("alternatives", sa.JSON(), nullable=False, server_default=sa.text("'[]'")),
         sa.Column("notes", sa.JSON(), nullable=False, server_default=sa.text("'[]'")),
-        sa.Column("is_valid", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_valid", sa.Boolean(), nullable=False, server_default=sa.text("true")),
     )
     op.create_index("ix_icd_codes_code", "icd_codes", ["code"])
     op.create_index("ix_icd_codes_hcc_code", "icd_codes", ["hcc_code"])
@@ -140,12 +140,12 @@ def upgrade() -> None:
                 "description": desc,
                 "hcc_code": hcc,
                 "hcc_label": hcc_label,
-                "category": category,
+                "category": None,
                 "alternatives": alts,
                 "notes": notes,
                 "is_valid": True,
             }
-            for code, desc, hcc, hcc_label, category, alts, notes in _SEED
+            for code, desc, hcc, hcc_label, alts, notes in _SEED
         ],
     )
 

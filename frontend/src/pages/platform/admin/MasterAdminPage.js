@@ -616,7 +616,7 @@ const filteredUsers = useMemo(() => {
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Application catalog</p>
                       <span className="text-xs text-slate-500 dark:text-slate-400">{apps.length} apps</span>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Contact Nexora to adjust your subscription.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Contact Nexora Lab to adjust your subscription.</p>
                     <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                       {apps.map((app) => {
                         const isPurchased = purchaseSelections.has(app.key);

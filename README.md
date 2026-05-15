@@ -1,6 +1,6 @@
-# Nexora Platform
+# Nexora Lab
 
-Nexora Platform delivers a HIPAA-conscious, multi-tenant analytics and coding workspace for payer groups. The repository hosts the FastAPI control plane, per-tenant data plane helpers, Streamlit prototypes, and the React portal that surfaces analytics, coding workflows, and operational dashboards.
+Nexora Lab delivers a HIPAA-conscious, multi-tenant analytics and coding workspace for payer groups. The repository hosts the FastAPI control plane, per-tenant data plane helpers, Streamlit prototypes, and the React portal that surfaces analytics, coding workflows, and operational dashboards.
 
 ## Highlights
 - Multi-tenant control plane with async SQLAlchemy connection pooling, per-request tenant context, audit trails, and JWT issuance.
@@ -11,7 +11,7 @@ Nexora Platform delivers a HIPAA-conscious, multi-tenant analytics and coding wo
 - CLI seeding, SQL bootstrapping scripts, and optional Streamlit dashboards to explore tenant data outside the SPA.
 
 ## HERO / RAT 2.0 Requirements
-The HERO (RAT 2.0) rebuild described in `C:\Users\asian\Downloads\HERO High Level Requirements 2.docx` defines the next wave of coder-platform capabilities that Nexora must support.
+The HERO (RAT 2.0) rebuild described in `C:\Users\asian\Downloads\HERO High Level Requirements 2.docx` defines the next wave of coder-platform capabilities that Nexora Lab must support.
 
 ### Goals
 - Eliminate external vendor spend by consolidating programs into one internal tool.
@@ -250,6 +250,8 @@ nexora-platform/
 
 **Authentication & tenancy**
 - `POST /api/login` - issues JWT + tenant-scoped application permissions (supports dummy login in development).
+- `GET /api/auth/azure/config` - returns runtime Entra ID login configuration for the React login page.
+- `POST /api/auth/azure/exchange` - exchanges an Entra authorization-code callback for a Nexora Lab JWT after matching the Azure email to an active tenant user.
 - `GET /api/tenant/self` - returns tenant metadata, purchased applications, feature flags, and the authenticated user's permissions.
 
 **Analytics & operational dashboards**

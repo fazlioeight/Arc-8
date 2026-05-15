@@ -98,8 +98,8 @@ export const buildFallbackOverview = (apps, user) => {
   return {
     applications: apps,
     profile: {
-      email: user?.email || "guest@nexora.ai",
-      tenant: user?.tenant || "Nexora Tenant",
+      email: user?.email || "guest@nexoralab.test",
+      tenant: user?.tenant || "Nexora Lab Tenant",
       role: user?.role || "user",
       lastLogin: new Date(now - 6 * 60 * 60 * 1000).toISOString(),
     },

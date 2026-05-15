@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     FEATURE_FLAG_DEFAULTS: Dict[str, bool] = {"analytics": True}
 
     PORTAL_APPLICATIONS: Dict[str, Dict[str, str]] = {
-        "portal": {"label": "Nexora Portal", "description": "Metrics & insights"},
+        "portal": {"label": "Nexora Lab", "description": "Metrics & insights"},
         "coding": {"label": "Coding Worklists", "description": "Member reviews"},
         "member360": {"label": "Member 360", "description": "Unified member search"},
         "ride_booking": {"label": "Ride Booking", "description": "Transportation"},
@@ -55,11 +55,46 @@ class Settings(BaseSettings):
         "docs": {"label": "Docs Library", "description": "Knowledge base"},
         "settings": {"label": "Settings", "description": "Preferences"},
         "admin_console": {"label": "Master Admin", "description": "Roles & access"},
+        "chat": {"label": "Nexora Chat", "description": "Claude-powered assistant"},
     }
+
+    ANTHROPIC_API_KEY: Optional[str] = None
+    CLAUDE_MODEL: str = "claude-sonnet-4-6"
+    CHAT_MAX_UPLOAD_MB: int = 500
+    CHAT_MAX_EXTRACTED_CHARS: int = 500_000
+    CHAT_RATE_LIMIT_PER_MINUTE: int = 20
+    CHAT_FILE_RATE_LIMIT_PER_MINUTE: int = 10
+    CHAT_WORKBOOK_RATE_LIMIT_PER_MINUTE: int = 5
+
+    WORKBOOK_DATA_DIR: str = "data/workbooks"
+    WORKBOOK_MAX_BYTES: int = 1024 * 1024 * 1024
+    WORKBOOK_MAX_PER_USER: int = 10
+    WORKBOOK_USER_QUOTA_BYTES: int = 4 * 1024 * 1024 * 1024
+    WORKBOOK_TTL_SECONDS: int = 30 * 24 * 60 * 60
+    WORKBOOK_QUERY_TIMEOUT_SECONDS: int = 10
+    WORKBOOK_QUERY_MAX_ROWS: int = 1000
+    WORKBOOK_QUERY_MEMORY_LIMIT: str = "1GB"
+    WORKBOOK_MAX_TOOL_ITERATIONS: int = 8
+    WORKBOOK_INGEST_CONCURRENCY: int = 2
+
+    DATASET_SCHEMA: str = "analytics"
+    DATASET_QUERY_TIMEOUT_SECONDS: int = 10
+    DATASET_QUERY_MAX_ROWS: int = 1000
+    DATASET_MAX_TOOL_ITERATIONS: int = 8
+    DATASET_MAX_INGEST_ROWS: int = 5_000_000
+    DATASET_INGEST_BATCH_SIZE: int = 1_000
+    DATASET_ADMIN_EMAILS: List[str] = []
 
 
     HIPAA_MODE: bool = True
     ALLOW_DUMMY_LOGIN: bool = False
+
+    AZURE_AUTH_ENABLED: bool = False
+    AZURE_TENANT_ID: Optional[str] = None
+    AZURE_CLIENT_ID: Optional[str] = None
+    AZURE_CLIENT_SECRET: Optional[str] = None
+    AZURE_AUTHORITY_HOST: str = "https://login.microsoftonline.com"
+    AZURE_AUTH_SCOPES: str = "openid profile email"
 
     model_config = SettingsConfigDict(
         case_sensitive=True,

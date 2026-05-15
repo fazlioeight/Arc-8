@@ -1,4 +1,4 @@
-/* Nexora Landing - Talkdesk-inspired layout (without colors) */
+/* Nexora Lab landing - Talkdesk-inspired layout (without colors) */
 
 :root {
   --nx-hero-bg: linear-gradient(135deg, color-mix(in oklab, var(--bg-light) 88%, transparent), var(--bg));
@@ -15,6 +15,9 @@
 .nx-hero__desc { font-size: clamp(1rem, .9rem + .6vw, 1.25rem); color: var(--text); opacity: .96; }
 .nx-hero__ctas { display: flex; gap: var(--space-sm); margin-top: var(--space-sm); flex-wrap: wrap; }
 .nx-hero__media { aspect-ratio: 4 / 3; background: var(--bg-card); border: var(--border-width) solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); display: grid; place-items: center; color: var(--text-muted); overflow: hidden; }
+.nx-brand-panel { width: 100%; height: 100%; display: grid; place-items: center; gap: var(--space-xs); align-content: center; background: color-mix(in srgb, var(--nx-primary) 10%, var(--bg-card)); }
+.nx-brand-panel__mark { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: var(--radius-md); background: var(--nx-primary); color: #fff; font-size: 2rem; font-weight: 900; box-shadow: var(--shadow-md); }
+.nx-brand-panel__name { color: var(--text); font-size: clamp(1.6rem, 1.1rem + 2vw, 2.5rem); font-weight: 800; }
 
 .nx-trust { max-width: 1120px; margin: 24px auto 0; padding: 0 20px 8px; }
 .nx-trust__label { color: var(--text-muted); font-size: .9rem; margin-bottom: 8px; }

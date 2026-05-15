@@ -121,7 +121,7 @@ const Navbar = () => {
             N
           </div>
           <span className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
-            Nexora Analytics
+            Nexora Lab
           </span>
         </NavLink>
 

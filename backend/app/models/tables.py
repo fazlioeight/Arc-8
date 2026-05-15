@@ -41,8 +41,8 @@ class Tenant(ControlBase):
     data_residency: Mapped[str | None] = mapped_column(String(64), nullable=True)
     encryption_key_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     users: Mapped[list["User"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
     audit_events: Mapped[list["TenantAuditEvent"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
@@ -60,7 +60,7 @@ class TenantAuditEvent(ControlBase):
     actor: Mapped[str] = mapped_column(String(255), nullable=False)
     event_type: Mapped[str] = mapped_column(String(128), nullable=False)
     payload: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
 
     tenant: Mapped[Tenant] = relationship(back_populates="audit_events")
 
@@ -75,8 +75,8 @@ class User(ControlBase):
     role: Mapped[str] = mapped_column(String(64), default="user")
     app_permissions: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
     is_active: Mapped[bool] = mapped_column(default=True)
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     tenant: Mapped[Tenant] = relationship(back_populates="users")
     portal_saved_items: Mapped[list["PortalSavedItem"]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -95,8 +95,8 @@ class FhirConnector(ControlBase):
     scopes: Mapped[str | None] = mapped_column(String(512), nullable=True)
     since: Mapped[str | None] = mapped_column(String(64), nullable=True)
     config_metadata: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     tenant: Mapped[Tenant] = relationship()
 
@@ -115,8 +115,8 @@ class FhirImportJob(ControlBase):
     status: Mapped[str] = mapped_column(String(32), default="queued", nullable=False)
     progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_log: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     tenant: Mapped[Tenant] = relationship()
@@ -137,14 +137,14 @@ class PortalSavedItem(ControlBase):
     app_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     saved_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     item_metadata: Mapped[Dict[str, str]] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
     )
 
     tenant: Mapped[Tenant] = relationship(back_populates="portal_saved_items")
@@ -165,14 +165,14 @@ class PortalTodo(ControlBase):
     assigned_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
     priority: Mapped[str] = mapped_column(String(32), default="low", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="open", nullable=False)
-    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     item_metadata: Mapped[Dict[str, str]] = mapped_column("metadata", JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
     )
 
     tenant: Mapped[Tenant] = relationship(back_populates="portal_todos")
@@ -194,10 +194,10 @@ class UserPreference(ControlBase):
     preference_key: Mapped[str] = mapped_column(String(128), nullable=False)
     value: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
     )
 
     tenant: Mapped[Tenant] = relationship(back_populates="user_preferences")
@@ -219,10 +219,10 @@ class DocsArticle(ControlBase):
     status: Mapped[str] = mapped_column(String(32), default="published", nullable=False, index=True)
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, onupdate=lambda: datetime.now(timezone.utc)
     )
 
     tenant: Mapped[Tenant] = relationship(back_populates="docs_articles")

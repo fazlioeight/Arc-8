@@ -22,6 +22,7 @@ export const DEFAULT_APPLICATIONS = {
   settings: 'user',
   job_center: 'admin',
   admin_console: 'admin',
+  chat: 'user',
 };
 
 const toKeyList = (value) => {

@@ -316,3 +316,162 @@ CREATE TABLE IF NOT EXISTS ride_payment_events (
 
 CREATE INDEX IF NOT EXISTS ix_ride_payment_events_source   ON ride_payment_events(source);
 CREATE INDEX IF NOT EXISTS ix_ride_payment_events_event_at ON ride_payment_events(event_at);
+
+-- ─────────────────────────────────────────────
+-- Chat module (merged from nexora-chat)
+-- ─────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS chat_workbooks (
+    id                 VARCHAR(64)  PRIMARY KEY,
+    owner_email        VARCHAR(320) NOT NULL,
+    original_filename  VARCHAR(256) NOT NULL,
+    sheet_schema_json  TEXT         NOT NULL DEFAULT '{}',
+    size_bytes         BIGINT       NOT NULL DEFAULT 0,
+    status             VARCHAR(16)  NOT NULL DEFAULT 'pending',
+    error_message      TEXT,
+    created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_accessed_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_chat_workbooks_owner_email      ON chat_workbooks(owner_email);
+CREATE INDEX IF NOT EXISTS ix_chat_workbooks_last_accessed_at ON chat_workbooks(last_accessed_at);
+
+CREATE TABLE IF NOT EXISTS chat_dataset_loads (
+    id            VARCHAR(64)  PRIMARY KEY,
+    table_name    VARCHAR(63)  NOT NULL,
+    mode          VARCHAR(16)  NOT NULL,
+    source        VARCHAR(16)  NOT NULL,
+    status        VARCHAR(16)  NOT NULL DEFAULT 'pending',
+    row_count     BIGINT       NOT NULL DEFAULT 0,
+    started_by    VARCHAR(320) NOT NULL,
+    started_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at   TIMESTAMP,
+    error_message TEXT
+);
+
+CREATE INDEX IF NOT EXISTS ix_chat_dataset_loads_table_name ON chat_dataset_loads(table_name);
+CREATE INDEX IF NOT EXISTS ix_chat_dataset_loads_started_at ON chat_dataset_loads(started_at);
+
+-- Shared analytics dataset tables (per-tenant copy).
+-- Schemas are intentionally permissive (TEXT for most ID-like fields, NUMERIC
+-- for currency, DATE for service dates). Refine per-tenant if a column is
+-- known to be uniformly numeric/categorical.
+
+CREATE TABLE IF NOT EXISTS php_claim_details (
+    claim_number     TEXT,
+    member_id        TEXT,
+    provider_npi     TEXT,
+    service_date     DATE,
+    icd10_code       TEXT,
+    procedure_code   TEXT,
+    revenue_code     TEXT,
+    pos_code         TEXT,
+    paid_amount      NUMERIC(14, 2),
+    billed_amount    NUMERIC(14, 2),
+    line_of_business TEXT,
+    loaded_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_php_claim_details_member_id    ON php_claim_details(member_id);
+CREATE INDEX IF NOT EXISTS ix_php_claim_details_service_date ON php_claim_details(service_date);
+
+CREATE TABLE IF NOT EXISTS php_enrollment_details (
+    member_id        TEXT,
+    plan_id          TEXT,
+    plan_name        TEXT,
+    coverage_start   DATE,
+    coverage_end     DATE,
+    line_of_business TEXT,
+    status           TEXT,
+    loaded_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_php_enrollment_details_member_id ON php_enrollment_details(member_id);
+
+CREATE TABLE IF NOT EXISTS php_member_details (
+    member_id     TEXT,
+    first_name    TEXT,
+    last_name     TEXT,
+    date_of_birth DATE,
+    gender        TEXT,
+    address_city  TEXT,
+    address_state TEXT,
+    address_zip   TEXT,
+    primary_lang  TEXT,
+    loaded_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_php_member_details_member_id ON php_member_details(member_id);
+
+CREATE TABLE IF NOT EXISTS php_member_pcp_details (
+    member_id    TEXT,
+    pcp_npi      TEXT,
+    pcp_name     TEXT,
+    assigned_from DATE,
+    assigned_to   DATE,
+    loaded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_php_member_pcp_details_member_id ON php_member_pcp_details(member_id);
+
+CREATE TABLE IF NOT EXISTS php_pharmacy (
+    member_id     TEXT,
+    rx_number     TEXT,
+    ndc           TEXT,
+    drug_name     TEXT,
+    fill_date     DATE,
+    days_supply   INTEGER,
+    quantity      NUMERIC(12, 2),
+    paid_amount   NUMERIC(12, 2),
+    pharmacy_npi  TEXT,
+    loaded_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_php_pharmacy_member_id ON php_pharmacy(member_id);
+CREATE INDEX IF NOT EXISTS ix_php_pharmacy_fill_date ON php_pharmacy(fill_date);
+
+CREATE TABLE IF NOT EXISTS php_provider (
+    provider_npi  TEXT,
+    name          TEXT,
+    specialty     TEXT,
+    network_status TEXT,
+    loaded_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_php_provider_provider_npi ON php_provider(provider_npi);
+
+CREATE TABLE IF NOT EXISTS php_provider_affiliation (
+    provider_npi TEXT,
+    group_npi    TEXT,
+    group_name   TEXT,
+    affiliation_start DATE,
+    affiliation_end   DATE,
+    loaded_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_php_provider_affiliation_provider_npi ON php_provider_affiliation(provider_npi);
+
+CREATE TABLE IF NOT EXISTS php_provider_location (
+    provider_npi  TEXT,
+    address_line1 TEXT,
+    city          TEXT,
+    state         TEXT,
+    postal_code   TEXT,
+    phone         TEXT,
+    loaded_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_php_provider_location_provider_npi ON php_provider_location(provider_npi);
+
+CREATE TABLE IF NOT EXISTS medication_adherence (
+    member_id      TEXT,
+    measure_year   INTEGER,
+    measure_name   TEXT,
+    pdc            NUMERIC(5, 2),
+    is_adherent    BOOLEAN,
+    drug_class     TEXT,
+    loaded_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_medication_adherence_member_id    ON medication_adherence(member_id);
+CREATE INDEX IF NOT EXISTS ix_medication_adherence_measure_year ON medication_adherence(measure_year);

@@ -10,7 +10,7 @@ const team = [
   },
   {
     name: "John Smith, CTO",
-    bio: "Expert in AI and data platforms.",
+    bio: "Expert in secure data platforms.",
     img: "/images/john.jpg",
     alt: "John Smith, CTO",
   },
@@ -36,7 +36,7 @@ const About = () => {
   <main className="container py-5" aria-labelledby="about-title">
     <header>
       <h1 id="about-title" className="text-center mb-4">
-        About Nexora Analytics
+        About Nexora Lab
       </h1>
       <p className="lead text-center">
         We are a healthcare tech startup dedicated to providing advanced
@@ -56,7 +56,7 @@ const About = () => {
     <section className="text-center mb-5" aria-labelledby="values-title">
       <h2 id="values-title">Our Values</h2>
       <div>
-        Innovation in analytics and AI<br />
+        Innovation in analytics and care operations<br />
         Commitment to data security and HIPAA compliance<br />
         Focus on user-centered design for seamless experiences<br />
         Partnerships for long-term success
@@ -90,7 +90,7 @@ const About = () => {
       role="contentinfo"
     >
       <p>
-        &copy; 2025 Nexora Analytics. All rights reserved. |{" "}
+        &copy; 2025 Nexora Lab. All rights reserved. |{" "}
         <a href="/privacy" className="text-white text-decoration-underline">
           Privacy Policy
         </a>{" "}

@@ -14,6 +14,11 @@ param(
     [string]$TenantName = "ProminenceHealth",
     [string]$InitialAdminEmail = "",
     [string]$InitialAdminPassword = $env:NEXORA_INITIAL_ADMIN_PASSWORD,
+    [string]$AzureTenantId = $env:NEXORA_AZURE_TENANT_ID,
+    [string]$AzureClientId = $env:NEXORA_AZURE_CLIENT_ID,
+    [string]$AzureClientSecret = $env:NEXORA_AZURE_CLIENT_SECRET,
+    [string]$AzureAuthScopes = "openid profile email",
+    [string]$AzureAuthEnabled = $(if ($env:NEXORA_AZURE_AUTH_ENABLED) { $env:NEXORA_AZURE_AUTH_ENABLED } elseif ($env:NEXORA_AZURE_TENANT_ID -and $env:NEXORA_AZURE_CLIENT_ID -and $env:NEXORA_AZURE_CLIENT_SECRET) { "true" } else { "false" }),
     [string]$OutputDirectory = "$PSScriptRoot"
 )
 
@@ -58,6 +63,11 @@ Write-Host "Step 2/4: Building and deploying backend..."
     -TenantName $TenantName `
     -InitialAdminEmail $InitialAdminEmail `
     -InitialAdminPassword $InitialAdminPassword `
+    -AzureTenantId $AzureTenantId `
+    -AzureClientId $AzureClientId `
+    -AzureClientSecret $AzureClientSecret `
+    -AzureAuthScopes $AzureAuthScopes `
+    -AzureAuthEnabled $AzureAuthEnabled `
     -OutputPath $backendOutput
 
 $backend = Get-Content -Raw $backendOutput | ConvertFrom-Json
@@ -87,6 +97,11 @@ Write-Host "Step 4/4: Redeploying backend with frontend CORS origin..."
     -CorsOrigin $frontend.frontendUrl `
     -TenantKey $TenantKey `
     -TenantName $TenantName `
+    -AzureTenantId $AzureTenantId `
+    -AzureClientId $AzureClientId `
+    -AzureClientSecret $AzureClientSecret `
+    -AzureAuthScopes $AzureAuthScopes `
+    -AzureAuthEnabled $AzureAuthEnabled `
     -OutputPath $backendOutput
 
 $final = [ordered]@{

@@ -1,8 +1,8 @@
-# SPEC-001-Nexora Platform
+# SPEC-001-Nexora Lab
 
 ## Background
 
-**Vision.** Nexora is a multi-tenant healthcare analytics and workflow SaaS for **payers, ACOs, and MSOs** with an expansion path to **providers**. It delivers risk adjustment, coding workflows, payer analytics, and FHIR-driven data exchange.
+**Vision.** Nexora Lab is a multi-tenant healthcare analytics and workflow SaaS for **payers, ACOs, and MSOs** with an expansion path to **providers**. It delivers risk adjustment, coding workflows, payer analytics, and FHIR-driven data exchange.
 
 **Problem.** Mid-market organizations lack an end-to-end platform that: (1) unifies claims/clinical data, (2) operationalizes risk/coding workflows, (3) is enterprise-ready (HIPAA/SOC 2), and (4) can be safely delegated to multiple tenants and sub-orgs without costly custom builds.
 

@@ -1,7 +1,7 @@
 ﻿import { DEFAULT_APPLICATIONS, DEFAULT_TENANTS } from '../context/AuthContext';
 
 export const SAMPLE_SESSION = {
-  email: 'chief.admin@nexora.ai',
+  email: 'chief.admin@nexoralab.test',
   name: 'Chief Admin',
   role: 'platform_admin',
   tenant: 'prominencehealth',
@@ -88,7 +88,7 @@ export const SAMPLE_JOBS = [
     startedAt: new Date(Date.now() - 1000 * 60 * 32).toISOString(),
     finishedAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
     tenant: 'prominencehealth',
-    initiatedBy: 'chief.admin@nexora.ai',
+    initiatedBy: 'chief.admin@nexoralab.test',
     recordsProcessed: 5120,
     recordsSucceeded: 5078,
     recordsFailed: 42,
@@ -103,7 +103,7 @@ export const SAMPLE_JOBS = [
     startedAt: new Date(Date.now() - 1000 * 60 * 11).toISOString(),
     finishedAt: null,
     tenant: 'prominencehealth',
-    initiatedBy: 'actuary.prominencehealth@nexora.ai',
+    initiatedBy: 'actuary.prominencehealth@nexoralab.test',
     recordsProcessed: 1873,
     recordsSucceeded: 1873,
     recordsFailed: 0,
@@ -118,7 +118,7 @@ export const SAMPLE_JOBS = [
     startedAt: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
     finishedAt: new Date(Date.now() - 1000 * 60 * 62).toISOString(),
     tenant: 'prominencehealth',
-    initiatedBy: 'ops.prominencehealth@nexora.ai',
+    initiatedBy: 'ops.prominencehealth@nexoralab.test',
     recordsProcessed: 932,
     recordsSucceeded: 624,
     recordsFailed: 308,
@@ -134,7 +134,7 @@ export const SAMPLE_JOBS = [
     startedAt: null,
     finishedAt: null,
     tenant: 'prominencehealth',
-    initiatedBy: 'dispatch.prominencehealth@nexora.ai',
+    initiatedBy: 'dispatch.prominencehealth@nexoralab.test',
     recordsProcessed: 0,
     recordsSucceeded: 0,
     recordsFailed: 0,
@@ -181,7 +181,7 @@ export const SAMPLE_ADMIN_APPLICATIONS = [
 export const SAMPLE_ADMIN_USERS = [
   {
     id: 'sample-admin-root',
-    email: 'alex.admin@nexora.ai',
+    email: 'alex.admin@nexoralab.test',
     role: 'platform_admin',
     is_active: true,
     applications: {
@@ -197,7 +197,7 @@ export const SAMPLE_ADMIN_USERS = [
   },
   {
     id: 'sample-manager',
-    email: 'maya.manager@nexora.ai',
+    email: 'maya.manager@nexoralab.test',
     role: 'user',
     is_active: true,
     applications: {
@@ -213,7 +213,7 @@ export const SAMPLE_ADMIN_USERS = [
   },
   {
     id: 'sample-ops',
-    email: 'sam.ops@nexora.ai',
+    email: 'sam.ops@nexoralab.test',
     role: 'user',
     is_active: false,
     applications: {
@@ -233,7 +233,7 @@ export const sampleDownload = (jobId) => {
   const payload = {
     jobId,
     exportedAt: new Date().toISOString(),
-    generatedBy: 'Nexora Sample Exporter',
+    generatedBy: 'Nexora Lab Sample Exporter',
     rows: Array.from({ length: 5 }, (_, idx) => ({
       id: `${jobId}-row-${idx + 1}`,
       status: idx % 2 === 0 ? 'ok' : 'quarantined',

@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 .env
+.venv/
+.pytest_cache/
 
 # React
 node_modules/
@@ -9,3 +11,9 @@ build/
 .env
 /logs/
 /tests/
+
+# Claude Code state
+.claude/
+
+# Local-only artifacts left behind by dev DB / scripts
+*.db-journal

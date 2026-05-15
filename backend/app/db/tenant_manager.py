@@ -29,7 +29,7 @@ class TenantContext:
 
     def application_enabled(self, app_key: str) -> bool:
         data = self.purchased_applications or {}
-        return bool(data.get(app_key) or app_key in {"portal", "admin_console", "settings"})
+        return bool(data.get(app_key) or app_key in {"portal", "admin_console", "settings", "chat"})
 
 
 class TenantConnectionManager:

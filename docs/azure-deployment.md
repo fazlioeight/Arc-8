@@ -1,6 +1,6 @@
 # Azure Deployment Runbook
 
-This runbook deploys Nexora with:
+This runbook deploys Nexora Lab with:
 
 - React frontend on Azure Static Web Apps
 - FastAPI backend on Azure Container Apps
@@ -21,10 +21,23 @@ az account set --subscription "<subscription-id>"
 $env:AZURE_SUBSCRIPTION_ID = "<subscription-id>"
 $env:NEXORA_POSTGRES_ADMIN_PASSWORD = "<strong-db-password>"
 $env:NEXORA_INITIAL_ADMIN_PASSWORD = "<strong-initial-admin-password>"
+$env:NEXORA_AZURE_TENANT_ID = "<entra-tenant-id>"
+$env:NEXORA_AZURE_CLIENT_ID = "<app-registration-client-id>"
+$env:NEXORA_AZURE_CLIENT_SECRET = "<app-registration-client-secret>"
 ```
 
 Use a real GitHub repository URL for Static Web Apps. The script creates the
 GitHub Actions workflow for the React build.
+
+Create a Microsoft Entra ID app registration for Nexora Lab sign-in before
+deploying the frontend:
+
+- Add `https://<static-web-app-host>/login` as a redirect URI.
+- For the backend exchange flow, use a Web redirect URI and create a client
+  secret for the backend container app.
+- Set the supported account type to the customer directory you want to allow.
+- Make sure every Entra user that should sign in already has a matching active
+  Nexora Lab user record for the tenant; the backend maps by email.
 
 ## 2. Provision Azure Foundation
 
@@ -96,6 +109,20 @@ The frontend build reads:
 REACT_APP_API_BASE=https://<backend-url>
 REACT_APP_DASHBOARD_SEED=false
 ```
+
+The login page also reads Azure settings from the backend at runtime:
+
+```env
+AZURE_AUTH_ENABLED=true
+AZURE_TENANT_ID=<entra-tenant-id>
+AZURE_CLIENT_ID=<app-registration-client-id>
+AZURE_CLIENT_SECRET=<app-registration-client-secret>
+AZURE_AUTH_SCOPES="openid profile email"
+```
+
+For local frontend development you may also set `REACT_APP_AZURE_TENANT_ID`,
+`REACT_APP_AZURE_CLIENT_ID`, and `REACT_APP_AZURE_REDIRECT_URI`, but production
+should keep the client secret only on the backend.
 
 After the Static Web App exists, redeploy the backend with CORS enabled:
 
@@ -180,3 +207,5 @@ Minimum ingestion work still needed in application code:
 - Azure Service Bus queues: https://learn.microsoft.com/azure/service-bus-messaging/service-bus-queues-topics-subscriptions
 - Azure Blob Storage events: https://learn.microsoft.com/azure/storage/blobs/storage-blob-event-overview
 - Azure Key Vault: https://learn.microsoft.com/azure/key-vault/general/overview
+- Microsoft identity platform authorization code flow: https://learn.microsoft.com/entra/identity-platform/v2-oauth2-auth-code-flow
+- Microsoft identity platform redirect URI setup: https://learn.microsoft.com/entra/identity-platform/how-to-add-redirect-uri

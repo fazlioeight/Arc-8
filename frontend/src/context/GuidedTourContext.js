@@ -13,7 +13,7 @@ const TOUR_STORAGE_KEY = 'nexora-guided-tour-v1';
 const DEFAULT_STEPS = [
   {
     id: 'navigation',
-    title: 'Welcome to Nexora',
+    title: 'Welcome to Nexora Lab',
     description: 'The global navigation keeps your most-used areas one click away. Explore analytics, coding worklists, jobs, and resources.',
     highlights: [
       'Use the top navigation bar to jump between analytics, coding, jobs, and docs.',

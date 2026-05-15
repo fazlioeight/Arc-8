@@ -112,7 +112,7 @@ const PortalUtilityBar = () => {
   }, []);
 
   const applicationTiles = useMemo(() => [
-    { key: 'portal',       label: 'Nexora Portal',    desc: 'Metrics & insights',  icon: 'NP', color: '#0176d3', path: ROUTES.PORTAL.LANDING },
+    { key: 'portal',       label: 'Nexora Lab',       desc: 'Metrics & insights',  icon: 'NL', color: '#0176d3', path: ROUTES.PORTAL.LANDING },
     { key: 'coding',       label: 'Coding Worklists', desc: 'Member reviews',      icon: 'CD', color: '#0f172a', path: ROUTES.CODING.LANDING },
     { key: 'member360',    label: 'Member 360',       desc: 'Chart launchpad',     icon: 'M3', color: '#0891b2', path: ROUTES.MEMBER_360.LANDING },
     { key: 'ride_booking', label: 'Ride Booking',     desc: 'Transportation',      icon: 'RB', color: '#0ea5e9', path: ROUTES.RIDE_BOOKING.LANDING },

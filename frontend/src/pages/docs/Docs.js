@@ -61,7 +61,7 @@ const Docs = () => {
       {isAuthenticated && <PortalUtilityBar />}
       <PortalHero
         align="left"
-        title="Nexora documentation"
+        title="Nexora Lab documentation"
         subtitle="Search knowledge articles and implementation guides (coming soon)."
         actions={(
           <button

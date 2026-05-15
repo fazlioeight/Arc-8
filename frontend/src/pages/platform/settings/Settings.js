@@ -184,7 +184,7 @@ const Settings = ({ themePreference, setThemePreference }) => {
   const headerContent = (
     <PortalPageHeader
       eyebrow="Settings"
-      title="Manage your Nexora preferences"
+      title="Manage your Nexora Lab preferences"
       subtitle="Personalize your workspace, navigation, and notifications."
       actions={
         <div className="flex flex-wrap items-center gap-3">
@@ -477,7 +477,7 @@ const Settings = ({ themePreference, setThemePreference }) => {
             <PortalCard title="About" subtitle="App info and plan details.">
               <div className="mt-1 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 shadow-inner dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
                 <div>
-                  <div className="font-semibold">Nexora Portal</div>
+                  <div className="font-semibold">Nexora Lab</div>
                   <div className="text-xs text-slate-500 dark:text-slate-300">Version 1.0.0</div>
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-300">All rights reserved</div>

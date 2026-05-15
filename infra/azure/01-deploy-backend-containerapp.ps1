@@ -13,6 +13,11 @@ param(
     [string]$TenantName = "ProminenceHealth",
     [string]$InitialAdminEmail = "",
     [string]$InitialAdminPassword = $env:NEXORA_INITIAL_ADMIN_PASSWORD,
+    [string]$AzureTenantId = $env:NEXORA_AZURE_TENANT_ID,
+    [string]$AzureClientId = $env:NEXORA_AZURE_CLIENT_ID,
+    [string]$AzureClientSecret = $env:NEXORA_AZURE_CLIENT_SECRET,
+    [string]$AzureAuthScopes = "openid profile email",
+    [string]$AzureAuthEnabled = $(if ($env:NEXORA_AZURE_AUTH_ENABLED) { $env:NEXORA_AZURE_AUTH_ENABLED } elseif ($env:NEXORA_AZURE_TENANT_ID -and $env:NEXORA_AZURE_CLIENT_ID -and $env:NEXORA_AZURE_CLIENT_SECRET) { "true" } else { "false" }),
     [string]$OutputPath = "$PSScriptRoot\azure-backend.outputs.json"
 )
 
@@ -45,6 +50,42 @@ $serviceBusConnection = az keyvault secret show --vault-name $KeyVaultName --nam
 
 $corsOrigins = if ($CorsOrigin) { "[`"$CorsOrigin`"]" } else { "[]" }
 
+if ($AzureAuthEnabled -eq "true" -and (-not $AzureTenantId -or -not $AzureClientId -or -not $AzureClientSecret)) {
+    throw "Azure auth is enabled. Provide AzureTenantId, AzureClientId, and AzureClientSecret."
+}
+
+$containerSecrets = @(
+    "secret-key=$secretKey",
+    "control-db-url=$controlDbUrl",
+    "tenant-db-url=$tenantDbUrl",
+    "redis-url=$redisUrl",
+    "storage-connection-string=$storageConnection",
+    "servicebus-connection-string=$serviceBusConnection"
+)
+
+$containerEnvVars = @(
+    "ENVIRONMENT=production",
+    "HIPAA_MODE=true",
+    "ALLOW_DUMMY_LOGIN=false",
+    "SECRET_KEY=secretref:secret-key",
+    "CONTROL_DATABASE_URL=secretref:control-db-url",
+    "DEFAULT_TENANT_DATABASE_URL=secretref:tenant-db-url",
+    "REDIS_URL=secretref:redis-url",
+    "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string",
+    "BACKGROUND_QUEUE_URL=secretref:servicebus-connection-string",
+    "CORS_ORIGINS=$corsOrigins",
+    "AUDIT_LOG_PATH=/tmp/audit.log",
+    "AZURE_AUTH_ENABLED=$AzureAuthEnabled"
+)
+
+if ($AzureAuthEnabled -eq "true") {
+    $containerSecrets += "azure-client-secret=$AzureClientSecret"
+    $containerEnvVars += "AZURE_TENANT_ID=$AzureTenantId"
+    $containerEnvVars += "AZURE_CLIENT_ID=$AzureClientId"
+    $containerEnvVars += "AZURE_CLIENT_SECRET=secretref:azure-client-secret"
+    $containerEnvVars += "AZURE_AUTH_SCOPES=$AzureAuthScopes"
+}
+
 $appExists = $true
 az containerapp show --resource-group $ResourceGroup --name $BackendAppName *> $null
 if ($LASTEXITCODE -ne 0) {
@@ -66,54 +107,20 @@ if (-not $appExists) {
         --max-replicas 5 `
         --cpu 1.0 `
         --memory 2.0Gi `
-        --secrets `
-            "secret-key=$secretKey" `
-            "control-db-url=$controlDbUrl" `
-            "tenant-db-url=$tenantDbUrl" `
-            "redis-url=$redisUrl" `
-            "storage-connection-string=$storageConnection" `
-            "servicebus-connection-string=$serviceBusConnection" `
-        --env-vars `
-            "ENVIRONMENT=production" `
-            "HIPAA_MODE=true" `
-            "ALLOW_DUMMY_LOGIN=false" `
-            "SECRET_KEY=secretref:secret-key" `
-            "CONTROL_DATABASE_URL=secretref:control-db-url" `
-            "DEFAULT_TENANT_DATABASE_URL=secretref:tenant-db-url" `
-            "REDIS_URL=secretref:redis-url" `
-            "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" `
-            "BACKGROUND_QUEUE_URL=secretref:servicebus-connection-string" `
-            "CORS_ORIGINS=$corsOrigins" `
-            "AUDIT_LOG_PATH=/tmp/audit.log"
+        --secrets $containerSecrets `
+        --env-vars $containerEnvVars
 }
 else {
     az containerapp secret set `
         --resource-group $ResourceGroup `
         --name $BackendAppName `
-        --secrets `
-            "secret-key=$secretKey" `
-            "control-db-url=$controlDbUrl" `
-            "tenant-db-url=$tenantDbUrl" `
-            "redis-url=$redisUrl" `
-            "storage-connection-string=$storageConnection" `
-            "servicebus-connection-string=$serviceBusConnection"
+        --secrets $containerSecrets
 
     az containerapp update `
         --resource-group $ResourceGroup `
         --name $BackendAppName `
         --image $image `
-        --set-env-vars `
-            "ENVIRONMENT=production" `
-            "HIPAA_MODE=true" `
-            "ALLOW_DUMMY_LOGIN=false" `
-            "SECRET_KEY=secretref:secret-key" `
-            "CONTROL_DATABASE_URL=secretref:control-db-url" `
-            "DEFAULT_TENANT_DATABASE_URL=secretref:tenant-db-url" `
-            "REDIS_URL=secretref:redis-url" `
-            "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" `
-            "BACKGROUND_QUEUE_URL=secretref:servicebus-connection-string" `
-            "CORS_ORIGINS=$corsOrigins" `
-            "AUDIT_LOG_PATH=/tmp/audit.log"
+        --set-env-vars $containerEnvVars
 }
 
 $backendUrl = az containerapp show `
