@@ -3,11 +3,12 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import Chart from 'chart.js/auto';
 
+import PortalPageLayout from '../../../components/PortalPageLayout';
 import { AuthContext } from '../../../context/AuthContext';
+import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import {
   chatWithFile,
   deleteWorkbook,
-  getDatasetLoad,
   listChatModels,
   listDatasetTables,
   listWorkbooks,
@@ -71,8 +72,6 @@ const formatTs = (iso) => {
   try { return new Date(iso).toLocaleString(); } catch (e) { return String(iso); }
 };
 
-// Split a markdown blob into segments: text strings and chart specs in order.
-// Chart blocks are fenced with ```chart ... ```.
 const extractSegments = (markdown) => {
   if (!markdown) return [];
   const re = /```chart\s*([\s\S]*?)```/g;
@@ -85,7 +84,7 @@ const extractSegments = (markdown) => {
     }
     let spec = null;
     try { spec = JSON.parse(m[1].trim()); } catch (e) { /* keep null */ }
-    segments.push({ type: 'chart', spec, raw: m[1].trim() });
+    segments.push({ type: 'chart', spec });
     lastIndex = m.index + m[0].length;
   }
   if (lastIndex < markdown.length) {
@@ -94,18 +93,18 @@ const extractSegments = (markdown) => {
   return segments;
 };
 
-const renderMarkdown = (text) =>
-  DOMPurify.sanitize(marked.parse(text || ''));
+const renderMarkdown = (text) => DOMPurify.sanitize(marked.parse(text || ''));
 
-const ChartBlock = ({ spec, accent }) => {
+const ChartBlock = ({ spec }) => {
   const ref = useRef(null);
   useEffect(() => {
     if (!ref.current || !spec || !spec.type) return undefined;
+    const accent = '#d97706';
     const datasets = (spec.datasets || []).map((d, i) => ({
       label: d.label || `Series ${i + 1}`,
       data: d.data || [],
-      backgroundColor: hexToRgba(accent || '#d97706', 0.55),
-      borderColor: accent || '#d97706',
+      backgroundColor: hexToRgba(accent, 0.55),
+      borderColor: accent,
       borderWidth: 2,
     }));
     const cfg = {
@@ -126,32 +125,53 @@ const ChartBlock = ({ spec, accent }) => {
     };
     const chart = new Chart(ref.current, cfg);
     return () => chart.destroy();
-  }, [spec, accent]);
+  }, [spec]);
 
   if (!spec || !spec.type) {
-    return <div className="nx-chart-card"><div className="nx-row-meta">Invalid chart JSON.</div></div>;
+    return (
+      <div className="my-3 rounded-[3px] border border-[#1e1e1e] bg-[#0f0f0f] p-3 text-[11px] text-[#666]">
+        Invalid chart JSON.
+      </div>
+    );
   }
   return (
-    <div className="nx-chart-card">
-      {spec.title && <div className="nx-chart-title">{spec.title}</div>}
-      <div className="nx-chart-container"><canvas ref={ref} /></div>
+    <div className="my-3 rounded-[3px] border border-[#1e1e1e] bg-[#0f0f0f] p-3">
+      {spec.title && <div className="mb-2 text-xs font-bold text-[#d4d4d4]">{spec.title}</div>}
+      <div className="relative h-[280px]"><canvas ref={ref} /></div>
     </div>
   );
 };
 
-const MessageBody = ({ content, accent, isTyping }) => {
-  if (isTyping) return <div className="nx-typing" aria-label="Assistant is typing" />;
+const MessageBody = ({ content, isTyping }) => {
   const segments = useMemo(() => extractSegments(content), [content]);
+  if (isTyping) return <div className="nx-typing text-[13px] leading-relaxed text-[#d97706]" />;
   return (
     <>
       {segments.map((seg, i) => (
         seg.type === 'chart'
-          ? <ChartBlock key={i} spec={seg.spec} accent={accent} />
-          : <div key={i} className="nx-bubble markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(seg.text) }} />
+          ? <ChartBlock key={i} spec={seg.spec} />
+          : <div
+              key={i}
+              className="nx-md text-[13px] leading-relaxed text-[#9a9a9a]"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(seg.text) }}
+            />
       ))}
     </>
   );
 };
+
+const SidebarSection = ({ label, children }) => (
+  <div className="flex flex-col gap-1.5">
+    <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#666]">{label}</div>
+    {children}
+  </div>
+);
+
+const Pill = ({ children }) => (
+  <span className="rounded-[3px] border border-[#2a2a2a] px-1.5 py-0.5 text-[11px] text-[#9a9a9a]">
+    {children}
+  </span>
+);
 
 const ChatPage = () => {
   const auth = useContext(AuthContext) || {};
@@ -190,7 +210,6 @@ const ChatPage = () => {
     [workbooks, activeWorkbookId],
   );
 
-  // Auto-grow the textarea.
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -198,12 +217,10 @@ const ChatPage = () => {
     ta.style.height = `${Math.min(ta.scrollHeight, 140)}px`;
   }, [draft]);
 
-  // Scroll to bottom on new content.
   useEffect(() => {
     if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
   }, [messages]);
 
-  // Load models.
   useEffect(() => {
     if (!token) return;
     listChatModels({ token, tenant: tenantKey })
@@ -219,7 +236,7 @@ const ChatPage = () => {
     try {
       const data = await listWorkbooks({ token, tenant: tenantKey });
       setWorkbooks(data?.workbooks || []);
-    } catch (e) { /* tenant DB may not have the table yet */ }
+    } catch (e) { /* tenant DB may not have the table */ }
   }, [token, tenantKey]);
 
   const refreshDatasetTables = useCallback(async () => {
@@ -233,7 +250,6 @@ const ChatPage = () => {
   useEffect(() => { refreshWorkbooks(); }, [refreshWorkbooks]);
   useEffect(() => { refreshDatasetTables(); }, [refreshDatasetTables]);
 
-  // Poll while any workbook is ingesting.
   useEffect(() => {
     const pending = workbooks.some((w) => w.status === 'pending' || w.status === 'ingesting');
     if (!pending) return undefined;
@@ -241,7 +257,6 @@ const ChatPage = () => {
     return () => clearInterval(handle);
   }, [workbooks, refreshWorkbooks]);
 
-  // Poll dataset loads while the modal is open and any load is in flight.
   useEffect(() => {
     if (!datasetModalOpen) return undefined;
     const handle = setInterval(refreshDatasetTables, 3500);
@@ -282,9 +297,7 @@ const ChatPage = () => {
 
     try {
       if (fileToSend) {
-        const res = await chatWithFile({
-          token, tenant: tenantKey, prompt: userMsg.content, file: fileToSend, model,
-        });
+        const res = await chatWithFile({ token, tenant: tenantKey, prompt: userMsg.content, file: fileToSend, model });
         setMessages([...nextMessages, { role: 'assistant', content: res.reply }]);
       } else if (usingTool) {
         const res = await sendChat({
@@ -371,321 +384,382 @@ const ChatPage = () => {
     } catch (err) { setError(err.message); }
   };
 
+  // Tailwind class tokens reused across the chat shell.
+  const fileBtn =
+    "rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] " +
+    "transition hover:border-[#d97706] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40";
+  const modalBtn =
+    "rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] " +
+    "transition hover:border-[#d97706] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40";
+
   return (
-    <div className="nx-chat" style={{ ['--nx-chat-bg']: bg }}>
-      <aside className="nx-sidebar" aria-label="Nexora AI navigation">
-        <div className="nx-brand-card">
-          <div className="nx-brand-row">
-            <div className="nx-logo" aria-hidden="true">◆</div>
-            <div>
-              <div className="nx-brand-title">Nexora <span>AI</span></div>
-              <div className="nx-brand-subtitle">Claude-powered assistant</div>
-            </div>
-          </div>
-        </div>
-
-        <button type="button" className="nx-new-chat" onClick={handleNewChat} aria-label="Start a new chat">
-          <span aria-hidden="true">+</span> new chat
-        </button>
-
-        <div className="nx-section">
-          <div className="nx-section-label">Model</div>
-          <select
-            className="nx-model-select"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            aria-label="Select Claude model"
-          >
-            {models.length === 0 && <option value="">loading…</option>}
-            {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-          </select>
-        </div>
-
-        <div className="nx-section">
-          <div className="nx-section-label">About</div>
-          <div className="nx-hint">Ask a question or upload a document for analysis.</div>
-        </div>
-
-        <div className="nx-section">
-          <div className="nx-section-label">Supported Files</div>
-          <div className="nx-pills">
-            {SUPPORTED_FILES.map((p) => <span key={p} className="nx-pill">{p}</span>)}
-          </div>
-        </div>
-
-        <div className="nx-section">
-          <div className="nx-section-label">Output</div>
-          <div className="nx-pills">
-            {OUTPUT_FORMATS.map((p) => <span key={p} className="nx-pill">{p}</span>)}
-          </div>
-        </div>
-
-        <div className="nx-section">
-          <div className="nx-section-label">Background</div>
-          <div className="nx-color-grid" role="radiogroup" aria-label="Chat background colour">
-            {BG_SWATCHES.map((sw) => (
-              <button
-                key={sw.color}
-                type="button"
-                className={`nx-swatch${bg === sw.color ? ' active' : ''}`}
-                style={{ background: sw.color }}
-                onClick={() => setBg(sw.color)}
-                aria-label={sw.name}
-              />
-            ))}
-          </div>
-          <div className="nx-custom-color">
-            <input
-              type="color"
-              value={bg}
-              onChange={(e) => setBg(e.target.value)}
-              aria-label="Custom background colour"
-            />
-            <span aria-hidden="true">Custom</span>
-          </div>
-        </div>
-
-        <div className="nx-section">
-          <div className="nx-section-label">Guardrails</div>
-          <div className="nx-hint" role="note">
-            Do not upload PHI, member identifiers, medical records, claims files, or confidential production data.
-          </div>
-        </div>
-
-        <div className="nx-sidebar-footer" aria-label="Application info">
-          Nexora AI · Azure-hosted<br />
-          Claude-powered
-        </div>
-      </aside>
-
-      <main className="nx-main">
-        <header className="nx-topbar" role="banner">
-          <div className="nx-topbar-title">
-            <strong>nexora</strong>
-            <span>Claude-powered AI assistant</span>
-          </div>
-          <div className="nx-status-row" role="status" aria-live="polite">
-            <div className="nx-status-chip" aria-label="Service active">
-              <span className="nx-status-dot" aria-hidden="true" />
-              active
-            </div>
-            <div className="nx-user-chip" title={userEmail}>{userEmail}</div>
-          </div>
-        </header>
-
-        {error && (
-          <div className="nx-error" role="alert" aria-live="assertive">{error}</div>
-        )}
-
-        <section className="nx-chat-wrap" ref={threadRef} aria-label="Conversation">
-          <div className="nx-chat-inner">
-            {messages.length === 0 ? (
-              <div className="nx-welcome">
-                <h1>Nexora AI</h1>
-                <p>
-                  Ask a question or attach a file (PDF, DOCX, XLSX, PPTX, CSV, JSON, TXT, PNG, JPG) for analysis.
-                  Responses can include tables, charts, and markdown formatting.
-                </p>
-                <div className="nx-prompt-grid" role="list" aria-label="Suggested prompts">
-                  {SUGGESTED_PROMPTS.map((p) => (
-                    <button
-                      key={p.title}
-                      type="button"
-                      className="nx-prompt-card"
-                      onClick={() => handlePickPrompt(p.prompt)}
-                      role="listitem"
-                    >
-                      <strong>{p.title}</strong>
-                      <span>{p.summary}</span>
-                    </button>
-                  ))}
+    <PortalPageLayout
+      eyebrow="Nexora Chat"
+      title="Claude-powered AI assistant"
+      subtitle="Ask anything, upload a document, query a workbook, or run the shared analytics dataset."
+      navItems={PORTAL_NAV_ITEMS}
+      currentNav="chat"
+      navProps={{ align: "center", tone: "surface" }}
+      align="left"
+      maxWidthClassName="max-w-6xl"
+      mainClassName="pt-4"
+    >
+      <div
+        className="nx-chat-root grid min-h-[640px] grid-cols-[200px_1fr] overflow-hidden rounded-2xl border border-[#1e1e1e] bg-[#0a0a0a] text-[13px] text-[#d4d4d4]"
+        style={{ height: 'calc(100vh - 280px)' }}
+      >
+        {/* ─ Sidebar ────────────────────────────────────────────────── */}
+        <aside
+          className="nx-scroll flex h-full flex-col gap-3.5 overflow-y-auto border-r border-[#1e1e1e] bg-[#0f0f0f] p-3"
+          aria-label="Nexora AI navigation"
+        >
+          <div className="border-b border-[#1e1e1e] pb-3">
+            <div className="flex items-center gap-2">
+              <div className="grid h-[18px] w-[18px] place-items-center text-[13px] text-[#d97706]" aria-hidden="true">◆</div>
+              <div>
+                <div className="text-[13px] font-bold tracking-wide">
+                  Nexora <span className="text-[#d97706]">AI</span>
+                </div>
+                <div className="mt-0.5 text-[11px] leading-tight text-[#666]">
+                  Claude-powered assistant
                 </div>
               </div>
-            ) : (
-              messages.map((m, i) => (
-                <article key={i} className={`nx-message ${m.role}`}>
-                  <div className="nx-avatar" aria-hidden="true">{m.role === 'user' ? '›' : '◆'}</div>
-                  <div className="nx-message-body">
-                    <div className="nx-message-meta">{m.role === 'user' ? 'USER' : 'ASSISTANT'}</div>
-                    {m.file && <div className="nx-row-meta">📎 {m.file}</div>}
-                    {m.role === 'user'
-                      ? <div className="nx-bubble">{m.content}</div>
-                      : <MessageBody content={m.content} accent="#d97706" isTyping={m.isTyping} />
-                    }
-                  </div>
-                </article>
-              ))
-            )}
+            </div>
           </div>
-        </section>
 
-        <div className="nx-composer-outer">
-          <div className="nx-composer-card">
-            <div className="nx-file-row">
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className="flex w-full items-center gap-1.5 rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-1 text-left text-[12px] text-[#9a9a9a] transition hover:border-[#d97706] hover:text-[#d4d4d4]"
+            aria-label="Start a new chat"
+          >
+            <span aria-hidden="true">+</span> new chat
+          </button>
+
+          <SidebarSection label="Model">
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="w-full rounded-[3px] border border-[#2a2a2a] bg-[#141414] py-1 pl-1.5 pr-5 text-[11px] text-[#9a9a9a] transition hover:border-[#d97706] hover:text-[#d4d4d4] focus:outline-none focus:ring-1 focus:ring-[#d97706]"
+              style={{ appearance: 'none', WebkitAppearance: 'none' }}
+              aria-label="Select Claude model"
+            >
+              {models.length === 0 && <option value="">loading…</option>}
+              {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </SidebarSection>
+
+          <SidebarSection label="About">
+            <div className="text-[11px] leading-snug text-[#9a9a9a]">
+              Ask a question or upload a document for analysis.
+            </div>
+          </SidebarSection>
+
+          <SidebarSection label="Supported Files">
+            <div className="flex flex-wrap gap-1">
+              {SUPPORTED_FILES.map((p) => <Pill key={p}>{p}</Pill>)}
+            </div>
+          </SidebarSection>
+
+          <SidebarSection label="Output">
+            <div className="flex flex-wrap gap-1">
+              {OUTPUT_FORMATS.map((p) => <Pill key={p}>{p}</Pill>)}
+            </div>
+          </SidebarSection>
+
+          <SidebarSection label="Background">
+            <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Chat background colour">
+              {BG_SWATCHES.map((sw) => (
+                <button
+                  key={sw.color}
+                  type="button"
+                  onClick={() => setBg(sw.color)}
+                  className={`h-[22px] w-full rounded-[3px] border transition ${
+                    bg === sw.color
+                      ? 'border-[#d97706] outline outline-1 outline-[#d97706] outline-offset-1'
+                      : 'border-[#2a2a2a] hover:border-[#d97706]'
+                  }`}
+                  style={{ background: sw.color }}
+                  aria-label={sw.name}
+                />
+              ))}
+            </div>
+            <div className="mt-1.5 flex items-center gap-1.5">
               <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.txt,.csv,.json,.docx,.xlsx,.pptx,.png,.jpg,.jpeg"
-                style={{ display: 'none' }}
-                onChange={handlePickFile}
+                type="color"
+                value={bg}
+                onChange={(e) => setBg(e.target.value)}
+                className="h-[22px] w-[30px] cursor-pointer rounded-[3px] border border-[#2a2a2a] bg-transparent p-0"
+                aria-label="Custom background colour"
               />
-              <button
-                className="nx-file-btn"
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy}
-              >
-                attach
-              </button>
-              <button
-                className="nx-file-btn"
-                type="button"
-                onClick={() => setAttachedFile(null)}
-                disabled={!attachedFile}
-              >
-                clear
-              </button>
-              <button
-                className="nx-file-btn"
-                type="button"
-                onClick={() => setWorkbookModalOpen(true)}
-              >
-                workbooks
-                {workbooks.some((w) => w.status === 'pending' || w.status === 'ingesting') && (
-                  <span className="nx-badge">{workbooks.filter((w) => w.status === 'pending' || w.status === 'ingesting').length}</span>
-                )}
-              </button>
-              <button
-                className="nx-file-btn"
-                type="button"
-                onClick={() => setDatasetModalOpen(true)}
-                disabled={datasetTables.length === 0}
-                title={datasetTables.length === 0 ? 'Dataset not yet loaded for this tenant' : ''}
-              >
-                dataset
-              </button>
-              <span className="nx-file-label">
-                {attachedFile ? `📎 ${attachedFile.name}` : 'no file selected'}
-              </span>
-              {activeWorkbook && (
-                <span className="nx-chip">
-                  workbook: {activeWorkbook.filename}
-                  <button className="detach" onClick={() => setActiveWorkbookId(null)} aria-label="Detach workbook">×</button>
-                </span>
+              <span className="text-[11px] text-[#666]" aria-hidden="true">Custom</span>
+            </div>
+          </SidebarSection>
+
+          <SidebarSection label="Guardrails">
+            <div className="text-[11px] leading-snug text-[#9a9a9a]" role="note">
+              Do not upload PHI, member identifiers, medical records, claims files, or confidential production data.
+            </div>
+          </SidebarSection>
+
+          <div className="mt-auto border-t border-[#1e1e1e] pt-2.5 text-[10px] leading-snug text-[#666]">
+            Nexora AI · Azure-hosted<br />
+            Claude-powered
+          </div>
+        </aside>
+
+        {/* ─ Main ───────────────────────────────────────────────────── */}
+        <main className="flex h-full min-w-0 flex-col" style={{ background: bg }}>
+          {/* Inner topbar (light) — gives Status + signed-in user without
+              duplicating the portal nav above. */}
+          <header className="flex h-[44px] flex-none items-center justify-between border-b border-[#1e1e1e] bg-[#0f0f0f] px-4">
+            <div className="flex items-baseline gap-2.5">
+              <strong className="text-[13px] font-bold">nexora</strong>
+              <span className="text-[11px] text-[#666]">Claude-powered AI assistant</span>
+            </div>
+            <div className="flex items-center gap-2" role="status" aria-live="polite">
+              <div className="flex items-center gap-1.5 rounded-[3px] border border-[#2a2a2a] px-2 py-0.5 text-[11px] text-[#4ade80]" aria-label="Service active">
+                <span className="h-[5px] w-[5px] rounded-full bg-[#4ade80]" aria-hidden="true" />
+                active
+              </div>
+              <div className="max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#666]" title={userEmail}>
+                {userEmail}
+              </div>
+            </div>
+          </header>
+
+          {error && (
+            <div
+              className="mx-auto mt-2.5 w-[calc(100%-32px)] max-w-[760px] rounded-[3px] border border-[rgba(248,113,113,0.3)] px-3 py-1.5 text-[12px] text-[#f87171]"
+              role="alert"
+            >
+              {error}
+            </div>
+          )}
+
+          <section
+            ref={threadRef}
+            className="nx-scroll flex-1 overflow-y-auto px-5 pb-44 pt-0"
+            aria-label="Conversation"
+          >
+            <div className="mx-auto flex max-w-[760px] flex-col">
+              {messages.length === 0 ? (
+                <div className="border-b border-[#1e1e1e] py-6">
+                  <h1 className="nx-welcome-h mb-1.5 text-[14px] font-bold leading-tight text-[#d4d4d4]">Nexora AI</h1>
+                  <p className="mb-3.5 max-w-[560px] text-[12px] leading-relaxed text-[#9a9a9a]">
+                    Ask a question or attach a file (PDF, DOCX, XLSX, PPTX, CSV, JSON, TXT, PNG, JPG) for analysis.
+                    Responses can include tables, charts, and markdown formatting.
+                  </p>
+                  <div className="flex flex-col" role="list" aria-label="Suggested prompts">
+                    {SUGGESTED_PROMPTS.map((p) => (
+                      <button
+                        key={p.title}
+                        type="button"
+                        className="nx-prompt-card flex items-baseline gap-2 border-none bg-transparent py-1 text-left text-[12px] leading-relaxed text-[#9a9a9a] transition hover:text-[#d4d4d4]"
+                        onClick={() => handlePickPrompt(p.prompt)}
+                        role="listitem"
+                      >
+                        <strong className="min-w-[148px] flex-none text-[12px] font-semibold text-[#60a5fa]">
+                          {p.title}
+                        </strong>
+                        <span>{p.summary}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                messages.map((m, i) => (
+                  <article
+                    key={i}
+                    className="grid grid-cols-[16px_1fr] items-start gap-2.5 border-t border-[#1e1e1e] py-3"
+                  >
+                    <div className={`pt-px text-[12px] leading-[1.7] ${m.role === 'user' ? 'text-[#60a5fa]' : 'text-[#d97706]'}`} aria-hidden="true">
+                      {m.role === 'user' ? '›' : '◆'}
+                    </div>
+                    <div className="min-w-0 overflow-x-auto">
+                      <div className={`mb-1 text-[11px] font-bold tracking-wide ${m.role === 'user' ? 'text-[#60a5fa]' : 'text-[#d97706]'}`}>
+                        {m.role === 'user' ? 'USER' : 'ASSISTANT'}
+                      </div>
+                      {m.file && <div className="text-[11px] text-[#666]">📎 {m.file}</div>}
+                      {m.role === 'user' ? (
+                        <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#d4d4d4]">{m.content}</div>
+                      ) : (
+                        <MessageBody content={m.content} isTyping={m.isTyping} />
+                      )}
+                    </div>
+                  </article>
+                ))
               )}
-              {datasetMode && (
-                <span className="nx-chip">
+            </div>
+          </section>
+
+          {/* ─ Composer ─────────────────────────────────────────────── */}
+          <div
+            className="sticky bottom-0 px-5 pb-4 pt-3"
+            style={{ background: `linear-gradient(to top, ${bg} 70%, transparent)` }}
+          >
+            <div className="mx-auto max-w-[760px] rounded-[3px] border border-[#2a2a2a] bg-[#0f0f0f] px-2.5 py-2">
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5 border-b border-dashed border-[#1e1e1e] pb-1.5">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.txt,.csv,.json,.docx,.xlsx,.pptx,.png,.jpg,.jpeg"
+                  className="hidden"
+                  onChange={handlePickFile}
+                />
+                <button className={fileBtn} type="button" onClick={() => fileInputRef.current?.click()} disabled={busy}>attach</button>
+                <button className={fileBtn} type="button" onClick={() => setAttachedFile(null)} disabled={!attachedFile}>clear</button>
+                <button className={fileBtn} type="button" onClick={() => setWorkbookModalOpen(true)}>
+                  workbooks
+                  {workbooks.some((w) => w.status === 'pending' || w.status === 'ingesting') && (
+                    <span className="ml-1 rounded-[6px] bg-[#d97706] px-1 text-[9px] font-bold text-black">
+                      {workbooks.filter((w) => w.status === 'pending' || w.status === 'ingesting').length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  className={fileBtn}
+                  type="button"
+                  onClick={() => setDatasetModalOpen(true)}
+                  disabled={datasetTables.length === 0}
+                  title={datasetTables.length === 0 ? 'Dataset not yet loaded for this tenant' : ''}
+                >
                   dataset
-                  <button className="detach" onClick={() => setDatasetMode(false)} aria-label="Detach dataset">×</button>
+                </button>
+                <span className="text-[11px] text-[#666]">
+                  {attachedFile ? `📎 ${attachedFile.name}` : 'no file selected'}
                 </span>
-              )}
-            </div>
+                {activeWorkbook && (
+                  <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-[#d97706] px-2 py-0.5 text-[11px] text-[#d4d4d4]">
+                    workbook: {activeWorkbook.filename}
+                    <button className="border-none bg-transparent px-0.5 text-[12px] text-[#666] hover:text-[#d97706]" onClick={() => setActiveWorkbookId(null)} aria-label="Detach workbook">×</button>
+                  </span>
+                )}
+                {datasetMode && (
+                  <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-[#d97706] px-2 py-0.5 text-[11px] text-[#d4d4d4]">
+                    dataset
+                    <button className="border-none bg-transparent px-0.5 text-[12px] text-[#666] hover:text-[#d97706]" onClick={() => setDatasetMode(false)} aria-label="Detach dataset">×</button>
+                  </span>
+                )}
+              </div>
 
-            <div className="nx-composer">
-              <span className="nx-prompt-char" aria-hidden="true">›</span>
-              <textarea
-                ref={textareaRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="message nexora..."
-                rows={1}
-                disabled={busy}
-                aria-label="Type your message"
-              />
-              <button
-                className="nx-send"
-                type="button"
-                onClick={handleSend}
-                disabled={busy || (!draft.trim() && !attachedFile)}
-                aria-label="Send message"
-                title="Send (Enter)"
-              >
-                <span aria-hidden="true">↑</span>
-              </button>
-            </div>
+              <div className="grid grid-cols-[auto_1fr_auto] items-end gap-1.5">
+                <span className="select-none pb-2 text-[14px] leading-none text-[#d97706] opacity-85" aria-hidden="true">›</span>
+                <textarea
+                  ref={textareaRef}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="message nexora..."
+                  rows={1}
+                  disabled={busy}
+                  className="w-full min-h-[36px] max-h-[140px] resize-none border-none bg-transparent px-1 py-2 text-[13px] leading-relaxed text-[#d4d4d4] outline-none placeholder:text-[#666]"
+                  aria-label="Type your message"
+                />
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={busy || (!draft.trim() && !attachedFile)}
+                  className="mb-0.5 grid h-8 w-8 place-items-center rounded-[3px] border border-[#2a2a2a] bg-transparent text-[14px] text-[#9a9a9a] transition hover:border-[#d97706] hover:text-[#d97706] disabled:cursor-not-allowed disabled:opacity-30"
+                  aria-label="Send message"
+                  title="Send (Enter)"
+                >
+                  <span aria-hidden="true">↑</span>
+                </button>
+              </div>
 
-            <div className="nx-composer-note" role="note">
-              Do not enter or upload PHI, member identifiers, claims files, medical records, or confidential production data.
+              <div className="mx-1 mt-1.5 text-center text-[10px] leading-tight text-[#666]" role="note">
+                Do not enter or upload PHI, member identifiers, claims files, medical records, or confidential production data.
+              </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
 
+      {/* ─ Workbook modal ─────────────────────────────────────────────── */}
       {workbookModalOpen && (
-        <div className="nx-modal-backdrop" role="dialog" aria-modal="true" onClick={(e) => {
-          if (e.target.classList.contains('nx-modal-backdrop')) setWorkbookModalOpen(false);
-        }}>
-          <div className="nx-modal-card">
-            <h2>Workbooks</h2>
-            <div className="nx-upload-row">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget) setWorkbookModalOpen(false); }}
+        >
+          <div className="nx-chat-root max-h-[80vh] w-[min(560px,92vw)] overflow-y-auto rounded-[3px] border border-[#2a2a2a] bg-[#0f0f0f] p-4 text-[12px] text-[#d4d4d4]">
+            <h2 className="mb-2 text-[13px] text-[#d4d4d4]">Workbooks</h2>
+            <div className="mb-2 flex items-center gap-1.5 border-b border-[#2a2a2a] pb-3">
               <input
                 ref={workbookFileRef}
                 type="file"
                 accept=".xlsx"
-                style={{ display: 'none' }}
+                className="hidden"
                 onChange={handleUploadWorkbook}
               />
-              <button type="button" onClick={() => workbookFileRef.current?.click()}>upload .xlsx</button>
-              <span className="nx-row-meta">drop in an Excel workbook to query it with SQL</span>
+              <button className={modalBtn} type="button" onClick={() => workbookFileRef.current?.click()}>upload .xlsx</button>
+              <span className="text-[11px] text-[#666]">drop in an Excel workbook to query it with SQL</span>
             </div>
             <div>
               {workbooks.length === 0 ? (
-                <div className="nx-modal-empty">no workbooks yet</div>
+                <div className="py-3 text-center text-[#666]">no workbooks yet</div>
               ) : workbooks.map((wb) => (
-                <div key={wb.id} className="nx-modal-row">
+                <div key={wb.id} className="flex items-center justify-between gap-2 border-b border-dashed border-[#1e1e1e] py-2 last:border-b-0">
                   <div>
                     <div>
                       {wb.filename}
                       {(wb.status === 'pending' || wb.status === 'ingesting') && (
-                        <span className={`nx-status-pill ${wb.status}`}>ingesting...</span>
+                        <span className="ml-1.5 inline-block rounded-[8px] border border-[#d97706] px-1.5 py-px text-[10px] text-[#d97706]">ingesting...</span>
                       )}
                       {wb.status === 'failed' && (
-                        <span className="nx-status-pill failed">failed</span>
+                        <span className="ml-1.5 inline-block rounded-[8px] border border-[rgba(248,113,113,0.4)] px-1.5 py-px text-[10px] text-[#f87171]">failed</span>
                       )}
                     </div>
-                    <div className="nx-row-meta">
+                    <div className="text-[11px] text-[#666]">
                       {STATUS_LABEL[wb.status] || wb.status} · {(wb.size_bytes / 1024).toFixed(0)} KB
                       {wb.error_message && ` — ${wb.error_message}`}
                     </div>
                   </div>
-                  <div className="nx-row-actions">
-                    <button
-                      type="button"
-                      onClick={() => handleAttachWorkbook(wb)}
-                      disabled={wb.status !== 'ready'}
-                    >
+                  <div className="flex flex-shrink-0 items-center gap-1.5">
+                    <button type="button" onClick={() => handleAttachWorkbook(wb)} disabled={wb.status !== 'ready'} className={modalBtn}>
                       {activeWorkbookId === wb.id ? 'attached' : 'attach'}
                     </button>
-                    <button type="button" className="danger" onClick={() => handleDeleteWorkbook(wb.id)}>delete</button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWorkbook(wb.id)}
+                      className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#f87171] hover:text-[#f87171]"
+                    >
+                      delete
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="nx-modal-footer">
-              <button type="button" onClick={() => setWorkbookModalOpen(false)}>close</button>
+            <div className="mt-3 text-right">
+              <button className={modalBtn} type="button" onClick={() => setWorkbookModalOpen(false)}>close</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ─ Dataset modal ──────────────────────────────────────────────── */}
       {datasetModalOpen && (
-        <div className="nx-modal-backdrop" role="dialog" aria-modal="true" onClick={(e) => {
-          if (e.target.classList.contains('nx-modal-backdrop')) setDatasetModalOpen(false);
-        }}>
-          <div className="nx-modal-card">
-            <h2>Analytics dataset</h2>
-            <div className="nx-upload-row">
-              <button type="button" onClick={handleToggleDatasetMode}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget) setDatasetModalOpen(false); }}
+        >
+          <div className="nx-chat-root max-h-[80vh] w-[min(560px,92vw)] overflow-y-auto rounded-[3px] border border-[#2a2a2a] bg-[#0f0f0f] p-4 text-[12px] text-[#d4d4d4]">
+            <h2 className="mb-2 text-[13px] text-[#d4d4d4]">Analytics dataset</h2>
+            <div className="mb-2 flex items-center gap-1.5 border-b border-[#2a2a2a] pb-3">
+              <button className={modalBtn} type="button" onClick={handleToggleDatasetMode}>
                 {datasetMode ? 'detach dataset' : 'use dataset for chat'}
               </button>
-              <span className="nx-row-meta">
+              <span className="text-[11px] text-[#666]">
                 {datasetMode ? 'chat is now routed to the dataset' : 'ask natural-language questions over the shared tables below'}
               </span>
             </div>
             <div>
               {datasetTables.length === 0 ? (
-                <div className="nx-modal-empty">no dataset tables defined</div>
+                <div className="py-3 text-center text-[#666]">no dataset tables defined</div>
               ) : datasetTables.map((t) => (
                 <DatasetRow
                   key={t.table_name}
@@ -694,13 +768,13 @@ const ChatPage = () => {
                 />
               ))}
             </div>
-            <div className="nx-modal-footer">
-              <button type="button" onClick={() => setDatasetModalOpen(false)}>close</button>
+            <div className="mt-3 text-right">
+              <button className={modalBtn} type="button" onClick={() => setDatasetModalOpen(false)}>close</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </PortalPageLayout>
   );
 };
 
@@ -718,23 +792,32 @@ const DatasetRow = ({ table, onUpload }) => {
     finally { setUploading(false); }
   };
   return (
-    <div className="nx-modal-row">
+    <div className="flex items-center justify-between gap-2 border-b border-dashed border-[#1e1e1e] py-2 last:border-b-0">
       <div>
         <div>{table.friendly_name} ({table.table_name})</div>
-        <div className="nx-row-meta">
+        <div className="text-[11px] text-[#666]">
           {table.row_count == null
             ? 'table missing — apply the migration'
             : `${table.row_count.toLocaleString()} rows`}
           {last && ` — last load ${formatTs(last)}`}
         </div>
       </div>
-      <div className="nx-row-actions">
-        <select value={mode} onChange={(e) => setMode(e.target.value)}>
+      <div className="flex flex-shrink-0 items-center gap-1.5">
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value)}
+          className="rounded-[3px] border border-[#2a2a2a] bg-[#141414] px-1.5 py-0.5 text-[11px] text-[#9a9a9a]"
+        >
           <option value="replace">replace</option>
           <option value="append">append</option>
         </select>
-        <input ref={fileRef} type="file" accept=".csv,.xlsx" style={{ display: 'none' }} onChange={handleChange} />
-        <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}>
+        <input ref={fileRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleChange} />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#d97706] hover:text-[#d4d4d4] disabled:opacity-40"
+        >
           {uploading ? 'uploading...' : 'upload csv/xlsx'}
         </button>
       </div>
