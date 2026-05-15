@@ -595,7 +595,6 @@ async def assign_admin_work(
         member_ids=payload.member_ids,
     )
     await session.commit()
-    await control_session.commit()
 
     await record_audit_event(
         control_session,
