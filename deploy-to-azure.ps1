@@ -489,13 +489,21 @@ if (-not $SkipFrontend) {
     $BuildDir = Join-Path $ProjectRoot "frontend\build"
     if (-not (Test-Path $BuildDir)) { throw "Frontend build directory not found: $BuildDir" }
 
-    # @azure/static-web-apps-cli ships a 'swa' CLI for direct upload.
+    # @azure/static-web-apps-cli ships a 'swa' CLI for direct upload. Run it
+    # from inside the build dir so its swa-cli.config.json lookup doesn't
+    # walk back up to the repo root and hit unreadable directories like
+    # .pytest_cache (which errors out the upload with EPERM scandir).
     Write-Host "Uploading bundle to Static Web App..."
-    npx --yes @azure/static-web-apps-cli deploy $BuildDir `
-        --deployment-token $DeployToken `
-        --env production `
-        --verbose
-    if ($LASTEXITCODE -ne 0) { throw "SWA deploy failed." }
+    Push-Location $BuildDir
+    try {
+        npx --yes @azure/static-web-apps-cli deploy . `
+            --deployment-token $DeployToken `
+            --env production `
+            --verbose
+        if ($LASTEXITCODE -ne 0) { throw "SWA deploy failed." }
+    } finally {
+        Pop-Location
+    }
 
     Write-Host "Frontend deployed to $FrontendUrl"
 } else {
