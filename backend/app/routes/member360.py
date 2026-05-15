@@ -2,6 +2,12 @@
 
 Mounted at ``/api/member360``. All routes require an authenticated user
 within the active tenant. Tables are auto-seeded on first use.
+
+Audit writes target the control plane (``tenant_audit_events`` is a
+``ControlBase`` table that only exists in the control DB). Routes accept
+both a tenant session for data work and a control session for audit, and
+commit them separately — data first, audit second — so an audit failure
+never rolls back a successful data change.
 """
 from __future__ import annotations
 
@@ -10,6 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
 from ..dependencies.tenant import get_tenant_context, get_tenant_session
 from ..schemas.member360 import (
@@ -42,18 +49,20 @@ async def _ensure(session: AsyncSession) -> None:
 async def get_dashboard(
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     await _ensure(session)
     payload = await member360_service.build_dashboard(session)
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="member360.dashboard.view",
         payload={},
     )
     await session.commit()
+    await control_session.commit()
     return payload
 
 
@@ -67,6 +76,7 @@ async def list_members(
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     await _ensure(session)
@@ -80,13 +90,14 @@ async def list_members(
         offset=offset,
     )
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="member360.members.list",
         payload={"count": len(items), "search": search or ""},
     )
     await session.commit()
+    await control_session.commit()
     return {"items": items, "total": total}
 
 
@@ -95,6 +106,7 @@ async def get_member(
     member_id: int,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     await _ensure(session)
@@ -102,13 +114,14 @@ async def get_member(
     if not detail:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="member360.member.detail",
         payload={"member_id": member_id},
     )
     await session.commit()
+    await control_session.commit()
     return detail
 
 
@@ -117,6 +130,7 @@ async def create_task(
     payload: TaskCreate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     await _ensure(session)
@@ -125,13 +139,14 @@ async def create_task(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="member360.task.create",
         payload={"task_id": task["id"], "member_id": task["member_id"]},
     )
     await session.commit()
+    await control_session.commit()
     return task
 
 
@@ -141,6 +156,7 @@ async def update_task(
     payload: TaskUpdate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     await _ensure(session)
@@ -151,13 +167,14 @@ async def update_task(
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="member360.task.update",
         payload={"task_id": task_id, "fields": list(data.keys())},
     )
     await session.commit()
+    await control_session.commit()
     return task
 
 
@@ -167,6 +184,7 @@ async def create_note(
     payload: NoteCreate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     await _ensure(session)
@@ -180,13 +198,14 @@ async def create_note(
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="member360.note.create",
         payload={"member_id": member_id, "note_id": note["id"]},
     )
     await session.commit()
+    await control_session.commit()
     return note
 
 
@@ -196,6 +215,7 @@ async def create_message(
     payload: MessageCreate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     await _ensure(session)
@@ -205,13 +225,14 @@ async def create_message(
     if not message:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="member360.message.create",
         payload={"member_id": member_id, "channel": message["channel"]},
     )
     await session.commit()
+    await control_session.commit()
     return message
 
 
@@ -220,6 +241,7 @@ async def create_care_option(
     payload: CareOptionCreate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     await _ensure(session)
@@ -227,13 +249,14 @@ async def create_care_option(
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="member360.care_option.create",
         payload={"member_id": payload.member_id, "service_type": payload.service_type},
     )
     await session.commit()
+    await control_session.commit()
     return result
 
 

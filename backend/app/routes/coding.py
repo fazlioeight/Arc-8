@@ -271,6 +271,7 @@ async def list_prioritized_members(
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     priorities, total = await coding_members.list_prioritized_members(
@@ -283,13 +284,14 @@ async def list_prioritized_members(
             continue
         items.append(_priority_to_view(member, priority))
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.members.prioritized",
         payload={"count": len(items), "submission_year": submission_year},
     )
     await session.commit()
+    await control_session.commit()
     return CodingPrioritizedResponse(items=items, total=total)
 
 
@@ -297,6 +299,7 @@ async def list_prioritized_members(
 async def list_coding_members(
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     search: Optional[str] = Query(default=None, description="Case-insensitive search term"),
     status_filters: Optional[list[str]] = Query(default=None, alias="status"),
     lob_filters: Optional[list[str]] = Query(default=None, alias="lob"),
@@ -318,13 +321,14 @@ async def list_coding_members(
         assignments_map = await coding_members.load_assignment_metadata(session, member_ids)
     items = [_member_to_summary(member, assignments_map.get(member.id)) for member in members]
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.members.list",
         payload={"count": len(items), "search": search},
     )
     await session.commit()
+    await control_session.commit()
     return CodingMemberSearchResponse(items=items, total=total)
 
 
@@ -333,6 +337,7 @@ async def create_coding_member(
     payload: CodingMemberCreate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     existing = await coding_members.get_member_by_key(session, payload.member_key)
@@ -340,13 +345,14 @@ async def create_coding_member(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Member already exists")
     member = await coding_members.create_member(session, payload.model_dump())
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.members.create",
         payload={"member_id": member.id, "member_key": member.member_key},
     )
     await session.commit()
+    await control_session.commit()
     return _member_to_detail(member)
 
 
@@ -356,6 +362,7 @@ async def get_coding_member(
     submission_year: int = Query(default=datetime.utcnow().year),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     member = await coding_members.get_member(session, member_id)
@@ -372,13 +379,14 @@ async def get_coding_member(
     priority = await coding_members.get_member_priority(session, member, submission_year=submission_year)
 
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.members.detail",
         payload={"member_id": member.id},
     )
     await session.commit()
+    await control_session.commit()
     return CodingMemberDetailResponse(
         member=_member_to_detail(member, assignment_snapshot),
         eligibility=_eligibility_to_schema(eligibility),
@@ -398,6 +406,7 @@ async def get_member_gap_analysis(
     submission_year: int = Query(default=datetime.utcnow().year),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     try:
@@ -407,13 +416,14 @@ async def get_member_gap_analysis(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.members.gaps",
         payload={"member_id": member_id, "submission_year": submission_year},
     )
     await session.commit()
+    await control_session.commit()
     return CodingMemberGapResponse(**result)
 
 
@@ -427,6 +437,7 @@ async def create_member_chase(
     payload: CodingChaseCreate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     member = await coding_members.get_member(session, member_id)
@@ -434,13 +445,14 @@ async def create_member_chase(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
     chase = await coding_members.create_chase(session, member=member, payload=payload.model_dump())
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.chases.create",
         payload={"member_id": member.id, "chase_id": chase.id},
     )
     await session.commit()
+    await control_session.commit()
     return _chase_to_schema(chase)
 
 
@@ -450,6 +462,7 @@ async def update_member_chase(
     payload: CodingChaseUpdate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     data = {k: v for k, v in payload.model_dump().items() if v is not None}
@@ -459,13 +472,14 @@ async def update_member_chase(
     if not chase:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chase not found")
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.chases.update",
         payload={"chase_id": chase.id, "changes": list(data.keys())},
     )
     await session.commit()
+    await control_session.commit()
     return _chase_to_schema(chase)
 
 
@@ -480,6 +494,7 @@ async def create_health_assessment(
     submission_year: int = Query(default=datetime.utcnow().year),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     member = await coding_members.get_member(session, member_id)
@@ -490,13 +505,14 @@ async def create_health_assessment(
     )
     await coding_members.get_member_priority(session, member, submission_year=submission_year)
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.assessments.create",
         payload={"member_id": member.id, "assessment_id": assessment.id},
     )
     await session.commit()
+    await control_session.commit()
     return _assessment_to_schema(assessment)
 
 
@@ -510,6 +526,7 @@ async def create_member_note(
     payload: CodingNoteCreate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     member = await coding_members.get_member(session, member_id)
@@ -521,13 +538,14 @@ async def create_member_note(
         note_payload["author_name"] = current_user.email
     note = await coding_members.create_note(session, member=member, payload=note_payload)
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.notes.create",
         payload={"member_id": member.id, "note_id": note.id},
     )
     await session.commit()
+    await control_session.commit()
     return _note_to_schema(note)
 
 
@@ -577,6 +595,7 @@ async def assign_admin_work(
         member_ids=payload.member_ids,
     )
     await session.commit()
+    await control_session.commit()
 
     await record_audit_event(
         control_session,
@@ -604,6 +623,7 @@ async def generate_submission_export(
     request: SubmissionGenerateRequest,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     result = await submission_builder.generate_submission_file(
@@ -613,13 +633,14 @@ async def generate_submission_export(
         member_ids=request.member_ids,
     )
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.submissions.generate",
         payload={"submission_year": request.submission_year, "record_count": result["record_count"]},
     )
     await session.commit()
+    await control_session.commit()
     return SubmissionGenerateResponse(**result)
 
 
@@ -633,6 +654,7 @@ async def create_member_attachment(
     payload: CodingAttachmentCreate,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     member = await coding_members.get_member(session, member_id)
@@ -646,13 +668,14 @@ async def create_member_attachment(
         payload=attachment_payload,
     )
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.attachments.create",
         payload={"member_id": member.id, "attachment_id": attachment.id},
     )
     await session.commit()
+    await control_session.commit()
     return _attachment_to_schema(attachment)
 
 
@@ -660,6 +683,7 @@ async def create_member_attachment(
 async def list_coding_providers(
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     search: Optional[str] = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
@@ -669,13 +693,14 @@ async def list_coding_providers(
         session, search=search, page=page, page_size=page_size
     )
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.providers.list",
         payload={"count": len(providers), "search": search},
     )
     await session.commit()
+    await control_session.commit()
     items = [_provider_to_summary(provider) for provider in providers]
     return CodingProviderSearchResponse(items=items, total=total)
 
@@ -685,17 +710,19 @@ async def get_coding_provider(
     provider_id: int,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     provider = await coding_members.get_provider(session, provider_id)
     if not provider:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
     await record_audit_event(
-        session,
+        control_session,
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="coding.providers.detail",
         payload={"provider_id": provider.id},
     )
     await session.commit()
+    await control_session.commit()
     return _provider_to_detail(provider)
