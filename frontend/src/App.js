@@ -28,6 +28,13 @@ const Member360LandingPage = lazy(() => import('./pages/platform/Member-360/Memb
 const Member360LabDashboard = lazy(() => import('./pages/platform/member360-lab/Member360LabDashboard'));
 const Member360LabMembersPage = lazy(() => import('./pages/platform/member360-lab/Member360LabMembersPage'));
 const Member360LabWorkspace = lazy(() => import('./pages/platform/member360-lab/Member360LabWorkspace'));
+const Member360LabTasksPage = lazy(() => import('./pages/platform/member360-lab/Member360LabTasksPage'));
+const Member360LabCareJourneysPage = lazy(() => import('./pages/platform/member360-lab/Member360LabCareJourneysPage'));
+const Member360LabRiskIntelligencePage = lazy(() => import('./pages/platform/member360-lab/Member360LabRiskIntelligencePage'));
+const Member360LabCareOptionsPage = lazy(() => import('./pages/platform/member360-lab/Member360LabCareOptionsPage'));
+const Member360LabMessagesPage = lazy(() => import('./pages/platform/member360-lab/Member360LabMessagesPage'));
+const Member360LabDocumentsPage = lazy(() => import('./pages/platform/member360-lab/Member360LabDocumentsPage'));
+const Member360LabAdminPage = lazy(() => import('./pages/platform/member360-lab/Member360LabAdminPage'));
 const RideBookingLandingPage = lazy(() => import('./pages/platform/ride_booking/RideBookingLandingPage'));
 const RideBooking = lazy(() => import('./pages/platform/ride_booking/RideBooking'));
 const RidePartnerManagementPage = lazy(() => import('./pages/platform/ride_booking/RidePartnerManagementPage'));
@@ -153,6 +160,41 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path={`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/:memberId`} element={(
             <ErrorBoundary title="Member360 workspace failed to load">
               <Member360LabWorkspace />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.MEMBER360_LAB.TASKS} element={(
+            <ErrorBoundary title="Tasks queue failed to load">
+              <Member360LabTasksPage />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.MEMBER360_LAB.CARE_JOURNEYS} element={(
+            <ErrorBoundary title="Care Journeys failed to load">
+              <Member360LabCareJourneysPage />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.MEMBER360_LAB.RISK_INTELLIGENCE} element={(
+            <ErrorBoundary title="Risk Intelligence failed to load">
+              <Member360LabRiskIntelligencePage />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.MEMBER360_LAB.CARE_OPTIONS} element={(
+            <ErrorBoundary title="Care Options failed to load">
+              <Member360LabCareOptionsPage />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.MEMBER360_LAB.MESSAGES} element={(
+            <ErrorBoundary title="Messages failed to load">
+              <Member360LabMessagesPage />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.MEMBER360_LAB.DOCUMENTS} element={(
+            <ErrorBoundary title="Documents failed to load">
+              <Member360LabDocumentsPage />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.MEMBER360_LAB.ADMIN} element={(
+            <ErrorBoundary title="Admin failed to load">
+              <Member360LabAdminPage />
             </ErrorBoundary>
           )} />
           <Route path={ROUTES.RIDE_BOOKING.LANDING} element={<RideBookingLandingPage />} />
