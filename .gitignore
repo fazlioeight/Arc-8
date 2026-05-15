@@ -17,3 +17,7 @@ build/
 
 # Local-only artifacts left behind by dev DB / scripts
 *.db-journal
+backend/logs/audit.log
+backend/nexora_control.db
+backend/tenants/*.db
+nexora.db
