@@ -618,7 +618,8 @@ if (-not $SkipBackend) {
   failureThreshold: 3
   timeoutSeconds: 3
 '@
-    $probesPath = Join-Path $env:TEMP "nexora-aca-probes.yaml"
+    # $env:TEMP is Windows-only; on the GH Linux runner it's $null.
+    $probesPath = Join-Path ([System.IO.Path]::GetTempPath()) "nexora-aca-probes.yaml"
     Set-Content -Path $probesPath -Value $probesYaml -Encoding utf8
     try {
         az containerapp update -n $AppName -g $ResourceGroup --probes $probesPath --output none
