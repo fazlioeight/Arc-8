@@ -11,12 +11,12 @@ from ..core.config import settings
 
 @lru_cache(maxsize=1)
 def _create_control_engine() -> AsyncEngine:
-    return create_async_engine(
-        settings.CONTROL_DATABASE_URL,
-        echo=False,
-        future=True,
-        pool_pre_ping=True,
-    )
+    url = settings.CONTROL_DATABASE_URL
+    kwargs: dict = {"echo": False, "future": True, "pool_pre_ping": True}
+    # SQLite (used in tests + dev) doesn't support pool sizing.
+    if not url.startswith("sqlite"):
+        kwargs.update(pool_size=20, max_overflow=40, pool_recycle=3600)
+    return create_async_engine(url, **kwargs)
 
 
 @lru_cache(maxsize=1)

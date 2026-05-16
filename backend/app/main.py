@@ -15,10 +15,12 @@ from .db.session import get_control_session
 from .db.tenant_manager import TenantContext, tenant_connection_manager
 from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.request_logging import RequestLoggingMiddleware
+from .middleware.security_headers import SecurityHeadersMiddleware
 from .middleware.tenant import TenantMiddleware
 from .models.tables import User
 from .routes import admin as admin_router
 from .routes import analytics as analytics_router
+from .routes import auth as auth_router
 from .routes import chat as chat_router
 from .routes import coding as coding_router
 from .routes import coding_dashboards as coding_dashboards_router
@@ -41,8 +43,11 @@ from .utils.auth_throttle import clear_failures, client_ip, is_locked_out, recor
 from .utils.security import (
     AuthenticatedUser,
     create_access_token,
+    decode_token,
     filter_application_permissions,
     get_current_user,
+    oauth2_scheme,
+    revoke_jti,
     tenant_application_keys,
     verify_password,
 )
@@ -67,6 +72,7 @@ for origin in settings.CORS_ORIGINS:
     cors_origins.append(origin_str)
     cors_origins.append(f"{origin_str}/")
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(set(cors_origins)),
@@ -84,6 +90,7 @@ class LoginRequest(BaseModel):
     email: NormalizedEmail
     password: str
     tenant: str | None = None
+    mfa_code: str | None = None
 
 
 class AzureAuthCodeRequest(BaseModel):
@@ -118,6 +125,7 @@ def _build_login_response(user: User, tenant: TenantContext) -> dict:
         "applications": applications,
         "purchased_applications": purchased_applications,
         "available_applications": sorted(available_app_keys),
+        "must_change_password": bool(user.must_change_password),
     }
 
 
@@ -210,6 +218,57 @@ async def login(
         await session.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
+    # MFA check happens after password verification but before issuing a token.
+    role = (user.role or "user")
+    mfa_enrolled = user.mfa_enrolled_at is not None
+    mfa_required_for_role = settings.REQUIRE_ADMIN_MFA and role in {"admin", "platform_admin"}
+
+    if mfa_enrolled:
+        if not credentials.mfa_code:
+            await record_audit_event(
+                session,
+                tenant_id=tenant.id,
+                actor=credentials.email,
+                event_type="login.mfa_required",
+                payload={"tenant": tenant.key, "ip": ip},
+            )
+            await session.commit()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="mfa_required",
+            )
+        from .routes.auth import verify_totp
+        if not verify_totp(user.mfa_secret or "", credentials.mfa_code):
+            await record_failure(tenant.key, ip, credentials.email)
+            await record_audit_event(
+                session,
+                tenant_id=tenant.id,
+                actor=credentials.email,
+                event_type="login.failed",
+                payload={
+                    "tenant": tenant.key,
+                    "ip": ip,
+                    "user_agent": user_agent,
+                    "reason": "bad_mfa_code",
+                },
+            )
+            await session.commit()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid MFA code",
+            )
+    elif mfa_required_for_role:
+        # Allow the user in but flag enrollment as required so the SPA can
+        # redirect to /mfa/enroll. We do NOT block login here because the
+        # enrollment endpoints require an authenticated session.
+        await record_audit_event(
+            session,
+            tenant_id=tenant.id,
+            actor=credentials.email,
+            event_type="login.mfa_enrollment_required",
+            payload={"tenant": tenant.key, "ip": ip, "role": role},
+        )
+
     await clear_failures(tenant.key, ip, credentials.email)
     user.last_login_at = datetime.now(timezone.utc)
     await record_audit_event(
@@ -217,11 +276,55 @@ async def login(
         tenant_id=tenant.id,
         actor=credentials.email,
         event_type="login.success",
-        payload={"tenant": tenant.key, "ip": ip, "user_agent": user_agent},
+        payload={
+            "tenant": tenant.key,
+            "ip": ip,
+            "user_agent": user_agent,
+            "mfa": "verified" if mfa_enrolled else ("enrollment_required" if mfa_required_for_role else "not_required"),
+        },
     )
     await session.commit()
 
-    return _build_login_response(user, tenant)
+    response = _build_login_response(user, tenant)
+    response["mfa_enrollment_required"] = bool(mfa_required_for_role and not mfa_enrolled)
+    return response
+
+
+@app.post("/api/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    request: Request,
+    token: str = Depends(oauth2_scheme),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_control_session),
+) -> None:
+    # Decode the token directly (do NOT call get_current_user — we want to be
+    # able to revoke even a tenant-mismatched or already-revoked token so the
+    # client can clean up its state).
+    try:
+        payload = decode_token(token)
+    except HTTPException:
+        return None
+    jti = payload.get("jti")
+    exp = payload.get("exp")
+    if jti and exp:
+        ttl = int(exp) - int(datetime.now(timezone.utc).timestamp())
+        if ttl > 0:
+            await revoke_jti(jti, ttl)
+    sub = payload.get("sub") or "unknown"
+    if tenant and tenant.id:
+        await record_audit_event(
+            session,
+            tenant_id=tenant.id,
+            actor=sub,
+            event_type="logout",
+            payload={
+                "tenant": tenant.key,
+                "ip": client_ip(request),
+                "jti": jti,
+            },
+        )
+        await session.commit()
+    return None
 
 
 @app.get("/api/auth/azure/config")
@@ -319,6 +422,7 @@ async def tenant_self(
 
 
 app.include_router(admin_router.router)
+app.include_router(auth_router.router)
 app.include_router(analytics_router.router)
 app.include_router(coding_router.router)
 app.include_router(coding_dashboards_router.router)

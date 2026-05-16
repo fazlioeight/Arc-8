@@ -9,6 +9,8 @@ from sqlalchemy.sql import func
 import uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from ..utils.encryption import EncryptedString
+
 
 class ControlBase(DeclarativeBase):
     """Metadata schema for control-plane tables (tenants, users, audits)."""
@@ -75,12 +77,28 @@ class User(ControlBase):
     role: Mapped[str] = mapped_column(String(64), default="user")
     app_permissions: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)
     is_active: Mapped[bool] = mapped_column(default=True)
+    must_change_password: Mapped[bool] = mapped_column(default=False)
+    mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mfa_enrolled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     tenant: Mapped[Tenant] = relationship(back_populates="users")
     portal_saved_items: Mapped[list["PortalSavedItem"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     preferences: Mapped[list["UserPreference"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+
+class PasswordResetToken(ControlBase):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    requested_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class FhirConnector(ControlBase):
@@ -91,7 +109,8 @@ class FhirConnector(ControlBase):
     base_url: Mapped[str] = mapped_column(String(512), nullable=False)
     token_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     client_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    client_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Encrypted at rest; ciphertext is longer than plaintext (Fernet base64).
+    client_secret: Mapped[str | None] = mapped_column(EncryptedString(1024), nullable=True)
     scopes: Mapped[str | None] = mapped_column(String(512), nullable=True)
     since: Mapped[str | None] = mapped_column(String(64), nullable=True)
     config_metadata: Mapped[Dict[str, str]] = mapped_column(JSON, default=dict)

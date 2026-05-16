@@ -125,6 +125,17 @@ if (-not $SecretKey) {
     az keyvault secret set --vault-name $KeyVaultName --name "platform-secret-key" --value $SecretKey --output none | Out-Null
 }
 
+# Generate (or reuse) FIELD_ENCRYPTION_KEY (Fernet: 32 random bytes, url-safe base64).
+$FieldKey = Invoke-AzQuiet { az keyvault secret show --vault-name $KeyVaultName --name "platform-field-encryption-key" --query value -o tsv }
+if (-not $FieldKey) {
+    Write-Host "Generating FIELD_ENCRYPTION_KEY..."
+    $fkBytes = New-Object byte[] 32
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($fkBytes)
+    # Fernet requires url-safe base64 (no '+/' chars, '=' padding kept).
+    $FieldKey = ([Convert]::ToBase64String($fkBytes)) -replace '\+', '-' -replace '/', '_'
+    az keyvault secret set --vault-name $KeyVaultName --name "platform-field-encryption-key" --value $FieldKey --output none | Out-Null
+}
+
 # Generate (or reuse) initial admin password.
 $InitialAdminPassword = Invoke-AzQuiet { az keyvault secret show --vault-name $KeyVaultName --name "platform-initial-admin-password" --query value -o tsv }
 if (-not $InitialAdminPassword) {
@@ -230,6 +241,7 @@ if (-not $SkipMigrations) {
     Write-Phase "Phase 3: Migrations and tenant provisioning"
 
     $MigrationJob = "nexora-platform-migrations"
+    $Path2DdlJob = "nexora-platform-path2-ddl"
     $TenantDdlJob = "nexora-platform-tenant-ddl"
     $TenantProvJob = "nexora-platform-tenant-provision"
 
@@ -302,6 +314,21 @@ if (-not $SkipMigrations) {
         -JobCommand "python" `
         -JobArgs @("scripts/apply_control_ddl.py")
 
+    # --- 3a': Path 2 idempotent DDL (column adds + audit triggers) -----------
+    # Runs after the create_all migration so the columns / tables it adds /
+    # widens already exist as base shapes from the model definitions.
+    Invoke-EnsureJob `
+        -JobName $Path2DdlJob `
+        -JobSecrets @(
+            "control-db-url-psycopg=$ControlDsnSync"
+        ) `
+        -EnvVars @(
+            "PYTHONPATH=/app",
+            "CONTROL_DATABASE_URL_PSYCOPG=secretref:control-db-url-psycopg"
+        ) `
+        -JobCommand "python" `
+        -JobArgs @("scripts/apply_path2_ddl.py")
+
     # --- 3b: Tenant DDL (create_tables.sql) ----------------------------------
     Invoke-EnsureJob `
         -JobName $TenantDdlJob `
@@ -363,6 +390,7 @@ if (-not $SkipMigrations) {
     }
 
     Wait-JobCompletion -JobName $MigrationJob
+    Wait-JobCompletion -JobName $Path2DdlJob
     Wait-JobCompletion -JobName $TenantDdlJob
     Wait-JobCompletion -JobName $TenantProvJob
 } else {
@@ -385,6 +413,7 @@ if (-not $SkipBackend) {
     # once we know the Static Web App URL.
     $ContainerSecrets = @(
         "platform-secret-key=$SecretKey",
+        "platform-field-encryption-key=$FieldKey",
         "platform-control-db-url=$ControlDsnAsyncpg",
         "platform-tenant-db-url=$TenantDsnAsyncpg"
     )
@@ -393,12 +422,16 @@ if (-not $SkipBackend) {
         "HIPAA_MODE=true",
         "ALLOW_DUMMY_LOGIN=false",
         "SECRET_KEY=secretref:platform-secret-key",
+        "FIELD_ENCRYPTION_KEY=secretref:platform-field-encryption-key",
         "CONTROL_DATABASE_URL=secretref:platform-control-db-url",
         "DEFAULT_TENANT_DATABASE_URL=secretref:platform-tenant-db-url",
         "CORS_ORIGINS=[]",
         "KEY_VAULT_URL=$KvUrl",
         "WORKBOOK_DATA_DIR=/mnt/workbooks",
-        "AUDIT_LOG_PATH=/tmp/audit.log",
+        # Audit table in Postgres is the canonical store; stdout is shipped to
+        # App Insights. /tmp is ephemeral on ACA and was producing a log that
+        # disappeared on every restart, so file logging is disabled in prod.
+        "AUDIT_LOG_PATH=",
         "CLAUDE_MODEL=claude-sonnet-4-6",
         "APPLICATIONINSIGHTS_CONNECTION_STRING=$ConnStr"
     )
@@ -415,11 +448,47 @@ if (-not $SkipBackend) {
 
     Write-Host "Pushing new image + secrets + env vars..."
     az containerapp secret set -n $AppName -g $ResourceGroup --secrets $ContainerSecrets --output none
+
+    # Health-gated multi-revision deploy: create the new revision in
+    # multiple-revision mode, wait for it to report Healthy, flip traffic to
+    # 100% on the new revision, then deactivate the old one. This avoids the
+    # naive single-revision swap where in-flight requests can drop the moment
+    # the old container tears down.
+    az containerapp revision set-mode -n $AppName -g $ResourceGroup --mode multiple --output none
+
+    $RevisionSuffix = "v" + (Get-Date -Format "yyyyMMddHHmmss")
+    Write-Host "Creating revision '$RevisionSuffix'..."
     az containerapp update `
         -n $AppName -g $ResourceGroup `
         --image $FullImage `
+        --revision-suffix $RevisionSuffix `
         --set-env-vars $ContainerEnvVars `
         --output none
+
+    $NewRevName = "$AppName--$RevisionSuffix"
+    Write-Host "Waiting for revision '$NewRevName' to report Healthy..."
+    $healthy = $false
+    for ($i = 1; $i -le 30; $i++) {
+        Start-Sleep -Seconds 10
+        $state = Invoke-AzQuiet { az containerapp revision show -n $AppName -g $ResourceGroup --revision $NewRevName --query "properties.healthState" -o tsv }
+        Write-Host "  attempt ${i}: healthState=$state"
+        if ($state -eq "Healthy") { $healthy = $true; break }
+    }
+    if (-not $healthy) {
+        Write-Host "::error::Revision '$NewRevName' did not reach Healthy within 5 minutes."
+        Write-Host "Leaving traffic on the previous revision. Inspect logs: az containerapp logs show -n $AppName -g $ResourceGroup --revision $NewRevName --type console --tail 200"
+        throw "deploy aborted: new revision unhealthy"
+    }
+
+    Write-Host "Flipping 100% traffic to '$NewRevName'..."
+    az containerapp ingress traffic set -n $AppName -g $ResourceGroup --revision-weight "$NewRevName=100" --output none
+
+    # Best-effort deactivate previous active revisions to release replicas.
+    $PrevRevs = Invoke-AzQuiet { az containerapp revision list -n $AppName -g $ResourceGroup --query "[?properties.active && name != '$NewRevName'].name" -o tsv }
+    foreach ($r in ($PrevRevs -split "`n" | Where-Object { $_ })) {
+        Write-Host "Deactivating previous revision: $r"
+        az containerapp revision deactivate -n $AppName -g $ResourceGroup --revision $r --output none 2>$null
+    }
 
     # Backend listens on 8000 (gunicorn -b 0.0.0.0:8000). nexora-chat used the
     # same port, so ingress.targetPort doesn't need changing -- but make sure.

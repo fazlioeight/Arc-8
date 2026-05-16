@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+import logging
+import secrets as _secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
@@ -13,10 +15,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
+from ..core.redis import get_redis_client
 from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
 from ..dependencies.tenant import get_tenant_context
 from ..models.tables import User
+
+_revocation_logger = logging.getLogger(__name__)
+_REVOCATION_KEY_PREFIX = "nexora:jwt:revoked:"
 
 
 async def hash_password(password: str) -> str:
@@ -84,7 +90,8 @@ def filter_application_permissions(app_permissions: Dict[str, str] | None, tenan
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.JWT_EXPIRES_MINUTES))
-    to_encode.update({"exp": expire})
+    to_encode.setdefault("jti", _secrets.token_urlsafe(16))
+    to_encode["exp"] = expire
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
@@ -96,6 +103,37 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired") from exc
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
+
+
+async def revoke_jti(jti: str, ttl_seconds: int) -> bool:
+    """Add a JWT jti to the revocation blacklist. Returns True if persisted."""
+    if not jti or ttl_seconds <= 0:
+        return False
+    redis = get_redis_client()
+    if not redis:
+        _revocation_logger.warning("revoke_jti: Redis not configured; jti %s not blacklisted", jti)
+        return False
+    try:
+        await redis.set(f"{_REVOCATION_KEY_PREFIX}{jti}", "1", ex=ttl_seconds)
+        return True
+    except Exception:
+        _revocation_logger.exception("revoke_jti: Redis set failed for jti %s", jti)
+        return False
+
+
+async def is_jti_revoked(jti: Optional[str]) -> bool:
+    """Check the revocation blacklist. Fails open (returns False) if Redis is down."""
+    if not jti:
+        return False
+    redis = get_redis_client()
+    if not redis:
+        return False
+    try:
+        value = await redis.get(f"{_REVOCATION_KEY_PREFIX}{jti}")
+        return bool(value)
+    except Exception:
+        _revocation_logger.exception("is_jti_revoked: Redis get failed for jti %s", jti)
+        return False
 
 
 async def get_current_user(
@@ -110,10 +148,13 @@ async def get_current_user(
     user_id = payload.get("uid")
     role = payload.get("role") or "user"
     scopes = payload.get("scp", [])
+    jti = payload.get("jti")
     if not sub or tenant_key is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
     if tenant_key != tenant.key:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant mismatch")
+    if await is_jti_revoked(jti):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
 
     if not user_id:
         stmt = select(User).where(User.email == sub, User.tenant_id == tenant.id)

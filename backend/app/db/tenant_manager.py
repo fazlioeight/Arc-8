@@ -88,12 +88,11 @@ class TenantConnectionManager:
             if cached:
                 return cached
 
-            engine = create_async_engine(
-                tenant.db_connection_uri,
-                future=True,
-                echo=False,
-                pool_pre_ping=True,
-            )
+            engine_kwargs = {"future": True, "echo": False, "pool_pre_ping": True}
+            # Tenant pools are smaller than control: many tenants share the host.
+            if not tenant.db_connection_uri.startswith("sqlite"):
+                engine_kwargs.update(pool_size=5, max_overflow=10, pool_recycle=3600)
+            engine = create_async_engine(tenant.db_connection_uri, **engine_kwargs)
             factory = async_sessionmaker(
                 engine,
                 expire_on_commit=False,

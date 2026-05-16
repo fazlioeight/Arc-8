@@ -35,10 +35,13 @@ from app.models.coding import (
 )
 from app.models.ride_booking import RidePartner, RidePartnerSchedule
 
+from cryptography.fernet import Fernet as _Fernet
+
 TEST_CONTROL_DB = "sqlite+aiosqlite:///./tests/test_control.db"
 TEST_TENANT_DB_TEMPLATE = "sqlite+aiosqlite:///./tests/tenants/{tenant_key}.db"
 TEST_SECRET = "super-secret-for-tests"
 TEST_TENANT_KEY = "prominencehealth"
+TEST_FIELD_KEY = _Fernet.generate_key().decode("utf-8")
 
 
 os.environ["ENVIRONMENT"] = "test"
@@ -46,12 +49,14 @@ os.environ["SECRET_KEY"] = TEST_SECRET
 os.environ["CONTROL_DATABASE_URL"] = TEST_CONTROL_DB
 os.environ["DEFAULT_TENANT_DATABASE_URL"] = TEST_TENANT_DB_TEMPLATE
 os.environ["ALLOW_DUMMY_LOGIN"] = "false"
+os.environ["FIELD_ENCRYPTION_KEY"] = TEST_FIELD_KEY
 
 
 config_module.settings.CONTROL_DATABASE_URL = TEST_CONTROL_DB
 config_module.settings.DEFAULT_TENANT_DATABASE_URL = TEST_TENANT_DB_TEMPLATE
 config_module.settings.SECRET_KEY = TEST_SECRET
 config_module.settings.ALLOW_DUMMY_LOGIN = False
+config_module.settings.FIELD_ENCRYPTION_KEY = TEST_FIELD_KEY
 
 def _tests_dir() -> Path:
     return Path(BACKEND_ROOT) / "tests"
@@ -67,11 +72,13 @@ async def _bootstrap_async():
     os.environ["CONTROL_DATABASE_URL"] = TEST_CONTROL_DB
     os.environ["DEFAULT_TENANT_DATABASE_URL"] = TEST_TENANT_DB_TEMPLATE
     os.environ["ALLOW_DUMMY_LOGIN"] = "false"
+    os.environ["FIELD_ENCRYPTION_KEY"] = TEST_FIELD_KEY
 
     config_module.settings.CONTROL_DATABASE_URL = TEST_CONTROL_DB
     config_module.settings.DEFAULT_TENANT_DATABASE_URL = TEST_TENANT_DB_TEMPLATE
     config_module.settings.SECRET_KEY = TEST_SECRET
     config_module.settings.ALLOW_DUMMY_LOGIN = False
+    config_module.settings.FIELD_ENCRYPTION_KEY = TEST_FIELD_KEY
 
     Path("tests").mkdir(parents=True, exist_ok=True)
     Path("tests/tenants").mkdir(parents=True, exist_ok=True)

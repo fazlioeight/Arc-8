@@ -231,8 +231,21 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(() => {
+    const token = authState?.token;
+    const tenant = authState?.tenant;
+    if (token) {
+      const apiBase = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+      // Best-effort revocation; ignore failures so logout is never blocked.
+      fetch(`${apiBase}/api/logout`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(tenant ? { 'X-Tenant-Key': tenant } : {}),
+        },
+      }).catch(() => {});
+    }
     setAuthState(null);
-  }, []);
+  }, [authState]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;

@@ -36,10 +36,18 @@ class Settings(BaseSettings):
     LOGIN_LOCKOUT_MAX_ATTEMPTS: int = 5
     LOGIN_LOCKOUT_WINDOW_SECONDS: int = 15 * 60
 
+    REQUIRE_ADMIN_MFA: bool = True
+    MFA_ISSUER: str = "Nexora Lab"
+
+    FIELD_ENCRYPTION_KEY: Optional[str] = None
+
     ALLOWED_TENANT_HOSTS: Dict[str, str] = {}
     CANONICAL_HOST_DOMAIN: Optional[str] = None
 
     AUDIT_LOG_PATH: str = "logs/audit.log"
+    # HIPAA §164.316(b)(2): documentation must be retained 6 years from the
+    # date of creation or last effective use. We treat audit events the same.
+    AUDIT_LOG_RETENTION_DAYS: int = 365 * 6
     LOG_LEVEL: str = "INFO"
     METRICS_NAMESPACE: str = "nexora"
 
@@ -127,6 +135,25 @@ class Settings(BaseSettings):
         env = (info.data.get("ENVIRONMENT") if info and info.data else "development").lower()
         if v and env == "production":
             raise ValueError("ALLOW_DUMMY_LOGIN must be False in production")
+        return v
+
+    @field_validator("FIELD_ENCRYPTION_KEY", mode="after")
+    @classmethod
+    def validate_field_encryption_key(cls, v: Optional[str], info: ValidationInfo) -> Optional[str]:
+        env = (info.data.get("ENVIRONMENT") if info and info.data else "development").lower()
+        if not v:
+            if env == "production":
+                raise ValueError(
+                    "FIELD_ENCRYPTION_KEY must be provided in production (comma-separated Fernet keys; writers use the first)"
+                )
+            return None
+        # Validate each comma-separated entry is a parseable Fernet key.
+        from cryptography.fernet import Fernet
+        for entry in (k.strip() for k in v.split(",") if k.strip()):
+            try:
+                Fernet(entry.encode("utf-8"))
+            except Exception as exc:
+                raise ValueError(f"FIELD_ENCRYPTION_KEY entry is not a valid Fernet key: {exc}") from exc
         return v
 
 
