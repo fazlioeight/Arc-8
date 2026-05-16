@@ -785,3 +785,147 @@ export const fetchMember360AllRiskInsights = async (token, tenant) => {
   });
   return rows;
 };
+
+// ------------------- Coding-flavoured gap & submission helpers -------------------
+// These mirror the legacy coding service surface but read entirely from the
+// Member360 data model: care gaps and high-scoring risk insights stand in for
+// "missing HCCs", and claims drive the submission export rows.
+
+const RISK_DOMAIN_HCC_PREFIX = {
+  Clinical: 'CLN',
+  Utilization: 'UTL',
+  Cost: 'COST',
+  Engagement: 'ENG',
+};
+
+const buildSampleGapAnalysis = (store, memberId, submissionYear) => {
+  const member = store.members.find((m) => m.id === Number(memberId));
+  if (!member) {
+    throw new Error('Member not found');
+  }
+  const insights = store.riskInsights[member.id] || [];
+  const submission_year = submissionYear || new Date().getFullYear();
+
+  // Surface high-impact risk insights as missing HCCs.
+  const fromInsights = insights
+    .filter((i) => Number(i.score || 0) >= 6)
+    .map((insight, idx) => {
+      const prefix = RISK_DOMAIN_HCC_PREFIX[insight.domain] || 'GEN';
+      return {
+        hcc_code: `M360-${prefix}-${String(idx + 1).padStart(2, '0')}`,
+        icd10_candidates: [],
+        reason: insight.driver,
+        recommendation: insight.recommendation,
+        domain: insight.domain,
+        score: insight.score,
+        confidence: insight.confidence,
+      };
+    });
+
+  // Pad with synthetic care-gap rows so the count matches `open_care_gaps`.
+  const desired = Math.max(member.open_care_gaps || 0, fromInsights.length);
+  const missing_hcc = [...fromInsights];
+  while (missing_hcc.length < desired) {
+    const idx = missing_hcc.length;
+    missing_hcc.push({
+      hcc_code: `M360-GAP-${String(idx + 1).padStart(2, '0')}`,
+      icd10_candidates: [],
+      reason: `Open care gap ${idx + 1}`,
+      recommendation: member.next_best_action || 'Review and close gap',
+    });
+  }
+
+  return {
+    member: {
+      id: member.id,
+      member_key: member.member_key,
+      risk_score: member.risk_score_composite,
+      risk_tier: member.risk_tier,
+    },
+    mao_records: [],
+    missing_hcc,
+    stale_records: [],
+    immediate_actions: missing_hcc.length > 0 ? ['close_open_gaps'] : [],
+    submission_year,
+    __sample: true,
+  };
+};
+
+export const fetchMember360GapAnalysis = async (token, tenant, memberId, submissionYear) => {
+  if (shouldUseSample(token)) {
+    return buildSampleGapAnalysis(getSampleStore(tenant), memberId, submissionYear);
+  }
+  const query = toQuery({ submission_year: submissionYear || new Date().getFullYear() });
+  const res = await fetch(`${API_BASE}/api/member360/members/${memberId}/gaps${query}`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+const buildSampleSubmissionExport = (store, submissionYear, memberIds) => {
+  const submission_year = submissionYear || new Date().getFullYear();
+  const idSet = memberIds && memberIds.length ? new Set(memberIds.map(Number)) : null;
+  const targets = idSet
+    ? store.members.filter((m) => idSet.has(m.id))
+    : store.members;
+
+  const rows = [];
+  targets.forEach((member) => {
+    const claims = store.claims[member.id] || [];
+    const insights = store.riskInsights[member.id] || [];
+    const primaryClaim = claims[0];
+    const serviceDate = primaryClaim?.service_date || today();
+
+    const qualifying = insights.filter((i) => Number(i.score || 0) >= 6);
+    qualifying.forEach((insight, idx) => {
+      const prefix = RISK_DOMAIN_HCC_PREFIX[insight.domain] || 'GEN';
+      rows.push([
+        member.id,
+        member.member_key,
+        submission_year,
+        `M360-${prefix}-${String(idx + 1).padStart(2, '0')}`,
+        '',
+        serviceDate,
+        serviceDate,
+        'member360',
+      ]);
+    });
+
+    if (qualifying.length === 0 && (member.open_care_gaps || 0) > 0) {
+      rows.push([
+        member.id,
+        member.member_key,
+        submission_year,
+        'M360-GAP-01',
+        '',
+        serviceDate,
+        serviceDate,
+        'member360',
+      ]);
+    }
+  });
+
+  const header = ['MemberID', 'MemberKey', 'SubmissionYear', 'HCCCode', 'ICD10', 'ServiceFrom', 'ServiceTo', 'Source'];
+  const csv = [header.join(','), ...rows.map((row) => row.join(','))].join('\n');
+  return {
+    batch_id: Date.now(),
+    submission_year,
+    record_count: rows.length,
+    csv,
+    __sample: true,
+  };
+};
+
+export const generateMember360SubmissionExport = async (token, tenant, submissionYear, memberIds) => {
+  if (shouldUseSample(token)) {
+    return buildSampleSubmissionExport(getSampleStore(tenant), submissionYear, memberIds);
+  }
+  const res = await fetch(`${API_BASE}/api/member360/submissions/export`, {
+    method: 'POST',
+    headers: buildHeaders(token, tenant),
+    body: JSON.stringify({ submission_year: submissionYear, member_ids: memberIds }),
+  });
+  return handleResponse(res);
+};

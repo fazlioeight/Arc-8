@@ -10,7 +10,9 @@ import {
   createMember360Message,
   createMember360Note,
   createMember360Task,
+  fetchMember360GapAnalysis,
   fetchMember360MemberDetail,
+  generateMember360SubmissionExport,
   updateMember360Task,
 } from '../../../services/member360LabService';
 import {
@@ -29,15 +31,31 @@ import {
   TalkdeskEmbedPlaceholder,
   TaskStatusBadge,
 } from './components';
+import ProblemsHCCPage from '../coding/member/pages/ProblemsHCCPage';
+import MedicationsPage from '../coding/member/pages/MedicationsPage';
+import LabsImagingPage from '../coding/member/pages/LabsImagingPage';
+import CareGapsPage from '../coding/member/pages/CareGapsPage';
+import DocumentsPage from '../coding/member/pages/DocumentsPage';
+import AuditLogPage from '../coding/member/pages/AuditLogPage';
+import SharingPage from '../coding/member/pages/SharingPage';
+import SettingsPage from '../coding/member/pages/SettingsPage';
 
 const TABS = [
   { key: 'timeline', label: 'Timeline' },
   { key: 'notes', label: 'Notes' },
   { key: 'messages', label: 'Messages' },
   { key: 'care_journey', label: 'Care Journey' },
+  { key: 'problems_hcc', label: 'Problems / HCC' },
+  { key: 'medications', label: 'Medications' },
+  { key: 'labs_imaging', label: 'Labs & Imaging' },
+  { key: 'care_gaps', label: 'Care Gaps' },
   { key: 'claims', label: 'Claims' },
   { key: 'accumulators', label: 'Accumulators' },
+  { key: 'documents', label: 'Documents' },
   { key: 'portal', label: 'Portal Preview' },
+  { key: 'audit_log', label: 'Audit Log' },
+  { key: 'sharing', label: 'Sharing' },
+  { key: 'settings', label: 'Settings' },
 ];
 
 const PRIMARY_ACTIONS = [
@@ -56,11 +74,14 @@ const Member360LabWorkspace = () => {
   const navigate = useNavigate();
   const { token, tenant } = useContext(AuthContext) || {};
   const [detail, setDetail] = useState(null);
+  const [gap, setGap] = useState(null);
   const [tab, setTab] = useState('timeline');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionDialog, setActionDialog] = useState(null);
   const [actionMessage, setActionMessage] = useState(null);
+  const [submissionState, setSubmissionState] = useState('idle');
+  const [submissionResult, setSubmissionResult] = useState(null);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -72,7 +93,50 @@ const Member360LabWorkspace = () => {
 
   useEffect(() => { reload(); }, [reload]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!token || !tenant || !memberId) return undefined;
+    fetchMember360GapAnalysis(token, tenant, Number(memberId))
+      .then((res) => { if (!cancelled) setGap(res); })
+      .catch(() => { if (!cancelled) setGap(null); });
+    return () => { cancelled = true; };
+  }, [token, tenant, memberId]);
+
   const member = detail?.member;
+  const missingHccCount = (gap?.missing_hcc || []).length;
+
+  const pcpHref = useMemo(() => {
+    if (!member?.primary_care_provider) return null;
+    const key = encodeURIComponent(String(member.primary_care_provider).trim());
+    const params = new URLSearchParams();
+    if (member.id != null) params.set('fromMemberId', String(member.id));
+    params.set('providerName', member.primary_care_provider);
+    return `/coding/providers/${key}?${params.toString()}`;
+  }, [member]);
+
+  const pcpState = useMemo(() => {
+    if (!member?.primary_care_provider) return undefined;
+    return {
+      fromMemberId: member.id,
+      providerName: member.primary_care_provider,
+      breadcrumb: member.primary_care_provider,
+    };
+  }, [member]);
+
+  const onSubmitToPayer = useCallback(async () => {
+    if (!token || !tenant || !memberId) return;
+    setSubmissionState('working');
+    setActionMessage(null);
+    try {
+      const year = new Date().getFullYear();
+      const response = await generateMember360SubmissionExport(token, tenant, year, [Number(memberId)]);
+      setSubmissionResult(response);
+      setSubmissionState('done');
+    } catch (err) {
+      setSubmissionState('error');
+      setActionMessage(`Submission preview failed: ${err.message || err}`);
+    }
+  }, [token, tenant, memberId]);
 
   const handleAction = useCallback((key, payload = {}) => {
     setActionMessage(null);
@@ -295,6 +359,22 @@ const Member360LabWorkspace = () => {
       }
       case 'portal':
         return <PortalPreview detail={detail} />;
+      case 'problems_hcc':
+        return <ProblemsHCCPage />;
+      case 'medications':
+        return <MedicationsPage />;
+      case 'labs_imaging':
+        return <LabsImagingPage />;
+      case 'care_gaps':
+        return <CareGapsPage />;
+      case 'documents':
+        return <DocumentsPage />;
+      case 'audit_log':
+        return <AuditLogPage />;
+      case 'sharing':
+        return <SharingPage />;
+      case 'settings':
+        return <SettingsPage />;
       default:
         return null;
     }
@@ -327,7 +407,12 @@ const Member360LabWorkspace = () => {
       maxWidthClassName="max-w-[1500px]"
       mainClassName="space-y-4"
       actions={
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {gap && (
+            <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 ring-1 ring-amber-200 px-2.5 py-0.5 text-xs font-semibold dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-700/40">
+              GAPS: {missingHccCount}
+            </span>
+          )}
           <button type="button" onClick={() => navigate(ROUTES.MEMBER360_LAB.MEMBERS)} className="rounded-md ring-1 ring-black/10 dark:ring-white/10 coding-surface coding-text-strong px-3 py-1.5 text-xs font-semibold hover:opacity-80">← Members</button>
           <button type="button" onClick={() => navigate(ROUTES.MEMBER360_LAB.DASHBOARD)} className="rounded-md ring-1 ring-black/10 dark:ring-white/10 coding-surface coding-text-strong px-3 py-1.5 text-xs font-semibold hover:opacity-80">Dashboard</button>
         </div>
@@ -346,7 +431,31 @@ const Member360LabWorkspace = () => {
             member={member}
             onAction={(key) => handleAction(key)}
             actions={PRIMARY_ACTIONS}
+            pcpHref={pcpHref}
+            pcpState={pcpState}
           />
+
+          <SectionCard
+            title="Coding actions"
+            subtitle="Preview a payer submission for this member."
+          >
+            <button
+              type="button"
+              onClick={onSubmitToPayer}
+              disabled={submissionState === 'working'}
+              className="w-full rounded-md bg-[var(--brand-primary)] text-white px-3 py-2 text-xs font-semibold shadow-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submissionState === 'working' ? 'Generating export...' : 'Submit to Payer (Preview)'}
+            </button>
+            {submissionResult?.batch_id && (
+              <p className="mt-2 text-[11px] coding-text-muted">
+                Last batch {submissionResult.batch_id}
+                {submissionResult.record_count != null
+                  ? ` · ${submissionResult.record_count} record${submissionResult.record_count === 1 ? '' : 's'}`
+                  : ''}
+              </p>
+            )}
+          </SectionCard>
         </div>
 
         {/* Center panel */}

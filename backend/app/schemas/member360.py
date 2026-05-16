@@ -316,3 +316,44 @@ class DashboardResponse(BaseModel):
     top_risk_drivers: list[DashboardRiskDriver] = Field(default_factory=list)
     recent_activity: list[DashboardRecentActivity] = Field(default_factory=list)
     upcoming_actions: list[DashboardUpcomingAction] = Field(default_factory=list)
+
+
+# ---- Gap analysis & submission export ------------------------------------
+
+
+class GapMember(BaseModel):
+    id: int
+    member_key: str
+    risk_score: Optional[float] = None
+    risk_tier: Optional[str] = None
+
+
+class MissingHcc(BaseModel):
+    hcc_code: str
+    icd10_candidates: list[str] = Field(default_factory=list)
+    reason: Optional[str] = None
+    recommendation: Optional[str] = None
+    domain: Optional[str] = None
+    score: Optional[float] = None
+    confidence: Optional[float] = None
+
+
+class GapAnalysisResponse(BaseModel):
+    member: GapMember
+    mao_records: list[dict[str, Any]] = Field(default_factory=list)
+    missing_hcc: list[MissingHcc] = Field(default_factory=list)
+    stale_records: list[dict[str, Any]] = Field(default_factory=list)
+    immediate_actions: list[str] = Field(default_factory=list)
+    submission_year: int
+
+
+class SubmissionExportRequest(BaseModel):
+    submission_year: Optional[int] = None
+    member_ids: Optional[list[int]] = None
+
+
+class SubmissionExportResponse(BaseModel):
+    batch_id: int
+    submission_year: int
+    record_count: int
+    csv: str

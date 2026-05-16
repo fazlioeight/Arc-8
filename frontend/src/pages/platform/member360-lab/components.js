@@ -127,9 +127,10 @@ export function SectionCard({ title, subtitle, action, children, className = '' 
   );
 }
 
-export function MemberSummaryCard({ member, onAction, actions = [] }) {
+export function MemberSummaryCard({ member, onAction, actions = [], pcpHref, pcpState }) {
   if (!member) return null;
   const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ');
+  const pcpValue = member.primary_care_provider;
   return (
     <div className="coding-surface rounded-2xl p-5 shadow-sm space-y-4">
       <div className="flex items-start justify-between gap-3">
@@ -146,7 +147,22 @@ export function MemberSummaryCard({ member, onAction, actions = [] }) {
         <KV label="LOB" value={member.line_of_business} />
         <KV label="Phone" value={member.phone} />
         <KV label="Email" value={member.email} className="truncate" />
-        <KV label="PCP" value={member.primary_care_provider} />
+        {pcpHref && pcpValue ? (
+          <div className="flex flex-col">
+            <dt className="text-[10px] uppercase tracking-wider coding-text-muted">PCP</dt>
+            <dd className="coding-text-strong">
+              <Link
+                to={pcpHref}
+                state={pcpState}
+                className="underline decoration-sky-400/70 underline-offset-4 hover:decoration-sky-300"
+              >
+                {pcpValue}
+              </Link>
+            </dd>
+          </div>
+        ) : (
+          <KV label="PCP" value={pcpValue} />
+        )}
         <KV label="Channel" value={member.preferred_channel} />
         <KV label="Language" value={member.preferred_language} />
         <KV label="City" value={member.address_city ? `${member.address_city}, ${member.address_state || ''}` : null} />

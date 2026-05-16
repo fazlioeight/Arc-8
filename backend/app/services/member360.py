@@ -1267,3 +1267,171 @@ async def list_care_journey_templates(session: AsyncSession) -> list[dict]:
         }
         for t in rows.scalars().all()
     ]
+
+
+# ---------------------- Gap analysis & submission export -------------------
+# These mirror the legacy coding service surface but read from Member360
+# tables: risk insights with score ≥ 6 stand in for "missing HCCs", padded
+# with synthetic care-gap rows so the count matches ``open_care_gaps``.
+
+_RISK_DOMAIN_PREFIX = {
+    "Clinical": "CLN",
+    "Utilization": "UTL",
+    "Cost": "COST",
+    "Engagement": "ENG",
+}
+_GAP_SCORE_THRESHOLD = 6.0
+
+
+def _qualifying_insights(insights: Iterable[Member360RiskInsight]) -> list[Member360RiskInsight]:
+    return [i for i in insights if (i.score or 0) >= _GAP_SCORE_THRESHOLD]
+
+
+def _missing_hcc_for_member(
+    member: Member360Member,
+    insights: Iterable[Member360RiskInsight],
+) -> list[dict]:
+    qualifying = _qualifying_insights(insights)
+    items: list[dict] = []
+    for idx, insight in enumerate(qualifying):
+        prefix = _RISK_DOMAIN_PREFIX.get(insight.domain, "GEN")
+        items.append(
+            {
+                "hcc_code": f"M360-{prefix}-{idx + 1:02d}",
+                "icd10_candidates": [],
+                "reason": insight.driver,
+                "recommendation": insight.recommendation,
+                "domain": insight.domain,
+                "score": float(insight.score) if insight.score is not None else None,
+                "confidence": float(insight.confidence) if insight.confidence is not None else None,
+            }
+        )
+    desired = max(member.open_care_gaps or 0, len(items))
+    while len(items) < desired:
+        idx = len(items)
+        items.append(
+            {
+                "hcc_code": f"M360-GAP-{idx + 1:02d}",
+                "icd10_candidates": [],
+                "reason": f"Open care gap {idx + 1}",
+                "recommendation": member.next_best_action or "Review and close gap",
+                "domain": None,
+                "score": None,
+                "confidence": None,
+            }
+        )
+    return items
+
+
+async def build_gap_analysis(
+    session: AsyncSession,
+    member_id: int,
+    submission_year: Optional[int] = None,
+) -> Optional[dict]:
+    member = await session.scalar(
+        select(Member360Member)
+        .where(Member360Member.id == member_id)
+        .options(selectinload(Member360Member.risk_insights))
+    )
+    if not member:
+        return None
+    year = submission_year or date.today().year
+    missing_hcc = _missing_hcc_for_member(member, member.risk_insights)
+    return {
+        "member": {
+            "id": member.id,
+            "member_key": member.member_key,
+            "risk_score": float(member.risk_score_composite) if member.risk_score_composite is not None else None,
+            "risk_tier": member.risk_tier,
+        },
+        "mao_records": [],
+        "missing_hcc": missing_hcc,
+        "stale_records": [],
+        "immediate_actions": ["close_open_gaps"] if missing_hcc else [],
+        "submission_year": year,
+    }
+
+
+async def generate_submission_export(
+    session: AsyncSession,
+    *,
+    submission_year: Optional[int] = None,
+    member_ids: Optional[list[int]] = None,
+) -> dict:
+    year = submission_year or date.today().year
+    stmt = (
+        select(Member360Member)
+        .options(
+            selectinload(Member360Member.risk_insights),
+            selectinload(Member360Member.claims),
+        )
+        .order_by(Member360Member.id.asc())
+    )
+    if member_ids:
+        stmt = stmt.where(Member360Member.id.in_(member_ids))
+    members = (await session.execute(stmt)).scalars().all()
+
+    today_iso = date.today().isoformat()
+    rows: list[list] = []
+    for member in members:
+        sorted_claims = sorted(
+            member.claims or [],
+            key=lambda c: c.service_date or date.min,
+            reverse=True,
+        )
+        primary = sorted_claims[0] if sorted_claims else None
+        service_date = (
+            primary.service_date.isoformat()
+            if primary and primary.service_date
+            else today_iso
+        )
+        qualifying = _qualifying_insights(member.risk_insights)
+        if qualifying:
+            for idx, insight in enumerate(qualifying):
+                prefix = _RISK_DOMAIN_PREFIX.get(insight.domain, "GEN")
+                rows.append(
+                    [
+                        member.id,
+                        member.member_key,
+                        year,
+                        f"M360-{prefix}-{idx + 1:02d}",
+                        "",
+                        service_date,
+                        service_date,
+                        "member360",
+                    ]
+                )
+        elif (member.open_care_gaps or 0) > 0:
+            rows.append(
+                [
+                    member.id,
+                    member.member_key,
+                    year,
+                    "M360-GAP-01",
+                    "",
+                    service_date,
+                    service_date,
+                    "member360",
+                ]
+            )
+
+    header = [
+        "MemberID",
+        "MemberKey",
+        "SubmissionYear",
+        "HCCCode",
+        "ICD10",
+        "ServiceFrom",
+        "ServiceTo",
+        "Source",
+    ]
+    csv_lines = [",".join(header)]
+    csv_lines.extend(",".join(str(cell) for cell in row) for row in rows)
+    csv_content = "\n".join(csv_lines)
+
+    return {
+        "batch_id": int(datetime.utcnow().timestamp() * 1000),
+        "submission_year": year,
+        "record_count": len(rows),
+        "csv": csv_content,
+    }

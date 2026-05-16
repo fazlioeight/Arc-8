@@ -24,12 +24,15 @@ from ..schemas.member360 import (
     CareOptionCreate,
     CareJourneyTemplate,
     DashboardResponse,
+    GapAnalysisResponse,
     MemberDetailResponse,
     MemberListResponse,
     Message,
     MessageCreate,
     Note,
     NoteCreate,
+    SubmissionExportRequest,
+    SubmissionExportResponse,
     Task,
     TaskCreate,
     TaskUpdate,
@@ -268,3 +271,62 @@ async def list_templates(
 ):
     await _ensure(session)
     return await member360_service.list_care_journey_templates(session)
+
+
+@router.get("/members/{member_id}/gaps", response_model=GapAnalysisResponse)
+async def get_member_gap_analysis(
+    member_id: int,
+    submission_year: Optional[int] = Query(default=None, ge=2000, le=2100),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    result = await member360_service.build_gap_analysis(session, member_id, submission_year)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.gaps.view",
+        payload={
+            "member_id": member_id,
+            "submission_year": result["submission_year"],
+            "missing_hcc_count": len(result["missing_hcc"]),
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return result
+
+
+@router.post("/submissions/export", response_model=SubmissionExportResponse)
+async def export_submission(
+    payload: SubmissionExportRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    result = await member360_service.generate_submission_export(
+        session,
+        submission_year=payload.submission_year,
+        member_ids=payload.member_ids,
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.submission.export",
+        payload={
+            "submission_year": result["submission_year"],
+            "record_count": result["record_count"],
+            "member_ids": payload.member_ids or [],
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return result
