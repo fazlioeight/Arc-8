@@ -428,6 +428,46 @@ if (-not $SkipBackend) {
     $ErrorActionPreference = $prev
     $global:LASTEXITCODE = 0
 
+    # Configure liveness/readiness/startup probes so ACA can detect a hung
+    # container and route traffic away. /health/live and /health/ready are
+    # implemented in backend/app/main.py.
+    $probesYaml = @'
+- type: Startup
+  httpGet:
+    path: /health/live
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  failureThreshold: 30
+  timeoutSeconds: 3
+- type: Liveness
+  httpGet:
+    path: /health/live
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 3
+  timeoutSeconds: 3
+- type: Readiness
+  httpGet:
+    path: /health/ready
+    port: 8000
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 3
+'@
+    $probesPath = Join-Path $env:TEMP "nexora-aca-probes.yaml"
+    Set-Content -Path $probesPath -Value $probesYaml -Encoding utf8
+    try {
+        az containerapp update -n $AppName -g $ResourceGroup --probes $probesPath --output none
+        Write-Host "Health probes configured (liveness/readiness/startup against /health/*)."
+    } catch {
+        Write-Host "Warning: failed to apply probes. az CLI containerapp extension may need an upgrade (az extension update --name containerapp)."
+    } finally {
+        Remove-Item -Path $probesPath -Force -ErrorAction SilentlyContinue
+    }
+
     Write-Host "Container App updated to platform image."
 } else {
     Write-Host "Phase 4 skipped (-SkipBackend)."

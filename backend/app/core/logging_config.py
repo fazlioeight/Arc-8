@@ -3,6 +3,7 @@ from __future__ import annotations
 import atexit
 import json
 import logging
+import os
 import queue
 from logging.handlers import QueueHandler, QueueListener
 from pathlib import Path
@@ -13,6 +14,31 @@ from .config import settings
 _log_queue: Optional[queue.SimpleQueue] = None
 _listener: Optional[QueueListener] = None
 _formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+_azure_monitor_configured = False
+
+
+def _configure_azure_monitor() -> None:
+    """Wire Python logs + traces to Azure App Insights when a connection string is set."""
+    global _azure_monitor_configured
+    if _azure_monitor_configured:
+        return
+    conn = os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING")
+    if not conn:
+        return
+    try:
+        from azure.monitor.opentelemetry import configure_azure_monitor
+    except ImportError:
+        logging.getLogger(__name__).warning(
+            "APPLICATIONINSIGHTS_CONNECTION_STRING is set but azure-monitor-opentelemetry is not installed; "
+            "telemetry will not be exported"
+        )
+        return
+    configure_azure_monitor(
+        connection_string=conn,
+        logger_name="",
+        disable_offline_storage=False,
+    )
+    _azure_monitor_configured = True
 
 
 def setup_logging() -> None:
@@ -53,6 +79,8 @@ def setup_logging() -> None:
     _listener = QueueListener(_log_queue, *handlers, respect_handler_level=True)
     _listener.start()
     atexit.register(_listener.stop)
+
+    _configure_azure_monitor()
 
 
 def log_context(logger: logging.Logger, message: str, **extra: Any) -> None:

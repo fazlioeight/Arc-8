@@ -234,6 +234,13 @@ export const AuthProvider = ({ children }) => {
     setAuthState(null);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handler = () => setAuthState(null);
+    window.addEventListener('auth:unauthorized', handler);
+    return () => window.removeEventListener('auth:unauthorized', handler);
+  }, []);
+
   const setTenant = useCallback((tenantKey) => {
     if (!tenantKey) return;
     setAuthState((prev) => {

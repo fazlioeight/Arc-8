@@ -33,6 +33,9 @@ class Settings(BaseSettings):
 
     USAGE_DAILY_LIMIT: int = 10000
 
+    LOGIN_LOCKOUT_MAX_ATTEMPTS: int = 5
+    LOGIN_LOCKOUT_WINDOW_SECONDS: int = 15 * 60
+
     ALLOWED_TENANT_HOSTS: Dict[str, str] = {}
     CANONICAL_HOST_DOMAIN: Optional[str] = None
 
@@ -111,8 +114,19 @@ class Settings(BaseSettings):
             if env == "production":
                 raise ValueError("SECRET_KEY must be provided via environment in production")
             return secrets.token_urlsafe(48)
-        if env == "production" and v.startswith("CHANGE_ME"):
-            raise ValueError("SECRET_KEY must be rotated for production")
+        if env == "production":
+            if v.startswith("CHANGE_ME"):
+                raise ValueError("SECRET_KEY must be rotated for production")
+            if len(v.encode("utf-8")) < 32:
+                raise ValueError("SECRET_KEY must be at least 32 bytes in production (RFC 7518 §3.2)")
+        return v
+
+    @field_validator("ALLOW_DUMMY_LOGIN", mode="after")
+    @classmethod
+    def reject_dummy_login_in_prod(cls, v: bool, info: ValidationInfo) -> bool:
+        env = (info.data.get("ENVIRONMENT") if info and info.data else "development").lower()
+        if v and env == "production":
+            raise ValueError("ALLOW_DUMMY_LOGIN must be False in production")
         return v
 
 

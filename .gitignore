@@ -20,5 +20,7 @@ build/
 backend/logs/audit.log
 backend/nexora_control.db
 backend/tenants/*.db
+backend/tests/*.db
+backend/tests/tenants/*.db
 nexora.db
 deploy-output.log

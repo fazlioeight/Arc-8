@@ -273,3 +273,32 @@ async def update_user(
 
     return _serialize_user(user, tenant)
 
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: int,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(require_admin),
+) -> None:
+    user = await session.get(User, user_id)
+    if not user or user.tenant_id != tenant.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot delete your own account")
+    if (user.role or "user") == "platform_admin" and current_user.role != "platform_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Platform admin records can only be deleted by a platform admin",
+        )
+
+    await record_audit_event(
+        session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="user.delete",
+        payload={"user_id": user.id, "email": user.email, "role": user.role},
+    )
+    await session.delete(user)
+    await session.commit()
+

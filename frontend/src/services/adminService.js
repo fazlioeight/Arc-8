@@ -110,6 +110,24 @@ export const updateAdminUser = async ({ token, tenant, userId, payload = {} }) =
   return handleResponse(response);
 };
 
+export const deleteAdminUser = async ({ token, tenant, userId }) => {
+  if (shouldUseSample(token)) {
+    return { id: userId, __sample: true };
+  }
+  const response = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+    method: 'DELETE',
+    headers: buildHeaders(token, tenant),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const error = new Error(data.detail || data.error || 'Request failed');
+    error.status = response.status;
+    error.payload = data;
+    throw error;
+  }
+  return { id: userId };
+};
+
 export const updatePurchasedApplications = async ({ token, tenant, purchased = [] }) => {
   if (shouldUseSample(token)) {
     const coreKeys = SAMPLE_ADMIN_APPLICATIONS.filter((app) => app.core).map((app) => app.key);

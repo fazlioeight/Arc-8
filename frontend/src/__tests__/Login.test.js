@@ -30,5 +30,5 @@ test("renders login form heading", () => {
   const html = renderLoginToString();
   expect(html).toContain("Sign in");
   expect(html).toContain("Workspace");
-  expect(html).toContain("Continue with Microsoft");
+  expect(html).toContain("Sign in with Microsoft");
 });

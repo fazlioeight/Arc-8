@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select, text
@@ -37,6 +37,7 @@ from .routes import utilization as utilization_router
 from .schemas.types import NormalizedEmail
 from .services.azure_auth import exchange_code_for_id_token, resolve_email_from_claims, validate_id_token
 from .utils.audit_logger import record_audit_event
+from .utils.auth_throttle import clear_failures, client_ip, is_locked_out, record_failure
 from .utils.security import (
     AuthenticatedUser,
     create_access_token,
@@ -54,7 +55,11 @@ app = FastAPI(title="Nexora Lab API", version="2.0.0")
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
-app.add_middleware(TenantMiddleware, default_tenant="prominencehealth", require_known_tenant=settings.HIPAA_MODE)
+app.add_middleware(
+    TenantMiddleware,
+    default_tenant=None if settings.is_production else "prominencehealth",
+    require_known_tenant=settings.HIPAA_MODE or settings.is_production,
+)
 
 cors_origins = []
 for origin in settings.CORS_ORIGINS:
@@ -135,11 +140,29 @@ async def health_ready(session: AsyncSession = Depends(get_control_session)):
 @app.post("/api/login")
 async def login(
     credentials: LoginRequest,
+    request: Request,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_control_session),
 ):
     if credentials.tenant and credentials.tenant != tenant.key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant mismatch")
+
+    ip = client_ip(request)
+    user_agent = request.headers.get("user-agent", "")
+
+    if await is_locked_out(tenant.key, ip, credentials.email):
+        await record_audit_event(
+            session,
+            tenant_id=tenant.id,
+            actor=credentials.email,
+            event_type="login.locked_out",
+            payload={"tenant": tenant.key, "ip": ip, "user_agent": user_agent},
+        )
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed attempts. Try again later.",
+        )
 
     if settings.ALLOW_DUMMY_LOGIN and credentials.email == "admin@admin.com" and credentials.password == "admin":
         available_app_keys = tenant_application_keys(tenant)
@@ -168,19 +191,33 @@ async def login(
         .limit(1)
     )
     user = await session.scalar(user_stmt)
-    if not user:
+    password_ok = bool(user) and await verify_password(credentials.password, user.password_hash)
+
+    if not password_ok:
+        await record_failure(tenant.key, ip, credentials.email)
+        await record_audit_event(
+            session,
+            tenant_id=tenant.id,
+            actor=credentials.email,
+            event_type="login.failed",
+            payload={
+                "tenant": tenant.key,
+                "ip": ip,
+                "user_agent": user_agent,
+                "reason": "no_such_user" if not user else "bad_password",
+            },
+        )
+        await session.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-    if not await verify_password(credentials.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-
+    await clear_failures(tenant.key, ip, credentials.email)
     user.last_login_at = datetime.now(timezone.utc)
     await record_audit_event(
         session,
         tenant_id=tenant.id,
         actor=credentials.email,
         event_type="login.success",
-        payload={"tenant": tenant.key},
+        payload={"tenant": tenant.key, "ip": ip, "user_agent": user_agent},
     )
     await session.commit()
 
@@ -201,11 +238,15 @@ async def azure_auth_config():
 @app.post("/api/auth/azure/exchange")
 async def azure_auth_exchange(
     payload: AzureAuthCodeRequest,
+    request: Request,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_control_session),
 ):
     if payload.tenant and payload.tenant != tenant.key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant mismatch")
+
+    ip = client_ip(request)
+    user_agent = request.headers.get("user-agent", "")
 
     id_token = await exchange_code_for_id_token(
         code=payload.code,
@@ -231,6 +272,14 @@ async def azure_auth_exchange(
     )
     user = await session.scalar(user_stmt)
     if not user:
+        await record_audit_event(
+            session,
+            tenant_id=tenant.id,
+            actor=email,
+            event_type="login.azure.failed",
+            payload={"tenant": tenant.key, "ip": ip, "user_agent": user_agent, "reason": "not_provisioned"},
+        )
+        await session.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Azure user is not provisioned for this tenant",
@@ -242,7 +291,7 @@ async def azure_auth_exchange(
         tenant_id=tenant.id,
         actor=email,
         event_type="login.azure.success",
-        payload={"tenant": tenant.key, "azure_oid": claims.get("oid", "")},
+        payload={"tenant": tenant.key, "azure_oid": claims.get("oid", ""), "ip": ip, "user_agent": user_agent},
     )
     await session.commit()
 
