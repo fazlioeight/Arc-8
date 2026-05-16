@@ -34,6 +34,14 @@ param(
     [switch]$SkipFrontend,
     [switch]$SkipMigrations,
 
+    # In CI we never want to silently regenerate an existing secret -- a missing
+    # SECRET_KEY or FIELD_ENCRYPTION_KEY would invalidate every JWT / encrypted
+    # column with no operator awareness. Pass -StrictSecrets to make the script
+    # FAIL if any expected Key Vault secret is missing; the interactive
+    # bootstrap path (operator running locally) omits it so the secrets can be
+    # generated on first deploy.
+    [switch]$StrictSecrets,
+
     [switch]$FollowLogs
 )
 
@@ -118,6 +126,9 @@ if (-not $PgAdminPassword) {
 # Generate (or reuse) SECRET_KEY.
 $SecretKey = Invoke-AzQuiet { az keyvault secret show --vault-name $KeyVaultName --name "platform-secret-key" --query value -o tsv }
 if (-not $SecretKey) {
+    if ($StrictSecrets) {
+        throw "Key Vault secret 'platform-secret-key' is missing. -StrictSecrets is on; refusing to regenerate (would invalidate every existing JWT). Bootstrap the secret manually before re-running."
+    }
     Write-Host "Generating platform SECRET_KEY..."
     $bytes = New-Object byte[] 48
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
@@ -128,6 +139,9 @@ if (-not $SecretKey) {
 # Generate (or reuse) FIELD_ENCRYPTION_KEY (Fernet: 32 random bytes, url-safe base64).
 $FieldKey = Invoke-AzQuiet { az keyvault secret show --vault-name $KeyVaultName --name "platform-field-encryption-key" --query value -o tsv }
 if (-not $FieldKey) {
+    if ($StrictSecrets) {
+        throw "Key Vault secret 'platform-field-encryption-key' is missing. -StrictSecrets is on; refusing to regenerate (would render every EncryptedString column undecryptable). Bootstrap the secret manually before re-running."
+    }
     Write-Host "Generating FIELD_ENCRYPTION_KEY..."
     $fkBytes = New-Object byte[] 32
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($fkBytes)
@@ -139,6 +153,9 @@ if (-not $FieldKey) {
 # Generate (or reuse) initial admin password.
 $InitialAdminPassword = Invoke-AzQuiet { az keyvault secret show --vault-name $KeyVaultName --name "platform-initial-admin-password" --query value -o tsv }
 if (-not $InitialAdminPassword) {
+    if ($StrictSecrets) {
+        throw "Key Vault secret 'platform-initial-admin-password' is missing. -StrictSecrets is on; refusing to regenerate (the seeded admin already exists with the original value)."
+    }
     Write-Host "Generating initial admin password..."
     $bytes = New-Object byte[] 24
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
@@ -303,13 +320,18 @@ if (-not $SkipMigrations) {
         -JobName $MigrationJob `
         -JobSecrets @(
             "control-db-url=$ControlDsnAsyncpg",
-            "secret-key=$SecretKey"
+            "secret-key=$SecretKey",
+            "field-encryption-key=$FieldKey"
         ) `
         -EnvVars @(
             "ENVIRONMENT=production",
             "PYTHONPATH=/app",
             "SECRET_KEY=secretref:secret-key",
-            "CONTROL_DATABASE_URL=secretref:control-db-url"
+            "CONTROL_DATABASE_URL=secretref:control-db-url",
+            # Required for app.models.tables to import (EncryptedString
+            # column type loads settings, which validates the key in prod).
+            # create_all only emits DDL so it never actually encrypts/decrypts.
+            "FIELD_ENCRYPTION_KEY=secretref:field-encryption-key"
         ) `
         -JobCommand "python" `
         -JobArgs @("scripts/apply_control_ddl.py")
@@ -349,12 +371,14 @@ if (-not $SkipMigrations) {
             "control-db-url=$ControlDsnAsyncpg",
             "tenant-db-url=$TenantDsnAsyncpg",
             "secret-key=$SecretKey",
+            "field-encryption-key=$FieldKey",
             "initial-admin-password=$InitialAdminPassword"
         ) `
         -EnvVars @(
             "ENVIRONMENT=production",
             "PYTHONPATH=/app",
             "SECRET_KEY=secretref:secret-key",
+            "FIELD_ENCRYPTION_KEY=secretref:field-encryption-key",
             "CONTROL_DATABASE_URL=secretref:control-db-url",
             "DEFAULT_TENANT_DATABASE_URL=secretref:tenant-db-url",
             "INITIAL_TENANT_KEY=$TenantKey",

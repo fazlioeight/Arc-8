@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "backend/**"
+      - "deploy-to-azure.ps1"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
 
@@ -47,7 +48,7 @@ jobs:
           DEFAULT_TENANT_DATABASE_URL: "sqlite+aiosqlite:///./test_tenant.db"
         run: pytest tests/ -v --tb=short
 
-  build-and-deploy:
+  deploy:
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -64,43 +65,23 @@ jobs:
       - name: Ensure containerapp extension
         run: az extension add --name containerapp --upgrade --only-show-errors
 
-      - name: Build + push image to ACR
-        id: build
-        working-directory: backend
+      # Single canonical deploy path. The script:
+      #   - reads existing Key Vault secrets (fails fast on missing under -StrictSecrets)
+      #   - runs the migration / Path 2 DDL / tenant provisioning jobs
+      #   - builds + pushes the image via ACR
+      #   - rolls out a suffixed revision, waits for Healthy, flips traffic
+      #   - configures ACA health probes
+      # Frontend is deployed by deploy-frontend.yml; we always pass -SkipFrontend.
+      - name: Deploy via deploy-to-azure.ps1
+        shell: pwsh
         env:
-          ACR: ${{ vars.AZURE_ACR }}
-          IMAGE: ${{ vars.AZURE_BACKEND_IMAGE }}
-          TAG: ${{ github.sha }}
+          APP_NAME: ${{ vars.AZURE_CONTAINER_APP }}
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
         run: |
-          az acr build \
-            --registry "$ACR" \
-            --image "$IMAGE:$TAG" \
-            --image "$IMAGE:latest" \
-            --output none .
-          echo "image=${ACR}.azurecr.io/${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Roll out Container App
-        env:
-          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
-          APP: ${{ vars.AZURE_CONTAINER_APP }}
-          IMAGE_FULL: ${{ steps.build.outputs.image }}
-        run: |
-          az containerapp update \
-            --name "$APP" \
-            --resource-group "$RG" \
-            --image "$IMAGE_FULL" \
-            --output none
-          # Wait for the new revision to go Healthy before considering deploy done.
-          for i in $(seq 1 30); do
-            state=$(az containerapp revision list \
-              --name "$APP" --resource-group "$RG" \
-              --query "sort_by([], &properties.createdTime)[-1].properties.healthState" -o tsv)
-            echo "  attempt $i: healthState=$state"
-            if [ "$state" = "Healthy" ]; then exit 0; fi
-            sleep 10
-          done
-          echo "::error::New revision did not reach Healthy within 5 minutes."
-          exit 1
+          $scriptArgs = @('-SkipFrontend', '-StrictSecrets')
+          if ($env:APP_NAME)       { $scriptArgs += @('-AppName', $env:APP_NAME) }
+          if ($env:RESOURCE_GROUP) { $scriptArgs += @('-ResourceGroup', $env:RESOURCE_GROUP) }
+          ./deploy-to-azure.ps1 @scriptArgs
 
       - name: Smoke test
         env:
