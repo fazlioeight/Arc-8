@@ -78,10 +78,16 @@ jobs:
           APP_NAME: ${{ vars.AZURE_CONTAINER_APP }}
           RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
         run: |
-          $scriptArgs = @('-SkipFrontend', '-StrictSecrets')
-          if ($env:APP_NAME)       { $scriptArgs += @('-AppName', $env:APP_NAME) }
-          if ($env:RESOURCE_GROUP) { $scriptArgs += @('-ResourceGroup', $env:RESOURCE_GROUP) }
-          ./deploy-to-azure.ps1 @scriptArgs
+          # Hashtable splat (NOT array splat). Array splat passes elements
+          # positionally; hashtable splat binds by name. We need the latter so
+          # -AppName / -ResourceGroup don't get bound to the wrong slots.
+          $params = @{
+            SkipFrontend  = $true
+            StrictSecrets = $true
+          }
+          if ($env:APP_NAME)       { $params.AppName       = $env:APP_NAME }
+          if ($env:RESOURCE_GROUP) { $params.ResourceGroup = $env:RESOURCE_GROUP }
+          ./deploy-to-azure.ps1 @params
 
       - name: Smoke test
         env:
