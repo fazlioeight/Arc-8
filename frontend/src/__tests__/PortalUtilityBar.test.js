@@ -1,44 +1,87 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
+// The repo ships a manual mock at __mocks__/react-router-dom.js that stubs out
+// MemoryRouter / Routes. These tests need real router behavior, so unmock and
+// pull in the real package.
+jest.unmock('react-router-dom');
+const { MemoryRouter } = jest.requireActual('react-router-dom');
+
 import PortalUtilityBar from '../components/PortalUtilityBar';
 import { AuthContext } from '../context/AuthContext';
 
-test('waffle opens a left-aligned waffle and notifications are right-aligned', async () => {
+jest.mock('../context/CommandPaletteContext', () => ({
+  useCommandPalette: () => ({
+    openPalette: jest.fn(),
+    closePalette: jest.fn(),
+    registerCommands: jest.fn(),
+    dynamicCommands: [],
+    query: '',
+    setQuery: jest.fn(),
+    isOpen: false,
+  }),
+}));
+
+jest.mock('../context/UserPreferencesContext', () => ({
+  useUserPreferences: () => ({
+    favorites: [],
+    toggleFavorite: jest.fn(),
+    isFavorite: () => false,
+    isNavItemEnabled: () => true,
+    recordViewPreference: jest.fn(),
+    getViewPreference: jest.fn(),
+    markNotificationRead: jest.fn(),
+    navVisibility: {},
+    updateRoleMenus: jest.fn(),
+    setNavVisibility: jest.fn(),
+    viewPreferences: {},
+    notificationPrefs: { dismissed: [], lastRead: null },
+  }),
+}));
+
+const renderBar = () => {
   const authValue = {
     user: { email: 'tester@nexora.test' },
     tenant: 'prominencehealth',
     tenantInfo: { name: 'ProminenceHealth' },
     hasApplicationAccess: () => true,
+    availableApplications: ['portal', 'coding'],
     availableTenants: [],
     auditTrail: [],
-    recordAuditEvent: () => {},
-    setTenant: () => {},
-    endImpersonation: () => {},
-    logout: () => {},
+    recordAuditEvent: jest.fn(),
+    setTenant: jest.fn(),
+    endImpersonation: jest.fn(),
+    logout: jest.fn(),
   };
 
-  const { container } = render(
-    <AuthContext.Provider value={authValue}>
-      <PortalUtilityBar />
-    </AuthContext.Provider>
+  return render(
+    <MemoryRouter>
+      <AuthContext.Provider value={authValue}>
+        <PortalUtilityBar />
+      </AuthContext.Provider>
+    </MemoryRouter>
   );
+};
 
+test('opens the waffle launcher and shows accessible apps', async () => {
+  renderBar();
   const user = userEvent.setup();
 
-  // Open the app launcher (waffle)
   const waffleBtn = await screen.findByTitle('App launcher');
   await user.click(waffleBtn);
 
-  // Waffle should render and use the left-aligned .sfdc-waffle class
-  expect(container.querySelector('.sfdc-waffle')).toBeTruthy();
-  expect(screen.getByText('Apps')).toBeTruthy();
+  expect(await screen.findByText(/Quick links/i)).toBeInTheDocument();
+});
 
-  // Open notifications and assert it uses the right-aligned dropdown modifier
+test('notifications dropdown is right-aligned and shows the heading', async () => {
+  const { container } = renderBar();
+  const user = userEvent.setup();
+
   const notifBtn = await screen.findByTitle('Notifications');
   await user.click(notifBtn);
 
-  // Notifications dropdown should be present and use the right modifier
-  expect(container.querySelector('.sfdc-dropdown--right')).toBeTruthy();
-  expect(screen.getByText('Notifications')).toBeTruthy();
+  expect(screen.getByText('Notifications')).toBeInTheDocument();
+  // Notifications dropdown uses right-0 utility class for right alignment
+  expect(container.querySelector('.right-0')).toBeTruthy();
 });

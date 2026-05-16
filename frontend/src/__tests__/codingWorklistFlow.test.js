@@ -1,7 +1,41 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+
+// The repo ships a manual mock at __mocks__/react-router-dom.js that stubs
+// out routing primitives. This test relies on real navigation between routes,
+// so opt back into the real package.
+jest.unmock('react-router-dom');
+const { MemoryRouter, Route, Routes } = jest.requireActual('react-router-dom');
+
+jest.mock('../context/CommandPaletteContext', () => ({
+  useCommandPalette: () => ({
+    openPalette: jest.fn(),
+    closePalette: jest.fn(),
+    registerCommands: jest.fn(),
+    dynamicCommands: [],
+    query: '',
+    setQuery: jest.fn(),
+    isOpen: false,
+  }),
+}));
+
+jest.mock('../context/UserPreferencesContext', () => ({
+  useUserPreferences: () => ({
+    favorites: [],
+    toggleFavorite: jest.fn(),
+    isFavorite: () => false,
+    isNavItemEnabled: () => true,
+    recordViewPreference: jest.fn(),
+    getViewPreference: jest.fn(),
+    markNotificationRead: jest.fn(),
+    navVisibility: {},
+    updateRoleMenus: jest.fn(),
+    setNavVisibility: jest.fn(),
+    viewPreferences: {},
+    notificationPrefs: { dismissed: [], lastRead: null },
+  }),
+}));
 
 import { AuthContext } from '../context/AuthContext';
 import CodingLandingPage from '../pages/platform/coding/CodingLandingPage';
@@ -136,16 +170,16 @@ describe('Coding worklist navigation flow', () => {
     const providerButton = await screen.findByRole('button', { name: /Dr\. Rivera/i });
     await user.click(providerButton);
 
-    await screen.findByRole('heading', { name: /Provider Details/i });
-    await screen.findByText(/Rivera Family Practice/i);
+    const providerHeadings = await screen.findAllByRole('heading', { name: /Rivera Family Practice/i });
+    expect(providerHeadings.length).toBeGreaterThan(0);
     // The referral UI is non-essential to navigation flow tests and can
     // be provided either via location.state or query params; it's flaky
     // across router test environments so we don't assert its presence
     // here. The important checks below verify the provider API calls.
 
-    await waitFor(() => expect(fetchCodingProviders).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(fetchCodingProviderDetail).toHaveBeenCalledWith('token', 'acme', 42)
-    );
+    await waitFor(() => expect(fetchCodingProviderDetail).toHaveBeenCalled());
+    // CodingMembersPage navigates with pcp_npi as the route param. The detail
+    // page skips the directory lookup when the param is numeric.
+    expect(fetchCodingProviderDetail).toHaveBeenCalledWith('token', 'acme', '1457389023');
   });
 });

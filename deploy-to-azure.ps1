@@ -489,6 +489,21 @@ if (-not $SkipMigrations) {
     Write-Host "Phase 3 skipped (-SkipMigrations)."
 }
 
+# Read the existing SWA URL up front so Phase 4's new revision is born with
+# the correct CORS_ORIGINS. Phase 6 only fires for the cold-start case where
+# the SWA gets created later in Phase 5; in steady-state we bake the right
+# value here so multi-revision traffic flips can't leave us with a 0%-traffic
+# revision that has the right CORS and a 100%-traffic revision that doesn't.
+# Hoisted above Phase 4's -SkipBackend gate so Phase 6 can reference the
+# variables under any -Skip* combination without tripping StrictMode.
+$InitialFrontendUrl = $null
+$existingSwa = Invoke-AzQuiet { az staticwebapp show -n $StaticWebAppName -g $ResourceGroup --query defaultHostname -o tsv }
+if ($existingSwa) {
+    $InitialFrontendUrl = "https://$existingSwa"
+    Write-Host "Pre-baking CORS_ORIGINS for existing SWA: $InitialFrontendUrl"
+}
+$InitialCorsOrigins = if ($InitialFrontendUrl) { $InitialFrontendUrl } else { "[]" }
+
 # == Phase 4: Update Container App with platform image + env vars ============-
 if (-not $SkipBackend) {
     Write-Phase "Phase 4: Container App update (replace nexora-chat in place)"
@@ -501,8 +516,6 @@ if (-not $SkipBackend) {
     # nexora-chat deploy. The platform's chat module reads it from this env var.
     $KvUrl = "https://$KeyVaultName.vault.azure.net"
 
-    # Build env var + secrets lists. CORS will be updated again in Phase 6
-    # once we know the Static Web App URL.
     $ContainerSecrets = @(
         "platform-secret-key=$SecretKey",
         "platform-field-encryption-key=$FieldKey",
@@ -517,7 +530,7 @@ if (-not $SkipBackend) {
         "FIELD_ENCRYPTION_KEY=secretref:platform-field-encryption-key",
         "CONTROL_DATABASE_URL=secretref:platform-control-db-url",
         "DEFAULT_TENANT_DATABASE_URL=secretref:platform-tenant-db-url",
-        "CORS_ORIGINS=[]",
+        "CORS_ORIGINS=$InitialCorsOrigins",
         "KEY_VAULT_URL=$KvUrl",
         "WORKBOOK_DATA_DIR=/mnt/workbooks",
         # Audit table in Postgres is the canonical store; stdout is shipped to
@@ -715,17 +728,48 @@ if (-not $SkipFrontend) {
 }
 
 # == Phase 6: CORS update ====================================================-
-if ($FrontendUrl) {
+# Only fires when Phase 5 produced a SWA URL we DIDN'T already know at Phase 4
+# (typically a brand-new SWA on first deploy). When firing, it must also flip
+# traffic to the new revision -- Phase 4 put the app in multi-revision mode,
+# so a naive `az containerapp update` leaves a 0%-traffic revision sitting
+# next to the live one with the right CORS, which doesn't help anyone.
+$NeedsCorsUpdate = $FrontendUrl -and ($FrontendUrl -ne $InitialFrontendUrl)
+if ($NeedsCorsUpdate) {
     Write-Phase "Phase 6: Update backend CORS for SWA origin"
     # Pass the URL bare. PowerShell + az.exe argument splitting eats inner
     # double quotes, so a JSON array like ["https://..."] arrives as
     # [https://...] in the container. The backend's parse_cors_origins
     # validator (config.py) accepts JSON arrays, comma-separated strings,
     # and bare URLs alike, so a bare URL is the simplest robust form.
+    $CorsRevisionSuffix = "cors" + (Get-Date -Format "yyyyMMddHHmmss")
     az containerapp update -n $AppName -g $ResourceGroup `
+        --revision-suffix $CorsRevisionSuffix `
         --set-env-vars "CORS_ORIGINS=$FrontendUrl" `
         --output none
-    Write-Host "CORS updated: $FrontendUrl"
+
+    $CorsRevName = "$AppName--$CorsRevisionSuffix"
+    Write-Host "Waiting for CORS-update revision '$CorsRevName' to report Healthy..."
+    $corsHealthy = $false
+    for ($i = 1; $i -le 30; $i++) {
+        Start-Sleep -Seconds 10
+        $state = Invoke-AzQuiet { az containerapp revision show -n $AppName -g $ResourceGroup --revision $CorsRevName --query "properties.healthState" -o tsv }
+        Write-Host "  attempt ${i}: healthState=$state"
+        if ($state -eq "Healthy") { $corsHealthy = $true; break }
+    }
+    if (-not $corsHealthy) {
+        throw "Phase 6 CORS revision '$CorsRevName' did not reach Healthy. CORS not updated; the previous revision keeps serving with CORS_ORIGINS=$InitialCorsOrigins."
+    }
+
+    az containerapp ingress traffic set -n $AppName -g $ResourceGroup --revision-weight "$CorsRevName=100" --output none
+
+    $StaleRevs = Invoke-AzQuiet { az containerapp revision list -n $AppName -g $ResourceGroup --query "[?properties.active && name != '$CorsRevName'].name" -o tsv }
+    foreach ($r in ($StaleRevs -split "`n" | Where-Object { $_ })) {
+        Write-Host "Deactivating prior revision: $r"
+        az containerapp revision deactivate -n $AppName -g $ResourceGroup --revision $r --output none 2>$null
+    }
+    Write-Host "CORS updated and traffic flipped: $FrontendUrl"
+} elseif ($FrontendUrl) {
+    Write-Host "Phase 6 skipped: CORS_ORIGINS already baked into the active revision ($FrontendUrl)."
 }
 
 # == Final summary ==========================================================─-

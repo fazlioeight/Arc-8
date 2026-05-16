@@ -1,12 +1,22 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+
+jest.unmock("react-router-dom");
+const { MemoryRouter } = jest.requireActual("react-router-dom");
+
 import Member360LandingPage from "./Member360LandingPage";
 import { AuthContext } from "../../../context/AuthContext";
 
-jest.mock("../../../services/codingService", () => ({
-  fetchCodingMembers: jest.fn(() => Promise.resolve({ items: [] })),
-}));
+jest.mock("../../../services/codingService", () => {
+  class MemberSearchService {
+    async search() { return { items: [] }; }
+    async lookup() { return { items: [] }; }
+  }
+  return {
+    fetchCodingMembers: jest.fn(() => Promise.resolve({ items: [] })),
+    MemberSearchService,
+  };
+});
 
 jest.mock("../../../context/UserPreferencesContext", () => ({
   useUserPreferences: () => ({
