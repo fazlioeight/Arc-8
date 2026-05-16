@@ -90,6 +90,63 @@ function Invoke-AzQuiet {
     }
 }
 
+# Read a Key Vault secret with first-class error categorization. Returns a
+# hashtable @{ ok, value, reason, detail }. Reasons: 'missing' (the secret
+# really doesn't exist), 'forbidden' (the principal can't read it -- usually
+# an RBAC gap on the vault), 'error' (anything else, e.g. network).
+function Get-KvSecretValue {
+    param(
+        [Parameter(Mandatory)][string]$VaultName,
+        [Parameter(Mandatory)][string]$SecretName
+    )
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $combined = & az keyvault secret show --vault-name $VaultName --name $SecretName --query value -o tsv 2>&1
+        $exit = $LASTEXITCODE
+        $global:LASTEXITCODE = 0
+        if ($exit -eq 0) {
+            $value = ($combined | Out-String).Trim()
+            if ([string]::IsNullOrWhiteSpace($value)) {
+                return @{ ok = $false; reason = "missing"; detail = "secret exists but has no value" }
+            }
+            return @{ ok = $true; value = $value }
+        }
+        $errText = ($combined | Out-String)
+        if ($errText -match "SecretNotFound|was not found|HTTP/1.1 404") {
+            return @{ ok = $false; reason = "missing"; detail = $errText.Trim() }
+        }
+        if ($errText -match "Forbidden|HTTP/1.1 403|does not have secrets get permission|AuthorizationFailed|InsufficientAccessRights") {
+            return @{ ok = $false; reason = "forbidden"; detail = $errText.Trim() }
+        }
+        return @{ ok = $false; reason = "error"; detail = $errText.Trim() }
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
+# Wrap a Key Vault secret read with a uniform error message that names the
+# vault, the secret, and (when relevant) the role grant that's missing.
+function Read-KvSecretOrThrow {
+    param(
+        [Parameter(Mandatory)][string]$VaultName,
+        [Parameter(Mandatory)][string]$SecretName,
+        [string]$MissingDetail = ""
+    )
+    $r = Get-KvSecretValue -VaultName $VaultName -SecretName $SecretName
+    if ($r.ok) { return $r.value }
+    if ($r.reason -eq "forbidden") {
+        throw "Cannot read Key Vault secret '$SecretName' from vault '$VaultName' -- the current principal lacks data-plane read access. Grant 'Key Vault Secrets User' (or 'Secrets Officer' if writes are also needed) at the vault scope. See docs/RUNBOOK_CI_IAM.md. Underlying error: $($r.detail)"
+    }
+    if ($r.reason -eq "missing") {
+        if ($MissingDetail) {
+            throw "Key Vault secret '$SecretName' is missing from vault '$VaultName'. $MissingDetail"
+        }
+        throw "Key Vault secret '$SecretName' is missing from vault '$VaultName'."
+    }
+    throw "Failed to read Key Vault secret '$SecretName' from vault '$VaultName'. Underlying error: $($r.detail)"
+}
+
 Test-Cmd az
 Test-Cmd docker
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -117,18 +174,23 @@ $Location  = az group show -n $ResourceGroup --query location -o tsv
 # == Phase 1: Secrets + databases ============================================─
 Write-Phase "Phase 1: Secrets and database provisioning"
 
-# Postgres admin password was previously stored by deploy-nexora.ps1.
-$PgAdminPassword = Invoke-AzQuiet { az keyvault secret show --vault-name $KeyVaultName --name "postgres-admin-password" --query value -o tsv }
-if (-not $PgAdminPassword) {
-    throw "Key Vault secret 'postgres-admin-password' is missing. The nexora-chat deploy created this -- run that first or set the password manually."
-}
+# Postgres admin password was previously stored by deploy-nexora.ps1. This
+# secret has no generate-on-miss fallback because regenerating it requires
+# coordinating with the live Postgres server (see RUNBOOK_SECRETS.md).
+$PgAdminPassword = Read-KvSecretOrThrow `
+    -VaultName $KeyVaultName `
+    -SecretName "postgres-admin-password" `
+    -MissingDetail "The nexora-chat deploy created this -- run that first or set the password manually."
 
 # Generate (or reuse) SECRET_KEY.
-$SecretKey = Invoke-AzQuiet { az keyvault secret show --vault-name $KeyVaultName --name "platform-secret-key" --query value -o tsv }
-if (-not $SecretKey) {
-    if ($StrictSecrets) {
-        throw "Key Vault secret 'platform-secret-key' is missing. -StrictSecrets is on; refusing to regenerate (would invalidate every existing JWT). Bootstrap the secret manually before re-running."
-    }
+$skResult = Get-KvSecretValue -VaultName $KeyVaultName -SecretName "platform-secret-key"
+if ($skResult.ok) {
+    $SecretKey = $skResult.value
+} elseif ($skResult.reason -eq "forbidden") {
+    throw "Cannot read Key Vault secret 'platform-secret-key' -- the current principal lacks data-plane read access on '$KeyVaultName'. Grant 'Key Vault Secrets User' (or 'Secrets Officer' if writes are also needed). See docs/RUNBOOK_CI_IAM.md."
+} elseif ($StrictSecrets) {
+    throw "Key Vault secret 'platform-secret-key' is missing. -StrictSecrets is on; refusing to regenerate (would invalidate every existing JWT). Bootstrap the secret manually before re-running."
+} else {
     Write-Host "Generating platform SECRET_KEY..."
     $bytes = New-Object byte[] 48
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
@@ -137,11 +199,14 @@ if (-not $SecretKey) {
 }
 
 # Generate (or reuse) FIELD_ENCRYPTION_KEY (Fernet: 32 random bytes, url-safe base64).
-$FieldKey = Invoke-AzQuiet { az keyvault secret show --vault-name $KeyVaultName --name "platform-field-encryption-key" --query value -o tsv }
-if (-not $FieldKey) {
-    if ($StrictSecrets) {
-        throw "Key Vault secret 'platform-field-encryption-key' is missing. -StrictSecrets is on; refusing to regenerate (would render every EncryptedString column undecryptable). Bootstrap the secret manually before re-running."
-    }
+$fkResult = Get-KvSecretValue -VaultName $KeyVaultName -SecretName "platform-field-encryption-key"
+if ($fkResult.ok) {
+    $FieldKey = $fkResult.value
+} elseif ($fkResult.reason -eq "forbidden") {
+    throw "Cannot read Key Vault secret 'platform-field-encryption-key' -- the current principal lacks data-plane read access on '$KeyVaultName'. Grant 'Key Vault Secrets User' (or 'Secrets Officer' if writes are also needed). See docs/RUNBOOK_CI_IAM.md."
+} elseif ($StrictSecrets) {
+    throw "Key Vault secret 'platform-field-encryption-key' is missing. -StrictSecrets is on; refusing to regenerate (would render every EncryptedString column undecryptable). Bootstrap the secret manually before re-running."
+} else {
     Write-Host "Generating FIELD_ENCRYPTION_KEY..."
     $fkBytes = New-Object byte[] 32
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($fkBytes)
@@ -151,11 +216,14 @@ if (-not $FieldKey) {
 }
 
 # Generate (or reuse) initial admin password.
-$InitialAdminPassword = Invoke-AzQuiet { az keyvault secret show --vault-name $KeyVaultName --name "platform-initial-admin-password" --query value -o tsv }
-if (-not $InitialAdminPassword) {
-    if ($StrictSecrets) {
-        throw "Key Vault secret 'platform-initial-admin-password' is missing. -StrictSecrets is on; refusing to regenerate (the seeded admin already exists with the original value)."
-    }
+$iapResult = Get-KvSecretValue -VaultName $KeyVaultName -SecretName "platform-initial-admin-password"
+if ($iapResult.ok) {
+    $InitialAdminPassword = $iapResult.value
+} elseif ($iapResult.reason -eq "forbidden") {
+    throw "Cannot read Key Vault secret 'platform-initial-admin-password' -- the current principal lacks data-plane read access on '$KeyVaultName'. Grant 'Key Vault Secrets User' (or 'Secrets Officer' if writes are also needed). See docs/RUNBOOK_CI_IAM.md."
+} elseif ($StrictSecrets) {
+    throw "Key Vault secret 'platform-initial-admin-password' is missing. -StrictSecrets is on; refusing to regenerate (the seeded admin already exists with the original value)."
+} else {
     Write-Host "Generating initial admin password..."
     $bytes = New-Object byte[] 24
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
