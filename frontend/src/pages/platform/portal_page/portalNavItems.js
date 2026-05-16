@@ -8,17 +8,13 @@ export const PORTAL_NAV_ITEMS = [
     match: (path) => path === ROUTES.PORTAL.LANDING,
   },
   {
-    key: "member-360",
-    label: "Member 360",
-    href: ROUTES.MEMBER_360.LANDING,
-    match: (path) => path === ROUTES.MEMBER_360.LANDING,
-  },
-  {
     key: "member360-lab",
     label: "Nexora Lab Member360",
     href: ROUTES.MEMBER360_LAB.DASHBOARD,
     match: (path) =>
-      path === ROUTES.MEMBER360_LAB.DASHBOARD || path.startsWith(`${ROUTES.MEMBER360_LAB.DASHBOARD}/`),
+      path === ROUTES.MEMBER360_LAB.DASHBOARD ||
+      path.startsWith(`${ROUTES.MEMBER360_LAB.DASHBOARD}/`) ||
+      path === ROUTES.MEMBER_360.LANDING,
   },
   {
     key: "coding",

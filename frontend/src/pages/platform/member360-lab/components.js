@@ -6,6 +6,7 @@ const joinClass = (...parts) => parts.filter(Boolean).join(' ');
 
 export const LAB_SUB_NAV = [
   { key: 'dashboard', label: 'Dashboard', href: ROUTES.MEMBER360_LAB.DASHBOARD, exact: true },
+  { key: 'chart', label: 'Chart', href: ROUTES.MEMBER_360.LANDING, exact: true },
   { key: 'members', label: 'Members', href: ROUTES.MEMBER360_LAB.MEMBERS, prefix: ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT },
   { key: 'tasks', label: 'Tasks', href: ROUTES.MEMBER360_LAB.TASKS },
   { key: 'care_journeys', label: 'Care Journeys', href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS },
