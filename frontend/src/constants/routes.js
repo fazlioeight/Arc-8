@@ -1,4 +1,7 @@
 export const ROUTES = {
+  AUTH: {
+    CHANGE_PASSWORD: "/change-password",
+  },
   PORTAL: {
     LANDING: "/portal",
   },

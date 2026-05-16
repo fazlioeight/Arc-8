@@ -22,6 +22,7 @@ class TenantContext:
     billing_plan: Optional[str] = None
     feature_flags: Dict[str, bool] = field(default_factory=dict)
     purchased_applications: Dict[str, bool] = field(default_factory=dict)
+    data_residency: Optional[str] = None
     request_host: Optional[str] = None
 
     def feature_enabled(self, flag: str) -> bool:

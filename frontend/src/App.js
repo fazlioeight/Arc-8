@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useContext, useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation, Navigate, useParams } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthContext, AuthProvider } from './context/AuthContext';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { UserPreferencesProvider } from './context/UserPreferencesContext';
 import { GuidedTourProvider } from './context/GuidedTourContext';
@@ -23,6 +23,7 @@ const Insights = lazy(() => import('./pages/website/insights/Insights'));
 const Contact = lazy(() => import('./pages/website/contact/Contact'));
 const Pricing = lazy(() => import('./pages/website/Pricing'));
 const Login = lazy(() => import('./pages/website/Login'));
+const ChangePassword = lazy(() => import('./pages/website/ChangePassword'));
 const PortalPage = lazy(() => import('./pages/platform/portal_page/portalPage'));
 const Member360LandingPage = lazy(() => import('./pages/platform/Member-360/Member360LandingPage'));
 const Member360LabDashboard = lazy(() => import('./pages/platform/member360-lab/Member360LabDashboard'));
@@ -109,6 +110,19 @@ const LoginOnlySessionLockOverlay = () => {
   return location.pathname === '/login' ? <SessionLockOverlay /> : null;
 };
 
+// Forces users whose token carries must_change_password=true onto the
+// rotation page until they finish. Skipping the redirect on /login keeps the
+// re-authentication flow from bouncing during initial sign-in; skipping it
+// on the page itself avoids a redirect loop.
+const ForcePasswordRotation = () => {
+  const { mustChangePassword } = useContext(AuthContext);
+  const location = useLocation();
+  if (!mustChangePassword) return null;
+  if (location.pathname === ROUTES.AUTH.CHANGE_PASSWORD) return null;
+  if (location.pathname === '/login') return null;
+  return <Navigate to={ROUTES.AUTH.CHANGE_PASSWORD} replace />;
+};
+
 const Shell = ({ themePreference, setThemePreference }) => {
   const location = useLocation();
   const hideNavbarOn = [
@@ -144,6 +158,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/login" element={<Login />} />
+          <Route path={ROUTES.AUTH.CHANGE_PASSWORD} element={<ChangePassword />} />
           <Route path={ROUTES.PORTAL.LANDING} element={<PortalPage />} />
           <Route path="/portalPage" element={<Navigate to={ROUTES.PORTAL.LANDING} replace />} />
           <Route path={ROUTES.MEMBER_360.LANDING} element={<Member360LandingPage />} />
@@ -368,6 +383,7 @@ function App() {
           <GuidedTourProvider>
             <NotificationsProvider>
               <Router>
+                <ForcePasswordRotation />
                 <Shell themePreference={themePreference} setThemePreference={setThemePreference} />
                 <CommandPalette onThemeToggle={handleThemeToggle} />
                 <GuidedTourOverlay />

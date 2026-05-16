@@ -29,6 +29,7 @@ async def provision_tenant(
     feature_flags: Optional[Dict[str, bool]] = None,
     db_connection_uri: Optional[str] = None,
     db_schema: Optional[str] = None,
+    data_residency: Optional[str] = None,
 ) -> ProvisioningResult:
     tenant = await session.scalar(select(Tenant).where(Tenant.key == key))
     if tenant:
@@ -37,6 +38,7 @@ async def provision_tenant(
     connection_uri = db_connection_uri or _resolve_connection_uri(key=key, slug=slug)
     schema = db_schema or _resolve_schema(slug=slug)
     merged_flags = {**(settings.FEATURE_FLAG_DEFAULTS or {}), **(feature_flags or {})}
+    residency = _validate_data_residency(data_residency)
 
     tenant = Tenant(
         key=key,
@@ -48,6 +50,7 @@ async def provision_tenant(
         db_schema=schema,
         created_by=created_by,
         phi_data_classification="restricted",
+        data_residency=residency,
     )
     session.add(tenant)
     try:
@@ -58,6 +61,22 @@ async def provision_tenant(
 
     await _ensure_tenant_datastore(connection_uri, schema)
     return ProvisioningResult(tenant=tenant, created=True)
+
+
+def _validate_data_residency(value: Optional[str]) -> str:
+    allowed = [v.lower() for v in (settings.ALLOWED_DATA_RESIDENCIES or [])]
+    if not allowed:
+        # Empty allowlist would mean every residency is rejected; treat as a
+        # config error rather than silently letting any value through.
+        raise RuntimeError("ALLOWED_DATA_RESIDENCIES is empty; refusing to provision tenants")
+    candidate = (value or settings.DEFAULT_DATA_RESIDENCY or "").strip().lower()
+    if not candidate:
+        raise ValueError("data_residency is required when provisioning a tenant")
+    if candidate not in allowed:
+        raise ValueError(
+            f"data_residency '{candidate}' is not permitted. Allowed values: {sorted(allowed)}"
+        )
+    return candidate
 
 
 def _resolve_connection_uri(*, key: str, slug: str) -> str:

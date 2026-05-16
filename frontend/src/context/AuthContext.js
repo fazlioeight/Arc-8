@@ -99,6 +99,10 @@ const normalizeState = (raw) => {
     applications,
     availableApplications,
     purchasedApplications,
+    // Surface backend's must_change_password flag (login response) so the
+    // router can force /change-password on first login. Accept both
+    // snake_case (server) and camelCase (rehydrated state) forms.
+    mustChangePassword: Boolean(raw.must_change_password ?? raw.mustChangePassword),
     auditTrail: Array.isArray(raw.auditTrail) ? raw.auditTrail : [],
     impersonation,
     session,
@@ -345,6 +349,16 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
+  const clearMustChangePassword = useCallback(() => {
+    setAuthState((prev) => {
+      if (!prev || !prev.mustChangePassword) return prev;
+      return appendAudit({ ...prev, mustChangePassword: false }, buildAuditEvent('password.rotation_completed', {
+        actor: prev.email,
+        tenant: prev.tenant,
+      }));
+    });
+  }, []);
+
   const unlockSession = useCallback((method = 'sso') => {
     setAuthState((prev) => {
       if (!prev?.session?.locked) return prev;
@@ -495,6 +509,7 @@ export const AuthProvider = ({ children }) => {
     auditTrail: authState?.auditTrail || [],
     session: authState?.session || null,
     sessionLocked: Boolean(authState?.token && authState?.session?.locked),
+    mustChangePassword: Boolean(authState?.token && authState?.mustChangePassword),
     isAuthenticated: Boolean(authState?.token),
     hasApplicationAccess,
     login,
@@ -505,6 +520,7 @@ export const AuthProvider = ({ children }) => {
     recordAuditEvent,
     touchSession,
     unlockSession,
+    clearMustChangePassword,
   }), [
     authState,
     effectiveApplications,
@@ -523,6 +539,7 @@ export const AuthProvider = ({ children }) => {
     recordAuditEvent,
     touchSession,
     unlockSession,
+    clearMustChangePassword,
   ]);
 
   return (

@@ -107,6 +107,13 @@ class Settings(BaseSettings):
     AZURE_AUTHORITY_HOST: str = "https://login.microsoftonline.com"
     AZURE_AUTH_SCOPES: str = "openid profile email"
 
+    # Allowed values for Tenant.data_residency. HIPAA BAAs and EU sovereignty
+    # requirements forbid moving PHI across geographies, so this is the
+    # canonical allowlist tenant provisioning checks against. Override with
+    # ALLOWED_DATA_RESIDENCIES env var (comma-separated) when expanding.
+    ALLOWED_DATA_RESIDENCIES: List[str] = ["us", "us-east-1", "us-west-2", "eu", "eu-west-1"]
+    DEFAULT_DATA_RESIDENCY: str = "us"
+
     model_config = SettingsConfigDict(
         case_sensitive=True,
         env_file=".env",
@@ -170,6 +177,38 @@ class Settings(BaseSettings):
         env = (info.data.get("ENVIRONMENT") if info and info.data else "development").lower()
         if value and value.startswith("sqlite") and env == "production":
             raise ValueError("SQLite storage is not supported for production workloads; configure a managed database")
+        return value
+
+    @field_validator("ALLOWED_DATA_RESIDENCIES", mode="before")
+    @classmethod
+    def parse_allowed_data_residencies(cls, v):
+        if v in (None, "", []):
+            return ["us"]
+        if isinstance(v, list):
+            return [str(x).strip().lower() for x in v if str(x).strip()]
+        if isinstance(v, str):
+            stripped = v.strip()
+            if stripped.startswith("[") and stripped.endswith("]"):
+                try:
+                    parsed = json.loads(stripped)
+                    if isinstance(parsed, list):
+                        return [str(x).strip().lower() for x in parsed if str(x).strip()]
+                except ValueError:
+                    pass
+            return [item.strip().lower() for item in stripped.split(",") if item.strip()]
+        raise ValueError("Unsupported ALLOWED_DATA_RESIDENCIES value")
+
+    @field_validator("DEFAULT_DATA_RESIDENCY", mode="after")
+    @classmethod
+    def validate_default_data_residency(cls, v: str, info: ValidationInfo) -> str:
+        allowed = (info.data or {}).get("ALLOWED_DATA_RESIDENCIES") or []
+        value = (v or "").strip().lower()
+        if not value:
+            raise ValueError("DEFAULT_DATA_RESIDENCY must be set")
+        if allowed and value not in allowed:
+            raise ValueError(
+                f"DEFAULT_DATA_RESIDENCY '{value}' is not in ALLOWED_DATA_RESIDENCIES {allowed}"
+            )
         return value
 
     @field_validator("CORS_ORIGINS", mode="before")

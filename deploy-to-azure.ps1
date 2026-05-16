@@ -216,6 +216,12 @@ if ($fkResult.ok) {
 }
 
 # Generate (or reuse) initial admin password.
+# $InitialAdminPasswordWasGenerated drives the post-deploy console echo: we
+# only print the plaintext password when we just generated it for a brand-new
+# admin account (the seeded user is created with must_change_password=true,
+# so the operator needs to see it once to perform the forced rotation). On
+# re-runs the secret already exists and the admin has presumably rotated it.
+$InitialAdminPasswordWasGenerated = $false
 $iapResult = Get-KvSecretValue -VaultName $KeyVaultName -SecretName "platform-initial-admin-password"
 if ($iapResult.ok) {
     $InitialAdminPassword = $iapResult.value
@@ -230,6 +236,7 @@ if ($iapResult.ok) {
     $InitialAdminPassword = ([Convert]::ToBase64String($bytes)) -replace '[+/=]', ''
     $InitialAdminPassword = $InitialAdminPassword.Substring(0, 24)
     az keyvault secret set --vault-name $KeyVaultName --name "platform-initial-admin-password" --value $InitialAdminPassword --output none | Out-Null
+    $InitialAdminPasswordWasGenerated = $true
 }
 
 # Create databases on the existing PG server.
@@ -780,10 +787,28 @@ if ($FrontendUrl) {
 }
 Write-Host "Tenant key for X-Tenant-Key header: $TenantKey"
 Write-Host "Initial admin: $InitialAdminEmail"
-Write-Host "Initial admin password: stored in Key Vault as 'platform-initial-admin-password'"
-Write-Host ""
-Write-Host "Retrieve admin password with:"
-Write-Host "  az keyvault secret show --vault-name $KeyVaultName --name platform-initial-admin-password --query value -o tsv"
+
+if ($InitialAdminPasswordWasGenerated) {
+    # Brand-new deploy: the seeded user has must_change_password=true, so the
+    # operator must perform the forced rotation on first login. Surface the
+    # plaintext once here rather than making them dig it out of Key Vault.
+    # Subsequent deploys hit the 'already exists' branch and print only the
+    # KV pointer (the admin has presumably rotated by then).
+    Write-Host ""
+    Write-Host "  +------------------------------------------------------------+" -ForegroundColor Yellow
+    Write-Host "  | INITIAL ADMIN PASSWORD (shown once -- save now)            |" -ForegroundColor Yellow
+    Write-Host "  +------------------------------------------------------------+" -ForegroundColor Yellow
+    Write-Host "  | $InitialAdminPassword" -ForegroundColor Yellow
+    Write-Host "  +------------------------------------------------------------+" -ForegroundColor Yellow
+    Write-Host "  This account is flagged must_change_password=true; the first" -ForegroundColor Yellow
+    Write-Host "  login will be forced into the rotation flow. Also stored as" -ForegroundColor Yellow
+    Write-Host "  'platform-initial-admin-password' in Key Vault '$KeyVaultName'." -ForegroundColor Yellow
+} else {
+    Write-Host "Initial admin password: stored in Key Vault as 'platform-initial-admin-password'"
+    Write-Host ""
+    Write-Host "Retrieve admin password with:"
+    Write-Host "  az keyvault secret show --vault-name $KeyVaultName --name platform-initial-admin-password --query value -o tsv"
+}
 
 if ($FollowLogs) {
     Write-Phase "Streaming Container App logs"

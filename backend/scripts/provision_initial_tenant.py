@@ -62,6 +62,13 @@ async def main() -> None:
     engine = create_async_engine(settings.CONTROL_DATABASE_URL, future=True, echo=False)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
+    residency = (env("INITIAL_DATA_RESIDENCY", settings.DEFAULT_DATA_RESIDENCY) or "").strip().lower()
+    allowed_residencies = [v.lower() for v in (settings.ALLOWED_DATA_RESIDENCIES or [])]
+    if residency not in allowed_residencies:
+        raise RuntimeError(
+            f"INITIAL_DATA_RESIDENCY '{residency}' is not in ALLOWED_DATA_RESIDENCIES {allowed_residencies}"
+        )
+
     async with session_factory() as session:
         tenant = await session.scalar(select(Tenant).where(Tenant.key == tenant_key))
         if tenant is None:
@@ -74,7 +81,7 @@ async def main() -> None:
                 db_schema=env("INITIAL_TENANT_DB_SCHEMA"),
                 purchased_applications=DEFAULT_PURCHASED_APPLICATIONS,
                 phi_data_classification="restricted",
-                data_residency=env("INITIAL_DATA_RESIDENCY", "us"),
+                data_residency=residency,
                 created_by="provision_initial_tenant",
             )
             session.add(tenant)
@@ -98,6 +105,7 @@ async def main() -> None:
                     password_hash=password_hash,
                     role="admin",
                     app_permissions=DEFAULT_APPLICATION_PERMISSIONS,
+                    must_change_password=True,
                     created_at=datetime.now(timezone.utc),
                 )
                 session.add(admin)

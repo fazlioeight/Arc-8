@@ -97,7 +97,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def decode_token(token: str) -> dict:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        # Algorithm list is intentionally not driven by settings: an attacker
+        # who can flip JWT_ALGORITHM to "none" or to an asymmetric alg (RS256)
+        # could forge tokens or trick the verifier into treating a public key
+        # as the HMAC secret. We always issue HS256 (create_access_token), so
+        # we always require HS256 on decode.
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         return payload
     except jwt.ExpiredSignatureError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired") from exc

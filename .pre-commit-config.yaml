@@ -1,0 +1,37 @@
+# Run hooks with: pre-commit install (one-time per clone) + pre-commit run --all-files
+# CI should call: pre-commit run --all-files --show-diff-on-failure
+#
+# Backend-focused: lint+format Python, then a pytest gate that runs only the
+# fast control-plane tests on commit so the loop stays usable. Heavy integration
+# tests are expected to run in CI.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        files: ^backend/
+        args: [--line-length=120]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (backend)
+        # Use the project's own venv so the hook sees the actual installed
+        # SQLAlchemy / FastAPI versions rather than pre-commit's isolated env.
+        entry: backend/.venv/Scripts/python.exe -m pytest backend/tests -q --no-header
+        language: system
+        pass_filenames: false
+        # Only fire when backend code or tests change; avoids blocking docs/
+        # frontend-only commits on a multi-minute test run.
+        files: ^backend/.*\.(py|sql)$
+        stages: [pre-commit]
