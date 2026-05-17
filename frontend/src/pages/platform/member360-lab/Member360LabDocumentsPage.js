@@ -6,7 +6,21 @@ import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { fetchMember360AllDocuments } from '../../../services/member360LabService';
-import { LabSubNav, MetricCard, RiskBadge, SectionCard } from './components';
+import { LabSubNav, RiskBadge } from './components';
+import FilterDropdown from '../../../components/ui/FilterDropdown';
+
+const SAVED_VIEWS = [
+  { key: 'all', label: 'All documents' },
+  { key: 'active', label: 'Active', status: 'active' },
+  { key: 'waivers', label: 'Care waivers', waiversOnly: true },
+  { key: 'recent', label: 'Last 7 days', recent: true },
+];
+
+const STATUS_TONE = {
+  active: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200',
+  expired: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200',
+  pending: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200',
+};
 
 const Member360LabDocumentsPage = () => {
   const navigate = useNavigate();
@@ -15,8 +29,11 @@ const Member360LabDocumentsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('any');
-  const [statusFilter, setStatusFilter] = useState('any');
+  const [types, setTypes] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+  const [activeView, setActiveView] = useState('all');
+  const [waiversOnly, setWaiversOnly] = useState(false);
+  const [recent, setRecent] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,23 +45,40 @@ const Member360LabDocumentsPage = () => {
     return () => { cancelled = true; };
   }, [token, tenant]);
 
-  const types = useMemo(() => {
+  const allTypes = useMemo(() => {
     const set = new Set();
     rows.forEach((r) => { if (r.document_type) set.add(r.document_type); });
-    return ['any', ...Array.from(set).sort()];
+    return Array.from(set).sort();
   }, [rows]);
 
-  const statuses = useMemo(() => {
+  const allStatuses = useMemo(() => {
     const set = new Set();
     rows.forEach((r) => { if (r.status) set.add(r.status); });
-    return ['any', ...Array.from(set).sort()];
+    return Array.from(set).sort();
   }, [rows]);
 
+  const applySavedView = (key) => {
+    const view = SAVED_VIEWS.find((v) => v.key === key);
+    setActiveView(key);
+    setStatuses(view?.status ? [view.status] : []);
+    setWaiversOnly(Boolean(view?.waiversOnly));
+    setRecent(Boolean(view?.recent));
+    setTypes([]);
+  };
+
+  const toggleType = (t) =>
+    setTypes((prev) => (prev.includes(t) ? prev.filter((k) => k !== t) : [...prev, t]));
+  const toggleStatus = (s) =>
+    setStatuses((prev) => (prev.includes(s) ? prev.filter((k) => k !== s) : [...prev, s]));
+
   const filtered = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 86400000;
     return rows
       .filter((d) => {
-        if (typeFilter !== 'any' && d.document_type !== typeFilter) return false;
-        if (statusFilter !== 'any' && d.status !== statusFilter) return false;
+        if (types.length > 0 && !types.includes(d.document_type)) return false;
+        if (statuses.length > 0 && !statuses.includes(d.status)) return false;
+        if (waiversOnly && !(d.document_type || '').toLowerCase().includes('waiver')) return false;
+        if (recent && new Date(d.uploaded_at || 0).getTime() < weekAgo) return false;
         if (search) {
           const term = search.toLowerCase();
           const hay = [d.file_name, d.document_type, d.member_name, d.member_key, d.uploaded_by].filter(Boolean).join(' ').toLowerCase();
@@ -53,7 +87,7 @@ const Member360LabDocumentsPage = () => {
         return true;
       })
       .sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0));
-  }, [rows, search, typeFilter, statusFilter]);
+  }, [rows, search, types, statuses, waiversOnly, recent]);
 
   const summary = useMemo(() => {
     const total = rows.length;
@@ -62,6 +96,9 @@ const Member360LabDocumentsPage = () => {
     const memberCount = new Set(rows.map((d) => d.member_id)).size;
     return { total, active, waivers, memberCount };
   }, [rows]);
+
+  const activeFilterCount =
+    (types.length > 0 ? 1 : 0) + (statuses.length > 0 ? 1 : 0) + (waiversOnly ? 1 : 0) + (recent ? 1 : 0);
 
   return (
     <PortalPageLayout
@@ -77,28 +114,117 @@ const Member360LabDocumentsPage = () => {
     >
       <LabSubNav />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MetricCard label="All documents" value={summary.total} />
-        <MetricCard label="Active" value={summary.active} />
-        <MetricCard label="Care waivers" value={summary.waivers} />
-        <MetricCard label="Members with files" value={summary.memberCount} />
-      </div>
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiTile label="All documents" value={summary.total} />
+        <KpiTile label="Active" value={summary.active} tone="success" />
+        <KpiTile label="Care waivers" value={summary.waivers} />
+        <KpiTile label="Members with files" value={summary.memberCount} />
+      </section>
 
-      <section className="coding-surface rounded-2xl p-4 shadow-sm">
-        <div className="flex flex-col lg:flex-row gap-3">
-          <input
-            type="search"
-            placeholder="Search by file name, type, member, or uploader"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="coding-input w-full rounded-lg px-3 py-2 text-sm"
-          />
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="coding-input rounded-lg px-3 py-2 text-sm lg:w-56">
-            {types.map((t) => <option key={t} value={t}>{t === 'any' ? 'Any type' : t}</option>)}
-          </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="coding-input rounded-lg px-3 py-2 text-sm lg:w-44">
-            {statuses.map((s) => <option key={s} value={s}>{s === 'any' ? 'Any status' : s}</option>)}
-          </select>
+      <nav className="border-b coding-border overflow-x-auto" aria-label="Saved views">
+        <div className="flex items-center gap-1">
+          {SAVED_VIEWS.map((v) => {
+            const active = v.key === activeView;
+            return (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => applySavedView(v.key)}
+                className={`whitespace-nowrap px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
+                  active
+                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                    : 'border-transparent coding-text-soft hover:coding-text-strong hover:border-slate-200 dark:hover:border-slate-700'
+                }`}
+              >
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      <section className="coding-surface rounded-2xl shadow-sm">
+        <div className="p-3">
+          <div className="relative">
+            <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 coding-text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+            </svg>
+            <input
+              type="search"
+              placeholder="Search file, type, member, or uploader"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="coding-input w-full rounded-md pl-9 pr-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <div className="border-t coding-border px-3 py-2 flex flex-wrap items-center gap-1.5 text-xs">
+          {allTypes.length > 0 && (
+            <FilterDropdown label="Type" count={types.length}>
+              <div className="flex flex-col gap-1 min-w-[220px] max-h-[280px] overflow-y-auto">
+                {allTypes.map((t) => (
+                  <label key={t} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--coding-hover)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={types.includes(t)}
+                      onChange={() => toggleType(t)}
+                      className="accent-[var(--brand-primary)]"
+                    />
+                    <span className="coding-text-strong">{t}</span>
+                  </label>
+                ))}
+              </div>
+            </FilterDropdown>
+          )}
+          {allStatuses.length > 0 && (
+            <FilterDropdown label="Status" count={statuses.length}>
+              <div className="flex flex-col gap-1 min-w-[180px]">
+                {allStatuses.map((s) => (
+                  <label key={s} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--coding-hover)] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={statuses.includes(s)}
+                      onChange={() => toggleStatus(s)}
+                      className="accent-[var(--brand-primary)]"
+                    />
+                    <span className="coding-text-strong capitalize">{s}</span>
+                  </label>
+                ))}
+              </div>
+            </FilterDropdown>
+          )}
+          <button
+            type="button"
+            onClick={() => setWaiversOnly((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-md ring-1 px-2.5 py-1.5 text-xs font-medium transition ${
+              waiversOnly
+                ? 'ring-[var(--brand-primary)] text-[var(--brand-primary)] bg-brand-50 dark:bg-brand-900/20'
+                : 'coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)]'
+            }`}
+          >
+            Waivers only
+          </button>
+          <button
+            type="button"
+            onClick={() => setRecent((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-md ring-1 px-2.5 py-1.5 text-xs font-medium transition ${
+              recent
+                ? 'ring-[var(--brand-primary)] text-[var(--brand-primary)] bg-brand-50 dark:bg-brand-900/20'
+                : 'coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)]'
+            }`}
+          >
+            Last 7 days
+          </button>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={() => applySavedView('all')}
+              className="ml-1 text-xs font-medium text-[var(--brand-primary)] hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       </section>
 
@@ -106,55 +232,75 @@ const Member360LabDocumentsPage = () => {
       {error && <ErrorState title="Documents unavailable" description={error} />}
 
       {!loading && !error && (
-        <SectionCard title={`${filtered.length} document${filtered.length === 1 ? '' : 's'}`}>
-          <div className="overflow-x-auto rounded-lg ring-1 ring-black/5 dark:ring-white/10">
+        <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-2.5 flex items-center justify-between text-xs coding-text-muted border-b coding-border">
+            <span>{filtered.length} document{filtered.length === 1 ? '' : 's'}{rows.length !== filtered.length ? ` of ${rows.length}` : ''}</span>
+          </div>
+          <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="coding-surface-subtle text-xs uppercase tracking-wide coding-text-muted">
-                <tr>
-                  <th className="text-left px-3 py-2 font-medium">File</th>
-                  <th className="text-left px-3 py-2 font-medium">Type</th>
-                  <th className="text-left px-3 py-2 font-medium">Member</th>
-                  <th className="text-left px-3 py-2 font-medium">Uploaded</th>
-                  <th className="text-left px-3 py-2 font-medium">By</th>
-                  <th className="text-left px-3 py-2 font-medium">Status</th>
+              <thead className="text-[11px] uppercase tracking-wider coding-text-muted">
+                <tr className="border-b coding-border">
+                  <th className="text-left px-4 py-2.5 font-semibold">File</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Type</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Member</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Uploaded</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">By</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y coding-divider">
+              <tbody>
                 {filtered.map((d) => (
                   <tr
                     key={d.id}
-                    className="cursor-pointer coding-hoverable"
+                    className="cursor-pointer border-b coding-border-subtle hover:bg-[var(--coding-hover)] transition"
                     onClick={() => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${d.member_id}`)}
                   >
-                    <td className="px-3 py-2 font-mono text-xs coding-text-strong">{d.file_name}</td>
-                    <td className="px-3 py-2 text-xs"><span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 coding-text-muted">{d.document_type || '—'}</span></td>
-                    <td className="px-3 py-2">
-                      <p className="coding-text-strong">{d.member_name || '—'}</p>
+                    <td className="px-4 py-3 font-mono text-xs coding-text-strong">{d.file_name}</td>
+                    <td className="px-3 py-3 text-xs">
+                      <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 coding-text-muted">{d.document_type || '—'}</span>
+                    </td>
+                    <td className="px-3 py-3">
+                      <p className="coding-text-strong font-medium">{d.member_name || '—'}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-[11px] coding-text-muted">{d.member_key}</p>
                         {d.risk_tier && <RiskBadge tier={d.risk_tier} />}
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-xs coding-text-soft">{d.uploaded_at ? new Date(d.uploaded_at).toLocaleString() : '—'}</td>
-                    <td className="px-3 py-2 text-xs coding-text-soft">{d.uploaded_by || '—'}</td>
-                    <td className="px-3 py-2 text-xs capitalize">
-                      <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 px-2 py-0.5">{d.status || 'active'}</span>
+                    <td className="px-3 py-3 text-xs coding-text-soft">{d.uploaded_at ? new Date(d.uploaded_at).toLocaleString() : '—'}</td>
+                    <td className="px-3 py-3 text-xs coding-text-soft">{d.uploaded_by || '—'}</td>
+                    <td className="px-3 py-3 text-xs">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 capitalize ${STATUS_TONE[d.status] || STATUS_TONE.active}`}>
+                        {d.status || 'active'}
+                      </span>
                     </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-8 text-center text-sm coding-text-soft">No documents on file.</td></tr>
+                  <tr><td colSpan={6} className="px-3 py-12 text-center text-sm coding-text-soft">No documents on file.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] coding-text-muted mt-3">
+          <p className="text-[11px] coding-text-muted px-4 py-2 border-t coding-border">
             Upload, preview, and audit workflows arrive in a future phase — this surface indexes existing files attached to member workspaces.
           </p>
-        </SectionCard>
+        </section>
       )}
     </PortalPageLayout>
   );
 };
+
+function KpiTile({ label, value, tone = 'neutral' }) {
+  const valueTone = {
+    neutral: 'coding-text-strong',
+    success: 'text-emerald-700 dark:text-emerald-300',
+  }[tone] || 'coding-text-strong';
+  return (
+    <div className="coding-surface rounded-2xl shadow-sm p-3.5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</p>
+      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueTone}`}>{value}</p>
+    </div>
+  );
+}
 
 export default Member360LabDocumentsPage;

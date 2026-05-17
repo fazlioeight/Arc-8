@@ -1,7 +1,8 @@
 import React from 'react';
 import PortalPageLayout from '../../../components/PortalPageLayout';
+import AlertShell from '../../../components/ui/AlertShell';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
-import { LabSubNav, SectionCard } from './components';
+import { LabSubNav } from './components';
 
 const ADMIN_SECTIONS = [
   {
@@ -80,39 +81,44 @@ const Member360LabAdminPage = () => (
   >
     <LabSubNav />
 
-    <div className="rounded-2xl ring-1 ring-amber-200 dark:ring-amber-700/40 bg-amber-50/60 dark:bg-amber-900/15 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">Admin preview</p>
-      <p className="text-sm coding-text-strong mt-1">
-        These configuration surfaces document what will be editable here. They render as read-only placeholders until each backend admin endpoint lands.
-      </p>
-    </div>
+    <AlertShell
+      tone="warning"
+      title="Admin preview"
+      description="These configuration surfaces document what will be editable here. They render as read-only placeholders until each backend admin endpoint lands."
+    />
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {ADMIN_SECTIONS.map((section) => (
-        <SectionCard
-          key={section.key}
-          title={section.title}
-          subtitle={section.description}
-          action={(
-            <span className="text-[10px] uppercase tracking-wider rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 coding-text-muted">Coming soon</span>
-          )}
-        >
-          <ul className="space-y-1.5">
-            {section.items.map((item) => (
-              <li key={item} className="flex items-start gap-2 text-sm coding-text-strong">
-                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)] shrink-0" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            disabled
-            className="mt-3 inline-flex items-center rounded-md coding-surface-subtle coding-text-muted ring-1 ring-black/5 dark:ring-white/10 px-3 py-1.5 text-xs font-semibold cursor-not-allowed"
-          >
-            Configure
-          </button>
-        </SectionCard>
+        <section key={section.key} className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+          <header className="px-5 py-3 border-b coding-border flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold coding-text-strong">{section.title}</h3>
+              <p className="mt-0.5 text-xs coding-text-soft">{section.description}</p>
+            </div>
+            <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider coding-text-muted shrink-0">
+              Coming soon
+            </span>
+          </header>
+          <div className="px-5 py-4">
+            <ul className="space-y-2">
+              {section.items.map((item) => (
+                <li key={item} className="flex items-start gap-2 text-sm coding-text-strong">
+                  <svg viewBox="0 0 24 24" className="mt-0.5 h-4 w-4 shrink-0 text-[var(--brand-primary)]" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              disabled
+              className="mt-4 inline-flex items-center rounded-md ring-1 coding-border coding-text-muted bg-transparent px-3 py-1.5 text-xs font-semibold cursor-not-allowed opacity-60"
+            >
+              Configure
+            </button>
+          </div>
+        </section>
       ))}
     </div>
   </PortalPageLayout>

@@ -9,10 +9,25 @@ import {
   fetchMember360AllRiskInsights,
   fetchMember360Members,
 } from '../../../services/member360LabService';
-import { LabSubNav, MetricCard, RiskBadge, SectionCard } from './components';
+import { LabSubNav, RiskBadge } from './components';
+import FilterDropdown from '../../../components/ui/FilterDropdown';
 
 const TIER_ORDER = ['Critical', 'High', 'Moderate', 'Low'];
 const DOMAINS = ['Clinical', 'Utilization', 'Cost', 'Engagement'];
+
+const TIER_TONE = {
+  Critical: 'text-rose-600 dark:text-rose-300',
+  High: 'text-amber-600 dark:text-amber-300',
+  Moderate: 'text-sky-600 dark:text-sky-300',
+  Low: 'text-emerald-600 dark:text-emerald-300',
+};
+
+const TIER_BAR = {
+  Critical: 'bg-rose-500',
+  High: 'bg-amber-500',
+  Moderate: 'bg-sky-500',
+  Low: 'bg-emerald-500',
+};
 
 const Member360LabRiskIntelligencePage = () => {
   const navigate = useNavigate();
@@ -21,7 +36,7 @@ const Member360LabRiskIntelligencePage = () => {
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [domainFilter, setDomainFilter] = useState('all');
+  const [domain, setDomain] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,19 +63,16 @@ const Member360LabRiskIntelligencePage = () => {
   }, [members]);
 
   const domainAverages = useMemo(() => {
-    return DOMAINS.map((domain) => {
-      const scores = members.map((m) => {
-        const key = `${domain.toLowerCase()}_risk_score`;
-        return Number(m[key]);
-      }).filter((v) => Number.isFinite(v));
+    return DOMAINS.map((d) => {
+      const scores = members.map((m) => Number(m[`${d.toLowerCase()}_risk_score`])).filter((v) => Number.isFinite(v));
       const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-      const high = members.filter((m) => Number(m[`${domain.toLowerCase()}_risk_score`]) >= 7).length;
-      return { domain, average: avg, high };
+      const high = members.filter((m) => Number(m[`${d.toLowerCase()}_risk_score`]) >= 7).length;
+      return { domain: d, average: avg, high };
     });
   }, [members]);
 
   const driverRollup = useMemo(() => {
-    const filtered = domainFilter === 'all' ? insights : insights.filter((i) => i.domain === domainFilter);
+    const filtered = !domain ? insights : insights.filter((i) => i.domain === domain);
     const map = new Map();
     filtered.forEach((i) => {
       const key = `${i.domain}|${i.driver}`;
@@ -87,7 +99,7 @@ const Member360LabRiskIntelligencePage = () => {
         confidence: d.confidenceCount ? d.confidence / d.confidenceCount : null,
       }))
       .sort((a, b) => b.average_score - a.average_score);
-  }, [insights, domainFilter]);
+  }, [insights, domain]);
 
   const topMembers = useMemo(() => {
     return [...members]
@@ -116,46 +128,52 @@ const Member360LabRiskIntelligencePage = () => {
 
       {!loading && !error && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {TIER_ORDER.map((tier) => (
-              <MetricCard
+              <KpiTile
                 key={tier}
                 label={`${tier} risk`}
                 value={tierBreakdown[tier]}
                 hint={`${((tierBreakdown[tier] / totalMembers) * 100).toFixed(0)}% of members`}
+                tone={tier}
               />
             ))}
-          </div>
+          </section>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SectionCard title="Risk distribution" subtitle="Members per tier as a share of the population.">
-              <ul className="space-y-2">
+            <section className="coding-surface rounded-2xl shadow-sm p-5">
+              <header className="mb-3">
+                <h3 className="text-sm font-semibold coding-text-strong">Risk distribution</h3>
+                <p className="text-xs coding-text-soft">Members per tier as a share of the population.</p>
+              </header>
+              <ul className="space-y-3">
                 {TIER_ORDER.map((tier) => {
                   const count = tierBreakdown[tier];
                   const pct = (count / totalMembers) * 100;
                   return (
-                    <li key={tier} className="text-xs">
-                      <div className="flex items-center justify-between mb-1">
+                    <li key={tier}>
+                      <div className="flex items-center justify-between mb-1.5">
                         <RiskBadge tier={tier} />
-                        <span className="tabular-nums coding-text-muted">{count} · {pct.toFixed(0)}%</span>
+                        <span className="text-xs tabular-nums coding-text-muted">{count} · {pct.toFixed(0)}%</span>
                       </div>
                       <div className="h-2 w-full rounded-full bg-slate-200/50 dark:bg-slate-700/40 overflow-hidden">
-                        <div
-                          className={`h-full ${tier === 'Critical' ? 'bg-rose-500' : tier === 'High' ? 'bg-amber-500' : tier === 'Moderate' ? 'bg-sky-500' : 'bg-emerald-500'}`}
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className={`h-full ${TIER_BAR[tier]}`} style={{ width: `${pct}%` }} />
                       </div>
                     </li>
                   );
                 })}
               </ul>
-            </SectionCard>
+            </section>
 
-            <SectionCard title="Average score by domain" subtitle="Where risk concentrates across the population.">
+            <section className="coding-surface rounded-2xl shadow-sm p-5">
+              <header className="mb-3">
+                <h3 className="text-sm font-semibold coding-text-strong">Average score by domain</h3>
+                <p className="text-xs coding-text-soft">Where risk concentrates across the population.</p>
+              </header>
               <ul className="space-y-3">
                 {domainAverages.map((d) => (
                   <li key={d.domain}>
-                    <div className="flex items-center justify-between text-xs mb-1">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
                       <span className="font-semibold coding-text-strong">{d.domain}</span>
                       <span className="tabular-nums coding-text-muted">avg {d.average.toFixed(1)} · {d.high} ≥7</span>
                     </div>
@@ -165,96 +183,133 @@ const Member360LabRiskIntelligencePage = () => {
                   </li>
                 ))}
               </ul>
-            </SectionCard>
+            </section>
           </div>
 
-          <SectionCard
-            title="Top drivers"
-            subtitle="Highest-impact drivers across the population, with members affected."
-            action={(
-              <select value={domainFilter} onChange={(e) => setDomainFilter(e.target.value)} className="coding-input rounded-md px-2 py-1 text-xs">
-                <option value="all">All domains</option>
-                {DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            )}
-          >
-            <div className="overflow-x-auto rounded-lg ring-1 ring-black/5 dark:ring-white/10">
+          <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+            <header className="px-5 py-3 border-b coding-border flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold coding-text-strong">Top drivers</h3>
+                <p className="text-xs coding-text-soft">Highest-impact drivers across the population, with members affected.</p>
+              </div>
+              <FilterDropdown label="Domain" count={domain ? 1 : 0} display={domain}>
+                {({ close }) => (
+                  <div className="flex flex-col gap-1 min-w-[160px]">
+                    <button
+                      type="button"
+                      onClick={() => { setDomain(null); close(); }}
+                      className={`text-left px-2 py-1 rounded hover:bg-[var(--coding-hover)] ${!domain ? 'coding-text-strong font-semibold' : 'coding-text-soft'}`}
+                    >
+                      All domains
+                    </button>
+                    {DOMAINS.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => { setDomain(d); close(); }}
+                        className={`text-left px-2 py-1 rounded hover:bg-[var(--coding-hover)] ${domain === d ? 'coding-text-strong font-semibold' : 'coding-text-soft'}`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </FilterDropdown>
+            </header>
+            <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="coding-surface-subtle text-xs uppercase tracking-wide coding-text-muted">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-medium">Driver</th>
-                    <th className="text-left px-3 py-2 font-medium">Domain</th>
-                    <th className="text-right px-3 py-2 font-medium">Members</th>
-                    <th className="text-right px-3 py-2 font-medium">Avg score</th>
-                    <th className="text-right px-3 py-2 font-medium">Confidence</th>
-                    <th className="text-left px-3 py-2 font-medium">Recommendation</th>
+                <thead className="text-[11px] uppercase tracking-wider coding-text-muted">
+                  <tr className="border-b coding-border">
+                    <th className="text-left px-4 py-2.5 font-semibold">Driver</th>
+                    <th className="text-left px-3 py-2.5 font-semibold">Domain</th>
+                    <th className="text-right px-3 py-2.5 font-semibold">Members</th>
+                    <th className="text-right px-3 py-2.5 font-semibold">Avg score</th>
+                    <th className="text-right px-3 py-2.5 font-semibold">Confidence</th>
+                    <th className="text-left px-3 py-2.5 font-semibold">Recommendation</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y coding-divider">
+                <tbody>
                   {driverRollup.map((d, idx) => (
-                    <tr key={`${d.domain}-${d.driver}-${idx}`} className="coding-hoverable">
-                      <td className="px-3 py-2 coding-text-strong">{d.driver}</td>
-                      <td className="px-3 py-2 text-xs"><span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 coding-text-muted">{d.domain}</span></td>
-                      <td className="px-3 py-2 text-right tabular-nums">{d.member_count}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{d.average_score.toFixed(1)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{d.confidence != null ? `${(d.confidence * 100).toFixed(0)}%` : '—'}</td>
-                      <td className="px-3 py-2 text-xs coding-text-soft">{d.recommendation || '—'}</td>
+                    <tr key={`${d.domain}-${d.driver}-${idx}`} className="border-b coding-border-subtle hover:bg-[var(--coding-hover)] transition">
+                      <td className="px-4 py-3 coding-text-strong font-medium">{d.driver}</td>
+                      <td className="px-3 py-3 text-xs">
+                        <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 coding-text-muted">{d.domain}</span>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular-nums coding-text-strong">{d.member_count}</td>
+                      <td className="px-3 py-3 text-right tabular-nums coding-text-strong">{d.average_score.toFixed(1)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{d.confidence != null ? `${(d.confidence * 100).toFixed(0)}%` : '—'}</td>
+                      <td className="px-3 py-3 text-xs coding-text-soft">{d.recommendation || '—'}</td>
                     </tr>
                   ))}
                   {driverRollup.length === 0 && (
-                    <tr><td colSpan={6} className="px-3 py-6 text-center text-xs coding-text-soft">No drivers in this view.</td></tr>
+                    <tr><td colSpan={6} className="px-3 py-12 text-center text-sm coding-text-soft">No drivers in this view.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </SectionCard>
+          </section>
 
-          <SectionCard title="Highest composite risk" subtitle="Top members ranked by composite score.">
-            <div className="overflow-x-auto rounded-lg ring-1 ring-black/5 dark:ring-white/10">
+          <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+            <header className="px-5 py-3 border-b coding-border">
+              <h3 className="text-sm font-semibold coding-text-strong">Highest composite risk</h3>
+              <p className="text-xs coding-text-soft">Top members ranked by composite score.</p>
+            </header>
+            <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="coding-surface-subtle text-xs uppercase tracking-wide coding-text-muted">
-                  <tr>
-                    <th className="text-left px-3 py-2 font-medium">Member</th>
-                    <th className="text-left px-3 py-2 font-medium">Tier</th>
-                    <th className="text-right px-3 py-2 font-medium">Composite</th>
-                    <th className="text-right px-3 py-2 font-medium">Clinical</th>
-                    <th className="text-right px-3 py-2 font-medium">Utilization</th>
-                    <th className="text-right px-3 py-2 font-medium">Cost</th>
-                    <th className="text-right px-3 py-2 font-medium">Engagement</th>
-                    <th className="text-left px-3 py-2 font-medium">Next best action</th>
+                <thead className="text-[11px] uppercase tracking-wider coding-text-muted">
+                  <tr className="border-b coding-border">
+                    <th className="text-left px-4 py-2.5 font-semibold">Member</th>
+                    <th className="text-left px-3 py-2.5 font-semibold">Tier</th>
+                    <th className="text-right px-3 py-2.5 font-semibold">Composite</th>
+                    <th className="text-right px-3 py-2.5 font-semibold">Clinical</th>
+                    <th className="text-right px-3 py-2.5 font-semibold">Utilization</th>
+                    <th className="text-right px-3 py-2.5 font-semibold">Cost</th>
+                    <th className="text-right px-3 py-2.5 font-semibold">Engagement</th>
+                    <th className="text-left px-3 py-2.5 font-semibold">Next best action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y coding-divider">
+                <tbody>
                   {topMembers.map((m) => (
                     <tr
                       key={m.id}
-                      className="cursor-pointer coding-hoverable"
+                      className="cursor-pointer border-b coding-border-subtle hover:bg-[var(--coding-hover)] transition"
                       onClick={() => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${m.id}`)}
                     >
-                      <td className="px-3 py-2">
-                        <p className="coding-text-strong font-semibold">{m.first_name} {m.last_name}</p>
+                      <td className="px-4 py-3">
+                        <p className="coding-text-strong font-medium">{m.first_name} {m.last_name}</p>
                         <p className="text-[11px] coding-text-muted">{m.member_key}</p>
                       </td>
-                      <td className="px-3 py-2"><RiskBadge tier={m.risk_tier} /></td>
-                      <td className="px-3 py-2 text-right tabular-nums">{m.risk_score_composite != null ? Number(m.risk_score_composite).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{m.clinical_risk_score != null ? Number(m.clinical_risk_score).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{m.utilization_risk_score != null ? Number(m.utilization_risk_score).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{m.cost_risk_score != null ? Number(m.cost_risk_score).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{m.engagement_risk_score != null ? Number(m.engagement_risk_score).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-2 text-xs coding-text-soft">{m.next_best_action || '—'}</td>
+                      <td className="px-3 py-3"><RiskBadge tier={m.risk_tier} /></td>
+                      <td className="px-3 py-3 text-right tabular-nums coding-text-strong font-medium">{m.risk_score_composite != null ? Number(m.risk_score_composite).toFixed(1) : '—'}</td>
+                      <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{m.clinical_risk_score != null ? Number(m.clinical_risk_score).toFixed(1) : '—'}</td>
+                      <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{m.utilization_risk_score != null ? Number(m.utilization_risk_score).toFixed(1) : '—'}</td>
+                      <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{m.cost_risk_score != null ? Number(m.cost_risk_score).toFixed(1) : '—'}</td>
+                      <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{m.engagement_risk_score != null ? Number(m.engagement_risk_score).toFixed(1) : '—'}</td>
+                      <td className="px-3 py-3 text-xs coding-text-soft">{m.next_best_action || '—'}</td>
                     </tr>
                   ))}
                   {topMembers.length === 0 && (
-                    <tr><td colSpan={8} className="px-3 py-6 text-center text-xs coding-text-soft">No members loaded.</td></tr>
+                    <tr><td colSpan={8} className="px-3 py-12 text-center text-sm coding-text-soft">No members loaded.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </SectionCard>
+          </section>
         </>
       )}
     </PortalPageLayout>
   );
 };
+
+function KpiTile({ label, value, hint, tone = 'neutral' }) {
+  const valueTone = TIER_TONE[tone] || 'coding-text-strong';
+  return (
+    <div className="coding-surface rounded-2xl shadow-sm p-3.5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</p>
+      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueTone}`}>{value}</p>
+      {hint && <p className="mt-1 text-[11px] coding-text-soft">{hint}</p>}
+    </div>
+  );
+}
 
 export default Member360LabRiskIntelligencePage;
