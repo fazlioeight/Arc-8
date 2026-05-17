@@ -7,6 +7,7 @@ import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { fetchMember360Members } from '../../../services/member360LabService';
 import { LabSubNav, RiskBadge } from './components';
+import FilterDropdown from '../../../components/ui/FilterDropdown';
 
 const RISK_TIERS = ['Critical', 'High', 'Moderate', 'Low'];
 const SORT_OPTIONS = [
@@ -254,46 +255,5 @@ const Member360LabMembersPage = () => {
     </PortalPageLayout>
   );
 };
-
-function FilterDropdown({ label, count = 0, display, children }) {
-  const [open, setOpen] = useState(false);
-  const ref = React.useRef(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
-  }, [open]);
-
-  const active = count > 0;
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1.5 rounded-md ring-1 px-2.5 py-1.5 text-xs font-medium transition ${
-          active
-            ? 'ring-[var(--brand-primary)] text-[var(--brand-primary)] bg-brand-50 dark:bg-brand-900/20'
-            : 'coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)]'
-        }`}
-      >
-        <span>{label}</span>
-        {display && <span className="coding-text-muted">· {display}</span>}
-        {count > 0 && !display && (
-          <span className="inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded-full bg-[var(--brand-primary)] text-white text-[10px]">{count}</span>
-        )}
-        <svg viewBox="0 0 24 24" className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full z-10 mt-1 min-w-[180px] coding-surface rounded-md shadow-md ring-1 coding-border p-1.5">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default Member360LabMembersPage;

@@ -44,6 +44,7 @@ const ProviderDetailPage = lazy(() => import('./pages/platform/providers/Provide
 const MasterAdminPage = lazy(() => import('./pages/platform/admin/MasterAdminPage'));
 const JobStatusCenter = lazy(() => import('./pages/platform/jobs/JobStatusCenter'));
 const ImportDataPage = lazy(() => import('./pages/platform/jobs/ImportDataPage'));
+const CodingWorklistPage = lazy(() => import('./pages/platform/coding/CodingWorklistPage'));
 const Mission = lazy(() => import('./pages/website/about/Mission'));
 const Values = lazy(() => import('./pages/website/about/Values'));
 const Team = lazy(() => import('./pages/website/about/Team'));
@@ -97,6 +98,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
     "/admin",
     "/jobs",
     ROUTES.CHAT,
+    ROUTES.CODING.WORKLIST,
   ];
   const hideNavbar = hideNavbarOn.some((p) => location.pathname.startsWith(p));
 
@@ -204,6 +206,11 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/admin/master" element={<MasterAdminPage />} />
           <Route path="/jobs/import-data" element={<ImportDataPage />} />
           <Route path="/jobs/status-center" element={<JobStatusCenter />} />
+          <Route path={ROUTES.CODING.WORKLIST} element={(
+            <ErrorBoundary title="Coding worklist failed to load">
+              <CodingWorklistPage />
+            </ErrorBoundary>
+          )} />
         </Routes>
       </Suspense>
     </div>

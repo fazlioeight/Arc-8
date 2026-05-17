@@ -1,8 +1,3 @@
-@keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
-}
-
 .coding-member-workspace {
   --coding-surface: var(--bg-card);
   --coding-surface-subtle: color-mix(in srgb, var(--bg-card) 82%, var(--bg) 18%);

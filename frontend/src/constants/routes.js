@@ -23,6 +23,9 @@ export const ROUTES = {
   PROVIDERS: {
     LANDING: "/providers",
   },
+  CODING: {
+    WORKLIST: "/coding",
+  },
   JOBS: {
     STATUS_CENTER: "/jobs/status-center",
     IMPORT_DATA: "/jobs/import-data",

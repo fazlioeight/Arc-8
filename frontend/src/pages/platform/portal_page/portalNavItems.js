@@ -25,6 +25,14 @@ export const PORTAL_NAV_ITEMS = [
       path.startsWith(`${ROUTES.PROVIDERS.LANDING}/`),
   },
   {
+    key: "coding",
+    label: "Coding Worklist",
+    href: ROUTES.CODING.WORKLIST,
+    match: (path) =>
+      path === ROUTES.CODING.WORKLIST ||
+      path.startsWith(`${ROUTES.CODING.WORKLIST}/`),
+  },
+  {
     key: "chat",
     label: "Nexora Chat",
     href: ROUTES.CHAT,
