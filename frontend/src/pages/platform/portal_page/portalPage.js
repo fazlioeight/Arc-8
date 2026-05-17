@@ -2,6 +2,8 @@
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalCard from "../../../components/PortalCard";
+import KpiTile from "../../../components/ui/KpiTile";
+import SearchInput from "../../../components/ui/SearchInput";
 import { AuthContext } from "../../../context/AuthContext";
 import {
   EmptyState,
@@ -211,10 +213,10 @@ const PortalPage = () => {
 
   const kpiStrip = (
     <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <PortalKpiTile label="Applications" value={allowedApps.length || renderableApps.length} hint="Available to you" />
-      <PortalKpiTile label="Open tasks" value={openTasks} tone={openTasks > 0 ? 'warning' : 'neutral'} hint="Across products" />
-      <PortalKpiTile label="Saved items" value={lastSavedItems.length} hint="Recently pinned" />
-      <PortalKpiTile label="Tenant" value={tenantLabel} hint="Workspace" small />
+      <KpiTile label="Applications" value={allowedApps.length || renderableApps.length} hint="Available to you" />
+      <KpiTile label="Open tasks" value={openTasks} tone={openTasks > 0 ? 'warning' : 'neutral'} hint="Across products" />
+      <KpiTile label="Saved items" value={lastSavedItems.length} hint="Recently pinned" />
+      <KpiTile label="Tenant" value={tenantLabel} hint="Workspace" small />
     </section>
   );
 
@@ -266,30 +268,24 @@ const PortalPage = () => {
             >
               Member ID
             </label>
-            <div className="relative">
-              <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 coding-text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="7" />
-                <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
-              </svg>
-              <input
-                id="portal-member-search-input"
-                type="search"
-                autoComplete="off"
-                placeholder="Search by member ID, name, or plan"
-                value={memberQuery}
-                onChange={(event) => handleMemberQueryChange(event.target.value)}
-                list="portal-member-suggestions"
-                aria-describedby="portal-member-search-help"
-                className="coding-input w-full rounded-md pl-9 pr-3 py-2.5 text-sm"
-              />
-              <datalist id="portal-member-suggestions">
-                {memberOptions.map((option) => (
-                  <option key={option.key} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </datalist>
-            </div>
+            <SearchInput
+              id="portal-member-search-input"
+              autoComplete="off"
+              placeholder="Search by member ID, name, or plan"
+              value={memberQuery}
+              onChange={(event) => handleMemberQueryChange(event.target.value)}
+              list="portal-member-suggestions"
+              aria-describedby="portal-member-search-help"
+              className="pl-9 pr-3 py-2.5"
+              wrapperClassName="w-full"
+            />
+            <datalist id="portal-member-suggestions">
+              {memberOptions.map((option) => (
+                <option key={option.key} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </datalist>
           </div>
           <button
             className="inline-flex items-center justify-center rounded-md bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -525,20 +521,5 @@ const PortalPage = () => {
     </PortalPageLayout>
   );
 };
-
-function PortalKpiTile({ label, value, hint, tone = 'neutral', small = false }) {
-  const valueTone = {
-    neutral: 'coding-text-strong',
-    warning: 'text-amber-700 dark:text-amber-300',
-    critical: 'text-rose-600 dark:text-rose-300',
-  }[tone] || 'coding-text-strong';
-  return (
-    <div className="coding-surface rounded-2xl shadow-sm p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</p>
-      <p className={`mt-1.5 ${small ? 'text-base font-semibold' : 'text-2xl font-semibold tabular-nums'} ${valueTone}`}>{value}</p>
-      {hint && <p className="mt-1 text-[11px] coding-text-soft">{hint}</p>}
-    </div>
-  );
-}
 
 export default PortalPage;

@@ -7,6 +7,9 @@ import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { fetchCodingWorklist } from '../../../services/codingService';
 import FilterDropdown from '../../../components/ui/FilterDropdown';
+import KpiTile from '../../../components/ui/KpiTile';
+import SavedViewsBar from '../../../components/ui/SavedViewsBar';
+import SearchInput from '../../../components/ui/SearchInput';
 
 const STATUSES = [
   { key: 'open', label: 'Open' },
@@ -145,44 +148,15 @@ export default function CodingWorklistPage() {
         </section>
       )}
 
-      {/* Saved views — HubSpot index pattern */}
-      <nav className="border-b coding-border overflow-x-auto" aria-label="Saved views">
-        <div className="flex items-center gap-1">
-          {SAVED_VIEWS.map((v) => {
-            const active = v.key === activeView;
-            return (
-              <button
-                key={v.key}
-                type="button"
-                onClick={() => applySavedView(v.key)}
-                className={`whitespace-nowrap px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
-                  active
-                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
-                    : 'border-transparent coding-text-soft hover:coding-text-strong hover:border-slate-200 dark:hover:border-slate-700'
-                }`}
-              >
-                {v.label}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <SavedViewsBar views={SAVED_VIEWS} activeKey={activeView} onChange={applySavedView} />
 
       <section className="coding-surface rounded-2xl shadow-sm">
         <div className="p-3 flex flex-col lg:flex-row gap-2 lg:items-center">
-          <div className="relative flex-1 min-w-0">
-            <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 coding-text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
-            </svg>
-            <input
-              type="search"
-              placeholder="Search member, HCC, or coder"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="coding-input w-full rounded-md pl-9 pr-3 py-2 text-sm"
-            />
-          </div>
+          <SearchInput
+            placeholder="Search member, HCC, or coder"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
 
         <div className="border-t coding-border px-3 py-2 flex flex-wrap items-center gap-1.5 text-xs">
@@ -364,16 +338,3 @@ export default function CodingWorklistPage() {
   );
 }
 
-function KpiTile({ label, value, tone = 'neutral' }) {
-  const toneClass = {
-    neutral: 'coding-text-strong',
-    warning: 'text-amber-700 dark:text-amber-300',
-    critical: 'text-rose-600 dark:text-rose-300',
-  }[tone] || 'coding-text-strong';
-  return (
-    <div className="coding-surface rounded-2xl shadow-sm p-3.5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</p>
-      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</p>
-    </div>
-  );
-}

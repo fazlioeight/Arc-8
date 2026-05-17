@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import AlertShell from "../../../components/ui/AlertShell";
 import FilterDropdown from "../../../components/ui/FilterDropdown";
+import SavedViewsBar from "../../../components/ui/SavedViewsBar";
+import SearchInput from "../../../components/ui/SearchInput";
 import { LoadingState, ErrorState } from "../../../components/ehr/Primitives";
 import { AuthContext } from "../../../context/AuthContext";
 import { useUserPreferences } from "../../../context/UserPreferencesContext";
@@ -104,45 +106,16 @@ const ProvidersPage = () => {
         <AlertShell tone="warning" title="Authentication required" description="Sign in to load provider data." />
       )}
 
-      {/* Saved views — HubSpot index pattern */}
-      <nav className="border-b coding-border overflow-x-auto" aria-label="Saved views">
-        <div className="flex items-center gap-1">
-          {SAVED_VIEWS.map((v) => {
-            const active = v.key === activeView;
-            return (
-              <button
-                key={v.key}
-                type="button"
-                onClick={() => applySavedView(v.key)}
-                className={`whitespace-nowrap px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
-                  active
-                    ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
-                    : "border-transparent coding-text-soft hover:coding-text-strong hover:border-slate-200 dark:hover:border-slate-700"
-                }`}
-              >
-                {v.label}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      <SavedViewsBar views={SAVED_VIEWS} activeKey={activeView} onChange={applySavedView} />
 
       <section className="coding-surface rounded-2xl shadow-sm">
         <form className="p-3 flex flex-col lg:flex-row gap-2 lg:items-center" onSubmit={handleSubmit}>
-          <div className="relative flex-1 min-w-0">
-            <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 coding-text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
-            </svg>
-            <input
-              type="search"
-              placeholder="Search name, NPI, or tax ID"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              disabled={!canQuery}
-              className="coding-input w-full rounded-md pl-9 pr-3 py-2 text-sm"
-            />
-          </div>
+          <SearchInput
+            placeholder="Search name, NPI, or tax ID"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            disabled={!canQuery}
+          />
           <button
             type="submit"
             disabled={loading || !canQuery}

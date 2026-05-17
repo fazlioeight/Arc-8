@@ -11,6 +11,8 @@ import {
 } from '../../../services/member360LabService';
 import { CareJourneyCard, LabSubNav, RiskBadge } from './components';
 import FilterDropdown from '../../../components/ui/FilterDropdown';
+import KpiTile from '../../../components/ui/KpiTile';
+import SearchInput from '../../../components/ui/SearchInput';
 
 const JOURNEY_STATUSES = [
   { key: 'active', label: 'Active' },
@@ -203,19 +205,11 @@ const Member360LabCareJourneysPage = () => {
                   </div>
                 </header>
                 <div className="px-3 py-2 flex items-center gap-2 border-b coding-border">
-                  <div className="relative flex-1 min-w-0">
-                    <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 coding-text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="11" cy="11" r="7" />
-                      <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
-                    </svg>
-                    <input
-                      type="search"
-                      placeholder="Search journey, member, or assignee"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="coding-input w-full rounded-md pl-9 pr-3 py-2 text-sm"
-                    />
-                  </div>
+                  <SearchInput
+                    placeholder="Search journey, member, or assignee"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                   <FilterDropdown label="Status" count={statuses.length}>
                     <div className="flex flex-col gap-1 min-w-[180px]">
                       {JOURNEY_STATUSES.map((s) => (
@@ -260,20 +254,5 @@ const Member360LabCareJourneysPage = () => {
     </PortalPageLayout>
   );
 };
-
-function KpiTile({ label, value, tone = 'neutral' }) {
-  const valueTone = {
-    neutral: 'coding-text-strong',
-    info: 'text-sky-700 dark:text-sky-300',
-    warning: 'text-amber-700 dark:text-amber-300',
-    success: 'text-emerald-700 dark:text-emerald-300',
-  }[tone] || 'coding-text-strong';
-  return (
-    <div className="coding-surface rounded-2xl shadow-sm p-3.5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</p>
-      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueTone}`}>{value}</p>
-    </div>
-  );
-}
 
 export default Member360LabCareJourneysPage;

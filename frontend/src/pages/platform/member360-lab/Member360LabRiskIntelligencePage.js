@@ -11,16 +11,10 @@ import {
 } from '../../../services/member360LabService';
 import { LabSubNav, RiskBadge } from './components';
 import FilterDropdown from '../../../components/ui/FilterDropdown';
+import KpiTile from '../../../components/ui/KpiTile';
 
 const TIER_ORDER = ['Critical', 'High', 'Moderate', 'Low'];
 const DOMAINS = ['Clinical', 'Utilization', 'Cost', 'Engagement'];
-
-const TIER_TONE = {
-  Critical: 'text-rose-600 dark:text-rose-300',
-  High: 'text-amber-600 dark:text-amber-300',
-  Moderate: 'text-sky-600 dark:text-sky-300',
-  Low: 'text-emerald-600 dark:text-emerald-300',
-};
 
 const TIER_BAR = {
   Critical: 'bg-rose-500',
@@ -300,16 +294,5 @@ const Member360LabRiskIntelligencePage = () => {
     </PortalPageLayout>
   );
 };
-
-function KpiTile({ label, value, hint, tone = 'neutral' }) {
-  const valueTone = TIER_TONE[tone] || 'coding-text-strong';
-  return (
-    <div className="coding-surface rounded-2xl shadow-sm p-3.5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</p>
-      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueTone}`}>{value}</p>
-      {hint && <p className="mt-1 text-[11px] coding-text-soft">{hint}</p>}
-    </div>
-  );
-}
 
 export default Member360LabRiskIntelligencePage;
