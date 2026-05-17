@@ -1,9 +1,8 @@
 ﻿import React, { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
-import PortalPageHeader from "../../../components/PortalPageHeader";
 import PortalCard from "../../../components/PortalCard";
-import PortalStat from "../../../components/PortalStat";
+import KpiTile from "../../../components/ui/KpiTile";
 import "../../../index.css";
 import "../../../styles/memberWorkspace.css";
 import DarkModeToggle from "../../../components/DarkModeToggle";
@@ -180,17 +179,11 @@ const Settings = ({ themePreference, setThemePreference }) => {
   );
 
   const headerContent = (
-    <PortalPageHeader
-      eyebrow="Settings"
-      title="Manage your Nexora Lab preferences"
-      subtitle="Personalize your workspace, navigation, and notifications."
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          <PortalStat label="Role" value={menuRole || "User"} meta="Access" />
-          <PortalStat label="Sections" value={navSections.length} meta="Available" tone="info" />
-        </div>
-      }
-    />
+    <div className="flex flex-col gap-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">Settings</p>
+      <h1 className="text-3xl font-semibold coding-text-strong">Manage your Nexora Lab preferences</h1>
+      <p className="text-sm coding-text-soft">Personalize your workspace, navigation, and notifications.</p>
+    </div>
   );
 
   return (
@@ -200,24 +193,39 @@ const Settings = ({ themePreference, setThemePreference }) => {
       mainClassName="space-y-6"
       utilityBar={isAuthenticated}
     >
-      <div className="grid gap-4 sm:grid-cols-[260px_1fr]">
-        <PortalCard title="Sections" compact className="sm:sticky sm:top-4 sm:self-start">
-          <div className="portal-list">
-            {navSections.map((s) => (
-              <button
-                key={s.id}
-                className={`portal-ghost-button w-full justify-between text-left ${
-                  active === s.id ? "border-sky-300 bg-sky-50/80 dark:border-sky-500/50 dark:bg-slate-800" : ""
-                }`}
-                onClick={() => setActive(s.id)}
-                type="button"
-              >
-                <span>{s.label}</span>
-                <span className="portal-pill portal-pill--ghost">{active === s.id ? "Active" : "Go"}</span>
-              </button>
-            ))}
-          </div>
-        </PortalCard>
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KpiTile label="Role" value={(menuRole || 'User').replace(/_/g, ' ')} hint="Access level" small />
+        <KpiTile label="Sections" value={navSections.length} hint="Available" />
+        <KpiTile label="Memories" value={memories.length} hint="Saved" />
+        <KpiTile label="Theme" value={prefs.theme || 'system'} hint="Current" small />
+      </section>
+
+      <div className="grid gap-4 sm:grid-cols-[240px_1fr]">
+        <nav className="coding-surface rounded-2xl shadow-sm overflow-hidden sm:sticky sm:top-4 sm:self-start">
+          <header className="px-4 py-2.5 border-b coding-border">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">Sections</h3>
+          </header>
+          <ul>
+            {navSections.map((s) => {
+              const isActive = active === s.id;
+              return (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActive(s.id)}
+                    className={`w-full text-left border-b coding-border-subtle px-4 py-2.5 text-sm transition border-l-4 ${
+                      isActive
+                        ? 'border-l-[var(--brand-primary)] bg-brand-50 dark:bg-brand-900/20 text-[var(--brand-primary)] font-medium'
+                        : 'border-l-transparent coding-text-strong hover:bg-[var(--coding-hover)]'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
 
         <section className="space-y-4">
           {active === "general" && (

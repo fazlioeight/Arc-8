@@ -1,6 +1,7 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalUtilityBar from "../../../components/PortalUtilityBar";
+import KpiTile from "../../../components/ui/KpiTile";
 import { AuthContext } from "../../../context/AuthContext";
 import {
   createAdminUser,
@@ -449,10 +450,10 @@ const filteredUsers = useMemo(() => {
       <PortalUtilityBar />
       <div className="mx-auto max-w-7xl px-4 pb-12 pt-8 sm:px-6 lg:px-8">
         <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Platform Admin</p>
-            <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">Master Admin Console</h1>
-            <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-300">
+          <div className="flex flex-col gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">Platform Admin</p>
+            <h1 className="text-3xl font-semibold coding-text-strong">Master Admin Console</h1>
+            <p className="max-w-3xl text-sm coding-text-soft">
               Manage users, roles, and application access for the {user?.tenant || tenant} tenant.
             </p>
           </div>
@@ -460,6 +461,13 @@ const filteredUsers = useMemo(() => {
             + New User
           </button>
         </header>
+
+        <section className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <KpiTile label="Users" value={users.length} hint="Total" />
+          <KpiTile label="Admins" value={users.filter((u) => u.role === 'admin' || u.role === 'platform_admin').length} tone="info" hint="Elevated" />
+          <KpiTile label="Active" value={users.filter((u) => u.is_active).length} tone="success" hint="Enabled" />
+          <KpiTile label="Applications" value={apps.length} hint="Available" />
+        </section>
 
         <div className="mt-6 space-y-4" id="admin-shell">
           {statusMessage && (

@@ -1,9 +1,9 @@
 ﻿import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
-import PortalPageHeader from "../../../components/PortalPageHeader";
 import PortalCard from "../../../components/PortalCard";
-import PortalStat from "../../../components/PortalStat";
+import KpiTile from "../../../components/ui/KpiTile";
+import SearchInput from "../../../components/ui/SearchInput";
 import { AuthContext } from "../../../context/AuthContext";
 import { useCommandPalette } from "../../../context/CommandPaletteContext";
 import { SAMPLE_JOBS, SAMPLE_JOB_LOGS, sampleDownload } from "../../../utils/sampleData";
@@ -217,19 +217,20 @@ const JobStatusCenter = () => {
   );
 
   const headerContent = (
-    <PortalPageHeader
-      eyebrow="Operations"
-      title="Job & Status Center"
-      subtitle="Track imports, model runs, and exports across tenants. Retry failures or download logs without leaving the page."
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          <PortalStat label="Jobs" value={totalCount} meta="Filtered" tone="info" />
-          <PortalStat label="In flight" value={processingCount} meta="Running/queued" tone="warning" />
-          <PortalStat label="Completed" value={completedCount} meta="Done" tone="success" />
-          <PortalStat label="Failed" value={failedCount} meta="Attention" tone="danger" />
-        </div>
-      }
-    />
+    <div className="flex flex-col gap-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">Operations</p>
+      <h1 className="text-3xl font-semibold coding-text-strong">Job &amp; Status Center</h1>
+      <p className="text-sm coding-text-soft">Track imports, model runs, and exports across tenants. Retry failures or download logs without leaving the page.</p>
+    </div>
+  );
+
+  const kpiStrip = (
+    <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <KpiTile label="Jobs" value={totalCount} hint="Filtered" />
+      <KpiTile label="In flight" value={processingCount} tone="warning" hint="Running/queued" />
+      <KpiTile label="Completed" value={completedCount} tone="success" hint="Done" />
+      <KpiTile label="Failed" value={failedCount} tone="critical" hint="Attention" />
+    </section>
   );
 
   const detailTone = useMemo(() => {
@@ -241,82 +242,72 @@ const JobStatusCenter = () => {
 
   return (
     <PortalPageLayout {...layoutProps} headerContent={headerContent}>
-      <PortalCard
-        title="Filters & shortcuts"
-        subtitle="Narrow down jobs by status, tenant, or keyword."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <button className="portal-ghost-button" onClick={() => navigate("/jobs/import-data")}>
+      {kpiStrip}
+
+      <section className="coding-surface rounded-2xl shadow-sm">
+        <div className="p-3 flex flex-col lg:flex-row gap-2 lg:items-center">
+          <SearchInput
+            placeholder="Search job name, ID, or submitted by"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="coding-input rounded-md px-3 py-2 text-sm lg:w-44"
+          >
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <select
+            value={tenantFilter}
+            onChange={(event) => setTenantFilter(event.target.value)}
+            className="coding-input rounded-md px-3 py-2 text-sm lg:w-44"
+          >
+            <option value="">All tenants</option>
+            {availableTenants.map((option) => (
+              <option key={option.key} value={option.key}>{option.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="border-t coding-border px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setStatusFilter(""); setTenantFilter(""); setSearchTerm(""); }}
+              className="text-[var(--brand-primary)] font-medium hover:underline"
+            >
+              Clear filters
+            </button>
+            <span className="coding-text-muted">·</span>
+            <span className="coding-text-soft">{filteredJobs.length} visible</span>
+            {lastUpdated && (
+              <>
+                <span className="coding-text-muted">·</span>
+                <span className="coding-text-soft">Updated {lastUpdated.toLocaleTimeString()}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => navigate("/jobs/import-data")}
+              className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-2.5 py-1.5 text-xs font-semibold"
+            >
               Go to Import Data
             </button>
-            <button className="portal-ghost-button" onClick={handleRefresh} disabled={loading}>
-              {loading ? "Refreshing..." : "Manual refresh"}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loading}
+              className="rounded-md bg-[var(--brand-primary)] text-white px-2.5 py-1.5 text-xs font-semibold hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Refreshing..." : "Refresh"}
             </button>
           </div>
-        }
-      >
-        <div className="portal-section-grid">
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300" htmlFor="job-search">
-              Search
-            </label>
-            <input
-              id="job-search"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-              placeholder="Job name, ID, or submitted by"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Status</label>
-            <select
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-            >
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Tenant</label>
-            <select
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-              value={tenantFilter}
-              onChange={(event) => setTenantFilter(event.target.value)}
-            >
-              <option value="">All tenants</option>
-              {availableTenants.map((option) => (
-                <option key={option.key} value={option.key}>
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col justify-between gap-2">
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="portal-ghost-button"
-                onClick={() => {
-                  setStatusFilter("");
-                  setTenantFilter("");
-                  setSearchTerm("");
-                }}
-              >
-                Clear filters
-              </button>
-              <span className="portal-pill portal-pill--ghost">{filteredJobs.length} job(s) visible</span>
-            </div>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              Last updated {lastUpdated ? lastUpdated.toLocaleTimeString() : "-"}
-            </span>
-          </div>
         </div>
-      </PortalCard>
+      </section>
 
       <PortalCard
         title="Job feed"

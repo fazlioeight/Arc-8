@@ -8,9 +8,8 @@
 } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
-import PortalPageHeader from "../../../components/PortalPageHeader";
 import PortalCard from "../../../components/PortalCard";
-import PortalStat from "../../../components/PortalStat";
+import KpiTile from "../../../components/ui/KpiTile";
 import { AuthContext } from "../../../context/AuthContext";
 import { useCommandPalette } from "../../../context/CommandPaletteContext";
 import "../../../styles/memberWorkspace.css";
@@ -381,19 +380,11 @@ const ImportDataPage = () => {
   );
 
   const headerContent = (
-    <PortalPageHeader
-      eyebrow="Imports"
-      title="Import Data"
-      subtitle="Load members, providers, claims, MAO-004, or chart manifests. Imports run as background jobs."
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          <PortalStat label="Queued" value={summary.total} meta="Total" tone="info" />
-          <PortalStat label="Processing" value={summary.processing} meta="In flight" tone="warning" />
-          <PortalStat label="Completed" value={summary.completed} meta="Finished" tone="success" />
-          <PortalStat label="Failed" value={summary.failed} meta="Attention" tone="danger" />
-        </div>
-      }
-    />
+    <div className="flex flex-col gap-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">Imports</p>
+      <h1 className="text-3xl font-semibold coding-text-strong">Import Data</h1>
+      <p className="text-sm coding-text-soft">Load members, providers, claims, MAO-004, or chart manifests. Imports run as background jobs.</p>
+    </div>
   );
 
   return (
@@ -403,6 +394,12 @@ const ImportDataPage = () => {
       mainClassName="space-y-6"
       utilityBar
     >
+      <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KpiTile label="Queued" value={summary.total} hint="Total" />
+        <KpiTile label="Processing" value={summary.processing} tone="warning" hint="In flight" />
+        <KpiTile label="Completed" value={summary.completed} tone="success" hint="Finished" />
+        <KpiTile label="Failed" value={summary.failed} tone="critical" hint="Attention" />
+      </section>
       <PortalCard
         title="Connect to FHIR endpoints"
         subtitle="Authenticate and pull resources via background jobs."
