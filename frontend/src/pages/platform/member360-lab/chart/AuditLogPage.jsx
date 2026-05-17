@@ -1,5 +1,5 @@
 import React from "react";
-import { SectionHeader, DataTable } from "../../../../components/ehr/Primitives";
+import { ChartTabHeader, ChartTable } from "./chartPrimitives";
 
 const auditLogColumns = [
   { label: "Time", accessor: "time" },
@@ -12,7 +12,7 @@ const auditLogColumns = [
 const auditLogRows = [
   {
     id: "audit-1",
-    time: "Oct 18, 2025 - 1:42 PM",
+    time: "Oct 18, 2025 · 1:42 PM",
     user: "M. Ramirez",
     action: "Updated diagnosis",
     entity: "Encounter #48392",
@@ -20,7 +20,7 @@ const auditLogRows = [
   },
   {
     id: "audit-2",
-    time: "Oct 17, 2025 - 9:15 AM",
+    time: "Oct 17, 2025 · 9:15 AM",
     user: "S. Patel",
     action: "Uploaded document",
     entity: "Care gap evidence",
@@ -30,13 +30,9 @@ const auditLogRows = [
 
 export default function AuditLogPage() {
   return (
-    <div className="space-y-4">
-      <div className="coding-surface rounded-xl p-4">
-        <SectionHeader title="Audit Log" subtitle="Who did what, when" />
-        <div className="mt-3">
-          <DataTable columns={auditLogColumns} rows={auditLogRows} />
-        </div>
-      </div>
+    <div>
+      <ChartTabHeader title="Audit log" subtitle="Who did what, and when" />
+      <ChartTable columns={auditLogColumns} rows={auditLogRows} />
     </div>
   );
 }

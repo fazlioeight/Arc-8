@@ -1,5 +1,5 @@
 import React from "react";
-import { SectionHeader, DataTable } from "../../../../components/ehr/Primitives";
+import { ChartTabHeader, ChartTable } from "./chartPrimitives";
 
 const medicationColumns = [
   { label: "Medication", accessor: "medication" },
@@ -13,7 +13,7 @@ const medicationRows = [
   {
     id: "rx-1",
     medication: "Metformin XR 500 mg",
-    sig: "Take 1 tablet by mouth twice daily with meals",
+    sig: "1 tablet by mouth twice daily with meals",
     start: "Jan 04, 2025",
     end: "Current",
     prescriber: "Dr. Harper (PCP)",
@@ -21,7 +21,7 @@ const medicationRows = [
   {
     id: "rx-2",
     medication: "Spironolactone 25 mg",
-    sig: "Take 1 tablet daily",
+    sig: "1 tablet daily",
     start: "Aug 18, 2025",
     end: "Nov 18, 2025",
     prescriber: "Dr. Nguyen (Cardiology)",
@@ -30,13 +30,9 @@ const medicationRows = [
 
 export default function MedicationsPage() {
   return (
-    <div className="space-y-4">
-      <div className="coding-surface rounded-xl p-4">
-        <SectionHeader title="Medications" subtitle="Active & historical" />
-        <div className="mt-3">
-          <DataTable columns={medicationColumns} rows={medicationRows} />
-        </div>
-      </div>
+    <div>
+      <ChartTabHeader title="Medications" subtitle="Active and historical prescriptions" />
+      <ChartTable columns={medicationColumns} rows={medicationRows} />
     </div>
   );
 }

@@ -1,18 +1,21 @@
 import React from "react";
-import { SectionHeader, DataTable, Chip } from "../../../../components/ehr/Primitives";
+import { ChartTabHeader, ChartTable, ChartChip } from "./chartPrimitives";
 
 const sharingColumns = [
   { label: "User / Group", accessor: "subject" },
   {
     label: "Role",
-    render: (row) => <Chip label={row.role} title={`Role: ${row.role}`} />,
+    render: (row) => <ChartChip label={row.role} tone="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200" />,
   },
   { label: "Added", accessor: "added" },
   { label: "Owner", accessor: "owner" },
   {
-    label: "Actions",
+    label: "Action",
     render: (row) => (
-      <button type="button" className="rounded border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50">
+      <button
+        type="button"
+        className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-2 py-1 text-[11px] font-semibold"
+      >
         {row.actionLabel}
       </button>
     ),
@@ -40,13 +43,20 @@ const sharingRows = [
 
 export default function SharingPage() {
   return (
-    <div className="space-y-4">
-      <div className="coding-surface rounded-xl p-4">
-        <SectionHeader title="Sharing" subtitle="Access & collaboration" />
-        <div className="mt-3">
-          <DataTable columns={sharingColumns} rows={sharingRows} />
-        </div>
-      </div>
+    <div>
+      <ChartTabHeader
+        title="Sharing"
+        subtitle="Access and collaboration"
+        action={
+          <button
+            type="button"
+            className="rounded-md bg-[var(--brand-primary)] text-white px-2.5 py-1.5 text-xs font-semibold hover:bg-brand-700"
+          >
+            + Share
+          </button>
+        }
+      />
+      <ChartTable columns={sharingColumns} rows={sharingRows} />
     </div>
   );
 }

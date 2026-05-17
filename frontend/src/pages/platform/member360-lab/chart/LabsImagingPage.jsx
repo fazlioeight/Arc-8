@@ -1,5 +1,5 @@
 import React from "react";
-import { SectionHeader, DataTable } from "../../../../components/ehr/Primitives";
+import { ChartTabHeader, ChartTable } from "./chartPrimitives";
 
 const labColumns = [
   { label: "Date", accessor: "date" },
@@ -30,13 +30,9 @@ const labRows = [
 
 export default function LabsImagingPage() {
   return (
-    <div className="space-y-4">
-      <div className="coding-surface rounded-xl p-4">
-        <SectionHeader title="Labs & Imaging" subtitle="Results & studies" />
-        <div className="mt-3">
-          <DataTable columns={labColumns} rows={labRows} />
-        </div>
-      </div>
+    <div>
+      <ChartTabHeader title="Labs & Imaging" subtitle="Recent results and studies" />
+      <ChartTable columns={labColumns} rows={labRows} />
     </div>
   );
 }

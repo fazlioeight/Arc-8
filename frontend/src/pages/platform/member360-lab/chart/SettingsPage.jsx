@@ -1,16 +1,17 @@
 import React from "react";
-import { SectionHeader, KeyValue } from "../../../../components/ehr/Primitives";
+import { ChartTabHeader, ChartKeyValue } from "./chartPrimitives";
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-4">
-      <div className="coding-surface rounded-xl p-4">
-        <SectionHeader title="Settings" subtitle="Member-level preferences" />
-        <div className="mt-3 grid grid-cols-2 gap-6 text-xs md:grid-cols-3">
-          <KeyValue k="Preferred Language" v="N/A" />
-          <KeyValue k="Communication" v="N/A" />
-          <KeyValue k="Care Team" v="N/A" />
-        </div>
+    <div>
+      <ChartTabHeader title="Member settings" subtitle="Member-level preferences and care team" />
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3">
+        <ChartKeyValue k="Preferred language" v={null} />
+        <ChartKeyValue k="Communication" v={null} />
+        <ChartKeyValue k="Care team" v={null} />
+        <ChartKeyValue k="Time zone" v={null} />
+        <ChartKeyValue k="Risk tier override" v={null} />
+        <ChartKeyValue k="Auto-route queue" v={null} />
       </div>
     </div>
   );

@@ -1,21 +1,14 @@
 import React from "react";
-import { SectionHeader, DataTable, Chip } from "../../../../components/ehr/Primitives";
+import { ChartTabHeader, ChartTable, ChartChip } from "./chartPrimitives";
 
 const problemColumns = [
   { label: "Problem", accessor: "problem" },
   { label: "HCC", accessor: "hcc" },
   { label: "Evidence", accessor: "evidence" },
-  { label: "Last Seen", accessor: "lastSeen" },
+  { label: "Last seen", accessor: "lastSeen" },
   {
-    label: "Actions",
-    render: (row) => (
-      <div className="flex items-center gap-2">
-        <button type="button" className="rounded border border-gray-300 px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-50">
-          Review
-        </button>
-        {row.flag && <Chip label={row.flag} title={row.flag} />}
-      </div>
-    ),
+    label: "Status",
+    render: (row) => (row.flag ? <ChartChip label={row.flag} /> : null),
   },
 ];
 
@@ -24,9 +17,9 @@ const problemRows = [
     id: "prob-1",
     problem: "Chronic systolic heart failure",
     hcc: "HCC 85",
-    evidence: "Cardiology note 10/05/2025 - BNP 980",
+    evidence: "Cardiology note 10/05/2025 — BNP 980",
     lastSeen: "Oct 12, 2025",
-    flag: "High priority",
+    flag: "High",
   },
   {
     id: "prob-2",
@@ -40,13 +33,9 @@ const problemRows = [
 
 export default function ProblemsHCCPage() {
   return (
-    <div className="space-y-4">
-      <div className="coding-surface rounded-xl p-4">
-        <SectionHeader title="Problem List / HCC" subtitle="Active problems mapped to HCCs" />
-        <div className="mt-3">
-          <DataTable columns={problemColumns} rows={problemRows} />
-        </div>
-      </div>
+    <div>
+      <ChartTabHeader title="Problem List / HCC" subtitle="Active problems mapped to HCCs" />
+      <ChartTable columns={problemColumns} rows={problemRows} />
     </div>
   );
 }

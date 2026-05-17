@@ -1,5 +1,5 @@
 import React from "react";
-import { SectionHeader, DataTable, Chip } from "../../../../components/ehr/Primitives";
+import { ChartTabHeader, ChartTable, ChartChip } from "./chartPrimitives";
 
 const careGapColumns = [
   { label: "Gap", accessor: "gap" },
@@ -7,9 +7,9 @@ const careGapColumns = [
   { label: "Due", accessor: "due" },
   {
     label: "Status",
-    render: (row) => <Chip label={row.status} title={`Current status: ${row.status}`} />,
+    render: (row) => <ChartChip label={row.status} />,
   },
-  { label: "Action", accessor: "action" },
+  { label: "Next action", accessor: "action" },
 ];
 
 const careGapRows = [
@@ -33,13 +33,9 @@ const careGapRows = [
 
 export default function CareGapsPage() {
   return (
-    <div className="space-y-4">
-      <div className="coding-surface rounded-xl p-4">
-        <SectionHeader title="Care Gaps" subtitle="Quality & risk closure" />
-        <div className="mt-3">
-          <DataTable columns={careGapColumns} rows={careGapRows} />
-        </div>
-      </div>
+    <div>
+      <ChartTabHeader title="Care Gaps" subtitle="Quality and risk closure" />
+      <ChartTable columns={careGapColumns} rows={careGapRows} />
     </div>
   );
 }

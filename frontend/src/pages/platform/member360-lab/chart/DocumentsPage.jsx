@@ -1,5 +1,5 @@
 import React from "react";
-import { SectionHeader, DataTable } from "../../../../components/ehr/Primitives";
+import { ChartTabHeader, ChartTable } from "./chartPrimitives";
 
 const documentColumns = [
   { label: "Date", accessor: "date" },
@@ -7,9 +7,12 @@ const documentColumns = [
   { label: "Description", accessor: "description" },
   { label: "Source", accessor: "source" },
   {
-    label: "Open",
+    label: "Action",
     render: (row) => (
-      <button type="button" className="text-xs font-semibold text-indigo-600 hover:underline">
+      <button
+        type="button"
+        className="text-xs font-medium text-[var(--brand-primary)] hover:underline"
+      >
         {row.actionLabel}
       </button>
     ),
@@ -37,13 +40,9 @@ const documentRows = [
 
 export default function DocumentsPage() {
   return (
-    <div className="space-y-4">
-      <div className="coding-surface rounded-xl p-4">
-        <SectionHeader title="Documents" subtitle="Charts, PDFs & uploads" />
-        <div className="mt-3">
-          <DataTable columns={documentColumns} rows={documentRows} />
-        </div>
-      </div>
+    <div>
+      <ChartTabHeader title="Documents" subtitle="Charts, PDFs and uploads" />
+      <ChartTable columns={documentColumns} rows={documentRows} />
     </div>
   );
 }
