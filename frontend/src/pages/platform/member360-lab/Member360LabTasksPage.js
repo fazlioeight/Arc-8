@@ -6,23 +6,46 @@ import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { fetchMember360AllTasks, updateMember360Task } from '../../../services/member360LabService';
-import { LabSubNav, PriorityBadge, RiskBadge, SectionCard, TaskStatusBadge } from './components';
+import { LabSubNav, PriorityBadge, RiskBadge, TaskStatusBadge } from './components';
+import FilterDropdown from '../../../components/ui/FilterDropdown';
 
 const PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3 };
 
-const STATUS_OPTIONS = ['any', 'open', 'in_progress', 'waiting', 'completed', 'escalated'];
-const PRIORITY_OPTIONS = ['any', 'urgent', 'high', 'medium', 'low'];
+const STATUSES = [
+  { key: 'open', label: 'Open' },
+  { key: 'in_progress', label: 'In progress' },
+  { key: 'waiting', label: 'Waiting' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'escalated', label: 'Escalated' },
+];
+
+const PRIORITIES = [
+  { key: 'urgent', label: 'Urgent' },
+  { key: 'high', label: 'High' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'low', label: 'Low' },
+];
+
 const DUE_OPTIONS = [
   { key: 'any', label: 'Any due date' },
   { key: 'overdue', label: 'Overdue' },
   { key: 'today', label: 'Due today' },
   { key: 'week', label: 'Next 7 days' },
 ];
+
 const SORT_OPTIONS = [
   { key: 'priority', label: 'Priority (urgent first)' },
   { key: 'due', label: 'Due date (soonest)' },
   { key: 'risk', label: 'Member risk tier' },
   { key: 'recent', label: 'Recently updated' },
+];
+
+const SAVED_VIEWS = [
+  { key: 'all', label: 'All tasks' },
+  { key: 'open', label: 'Open & in progress', statuses: ['open', 'in_progress'] },
+  { key: 'urgent', label: 'Urgent', priorities: ['urgent'] },
+  { key: 'overdue', label: 'Overdue', due: 'overdue' },
+  { key: 'completed', label: 'Completed', statuses: ['completed'] },
 ];
 
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
@@ -35,8 +58,9 @@ const Member360LabTasksPage = () => {
   const [error, setError] = useState(null);
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('open');
-  const [priority, setPriority] = useState('any');
+  const [activeView, setActiveView] = useState('open');
+  const [statuses, setStatuses] = useState(['open', 'in_progress']);
+  const [priorities, setPriorities] = useState([]);
   const [due, setDue] = useState('any');
   const [sortKey, setSortKey] = useState('priority');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -51,13 +75,26 @@ const Member360LabTasksPage = () => {
     return () => { cancelled = true; };
   }, [token, tenant, refreshKey]);
 
+  const applySavedView = (key) => {
+    const view = SAVED_VIEWS.find((v) => v.key === key);
+    setActiveView(key);
+    setStatuses(view?.statuses || []);
+    setPriorities(view?.priorities || []);
+    setDue(view?.due || 'any');
+  };
+
+  const toggleStatus = (key) =>
+    setStatuses((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  const togglePriority = (key) =>
+    setPriorities((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+
   const filtered = useMemo(() => {
     const today = startOfDay(new Date());
     const weekOut = new Date(today.getTime() + 7 * 86400000);
     return rows
       .filter((t) => {
-        if (status !== 'any' && t.status !== status) return false;
-        if (priority !== 'any' && t.priority !== priority) return false;
+        if (statuses.length > 0 && !statuses.includes(t.status)) return false;
+        if (priorities.length > 0 && !priorities.includes(t.priority)) return false;
         if (search) {
           const term = search.toLowerCase();
           const hay = [t.title, t.member_name, t.member_key, t.assigned_queue, t.assigned_user, t.recommended_next_action, t.sbar?.recommendation].filter(Boolean).join(' ').toLowerCase();
@@ -82,7 +119,7 @@ const Member360LabTasksPage = () => {
         if (sortKey === 'recent') return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
         return 0;
       });
-  }, [rows, status, priority, due, search, sortKey]);
+  }, [rows, statuses, priorities, due, search, sortKey]);
 
   const summary = useMemo(() => {
     const today = startOfDay(new Date());
@@ -103,6 +140,16 @@ const Member360LabTasksPage = () => {
     }
   };
 
+  const activeFilterCount =
+    (statuses.length > 0 ? 1 : 0) +
+    (priorities.length > 0 ? 1 : 0) +
+    (due !== 'any' ? 1 : 0);
+
+  const dueLabel = useMemo(() => {
+    if (due === 'any') return null;
+    return DUE_OPTIONS.find((o) => o.key === due)?.label || null;
+  }, [due]);
+
   return (
     <PortalPageLayout
       eyebrow="Nexora Lab Member360"
@@ -117,34 +164,112 @@ const Member360LabTasksPage = () => {
     >
       <LabSubNav />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <SummaryTile label="All tasks" value={summary.total} />
-        <SummaryTile label="Active" value={summary.open} accent="sky" />
-        <SummaryTile label="Urgent" value={summary.urgent} accent="rose" />
-        <SummaryTile label="Overdue" value={summary.overdue} accent="amber" />
-      </div>
+      {/* KPI strip */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <KpiTile label="All tasks" value={summary.total} />
+        <KpiTile label="Active" value={summary.open} tone="info" />
+        <KpiTile label="Urgent" value={summary.urgent} tone="critical" />
+        <KpiTile label="Overdue" value={summary.overdue} tone="warning" />
+      </section>
 
-      <section className="coding-surface rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="flex flex-col lg:flex-row gap-3">
-          <input
-            type="search"
-            placeholder="Search by title, member, queue, or assignee"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="coding-input w-full rounded-lg px-3 py-2 text-sm"
-          />
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="coding-input rounded-lg px-3 py-2 text-sm lg:w-48">
-            {STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o === 'any' ? 'Any status' : `Status: ${o.replace('_', ' ')}`}</option>)}
-          </select>
-          <select value={priority} onChange={(e) => setPriority(e.target.value)} className="coding-input rounded-lg px-3 py-2 text-sm lg:w-44">
-            {PRIORITY_OPTIONS.map((o) => <option key={o} value={o}>{o === 'any' ? 'Any priority' : `Priority: ${o}`}</option>)}
-          </select>
-          <select value={due} onChange={(e) => setDue(e.target.value)} className="coding-input rounded-lg px-3 py-2 text-sm lg:w-44">
-            {DUE_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-          </select>
-          <select value={sortKey} onChange={(e) => setSortKey(e.target.value)} className="coding-input rounded-lg px-3 py-2 text-sm lg:w-56">
+      {/* Saved views */}
+      <nav className="border-b coding-border overflow-x-auto" aria-label="Saved views">
+        <div className="flex items-center gap-1">
+          {SAVED_VIEWS.map((v) => {
+            const active = v.key === activeView;
+            return (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => applySavedView(v.key)}
+                className={`whitespace-nowrap px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
+                  active
+                    ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                    : 'border-transparent coding-text-soft hover:coding-text-strong hover:border-slate-200 dark:hover:border-slate-700'
+                }`}
+              >
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      <section className="coding-surface rounded-2xl shadow-sm">
+        <div className="p-3 flex flex-col lg:flex-row gap-2 lg:items-center">
+          <div className="relative flex-1 min-w-0">
+            <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 coding-text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+            </svg>
+            <input
+              type="search"
+              placeholder="Search title, member, queue, or assignee"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="coding-input w-full rounded-md pl-9 pr-3 py-2 text-sm"
+            />
+          </div>
+          <select value={sortKey} onChange={(e) => setSortKey(e.target.value)} className="coding-input rounded-md px-3 py-2 text-sm lg:w-56">
             {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>Sort: {o.label}</option>)}
           </select>
+        </div>
+        <div className="border-t coding-border px-3 py-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <FilterDropdown label="Status" count={statuses.length}>
+            <div className="flex flex-col gap-1 min-w-[180px]">
+              {STATUSES.map((s) => (
+                <label key={s.key} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--coding-hover)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={statuses.includes(s.key)}
+                    onChange={() => toggleStatus(s.key)}
+                    className="accent-[var(--brand-primary)]"
+                  />
+                  <span className="coding-text-strong">{s.label}</span>
+                </label>
+              ))}
+            </div>
+          </FilterDropdown>
+          <FilterDropdown label="Priority" count={priorities.length}>
+            <div className="flex flex-col gap-1 min-w-[160px]">
+              {PRIORITIES.map((p) => (
+                <label key={p.key} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--coding-hover)] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={priorities.includes(p.key)}
+                    onChange={() => togglePriority(p.key)}
+                    className="accent-[var(--brand-primary)]"
+                  />
+                  <span className="coding-text-strong">{p.label}</span>
+                </label>
+              ))}
+            </div>
+          </FilterDropdown>
+          <FilterDropdown label="Due" count={due !== 'any' ? 1 : 0} display={dueLabel}>
+            {({ close }) => (
+              <div className="flex flex-col gap-1 min-w-[180px]">
+                {DUE_OPTIONS.map((o) => (
+                  <button
+                    key={o.key}
+                    type="button"
+                    onClick={() => { setDue(o.key); close(); }}
+                    className={`text-left px-2 py-1 rounded hover:bg-[var(--coding-hover)] ${due === o.key ? 'coding-text-strong font-semibold' : 'coding-text-soft'}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </FilterDropdown>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={() => applySavedView('all')}
+              className="ml-1 text-xs font-medium text-[var(--brand-primary)] hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       </section>
 
@@ -152,28 +277,31 @@ const Member360LabTasksPage = () => {
       {error && <ErrorState title="Tasks unavailable" description={error} />}
 
       {!loading && !error && (
-        <SectionCard title={`${filtered.length} task${filtered.length === 1 ? '' : 's'}`}>
-          <div className="overflow-x-auto rounded-lg ring-1 ring-black/5 dark:ring-white/10">
+        <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-2.5 flex items-center justify-between text-xs coding-text-muted border-b coding-border">
+            <span>{filtered.length} task{filtered.length === 1 ? '' : 's'}{rows.length !== filtered.length ? ` of ${rows.length}` : ''}</span>
+          </div>
+          <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="coding-surface-subtle text-xs uppercase tracking-wide coding-text-muted">
-                <tr>
-                  <th className="text-left px-3 py-2 font-medium">Task</th>
-                  <th className="text-left px-3 py-2 font-medium">Member</th>
-                  <th className="text-left px-3 py-2 font-medium">Priority</th>
-                  <th className="text-left px-3 py-2 font-medium">Status</th>
-                  <th className="text-left px-3 py-2 font-medium">Due</th>
-                  <th className="text-left px-3 py-2 font-medium">Queue</th>
-                  <th className="text-right px-3 py-2 font-medium">Actions</th>
+              <thead className="text-[11px] uppercase tracking-wider coding-text-muted">
+                <tr className="border-b coding-border">
+                  <th className="text-left px-4 py-2.5 font-semibold">Task</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Member</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Priority</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Status</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Due</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Queue</th>
+                  <th className="text-right px-3 py-2.5 font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y coding-divider">
+              <tbody>
                 {filtered.map((t) => (
-                  <tr key={t.id} className="coding-hoverable">
-                    <td className="px-3 py-2 align-top">
+                  <tr key={t.id} className="border-b coding-border-subtle hover:bg-[var(--coding-hover)] transition">
+                    <td className="px-4 py-3 align-top">
                       <button
                         type="button"
                         onClick={() => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${t.member_id}`)}
-                        className="text-left coding-text-strong font-semibold hover:underline"
+                        className="text-left coding-text-strong font-medium hover:text-[var(--brand-primary)] hover:underline"
                       >
                         {t.title}
                       </button>
@@ -184,53 +312,54 @@ const Member360LabTasksPage = () => {
                         <p className="text-[10px] italic coding-text-muted">{t.auto_generated_reason}</p>
                       )}
                     </td>
-                    <td className="px-3 py-2 align-top">
+                    <td className="px-3 py-3 align-top">
                       <p className="coding-text-strong">{t.member_name || '—'}</p>
                       <p className="text-[11px] coding-text-muted">{t.member_key || ''}</p>
                       {t.risk_tier && <div className="mt-1"><RiskBadge tier={t.risk_tier} /></div>}
                     </td>
-                    <td className="px-3 py-2 align-top"><PriorityBadge priority={t.priority} /></td>
-                    <td className="px-3 py-2 align-top"><TaskStatusBadge status={t.status} /></td>
-                    <td className="px-3 py-2 align-top text-xs coding-text-soft">{t.due_date || '—'}</td>
-                    <td className="px-3 py-2 align-top text-xs coding-text-soft">
+                    <td className="px-3 py-3 align-top"><PriorityBadge priority={t.priority} /></td>
+                    <td className="px-3 py-3 align-top"><TaskStatusBadge status={t.status} /></td>
+                    <td className="px-3 py-3 align-top text-xs coding-text-soft">{t.due_date || '—'}</td>
+                    <td className="px-3 py-3 align-top text-xs">
                       <p className="coding-text-strong">{t.assigned_queue || '—'}</p>
-                      <p>{t.assigned_user || ''}</p>
+                      <p className="coding-text-soft">{t.assigned_user || ''}</p>
                     </td>
-                    <td className="px-3 py-2 align-top text-right">
+                    <td className="px-3 py-3 align-top text-right">
                       <div className="flex flex-wrap justify-end gap-1.5">
                         {t.status === 'open' && (
-                          <button type="button" onClick={() => advance(t, 'in_progress')} className="rounded-md coding-surface coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-2 py-1 text-xs hover:opacity-80">Start</button>
+                          <button type="button" onClick={() => advance(t, 'in_progress')} className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-2 py-1 text-xs font-semibold">Start</button>
                         )}
                         {t.status !== 'completed' && (
-                          <button type="button" onClick={() => advance(t, 'completed')} className="rounded-md bg-emerald-600 text-white px-2 py-1 text-xs hover:opacity-90">Complete</button>
+                          <button type="button" onClick={() => advance(t, 'completed')} className="rounded-md bg-emerald-600 text-white px-2 py-1 text-xs font-semibold hover:bg-emerald-700">Complete</button>
                         )}
-                        <button type="button" onClick={() => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${t.member_id}`)} className="rounded-md bg-[var(--brand-primary)] text-white px-2 py-1 text-xs hover:opacity-90">Open</button>
+                        <button type="button" onClick={() => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${t.member_id}`)} className="rounded-md bg-[var(--brand-primary)] text-white px-2 py-1 text-xs font-semibold hover:bg-brand-700">Open</button>
                       </div>
                     </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-sm coding-text-soft">No tasks match the current filters.</td></tr>
+                  <tr><td colSpan={7} className="px-3 py-12 text-center text-sm coding-text-soft">No tasks match the current filters.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
-        </SectionCard>
+        </section>
       )}
     </PortalPageLayout>
   );
 };
 
-function SummaryTile({ label, value, accent }) {
-  const accentClass = {
-    sky: 'text-sky-600 dark:text-sky-300',
-    rose: 'text-rose-600 dark:text-rose-300',
-    amber: 'text-amber-600 dark:text-amber-300',
-  }[accent];
+function KpiTile({ label, value, tone = 'neutral' }) {
+  const valueTone = {
+    neutral: 'coding-text-strong',
+    info: 'text-sky-700 dark:text-sky-300',
+    warning: 'text-amber-700 dark:text-amber-300',
+    critical: 'text-rose-600 dark:text-rose-300',
+  }[tone] || 'coding-text-strong';
   return (
-    <div className="coding-surface rounded-2xl p-4 shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] coding-text-muted">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold tabular-nums ${accentClass || 'coding-text-strong'}`}>{value}</p>
+    <div className="coding-surface rounded-2xl shadow-sm p-3.5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</p>
+      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${valueTone}`}>{value}</p>
     </div>
   );
 }

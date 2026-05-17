@@ -25,6 +25,7 @@ export const ROUTES = {
   },
   CODING: {
     WORKLIST: "/coding",
+    CHASE_ROOT: "/coding/chases",
   },
   JOBS: {
     STATUS_CENTER: "/jobs/status-center",

@@ -45,6 +45,7 @@ const MasterAdminPage = lazy(() => import('./pages/platform/admin/MasterAdminPag
 const JobStatusCenter = lazy(() => import('./pages/platform/jobs/JobStatusCenter'));
 const ImportDataPage = lazy(() => import('./pages/platform/jobs/ImportDataPage'));
 const CodingWorklistPage = lazy(() => import('./pages/platform/coding/CodingWorklistPage'));
+const CodingChasePage = lazy(() => import('./pages/platform/coding/CodingChasePage'));
 const Mission = lazy(() => import('./pages/website/about/Mission'));
 const Values = lazy(() => import('./pages/website/about/Values'));
 const Team = lazy(() => import('./pages/website/about/Team'));
@@ -209,6 +210,11 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path={ROUTES.CODING.WORKLIST} element={(
             <ErrorBoundary title="Coding worklist failed to load">
               <CodingWorklistPage />
+            </ErrorBoundary>
+          )} />
+          <Route path={`${ROUTES.CODING.CHASE_ROOT}/:chaseId`} element={(
+            <ErrorBoundary title="Chase failed to load">
+              <CodingChasePage />
             </ErrorBoundary>
           )} />
         </Routes>

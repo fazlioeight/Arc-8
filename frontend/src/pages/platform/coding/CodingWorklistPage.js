@@ -65,6 +65,7 @@ export default function CodingWorklistPage() {
 
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -95,6 +96,7 @@ export default function CodingWorklistPage() {
         if (overdueOnly) list = list.filter((i) => isOverdue(i.due_date));
         setItems(list);
         setTotal(res.total ?? list.length);
+        setSummary(res.summary || null);
         setError(null);
       })
       .catch((err) => { if (!cancelled) setError(err.message || String(err)); })
@@ -131,6 +133,18 @@ export default function CodingWorklistPage() {
       maxWidthClassName="max-w-7xl"
       mainClassName="space-y-4"
     >
+      {/* KPI strip — README HERO Internal Programs spec */}
+      {summary && (
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <KpiTile label="Open" value={summary.status_counts?.open || 0} />
+          <KpiTile label="In progress" value={summary.status_counts?.in_progress || 0} />
+          <KpiTile label="Pending review" value={summary.status_counts?.pending_review || 0} />
+          <KpiTile label="Audit feedback" value={summary.status_counts?.audit_feedback || 0} tone="warning" />
+          <KpiTile label="Query pending" value={summary.status_counts?.query_pending || 0} tone="warning" />
+          <KpiTile label="Overdue" value={summary.overdue || 0} tone={summary.overdue > 0 ? 'critical' : 'neutral'} />
+        </section>
+      )}
+
       {/* Saved views — HubSpot index pattern */}
       <nav className="border-b coding-border overflow-x-auto" aria-label="Saved views">
         <div className="flex items-center gap-1">
@@ -294,15 +308,22 @@ export default function CodingWorklistPage() {
               <tbody>
                 {items.map((c) => {
                   const overdue = isOverdue(c.due_date);
+                  const openChase = () => navigate(`${ROUTES.CODING.CHASE_ROOT}/${c.chase_id}`, { state: { chase: c } });
+                  const openMember = (e) => {
+                    e.stopPropagation();
+                    navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${c.member_id}`);
+                  };
                   return (
                     <tr
                       key={c.chase_id}
                       className="cursor-pointer border-b coding-border-subtle hover:bg-[var(--coding-hover)] transition"
-                      onClick={() => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${c.member_id}`)}
+                      onClick={openChase}
                     >
-                      <td className="px-4 py-3 font-mono text-xs coding-text-strong">#{c.chase_id}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-[var(--brand-primary)] font-semibold">#{c.chase_id}</td>
                       <td className="px-3 py-3">
-                        <p className="coding-text-strong font-medium">{c.member_name || '—'}</p>
+                        <button type="button" onClick={openMember} className="text-left coding-text-strong font-medium hover:text-[var(--brand-primary)] hover:underline">
+                          {c.member_name || '—'}
+                        </button>
                         <p className="text-[11px] coding-text-muted">{c.member_key}</p>
                       </td>
                       <td className="px-3 py-3 font-mono text-xs coding-text-strong">{c.hcc_code || '—'}</td>
@@ -340,5 +361,19 @@ export default function CodingWorklistPage() {
         </section>
       )}
     </PortalPageLayout>
+  );
+}
+
+function KpiTile({ label, value, tone = 'neutral' }) {
+  const toneClass = {
+    neutral: 'coding-text-strong',
+    warning: 'text-amber-700 dark:text-amber-300',
+    critical: 'text-rose-600 dark:text-rose-300',
+  }[tone] || 'coding-text-strong';
+  return (
+    <div className="coding-surface rounded-2xl shadow-sm p-3.5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</p>
+      <p className={`mt-1.5 text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</p>
+    </div>
   );
 }

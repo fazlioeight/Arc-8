@@ -1,32 +1,37 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
-import PortalPageHeader from "../../../components/PortalPageHeader";
-import PortalCard from "../../../components/PortalCard";
-import PortalStat from "../../../components/PortalStat";
+import AlertShell from "../../../components/ui/AlertShell";
+import FilterDropdown from "../../../components/ui/FilterDropdown";
+import { LoadingState, ErrorState } from "../../../components/ehr/Primitives";
 import { AuthContext } from "../../../context/AuthContext";
 import { useUserPreferences } from "../../../context/UserPreferencesContext";
-import { fetchCodingProviderDetail, fetchCodingProviders } from "../../../services/codingService";
-import InfoTooltip from "../../../components/ui/InfoTooltip";
-import AlertShell from "../../../components/ui/AlertShell";
+import { fetchCodingProviders } from "../../../services/codingService";
 import { PORTAL_NAV_ITEMS } from "../portal_page/portalNavItems";
 import { ROUTES } from "../../../constants/routes";
 import "../../../styles/memberWorkspace.css";
+
+const SAVED_VIEWS = [
+  { key: "all", label: "All providers" },
+  { key: "with_npi", label: "Has NPI", hasNpi: true },
+  { key: "with_taxid", label: "Has Tax ID", hasTaxId: true },
+];
 
 const ProvidersPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { token, tenant, isAuthenticated } = useContext(AuthContext) || {};
   const { getViewPreference, recordViewPreference } = useUserPreferences();
-  const canQuery = useMemo(() => token && tenant, [token, tenant]);
+  const canQuery = useMemo(() => Boolean(token && tenant), [token, tenant]);
 
   const [providers, setProviders] = useState([]);
   const [total, setTotal] = useState(0);
-  const [selectedProvider, setSelectedProvider] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
+  const [activeView, setActiveView] = useState("all");
+  const [hasNpi, setHasNpi] = useState(false);
+  const [hasTaxId, setHasTaxId] = useState(false);
 
   const loadProviders = useCallback(
     async (term = search) => {
@@ -36,7 +41,7 @@ const ProvidersPage = () => {
       try {
         const response = await fetchCodingProviders(token, tenant, { search: term });
         setProviders(response.items || []);
-        setTotal(response.total || 0);
+        setTotal(response.total || (response.items || []).length);
       } catch (err) {
         setError(err.message || "Unable to load providers");
       } finally {
@@ -46,222 +51,192 @@ const ProvidersPage = () => {
     [canQuery, search, tenant, token]
   );
 
-  const selectProvider = useCallback(
-    async (providerId) => {
-      if (!canQuery || !providerId) return;
-      setDetailLoading(true);
-      setError(null);
-      try {
-        const detail = await fetchCodingProviderDetail(token, tenant, providerId);
-        setSelectedProvider(detail);
-        recordViewPreference("providers", { search, lastSelected: providerId });
-      } catch (err) {
-        setError(err.message || "Unable to load provider detail");
-      } finally {
-        setDetailLoading(false);
-      }
-    },
-    [canQuery, recordViewPreference, search, tenant, token]
-  );
-
   useEffect(() => {
     if (!isAuthenticated || !canQuery) return;
     const saved = getViewPreference("providers");
     const initialSearch = saved?.search || "";
     setSearch(initialSearch);
     void loadProviders(initialSearch);
-    if (saved?.lastSelected) {
-      void selectProvider(saved.lastSelected);
-    }
-  }, [isAuthenticated, canQuery, getViewPreference, loadProviders, selectProvider]);
+  }, [isAuthenticated, canQuery, getViewPreference, loadProviders]);
+
+  const applySavedView = (key) => {
+    const view = SAVED_VIEWS.find((v) => v.key === key);
+    setActiveView(key);
+    setHasNpi(Boolean(view?.hasNpi));
+    setHasTaxId(Boolean(view?.hasTaxId));
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    recordViewPreference("providers", { search, lastSelected: selectedProvider?.id });
+    recordViewPreference("providers", { search });
     void loadProviders(search);
   };
 
-  const layoutProps = useMemo(
-    () => ({
-      backgroundClassName: "",
-      maxWidthClassName: "max-w-6xl",
-      paddingClassName: "px-4",
-      navItems: PORTAL_NAV_ITEMS,
-      currentNav: "providers",
-      navProps: { align: "center", tone: "surface" },
-    }),
-    []
-  );
+  const openProvider = (providerId) => {
+    if (!providerId) return;
+    navigate(`${ROUTES.PROVIDERS.LANDING}/${encodeURIComponent(providerId)}`, {
+      state: { from: `${location.pathname}${location.search}` },
+    });
+  };
 
-  const headerContent = (
-    <PortalPageHeader
-      eyebrow="Providers"
-      title="Provider directory"
-      subtitle="Search providers and open details."
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          <PortalStat label="Providers" value={total} meta="Matching" tone="info" />
-          <PortalStat label="Selected" value={selectedProvider ? 1 : 0} meta="Detail" tone="success" />
-          <PortalStat label="Status" value={loading ? "Loading" : "Ready"} meta="State" tone={loading ? "warning" : "info"} />
-        </div>
-      }
-    />
-  );
+  const filtered = useMemo(() => {
+    return providers.filter((p) => {
+      if (hasNpi && !p.npi) return false;
+      if (hasTaxId && !p.tax_id) return false;
+      return true;
+    });
+  }, [providers, hasNpi, hasTaxId]);
+
+  const activeFilterCount = (hasNpi ? 1 : 0) + (hasTaxId ? 1 : 0);
 
   return (
-    <PortalPageLayout {...layoutProps} headerContent={headerContent}>
-      {!isAuthenticated ? (
-        <PortalCard tone="warning" title="Authentication required" subtitle="Sign in to load provider data." />
-      ) : null}
+    <PortalPageLayout
+      eyebrow="Providers"
+      title="Provider directory"
+      subtitle="Search providers and open a record to review profile, locations, and contact information."
+      navItems={PORTAL_NAV_ITEMS}
+      currentNav="providers"
+      navProps={{ align: "center", tone: "surface" }}
+      maxWidthClassName="max-w-7xl"
+      mainClassName="space-y-4"
+    >
+      {!isAuthenticated && (
+        <AlertShell tone="warning" title="Authentication required" description="Sign in to load provider data." />
+      )}
 
-      <PortalCard
-        title="Filters"
-        subtitle="Search by provider name, NPI, or tax ID."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <button className="portal-ghost-button" onClick={() => void loadProviders(search)} disabled={loading || !canQuery}>
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
-        }
-      >
-        <form onSubmit={handleSubmit} className="portal-section-grid">
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300" htmlFor="provider-search">
-              Provider search
-            </label>
+      {/* Saved views — HubSpot index pattern */}
+      <nav className="border-b coding-border overflow-x-auto" aria-label="Saved views">
+        <div className="flex items-center gap-1">
+          {SAVED_VIEWS.map((v) => {
+            const active = v.key === activeView;
+            return (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => applySavedView(v.key)}
+                className={`whitespace-nowrap px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
+                  active
+                    ? "border-[var(--brand-primary)] text-[var(--brand-primary)]"
+                    : "border-transparent coding-text-soft hover:coding-text-strong hover:border-slate-200 dark:hover:border-slate-700"
+                }`}
+              >
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      <section className="coding-surface rounded-2xl shadow-sm">
+        <form className="p-3 flex flex-col lg:flex-row gap-2 lg:items-center" onSubmit={handleSubmit}>
+          <div className="relative flex-1 min-w-0">
+            <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 coding-text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+            </svg>
             <input
-              id="provider-search"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-              placeholder="Name, NPI, or tax ID"
+              type="search"
+              placeholder="Search name, NPI, or tax ID"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               disabled={!canQuery}
+              className="coding-input w-full rounded-md pl-9 pr-3 py-2 text-sm"
             />
           </div>
-          <div className="flex items-end">
-            <button type="submit" className="portal-ghost-button" disabled={loading || !canQuery}>
-              {loading ? "Searching..." : "Search"}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading || !canQuery}
+            className="rounded-md bg-[var(--brand-primary)] text-white px-3 py-2 text-sm font-semibold hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "Searching..." : "Search"}
+          </button>
         </form>
-        {error ? <AlertShell tone="danger" title="Unable to load providers" description={error} className="mt-3" /> : null}
-      </PortalCard>
 
-      <PortalCard
-        title="Providers"
-        subtitle="Select a row to view provider details."
-        actions={<span className="portal-pill portal-pill--ghost">{total} result(s)</span>}
-      >
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-            <thead className="bg-slate-50 dark:bg-slate-800/60">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Provider</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">NPI</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Tax ID</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Members</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {loading && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
-                    Loading providers...
-                  </td>
-                </tr>
-              )}
-              {!loading && providers.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
-                    No providers match the current filters.
-                  </td>
-                </tr>
-              )}
-              {providers.map((provider) => (
-                <tr key={provider.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                  <td className="px-4 py-3 text-slate-900 dark:text-slate-100">
-                    <div className="font-semibold">{provider.name || "Unknown"}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-300">{provider.id}</div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{provider.npi || "-"}</td>
-                  <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{provider.tax_id || "-"}</td>
-                  <td className="px-4 py-3 text-slate-900 dark:text-slate-100">{provider.member_count ?? "-"}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      className="portal-ghost-button"
-                      onClick={() => {
-                        setSelectedProvider(null);
-                        void selectProvider(provider.id);
-                      }}
-                    >
-                      View detail
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="border-t coding-border px-3 py-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <FilterDropdown label="Identifiers" count={activeFilterCount}>
+            <div className="flex flex-col gap-1 min-w-[180px]">
+              <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--coding-hover)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hasNpi}
+                  onChange={() => setHasNpi((v) => !v)}
+                  className="accent-[var(--brand-primary)]"
+                />
+                <span className="coding-text-strong">Has NPI</span>
+              </label>
+              <label className="flex items-center gap-2 px-2 py-1 rounded hover:bg-[var(--coding-hover)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hasTaxId}
+                  onChange={() => setHasTaxId((v) => !v)}
+                  className="accent-[var(--brand-primary)]"
+                />
+                <span className="coding-text-strong">Has Tax ID</span>
+              </label>
+            </div>
+          </FilterDropdown>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={() => applySavedView("all")}
+              className="ml-1 text-xs font-medium text-[var(--brand-primary)] hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
-      </PortalCard>
+      </section>
 
-      <PortalCard
-        title={selectedProvider ? selectedProvider.name || "Provider detail" : "Provider detail"}
-        subtitle={selectedProvider ? selectedProvider.npi || selectedProvider.tax_id || selectedProvider.id : "Select a provider to view details"}
-      >
-        {detailLoading && (
-          <div className="text-sm text-slate-500 dark:text-slate-300">Loading provider detail...</div>
-        )}
-        {!detailLoading && !selectedProvider ? (
-          <AlertShell
-            tone="info"
-            title="Select a provider"
-            description="Choose a row above to preview provider detail."
-          />
-        ) : null}
-        {!detailLoading && selectedProvider ? (
-          <div className="space-y-3 text-sm text-slate-800 dark:text-slate-100">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="portal-pill portal-pill--ghost">{selectedProvider.tax_id || "No tax ID"}</span>
-              <InfoTooltip id="provider-id" text={`Provider ID: ${selectedProvider.id}`} />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">NPI</div>
-                <div className="font-semibold">{selectedProvider.npi || "Not provided"}</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Tax ID</div>
-                <div className="font-semibold">{selectedProvider.tax_id || "Not provided"}</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Members</div>
-                <div className="font-semibold">{selectedProvider.member_count ?? "-"}</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Assigned queue</div>
-                <div className="font-semibold">{selectedProvider.queue_name || "Not assigned"}</div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="portal-ghost-button"
-                onClick={() =>
-                  navigate(`${ROUTES.PROVIDERS.LANDING}/${encodeURIComponent(selectedProvider.id)}`, {
-                    state: {
-                      from: `${location.pathname}${location.search}`,
-                      breadcrumb: selectedProvider.name || selectedProvider.id,
-                    },
-                  })
-                }
-              >
-                Open provider page
-              </button>
-            </div>
+      {error && <ErrorState title="Unable to load providers" description={error} />}
+
+      {!error && loading && providers.length === 0 && (
+        <LoadingState title="Loading providers" />
+      )}
+
+      {!error && (loading || providers.length > 0) && (
+        <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-2.5 flex items-center justify-between text-xs coding-text-muted border-b coding-border">
+            <span>
+              {filtered.length} provider{filtered.length === 1 ? "" : "s"}
+              {total !== filtered.length ? ` of ${total}` : ""}
+            </span>
           </div>
-        ) : null}
-      </PortalCard>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="text-[11px] uppercase tracking-wider coding-text-muted">
+                <tr className="border-b coding-border">
+                  <th className="text-left px-4 py-2.5 font-semibold">Provider</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">NPI</th>
+                  <th className="text-left px-3 py-2.5 font-semibold">Tax ID</th>
+                  <th className="text-right px-3 py-2.5 font-semibold">Members</th>
+                  <th className="text-right px-3 py-2.5 font-semibold">Open gaps</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => (
+                  <tr
+                    key={p.id}
+                    className="cursor-pointer border-b coding-border-subtle hover:bg-[var(--coding-hover)] transition"
+                    onClick={() => openProvider(p.id)}
+                  >
+                    <td className="px-4 py-3">
+                      <p className="coding-text-strong font-medium">{p.name || "Unknown"}</p>
+                      <p className="text-[11px] coding-text-muted font-mono">{p.id}</p>
+                    </td>
+                    <td className="px-3 py-3 font-mono text-xs coding-text-strong">{p.npi || <span className="coding-text-soft">—</span>}</td>
+                    <td className="px-3 py-3 font-mono text-xs coding-text-strong">{p.tax_id || <span className="coding-text-soft">—</span>}</td>
+                    <td className="px-3 py-3 text-right tabular-nums coding-text-strong">{p.member_count ?? 0}</td>
+                    <td className="px-3 py-3 text-right tabular-nums coding-text-strong">{p.open_gaps ?? 0}</td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && !loading && (
+                  <tr><td colSpan={5} className="px-3 py-12 text-center text-sm coding-text-soft">No providers match the current filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </PortalPageLayout>
   );
 };

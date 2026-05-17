@@ -1,13 +1,12 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
-import PortalPageHeader from '../../../components/PortalPageHeader';
-import PortalCard from '../../../components/PortalCard';
-import PortalStat from '../../../components/PortalStat';
+import RecordHeader from '../../../components/ui/RecordHeader';
+import PropertyList, { PropertyRow, PropertySection } from '../../../components/ui/PropertyList';
+import AlertShell from '../../../components/ui/AlertShell';
+import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { AuthContext } from '../../../context/AuthContext';
 import { fetchCodingProviderDetail, fetchCodingProviders } from '../../../services/codingService';
-import BackLink from '../../../components/BackLink';
-import AlertShell from '../../../components/ui/AlertShell';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import '../../../styles/memberWorkspace.css';
@@ -84,121 +83,194 @@ const ProviderDetailPage = () => {
     // eslint-disable-next-line
   }, [isAuthenticated, canQuery]);
 
-  const layoutProps = useMemo(
-    () => ({
-      backgroundClassName: '',
-      maxWidthClassName: 'max-w-5xl',
-      paddingClassName: 'px-4',
-      navItems: PORTAL_NAV_ITEMS,
-      currentNav: 'providers',
-      navProps: { align: 'center', tone: 'surface' },
-    }),
-    []
+  const locationText = useMemo(() => {
+    if (!provider?.location) return null;
+    return [
+      provider.location.address_line1,
+      provider.location.city,
+      provider.location.state,
+      provider.location.postal_code,
+    ].filter(Boolean).join(', ');
+  }, [provider]);
+
+  if (!isAuthenticated) {
+    return (
+      <PortalPageLayout
+        eyebrow="Providers"
+        title="Authentication required"
+        navItems={PORTAL_NAV_ITEMS}
+        currentNav="providers"
+        navProps={{ align: 'center', tone: 'surface' }}
+        maxWidthClassName="max-w-5xl"
+      >
+        <AlertShell tone="warning" title="Authentication required" description="You must be logged in to view provider information." />
+      </PortalPageLayout>
+    );
+  }
+
+  if (loading && !provider) {
+    return (
+      <PortalPageLayout
+        eyebrow="Providers"
+        title="Loading provider"
+        navItems={PORTAL_NAV_ITEMS}
+        currentNav="providers"
+        navProps={{ align: 'center', tone: 'surface' }}
+        maxWidthClassName="max-w-7xl"
+      >
+        <LoadingState title="Loading provider" />
+      </PortalPageLayout>
+    );
+  }
+
+  if (error || !provider) {
+    return (
+      <PortalPageLayout
+        eyebrow="Providers"
+        title="Provider unavailable"
+        navItems={PORTAL_NAV_ITEMS}
+        currentNav="providers"
+        navProps={{ align: 'center', tone: 'surface' }}
+        maxWidthClassName="max-w-5xl"
+        mainClassName="space-y-4"
+      >
+        <ErrorState title="Could not open provider" description={error || 'Provider not found'} />
+        <button
+          type="button"
+          onClick={() => navigate(ROUTES.PROVIDERS.LANDING)}
+          className="rounded-md bg-[var(--brand-primary)] text-white px-3 py-1.5 text-xs font-semibold hover:bg-brand-700"
+        >
+          Back to providers
+        </button>
+      </PortalPageLayout>
+    );
+  }
+
+  const meta = [
+    provider.npi && `NPI ${provider.npi}`,
+    provider.tax_id && `Tax ID ${provider.tax_id}`,
+    provider.location?.city && provider.location?.state && `${provider.location.city}, ${provider.location.state}`,
+  ].filter(Boolean);
+
+  const badges = (
+    <>
+      {provider.member_count != null && provider.member_count > 0 && (
+        <span className="inline-flex items-center rounded-full bg-brand-50 text-[var(--brand-primary)] ring-1 ring-brand-200 px-2 py-0.5 text-[11px] font-semibold dark:bg-brand-900/20 dark:ring-brand-800/60">
+          {provider.member_count} member{provider.member_count === 1 ? '' : 's'}
+        </span>
+      )}
+      {provider.open_gaps != null && provider.open_gaps > 0 && (
+        <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 ring-1 ring-amber-200 px-2 py-0.5 text-[11px] font-semibold dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-700/40">
+          {provider.open_gaps} open gap{provider.open_gaps === 1 ? '' : 's'}
+        </span>
+      )}
+    </>
   );
 
-  const headerContent = (
-    <PortalPageHeader
-      eyebrow="Providers"
-      title={provider?.name || 'Provider workspace'}
-      subtitle="Review partner profiles, locations, and contact information."
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          <PortalStat label="Members" value={provider?.member_count ?? 0} meta="Panel" tone="info" />
-          <PortalStat label="Open gaps" value={provider?.open_gaps ?? 0} meta="Pending" tone="warning" />
-          <PortalStat label="ID" value={provider ? provider.id : '-'} meta="Provider" tone="success" />
-        </div>
-      }
-    />
+  const rightSlot = (
+    <button
+      type="button"
+      onClick={() => navigate(ROUTES.PROVIDERS.LANDING)}
+      className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-2.5 py-1.5 text-xs font-semibold"
+    >
+      Providers
+    </button>
   );
 
   return (
-    <PortalPageLayout {...layoutProps} headerContent={headerContent}>
-      {!isAuthenticated ? (
-        <PortalCard tone="warning" title="Authentication required" subtitle="You must be logged in to view provider information." />
-      ) : null}
+    <PortalPageLayout
+      eyebrow="Providers"
+      title={provider.name || 'Provider workspace'}
+      navItems={PORTAL_NAV_ITEMS}
+      currentNav="providers"
+      navProps={{ align: 'center', tone: 'surface' }}
+      maxWidthClassName="max-w-7xl"
+      mainClassName="space-y-4"
+      hideHeader
+    >
+      <RecordHeader
+        title={provider.name || 'Provider'}
+        meta={meta}
+        badges={badges}
+        rightSlot={rightSlot}
+      />
 
-      <PortalCard
-        title="Navigation"
-        subtitle="Jump back to the provider directory or previous page."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <button className="portal-ghost-button" onClick={() => navigate(-1)}>&larr; Back</button>
-            <button className="portal-ghost-button" onClick={() => navigate(ROUTES.PROVIDERS.LANDING)}>
-              Browse providers
-            </button>
-          </div>
-        }
-      >
-        <BackLink fallback={ROUTES.PROVIDERS.LANDING}>Back to provider directory</BackLink>
-        {referral?.fromMemberId ? (
-          <AlertShell
-            tone="info"
-            title="Linked from member"
-            description={`Member #${referral.fromMemberId}${referral.providerName ? ` (${referral.providerName})` : ''}`}
-            className="mt-3"
-          />
-        ) : null}
-      </PortalCard>
+      {referral?.fromMemberId && (
+        <AlertShell
+          tone="info"
+          title="Linked from member"
+          description={`Member #${referral.fromMemberId}${referral.providerName ? ` (${referral.providerName})` : ''}`}
+        />
+      )}
 
-      {error ? (
-        <PortalCard tone="danger" title="Unable to load provider" subtitle={error} />
-      ) : null}
+      <div className="grid grid-cols-12 gap-4">
+        <div className="col-span-12 lg:col-span-4 space-y-4">
+          <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+            <header className="px-4 py-2.5 border-b coding-border flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">About this provider</h3>
+            </header>
+            <dl>
+              <PropertyRow label="Name" value={provider.name} editable />
+              <PropertyRow label="NPI" value={provider.npi} editable />
+              <PropertyRow label="Tax ID" value={provider.tax_id} editable />
+              <PropertyRow label="Phone" value={provider.phone} editable />
+              <PropertyRow label="Email" value={provider.email} editable />
+              <PropertyRow label="Queue" value={provider.queue_name} editable />
+            </dl>
 
-      <PortalCard
-        title={provider?.name || 'Provider details'}
-        subtitle={provider ? provider.npi || provider.tax_id || provider.id : 'Select a provider'}
-      >
-        {loading && <div className="text-sm text-slate-500 dark:text-slate-300">Loading provider detail...</div>}
-        {!loading && !provider && !error ? (
-          <AlertShell tone="warning" title="Provider details are unavailable." />
-        ) : null}
-        {!loading && provider ? (
-          <div className="space-y-4 text-sm text-slate-800 dark:text-slate-100">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Tax ID</div>
-                <div className="font-semibold">{provider.tax_id || 'Not provided'}</div>
+            <PropertySection title="Location">
+              <dl>
+                <PropertyRow label="Address" value={provider.location?.address_line1} editable />
+                <PropertyRow label="City" value={provider.location?.city} editable />
+                <PropertyRow label="State" value={provider.location?.state} editable />
+                <PropertyRow label="Postal" value={provider.location?.postal_code} editable />
+              </dl>
+            </PropertySection>
+          </section>
+        </div>
+
+        <div className="col-span-12 lg:col-span-8 space-y-4">
+          <section className="coding-surface rounded-2xl shadow-sm p-5">
+            <header className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-sm font-semibold coding-text-strong">Provider snapshot</h3>
+                <p className="text-xs coding-text-soft">High-level numbers for this provider's panel.</p>
               </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">NPI</div>
-                <div className="font-semibold">{provider.npi || 'Not provided'}</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Members</div>
-                <div className="font-semibold">{provider.member_count ?? '-'}</div>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Assigned queue</div>
-                <div className="font-semibold">{provider.queue_name || 'Not assigned'}</div>
-              </div>
+            </header>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <SnapshotTile label="Members" value={provider.member_count ?? 0} />
+              <SnapshotTile label="Open gaps" value={provider.open_gaps ?? 0} />
+              <SnapshotTile label="MAO records" value={provider.mao_records ?? '—'} />
+              <SnapshotTile label="Last contacted" value={provider.last_contacted_at ? new Date(provider.last_contacted_at).toLocaleDateString() : '—'} />
             </div>
+          </section>
 
-            <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-              <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Location</div>
-              <div className="font-semibold">
-                {provider.location
-                  ? [
-                      provider.location.address_line1,
-                      provider.location.city,
-                      provider.location.state,
-                      provider.location.postal_code,
-                    ]
-                      .filter(Boolean)
-                      .join(', ')
-                  : 'Not provided'}
+          <section className="coding-surface rounded-2xl shadow-sm p-5">
+            <header className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-sm font-semibold coding-text-strong">Address</h3>
+                <p className="text-xs coding-text-soft">Primary location on record.</p>
               </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button className="portal-ghost-button" onClick={() => navigate(ROUTES.PROVIDERS.LANDING)}>
-                Back to provider list
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </PortalCard>
+            </header>
+            {locationText ? (
+              <p className="text-sm coding-text-strong">{locationText}</p>
+            ) : (
+              <p className="text-sm coding-text-soft italic">No address on file.</p>
+            )}
+          </section>
+        </div>
+      </div>
     </PortalPageLayout>
   );
 };
+
+function SnapshotTile({ label, value }) {
+  return (
+    <div className="coding-surface-subtle rounded-lg px-3 py-2.5">
+      <p className="text-[10px] uppercase tracking-wider coding-text-muted">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold coding-text-strong tabular-nums">{value}</p>
+    </div>
+  );
+}
 
 export default ProviderDetailPage;

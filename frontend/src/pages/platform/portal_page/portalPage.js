@@ -2,8 +2,6 @@
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalCard from "../../../components/PortalCard";
-import PortalPageHeader from "../../../components/PortalPageHeader";
-import PortalStat from "../../../components/PortalStat";
 import { AuthContext } from "../../../context/AuthContext";
 import {
   EmptyState,
@@ -194,28 +192,30 @@ const PortalPage = () => {
   const todoItems = overview.todos || [];
   const openTasks = todoItems.length;
 
+  const tenantLabel = overview.profile?.tenant || tenant || 'Nexora Lab';
+  const lastLoginText = overview.profile?.lastLogin
+    ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
+    : 'Last login just now';
+
   const headerContent = (
-    <PortalPageHeader
-      eyebrow="Portal Overview"
-      title={`Welcome back, ${displayName}`}
-      subtitle="Stay aligned with the same workspace feel as your chart view."
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          <PortalStat
-            label="Applications"
-            value={allowedApps.length || renderableApps.length}
-            meta="Available"
-            tone="info"
-          />
-          <PortalStat
-            label="Open tasks"
-            value={openTasks}
-            meta="Across products"
-            tone="warning"
-          />
-        </div>
-      }
-    />
+    <div className="flex flex-col gap-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">Portal Overview</p>
+      <h1 className="text-3xl font-semibold coding-text-strong">
+        Welcome back, {displayName}
+      </h1>
+      <p className="text-sm coding-text-soft">
+        {tenantLabel} · {formatRoleLabel(overview.profile?.role)} · {lastLoginText}
+      </p>
+    </div>
+  );
+
+  const kpiStrip = (
+    <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <PortalKpiTile label="Applications" value={allowedApps.length || renderableApps.length} hint="Available to you" />
+      <PortalKpiTile label="Open tasks" value={openTasks} tone={openTasks > 0 ? 'warning' : 'neutral'} hint="Across products" />
+      <PortalKpiTile label="Saved items" value={lastSavedItems.length} hint="Recently pinned" />
+      <PortalKpiTile label="Tenant" value={tenantLabel} hint="Workspace" small />
+    </section>
   );
 
   if (overviewLoading) {
@@ -245,35 +245,42 @@ const PortalPage = () => {
       headerContent={headerContent}
       mainClassName="space-y-6"
     >
-      <PortalCard
-        compact
-        title="Member quick search"
-        subtitle="Open a chart without leaving the portal."
-        className="coding-member-toolbar"
-      >
+      {kpiStrip}
+
+      <section className="coding-surface rounded-2xl shadow-sm p-5">
+        <header className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h2 className="text-sm font-semibold coding-text-strong">Member quick search</h2>
+            <p className="text-xs coding-text-soft">Open a chart without leaving the portal.</p>
+          </div>
+        </header>
         <form
-          className="flex flex-col gap-4 sm:flex-row sm:items-end"
+          className="flex flex-col gap-3 sm:flex-row sm:items-end"
           onSubmit={handleMemberSearch}
           aria-label="Member quick search"
         >
-          <div className="flex-1 space-y-2">
+          <div className="flex-1">
             <label
-              className="text-sm font-semibold coding-text-strong"
+              className="block text-[11px] font-medium uppercase tracking-wider coding-text-muted mb-1"
               htmlFor="portal-member-search-input"
             >
               Member ID
             </label>
             <div className="relative">
+              <svg viewBox="0 0 24 24" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 coding-text-muted pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+              </svg>
               <input
                 id="portal-member-search-input"
                 type="search"
                 autoComplete="off"
-                placeholder="Search by member ID"
+                placeholder="Search by member ID, name, or plan"
                 value={memberQuery}
                 onChange={(event) => handleMemberQueryChange(event.target.value)}
                 list="portal-member-suggestions"
                 aria-describedby="portal-member-search-help"
-                className="coding-input w-full rounded-xl px-4 py-3 text-sm"
+                className="coding-input w-full rounded-md pl-9 pr-3 py-2.5 text-sm"
               />
               <datalist id="portal-member-suggestions">
                 {memberOptions.map((option) => (
@@ -285,7 +292,7 @@ const PortalPage = () => {
             </div>
           </div>
           <button
-            className="inline-flex h-12 items-center justify-center rounded-xl bg-slate-900 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center rounded-md bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
             type="submit"
             disabled={!memberQuery.trim() || isLaunchingMember}
           >
@@ -293,15 +300,15 @@ const PortalPage = () => {
           </button>
         </form>
         <p
-          className={`text-sm ${
-            memberSearchError ? "text-red-600" : "coding-text-muted"
+          className={`mt-2 text-xs ${
+            memberSearchError ? "text-rose-600 dark:text-rose-300" : "coding-text-muted"
           }`}
           id="portal-member-search-help"
           role="status"
         >
           {memberSearchStatus}
         </p>
-      </PortalCard>
+      </section>
 
       {portalError && (
         <ErrorState
@@ -518,5 +525,20 @@ const PortalPage = () => {
     </PortalPageLayout>
   );
 };
+
+function PortalKpiTile({ label, value, hint, tone = 'neutral', small = false }) {
+  const valueTone = {
+    neutral: 'coding-text-strong',
+    warning: 'text-amber-700 dark:text-amber-300',
+    critical: 'text-rose-600 dark:text-rose-300',
+  }[tone] || 'coding-text-strong';
+  return (
+    <div className="coding-surface rounded-2xl shadow-sm p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</p>
+      <p className={`mt-1.5 ${small ? 'text-base font-semibold' : 'text-2xl font-semibold tabular-nums'} ${valueTone}`}>{value}</p>
+      {hint && <p className="mt-1 text-[11px] coding-text-soft">{hint}</p>}
+    </div>
+  );
+}
 
 export default PortalPage;
