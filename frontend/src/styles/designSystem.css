@@ -126,9 +126,8 @@
 }
 
 .ds-card--interactive:hover {
-  transform: translateY(-3px);
   box-shadow: var(--shadow-md);
-  border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--border));
+  border-color: color-mix(in srgb, var(--brand-primary) 28%, var(--border));
 }
 
 .ds-card--compact {
@@ -423,42 +422,42 @@
 .ds-btn--primary {
   background: var(--brand-primary);
   color: #ffffff;
-  box-shadow: var(--shadow-sm);
 }
 
 .ds-btn--primary:hover {
-  background: color-mix(in srgb, var(--brand-primary) 90%, #000000 10%);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  background: color-mix(in srgb, var(--brand-primary) 88%, #000000 12%);
 }
 
 .ds-btn--primary:active {
-  transform: translateY(0);
-  box-shadow: var(--shadow-sm);
+  background: color-mix(in srgb, var(--brand-primary) 80%, #000000 20%);
 }
 
 .ds-btn--secondary {
-  background: color-mix(in srgb, var(--bg-light) 85%, transparent);
-  border-color: color-mix(in srgb, var(--border) 90%, transparent);
-  color: var(--text);
+  background: var(--bg-card);
+  border-color: color-mix(in srgb, var(--brand-primary) 30%, var(--border));
+  color: var(--brand-primary);
 }
 
 .ds-btn--secondary:hover {
-  border-color: color-mix(in srgb, var(--brand-primary) 30%, var(--border));
-  color: color-mix(in srgb, var(--brand-primary) 90%, var(--text));
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--brand-primary) 8%, var(--bg-card));
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+.ds-btn--secondary:active {
+  background: color-mix(in srgb, var(--brand-primary) 14%, var(--bg-card));
 }
 
 .ds-btn--ghost {
-  border-color: color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--bg-light) 70%, transparent);
+  border-color: color-mix(in srgb, var(--border) 90%, transparent);
+  background: transparent;
   color: var(--text);
 }
 
 .ds-btn--ghost:hover {
-  border-color: color-mix(in srgb, var(--brand-primary) 30%, var(--border));
-  background: color-mix(in srgb, var(--brand-primary) 12%, var(--bg-light));
-  color: color-mix(in srgb, var(--brand-primary) 85%, var(--text));
+  background: color-mix(in srgb, var(--brand-primary) 8%, var(--bg-card));
+  border-color: color-mix(in srgb, var(--brand-primary) 24%, var(--border));
+  color: var(--brand-primary);
 }
 
 .ds-btn[disabled],
@@ -747,7 +746,6 @@
 .ds-navbar .navbar-nav .nav-link:focus-visible,
 .ds-navbar .navbar-nav .nav-link.active {
   color: var(--brand-primary);
-  transform: translateY(-1px);
 }
 
 .ds-navbar .dropdown-menu {
@@ -803,26 +801,26 @@
   border-top: var(--border-width) solid color-mix(in srgb, var(--border) 80%, transparent);
 }
 
-/* Empty states */
+/* Empty states (HubSpot: illustration tile + clear CTA, no dashed outline) */
 .ds-empty {
-  border: var(--border-width) dashed color-mix(in srgb, var(--border) 70%, transparent);
+  border: var(--border-width) solid var(--border);
   border-radius: var(--radius-md);
-  padding: clamp(var(--space-md), 6vw, var(--space-xl));
+  padding: clamp(var(--space-lg), 6vw, var(--space-2xl));
   display: grid;
   gap: var(--space-sm);
   justify-items: center;
   text-align: center;
-  background: color-mix(in srgb, var(--bg-light) 80%, transparent);
+  background: var(--bg-card);
 }
 
 .ds-empty__icon {
   display: inline-flex;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--brand-primary) 15%, var(--bg));
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--brand-primary) 12%, var(--bg));
   color: var(--brand-primary);
 }
 

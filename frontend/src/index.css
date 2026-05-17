@@ -30,15 +30,15 @@ html:focus-within { scroll-behavior: smooth; }
   --dm-accent:    #2a2f34;
   --dm-input:     #262c31;
 
-  /* Light mode surface tokens */
-  --lm-bg:        #f3f2ef;
+  /* Light mode surface tokens (HubSpot Canvas-tuned) */
+  --lm-bg:        #f5f8fa;
   --lm-bg-light:  #ffffff;
   --lm-bg-card:   #ffffff;
-  --lm-text:      #1d2226;
-  --lm-text-muted:#6f7780;
-  --lm-border:    #e0e0e0;
-  --lm-shadow:    0 1px 3px rgba(0,0,0,0.08);
-  --lm-accent:    #eef3f8;
+  --lm-text:      #33475b;
+  --lm-text-muted:#516f90;
+  --lm-border:    #dfe3eb;
+  --lm-shadow:    0 1px 2px rgba(33, 51, 67, 0.04), 0 1px 3px rgba(33, 51, 67, 0.06);
+  --lm-accent:    #eaf0f6;
 
   /* Semantic aliases (default → light) */
   --bg:        var(--lm-bg);
@@ -76,19 +76,19 @@ html:focus-within { scroll-behavior: smooth; }
   --space-3xl: 4.5rem;
   --content-max-width: 1120px;
 
-  /* Radii */
-  --radius-xs:   6px;
-  --radius-sm:   8px;
-  --radius-md:   12px;
-  --radius-lg:   18px;
-  --radius-xl:   24px;
+  /* Radii (HubSpot Canvas: small, sharp) */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
   --radius-pill: 999px;
   --border-width:1px;
 
-  /* Elevation */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
-  --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.12);
-  --shadow-lg: 0 24px 48px rgba(15, 23, 42, 0.18);
+  /* Elevation (HubSpot Canvas: hairline + soft lift) */
+  --shadow-sm: 0 1px 2px rgba(33, 51, 67, 0.04), 0 1px 3px rgba(33, 51, 67, 0.06);
+  --shadow-md: 0 2px 6px rgba(33, 51, 67, 0.08), 0 4px 12px rgba(33, 51, 67, 0.08);
+  --shadow-lg: 0 6px 16px rgba(33, 51, 67, 0.10), 0 12px 28px rgba(33, 51, 67, 0.10);
 
   /* Typography */
   --font-size-xs:  0.75rem;
@@ -223,7 +223,7 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
 .metric-value {
   font-size: 2em;
   font-weight: bold;
-  color: #22c55e;
+  color: var(--brand-primary);
   margin: 10px 0;
 }
 
