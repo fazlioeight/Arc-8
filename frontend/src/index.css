@@ -163,6 +163,19 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
 
 :root { accent-color: #0a66c2; }
 
+/* ─── Text selection ─────────────────────────────────────────────────────── */
+/* Use a brand-tinted background and the page text color so selected text
+   stays readable in both light and dark mode. Without this, browsers default
+   to white selection text — which becomes invisible on brand-blue links. */
+::selection {
+  background: color-mix(in srgb, var(--brand-primary) 28%, transparent);
+  color: var(--text);
+}
+::-moz-selection {
+  background: color-mix(in srgb, var(--brand-primary) 28%, transparent);
+  color: var(--text);
+}
+
 /* ─── Animation utilities ────────────────────────────────────────────────── */
 .fade-in  { opacity: 0; transform: translateY(4px);  animation: fadeIn  var(--dur-med) var(--easing-standard) forwards; }
 .slide-up { opacity: 0; transform: translateY(12px); animation: slideUp var(--dur-slow) var(--easing-standard) forwards; }
