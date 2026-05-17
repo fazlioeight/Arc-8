@@ -24,6 +24,7 @@ const PortalPageLayout = ({
   headerContent = null,
   mainClassName = 'space-y-6',
   utilityBar = true,
+  hideHeader = false,
   children,
 }) => {
   const alignment = useMemo(() => ALIGNMENT[align] || ALIGNMENT.left, [align]);
@@ -66,17 +67,30 @@ const PortalPageLayout = ({
     <div className={['coding-member-workspace portal-theme min-h-screen', backgroundClassName].filter(Boolean).join(' ')}>
       {utilityBar ? <PortalUtilityBar /> : null}
       <div className={['mx-auto w-full', maxWidthClassName, paddingClassName, 'pb-10'].join(' ')}>
-        <header className="pt-6 space-y-4">
-          {header}
-          {navItems.length ? (
-            <PortalNav
-              items={navItems}
-              currentKey={currentNav}
-              className={['mt-1', navClassName].join(' ')}
-              {...restNavProps}
-            />
-          ) : null}
-        </header>
+        {hideHeader ? (
+          navItems.length ? (
+            <div className="pt-6">
+              <PortalNav
+                items={navItems}
+                currentKey={currentNav}
+                className={navClassName}
+                {...restNavProps}
+              />
+            </div>
+          ) : null
+        ) : (
+          <header className="pt-6 space-y-4">
+            {header}
+            {navItems.length ? (
+              <PortalNav
+                items={navItems}
+                currentKey={currentNav}
+                className={['mt-1', navClassName].join(' ')}
+                {...restNavProps}
+              />
+            ) : null}
+          </header>
+        )}
         <main className={['pt-6', mainClassName].join(' ')}>
           {children}
         </main>

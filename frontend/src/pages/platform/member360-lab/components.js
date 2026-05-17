@@ -127,73 +127,85 @@ export function SectionCard({ title, subtitle, action, children, className = '' 
   );
 }
 
-export function MemberSummaryCard({ member, onAction, actions = [], pcpHref, pcpState }) {
+function memberInitials(member) {
+  const first = (member?.first_name || '').trim();
+  const last = (member?.last_name || '').trim();
+  const initials = `${first[0] || ''}${last[0] || ''}`.toUpperCase();
+  return initials || (member?.member_key || '?').slice(0, 2).toUpperCase();
+}
+
+export function RecordHeader({ member, gapCount, onAction, actions = [], onBack, onDashboard, pcpHref, pcpState }) {
   if (!member) return null;
-  const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ');
+  const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.member_key;
   const pcpValue = member.primary_care_provider;
+  const meta = [
+    member.member_key,
+    member.plan_name,
+    member.age != null ? `Age ${member.age}` : null,
+    member.gender,
+    member.line_of_business,
+  ].filter(Boolean);
+
   return (
-    <div className="coding-surface rounded-2xl p-5 shadow-sm space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] coding-text-muted">Member</p>
-          <h2 className="text-xl font-semibold coding-text-strong">{fullName || member.member_key}</h2>
-          <p className="text-xs coding-text-soft">{member.member_key} {member.age != null && `· Age ${member.age}`}{member.gender && ` · ${member.gender}`}</p>
+    <header className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+      <div className="flex items-start gap-4 p-5">
+        <div className="h-14 w-14 shrink-0 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-900/40 dark:text-brand-200 flex items-center justify-center text-base font-semibold ring-1 ring-brand-200 dark:ring-brand-800/60">
+          {memberInitials(member)}
         </div>
-        <RiskBadge tier={member.risk_tier} score={member.risk_score_composite} />
-      </div>
-
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-        <KV label="Plan" value={member.plan_name} />
-        <KV label="LOB" value={member.line_of_business} />
-        <KV label="Phone" value={member.phone} />
-        <KV label="Email" value={member.email} className="truncate" />
-        {pcpHref && pcpValue ? (
-          <div className="flex flex-col">
-            <dt className="text-[10px] uppercase tracking-wider coding-text-muted">PCP</dt>
-            <dd className="coding-text-strong">
-              <Link
-                to={pcpHref}
-                state={pcpState}
-                className="underline decoration-sky-400/70 underline-offset-4 hover:decoration-sky-300"
-              >
-                {pcpValue}
-              </Link>
-            </dd>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-semibold coding-text-strong truncate">{fullName}</h1>
+            <RiskBadge tier={member.risk_tier} score={member.risk_score_composite} />
+            {gapCount != null && gapCount > 0 && (
+              <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 ring-1 ring-amber-200 px-2 py-0.5 text-[11px] font-semibold dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-700/40">
+                {gapCount} gap{gapCount === 1 ? '' : 's'}
+              </span>
+            )}
           </div>
-        ) : (
-          <KV label="PCP" value={pcpValue} />
-        )}
-        <KV label="Channel" value={member.preferred_channel} />
-        <KV label="Language" value={member.preferred_language} />
-        <KV label="City" value={member.address_city ? `${member.address_city}, ${member.address_state || ''}` : null} />
-      </dl>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Stat label="Care gaps" value={member.open_care_gaps ?? 0} />
-        <Stat label="Open tasks" value={member.open_task_count ?? 0} />
-        <Stat label="Active journeys" value={member.active_journey_count ?? 0} />
-        <Stat label="Composite risk" value={member.risk_score_composite != null ? Number(member.risk_score_composite).toFixed(1) : '—'} />
-      </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        <RiskMini label="Clinical" value={member.clinical_risk_score} />
-        <RiskMini label="Utilization" value={member.utilization_risk_score} />
-        <RiskMini label="Cost" value={member.cost_risk_score} />
-        <RiskMini label="Engagement" value={member.engagement_risk_score} />
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs coding-text-muted">
+            {meta.map((m, i) => (
+              <React.Fragment key={`${m}-${i}`}>
+                {i > 0 && <span aria-hidden className="opacity-50">·</span>}
+                <span>{m}</span>
+              </React.Fragment>
+            ))}
+            {pcpHref && pcpValue && (
+              <>
+                <span aria-hidden className="opacity-50">·</span>
+                <span>PCP </span>
+                <Link to={pcpHref} state={pcpState} className="font-medium text-[var(--brand-primary)] hover:underline">
+                  {pcpValue}
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="hidden lg:flex items-center gap-1.5 shrink-0">
+          {onBack && (
+            <button type="button" onClick={onBack} className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-2.5 py-1.5 text-xs font-semibold">
+              Members
+            </button>
+          )}
+          {onDashboard && (
+            <button type="button" onClick={onDashboard} className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-2.5 py-1.5 text-xs font-semibold">
+              Dashboard
+            </button>
+          )}
+        </div>
       </div>
 
       {actions.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="border-t coding-border px-3 py-2 flex flex-wrap items-center gap-1">
           {actions.map((a) => (
             <button
               key={a.key}
               type="button"
               onClick={() => onAction?.(a.key)}
               className={joinClass(
-                'inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition',
                 a.primary
-                  ? 'bg-[var(--brand-primary)] text-white hover:opacity-90'
-                  : 'coding-surface-subtle coding-text-strong hover:opacity-80 ring-1 ring-black/5 dark:ring-white/10'
+                  ? 'bg-[var(--brand-primary)] text-white hover:bg-brand-700'
+                  : 'coding-text-strong hover:bg-[var(--coding-hover)]'
               )}
             >
               {a.label}
@@ -201,15 +213,155 @@ export function MemberSummaryCard({ member, onAction, actions = [], pcpHref, pcp
           ))}
         </div>
       )}
+    </header>
+  );
+}
+
+export function MemberSummaryCard({ member, pcpHref, pcpState }) {
+  if (!member) return null;
+  const pcpValue = member.primary_care_provider;
+  const pcpNode = pcpHref && pcpValue ? (
+    <Link to={pcpHref} state={pcpState} className="text-[var(--brand-primary)] hover:underline">
+      {pcpValue}
+    </Link>
+  ) : pcpValue;
+  const cityValue = member.address_city ? `${member.address_city}, ${member.address_state || ''}` : null;
+
+  const properties = [
+    { label: 'Plan', value: member.plan_name },
+    { label: 'Line of business', value: member.line_of_business },
+    { label: 'Phone', value: member.phone },
+    { label: 'Email', value: member.email },
+    { label: 'PCP', value: pcpNode },
+    { label: 'Channel', value: member.preferred_channel },
+    { label: 'Language', value: member.preferred_language },
+    { label: 'City', value: cityValue },
+  ];
+
+  return (
+    <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+      <header className="px-4 py-2.5 border-b coding-border flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">About this member</h3>
+      </header>
+      <dl>
+        {properties.map((p) => (
+          <PropertyRow key={p.label} label={p.label} value={p.value} />
+        ))}
+      </dl>
+
+      <header className="px-4 py-2.5 border-y coding-border flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">Quick stats</h3>
+      </header>
+      <div className="grid grid-cols-2 gap-2 p-3">
+        <Stat label="Care gaps" value={member.open_care_gaps ?? 0} />
+        <Stat label="Open tasks" value={member.open_task_count ?? 0} />
+        <Stat label="Active journeys" value={member.active_journey_count ?? 0} />
+        <Stat label="Composite risk" value={member.risk_score_composite != null ? Number(member.risk_score_composite).toFixed(1) : '—'} />
+      </div>
+
+      <header className="px-4 py-2.5 border-y coding-border flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">Risk dimensions</h3>
+      </header>
+      <div className="grid grid-cols-2 gap-2 p-3">
+        <RiskMini label="Clinical" value={member.clinical_risk_score} />
+        <RiskMini label="Utilization" value={member.utilization_risk_score} />
+        <RiskMini label="Cost" value={member.cost_risk_score} />
+        <RiskMini label="Engagement" value={member.engagement_risk_score} />
+      </div>
+    </section>
+  );
+}
+
+function PropertyRow({ label, value }) {
+  const isEmpty = value == null || value === '' || value === '—';
+  return (
+    <div className="group flex items-start gap-3 px-4 py-2 transition hover:bg-[var(--coding-hover)]">
+      <dt className="text-[11px] font-medium coding-text-muted w-24 shrink-0 pt-0.5">{label}</dt>
+      <dd className="flex-1 min-w-0 text-sm coding-text-strong break-words">
+        {isEmpty ? <span className="coding-text-soft italic">Empty</span> : value}
+      </dd>
+      <button
+        type="button"
+        aria-label={`Edit ${label}`}
+        className="opacity-0 group-hover:opacity-100 transition coding-text-muted hover:text-[var(--brand-primary)]"
+      >
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 20h9M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
     </div>
   );
 }
 
-function KV({ label, value, className = '' }) {
+export function WorkspaceTabs({ tabs, activeKey, onChange }) {
   return (
-    <div className="flex flex-col">
-      <dt className="text-[10px] uppercase tracking-wider coding-text-muted">{label}</dt>
-      <dd className={joinClass('coding-text-strong', className)}>{value || '—'}</dd>
+    <nav className="relative border-b coding-border overflow-x-auto" role="tablist">
+      <div className="flex items-center gap-1 px-1">
+        {tabs.map((t) => {
+          const active = t.key === activeKey;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onChange(t.key)}
+              className={joinClass(
+                'whitespace-nowrap px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition',
+                active
+                  ? 'border-[var(--brand-primary)] text-[var(--brand-primary)]'
+                  : 'border-transparent coding-text-soft hover:coding-text-strong hover:border-slate-200 dark:hover:border-slate-700'
+              )}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+export function WorkspaceDrawer({ title, subtitle, onClose, children, footer }) {
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-slate-900/40 dark:bg-black/60" onClick={onClose} aria-hidden />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        className="absolute inset-y-0 right-0 w-full sm:w-[480px] coding-surface shadow-xl flex flex-col animate-[slideInRight_var(--dur-med)_var(--easing-standard)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-start justify-between gap-3 px-5 py-4 border-b coding-border">
+          <div>
+            <h3 className="text-base font-semibold coding-text-strong">{title}</h3>
+            {subtitle && <p className="mt-0.5 text-xs coding-text-soft">{subtitle}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-md p-1 coding-text-muted hover:bg-[var(--coding-hover)] hover:coding-text-strong transition"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+            </svg>
+          </button>
+        </header>
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">{children}</div>
+        {footer && <footer className="px-5 py-3 border-t coding-border flex items-center justify-end gap-2">{footer}</footer>}
+      </aside>
     </div>
   );
 }

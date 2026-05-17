@@ -23,6 +23,7 @@ import {
   MemberTimeline,
   PortalPreview,
   PriorityBadge,
+  RecordHeader,
   RiskBadge,
   RiskInsightsCard,
   SBARPanel,
@@ -30,6 +31,8 @@ import {
   SectionCard,
   TalkdeskEmbedPlaceholder,
   TaskStatusBadge,
+  WorkspaceDrawer,
+  WorkspaceTabs,
 } from './components';
 import ProblemsHCCPage from './chart/ProblemsHCCPage';
 import MedicationsPage from './chart/MedicationsPage';
@@ -406,18 +409,19 @@ const Member360LabWorkspace = () => {
       navProps={{ align: 'center', tone: 'surface' }}
       maxWidthClassName="max-w-[1500px]"
       mainClassName="space-y-4"
-      actions={
-        <div className="flex flex-wrap items-center gap-2">
-          {gap && (
-            <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 ring-1 ring-amber-200 px-2.5 py-0.5 text-xs font-semibold dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-700/40">
-              GAPS: {missingHccCount}
-            </span>
-          )}
-          <button type="button" onClick={() => navigate(ROUTES.MEMBER360_LAB.MEMBERS)} className="rounded-md ring-1 ring-black/10 dark:ring-white/10 coding-surface coding-text-strong px-3 py-1.5 text-xs font-semibold hover:opacity-80">← Members</button>
-          <button type="button" onClick={() => navigate(ROUTES.MEMBER360_LAB.DASHBOARD)} className="rounded-md ring-1 ring-black/10 dark:ring-white/10 coding-surface coding-text-strong px-3 py-1.5 text-xs font-semibold hover:opacity-80">Dashboard</button>
-        </div>
-      }
+      hideHeader
     >
+      <RecordHeader
+        member={member}
+        gapCount={missingHccCount}
+        onAction={(key) => handleAction(key)}
+        actions={PRIMARY_ACTIONS}
+        onBack={() => navigate(ROUTES.MEMBER360_LAB.MEMBERS)}
+        onDashboard={() => navigate(ROUTES.MEMBER360_LAB.DASHBOARD)}
+        pcpHref={pcpHref}
+        pcpState={pcpState}
+      />
+
       {actionMessage && (
         <div className="rounded-lg ring-1 ring-emerald-200 dark:ring-emerald-700/40 bg-emerald-50/70 dark:bg-emerald-900/20 px-3 py-2 text-sm coding-text-strong">
           {actionMessage}
@@ -425,15 +429,9 @@ const Member360LabWorkspace = () => {
       )}
 
       <div className="grid grid-cols-12 gap-4">
-        {/* Left panel */}
+        {/* Left rail — properties */}
         <div className="col-span-12 xl:col-span-3 space-y-4">
-          <MemberSummaryCard
-            member={member}
-            onAction={(key) => handleAction(key)}
-            actions={PRIMARY_ACTIONS}
-            pcpHref={pcpHref}
-            pcpState={pcpState}
-          />
+          <MemberSummaryCard member={member} pcpHref={pcpHref} pcpState={pcpState} />
 
           <SectionCard
             title="Coding actions"
@@ -443,7 +441,7 @@ const Member360LabWorkspace = () => {
               type="button"
               onClick={onSubmitToPayer}
               disabled={submissionState === 'working'}
-              className="w-full rounded-md bg-[var(--brand-primary)] text-white px-3 py-2 text-xs font-semibold shadow-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-md bg-[var(--brand-primary)] text-white px-3 py-2 text-xs font-semibold hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submissionState === 'working' ? 'Generating export...' : 'Submit to Payer (Preview)'}
             </button>
@@ -458,26 +456,15 @@ const Member360LabWorkspace = () => {
           </SectionCard>
         </div>
 
-        {/* Center panel */}
+        {/* Center — activity */}
         <div className="col-span-12 xl:col-span-6 space-y-4">
           <section className="coding-surface rounded-2xl shadow-sm">
-            <div className="flex items-center gap-1 px-3 pt-3 overflow-x-auto">
-              {TABS.map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTab(t.key)}
-                  className={`px-3 py-2 text-xs font-semibold rounded-t-md ${tab === t.key ? 'bg-[var(--brand-primary)] text-white' : 'coding-text-strong hover:opacity-80'}`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            <WorkspaceTabs tabs={TABS} activeKey={tab} onChange={setTab} />
             <div className="p-4">{tabContent}</div>
           </section>
         </div>
 
-        {/* Right panel */}
+        {/* Right rail — associations */}
         <div className="col-span-12 xl:col-span-3 space-y-4">
           <GuidedTriagePanel member={member} onAction={(key, payload) => handleAction(key, payload)} />
           <RiskInsightsCard member={member} insights={detail.risk_insights} />
@@ -557,76 +544,85 @@ function ActionDialog({ dialog, member, onSubmit, onCancel }) {
     escalate: 'Escalate to RN',
   }[dialog.key] || 'Action';
 
+  const memberLabel = [member?.first_name, member?.last_name].filter(Boolean).join(' ');
+  const subtitle = memberLabel ? `${memberLabel} · ${member?.member_key}` : member?.member_key;
+
   return (
-    <div className="fixed inset-0 z-40 bg-black/40 dark:bg-black/60 flex items-center justify-center p-4" onClick={onCancel}>
-      <div className="coding-surface rounded-2xl shadow-xl max-w-xl w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold coding-text-strong">{title}</h3>
-          <RiskBadge tier={member?.risk_tier} score={member?.risk_score_composite} />
-        </div>
-        <p className="text-xs coding-text-soft">{member?.first_name} {member?.last_name} · {member?.member_key}</p>
-
-        {dialog.key === 'create_task' && (
-          <div className="space-y-2">
-            <Input label="Title" value={form.title} onChange={(v) => update('title', v)} />
-            <div className="grid grid-cols-2 gap-2">
-              <Select label="Priority" value={form.priority} onChange={(v) => update('priority', v)} options={['low', 'medium', 'high', 'urgent']} />
-              <Input type="date" label="Due date" value={form.due_date} onChange={(v) => update('due_date', v)} />
-            </div>
-            <h4 className="text-xs uppercase tracking-wider coding-text-muted pt-2">SBAR</h4>
-            <Textarea label="Situation" value={form.sbar.situation} onChange={(v) => updateSbar('situation', v)} />
-            <Textarea label="Background" value={form.sbar.background} onChange={(v) => updateSbar('background', v)} />
-            <Textarea label="Assessment" value={form.sbar.assessment} onChange={(v) => updateSbar('assessment', v)} />
-            <Textarea label="Recommendation" value={form.sbar.recommendation} onChange={(v) => updateSbar('recommendation', v)} />
-          </div>
-        )}
-
-        {dialog.key === 'add_note' && (
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <Select label="Channel" value={form.channel} onChange={(v) => update('channel', v)} options={['Internal', 'Phone', 'Chat', 'SMS', 'Secure Message', 'Email']} />
-              <Input label="Note type" value={form.note_type} onChange={(v) => update('note_type', v)} />
-            </div>
-            <Textarea label="Body" value={form.body} onChange={(v) => update('body', v)} rows={5} />
-          </div>
-        )}
-
-        {dialog.key === 'send_message' && (
-          <div className="space-y-2">
-            <Select label="Channel" value={form.channel} onChange={(v) => update('channel', v)} options={['SMS', 'Chat', 'Secure Message', 'Email']} />
-            <Textarea label="Message" value={form.body} onChange={(v) => update('body', v)} rows={4} />
-            <p className="text-[11px] coding-text-muted">Recipient: {member?.phone || member?.email || member?.member_key}</p>
-          </div>
-        )}
-
-        {dialog.key === 'recommend_care_option' && (
-          <div className="space-y-2">
-            <Input label="Service type" value={form.service_type} onChange={(v) => update('service_type', v)} placeholder="e.g. MRI - Shoulder" />
-            <div className="grid grid-cols-2 gap-2">
-              <Input label="Recommended provider / facility" value={form.recommended_provider} onChange={(v) => update('recommended_provider', v)} />
-              <Select label="Network status" value={form.network_status} onChange={(v) => update('network_status', v)} options={['In Network', 'Out of Network', 'Tier 1', 'Tier 2']} />
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              <Input label="Cost ($)" value={form.cost_estimate} onChange={(v) => update('cost_estimate', v)} placeholder="640" />
-              <Input label="Quality" value={form.quality_score} onChange={(v) => update('quality_score', v)} placeholder="4.7" />
-              <Input label="Distance (mi)" value={form.distance_miles} onChange={(v) => update('distance_miles', v)} placeholder="5.2" />
-              <Input label="Savings ($)" value={form.potential_savings} onChange={(v) => update('potential_savings', v)} placeholder="620" />
-            </div>
-            <Textarea label="Rationale (internal)" value={form.rationale} onChange={(v) => update('rationale', v)} rows={3} />
-            <Textarea label="Member-facing explanation" value={form.member_facing_explanation} onChange={(v) => update('member_facing_explanation', v)} rows={3} />
-          </div>
-        )}
-
-        {(dialog.key === 'start_journey' || dialog.key === 'escalate') && (
-          <p className="text-sm coding-text-soft">This will be recorded against the member and surfaced in the workspace. Detailed editing UI is part of the next phase.</p>
-        )}
-
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onCancel} className="rounded-md coding-surface-subtle coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-3 py-1.5 text-xs font-semibold hover:opacity-80">Cancel</button>
-          <button type="button" onClick={() => onSubmit(form)} className="rounded-md bg-[var(--brand-primary)] text-white px-3 py-1.5 text-xs font-semibold hover:opacity-90">Submit</button>
-        </div>
+    <WorkspaceDrawer
+      title={title}
+      subtitle={subtitle}
+      onClose={onCancel}
+      footer={
+        <>
+          <button type="button" onClick={onCancel} className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-3 py-1.5 text-xs font-semibold">
+            Cancel
+          </button>
+          <button type="button" onClick={() => onSubmit(form)} className="rounded-md bg-[var(--brand-primary)] text-white px-3 py-1.5 text-xs font-semibold hover:bg-brand-700">
+            Submit
+          </button>
+        </>
+      }
+    >
+      <div className="flex items-center justify-between -mt-1">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">Member context</span>
+        <RiskBadge tier={member?.risk_tier} score={member?.risk_score_composite} />
       </div>
-    </div>
+
+      {dialog.key === 'create_task' && (
+        <div className="space-y-3">
+          <Input label="Title" value={form.title} onChange={(v) => update('title', v)} />
+          <div className="grid grid-cols-2 gap-3">
+            <Select label="Priority" value={form.priority} onChange={(v) => update('priority', v)} options={['low', 'medium', 'high', 'urgent']} />
+            <Input type="date" label="Due date" value={form.due_date} onChange={(v) => update('due_date', v)} />
+          </div>
+          <h4 className="text-[11px] uppercase tracking-[0.14em] font-semibold coding-text-muted pt-1">SBAR</h4>
+          <Textarea label="Situation" value={form.sbar.situation} onChange={(v) => updateSbar('situation', v)} />
+          <Textarea label="Background" value={form.sbar.background} onChange={(v) => updateSbar('background', v)} />
+          <Textarea label="Assessment" value={form.sbar.assessment} onChange={(v) => updateSbar('assessment', v)} />
+          <Textarea label="Recommendation" value={form.sbar.recommendation} onChange={(v) => updateSbar('recommendation', v)} />
+        </div>
+      )}
+
+      {dialog.key === 'add_note' && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Select label="Channel" value={form.channel} onChange={(v) => update('channel', v)} options={['Internal', 'Phone', 'Chat', 'SMS', 'Secure Message', 'Email']} />
+            <Input label="Note type" value={form.note_type} onChange={(v) => update('note_type', v)} />
+          </div>
+          <Textarea label="Body" value={form.body} onChange={(v) => update('body', v)} rows={5} />
+        </div>
+      )}
+
+      {dialog.key === 'send_message' && (
+        <div className="space-y-3">
+          <Select label="Channel" value={form.channel} onChange={(v) => update('channel', v)} options={['SMS', 'Chat', 'Secure Message', 'Email']} />
+          <Textarea label="Message" value={form.body} onChange={(v) => update('body', v)} rows={4} />
+          <p className="text-[11px] coding-text-muted">Recipient: {member?.phone || member?.email || member?.member_key}</p>
+        </div>
+      )}
+
+      {dialog.key === 'recommend_care_option' && (
+        <div className="space-y-3">
+          <Input label="Service type" value={form.service_type} onChange={(v) => update('service_type', v)} placeholder="e.g. MRI - Shoulder" />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Recommended provider / facility" value={form.recommended_provider} onChange={(v) => update('recommended_provider', v)} />
+            <Select label="Network status" value={form.network_status} onChange={(v) => update('network_status', v)} options={['In Network', 'Out of Network', 'Tier 1', 'Tier 2']} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Cost ($)" value={form.cost_estimate} onChange={(v) => update('cost_estimate', v)} placeholder="640" />
+            <Input label="Quality" value={form.quality_score} onChange={(v) => update('quality_score', v)} placeholder="4.7" />
+            <Input label="Distance (mi)" value={form.distance_miles} onChange={(v) => update('distance_miles', v)} placeholder="5.2" />
+            <Input label="Savings ($)" value={form.potential_savings} onChange={(v) => update('potential_savings', v)} placeholder="620" />
+          </div>
+          <Textarea label="Rationale (internal)" value={form.rationale} onChange={(v) => update('rationale', v)} rows={3} />
+          <Textarea label="Member-facing explanation" value={form.member_facing_explanation} onChange={(v) => update('member_facing_explanation', v)} rows={3} />
+        </div>
+      )}
+
+      {(dialog.key === 'start_journey' || dialog.key === 'escalate') && (
+        <p className="text-sm coding-text-soft">This will be recorded against the member and surfaced in the workspace. Detailed editing UI is part of the next phase.</p>
+      )}
+    </WorkspaceDrawer>
   );
 }
 
