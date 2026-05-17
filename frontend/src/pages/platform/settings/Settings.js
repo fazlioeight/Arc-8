@@ -5,7 +5,7 @@ import PortalPageHeader from "../../../components/PortalPageHeader";
 import PortalCard from "../../../components/PortalCard";
 import PortalStat from "../../../components/PortalStat";
 import "../../../index.css";
-import "../coding/member/memberWorkspace.css";
+import "../../../styles/memberWorkspace.css";
 import DarkModeToggle from "../../../components/DarkModeToggle";
 import ToggleSwitch from "../../../components/ToggleSwitch";
 import { AuthContext } from "../../../context/AuthContext";
@@ -15,15 +15,13 @@ import { fetchUserPreferences, updateUserPreferences } from "../../../services/s
 const NAV_ITEMS = [
   { key: "home", label: "Home & Landing" },
   { key: "analytics", label: "Analytics Dashboard" },
-  { key: "coding", label: "Coding Workbench" },
+  { key: "providers", label: "Provider Directory" },
   { key: "care", label: "Care Operations menu" },
-  { key: "rideBooking", label: "Ride coordination" },
   { key: "jobCenter", label: "Operations Center" },
   { key: "importData", label: "Data imports" },
   { key: "resources", label: "Docs library" },
   { key: "admin", label: "Administration menu" },
   { key: "adminConsole", label: "Master admin console" },
-  { key: "assignments", label: "Work distribution" },
   { key: "settings", label: "Settings access" },
   { key: "pricing", label: "Pricing" },
   { key: "contact", label: "Contact" },

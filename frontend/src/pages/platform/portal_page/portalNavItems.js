@@ -17,11 +17,12 @@ export const PORTAL_NAV_ITEMS = [
       path === ROUTES.MEMBER_360.LANDING,
   },
   {
-    key: "coding",
-    label: "Coding Worklists",
-    href: ROUTES.CODING.LANDING,
+    key: "providers",
+    label: "Providers",
+    href: ROUTES.PROVIDERS.LANDING,
     match: (path) =>
-      path === ROUTES.CODING.LANDING || path.startsWith(`${ROUTES.CODING.LANDING}/`),
+      path === ROUTES.PROVIDERS.LANDING ||
+      path.startsWith(`${ROUTES.PROVIDERS.LANDING}/`),
   },
   {
     key: "chat",

@@ -14,15 +14,13 @@ const ROLE_MENU_STORAGE_KEY = 'nexora-role-menus';
 const DEFAULT_NAV_KEYS = [
   'home',
   'analytics',
-  'coding',
+  'providers',
   'care',
-  'rideBooking',
   'jobCenter',
   'importData',
   'resources',
   'admin',
   'adminConsole',
-  'assignments',
   'settings',
   'pricing',
   'login',
@@ -34,15 +32,13 @@ const DEFAULT_ROLE_MENU = {
   manager: {
     home: true,
     analytics: true,
-    coding: true,
+    providers: true,
     care: true,
-    rideBooking: true,
     jobCenter: true,
     importData: true,
     resources: true,
     admin: false,
     adminConsole: false,
-    assignments: false,
     settings: true,
     pricing: false,
     login: false,
@@ -51,15 +47,13 @@ const DEFAULT_ROLE_MENU = {
   user: {
     home: true,
     analytics: false,
-    coding: true,
+    providers: true,
     care: false,
-    rideBooking: false,
     jobCenter: false,
     importData: false,
     resources: true,
     admin: false,
     adminConsole: false,
-    assignments: false,
     settings: true,
     pricing: false,
     login: false,
@@ -68,8 +62,8 @@ const DEFAULT_ROLE_MENU = {
 };
 
 const DEFAULT_FAVORITES = [
-  { path: '/dashboard', label: 'Analytics Dashboard' },
-  { path: '/coding', label: 'Coding Worklists' },
+  { path: '/portal', label: 'Portal Overview' },
+  { path: '/providers', label: 'Providers' },
 ];
 
 const loadRoleMenuConfig = () => {

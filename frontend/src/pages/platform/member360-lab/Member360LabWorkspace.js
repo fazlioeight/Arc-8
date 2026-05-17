@@ -31,14 +31,14 @@ import {
   TalkdeskEmbedPlaceholder,
   TaskStatusBadge,
 } from './components';
-import ProblemsHCCPage from '../coding/member/pages/ProblemsHCCPage';
-import MedicationsPage from '../coding/member/pages/MedicationsPage';
-import LabsImagingPage from '../coding/member/pages/LabsImagingPage';
-import CareGapsPage from '../coding/member/pages/CareGapsPage';
-import DocumentsPage from '../coding/member/pages/DocumentsPage';
-import AuditLogPage from '../coding/member/pages/AuditLogPage';
-import SharingPage from '../coding/member/pages/SharingPage';
-import SettingsPage from '../coding/member/pages/SettingsPage';
+import ProblemsHCCPage from './chart/ProblemsHCCPage';
+import MedicationsPage from './chart/MedicationsPage';
+import LabsImagingPage from './chart/LabsImagingPage';
+import CareGapsPage from './chart/CareGapsPage';
+import DocumentsPage from './chart/DocumentsPage';
+import AuditLogPage from './chart/AuditLogPage';
+import SharingPage from './chart/SharingPage';
+import SettingsPage from './chart/SettingsPage';
 
 const TABS = [
   { key: 'timeline', label: 'Timeline' },
@@ -111,7 +111,7 @@ const Member360LabWorkspace = () => {
     const params = new URLSearchParams();
     if (member.id != null) params.set('fromMemberId', String(member.id));
     params.set('providerName', member.primary_care_provider);
-    return `/coding/providers/${key}?${params.toString()}`;
+    return `${ROUTES.PROVIDERS.LANDING}/${key}?${params.toString()}`;
   }, [member]);
 
   const pcpState = useMemo(() => {

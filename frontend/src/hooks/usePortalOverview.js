@@ -65,10 +65,8 @@ export const buildFallbackOverview = (apps, user) => {
     title: `${app.label} snapshot ${idx % 2 ? "(draft)" : "(published)"}`,
     appKey: app.key,
     summary:
-      app.key === "coding"
-        ? "Queued chart review saved by you"
-        : app.key === "ride_booking"
-        ? "Ride manifest changes captured"
+      app.key === "providers"
+        ? "Provider directory filters saved"
         : app.key === "portal"
         ? "Personal overview preferences cached"
         : "Latest workspace preferences stored",
@@ -79,12 +77,10 @@ export const buildFallbackOverview = (apps, user) => {
   const todos = source.slice(0, 5).map((app, idx) => ({
     id: `todo-${idx}`,
     title:
-      app.key === "coding"
-        ? "Complete chart validation for high-risk cohort"
-        : app.key === "dashboard"
+      app.key === "dashboard"
         ? "Review metrics variance for Q3 close"
-        : app.key === "ride_booking"
-        ? "Confirm transport coverage for dialysis members"
+        : app.key === "providers"
+        ? "Reconcile provider directory updates"
         : app.key === "portal"
         ? "Publish weekly updates on your overview"
         : "Follow up on configuration updates",

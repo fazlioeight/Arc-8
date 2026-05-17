@@ -7,7 +7,7 @@ import PortalStat from "../../../components/PortalStat";
 import { AuthContext } from "../../../context/AuthContext";
 import { useCommandPalette } from "../../../context/CommandPaletteContext";
 import { SAMPLE_JOBS, SAMPLE_JOB_LOGS, sampleDownload } from "../../../utils/sampleData";
-import "../coding/member/memberWorkspace.css";
+import "../../../styles/memberWorkspace.css";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },

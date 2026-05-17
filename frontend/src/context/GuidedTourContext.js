@@ -14,9 +14,9 @@ const DEFAULT_STEPS = [
   {
     id: 'navigation',
     title: 'Welcome to Nexora Lab',
-    description: 'The global navigation keeps your most-used areas one click away. Explore analytics, coding worklists, jobs, and resources.',
+    description: 'The global navigation keeps your most-used areas one click away. Explore analytics, providers, jobs, and resources.',
     highlights: [
-      'Use the top navigation bar to jump between analytics, coding, jobs, and docs.',
+      'Use the top navigation bar to jump between analytics, providers, jobs, and docs.',
       'The breadcrumb below the nav helps you understand where you are.',
     ],
   },
@@ -30,12 +30,12 @@ const DEFAULT_STEPS = [
     ],
   },
   {
-    id: 'coding',
-    title: 'Coding Workbench',
-    description: 'Manage member charts, assignments, and provider follow-ups without leaving the platform.',
+    id: 'providers',
+    title: 'Provider Directory',
+    description: 'Search the provider directory and open provider details from a single place.',
     highlights: [
-      'Members and providers cards show empty-state guidance when there is no data.',
-      'Inline microcopy clarifies actions like approving charts or updating outreach.',
+      'Filter by provider name, NPI, or tax ID.',
+      'Select a row to view provider detail and navigate to the provider page.',
     ],
   },
   {

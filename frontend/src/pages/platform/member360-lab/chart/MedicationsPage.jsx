@@ -1,5 +1,5 @@
 import React from "react";
-import { SectionHeader, DataTable } from "../../../../../components/ehr/Primitives";
+import { SectionHeader, DataTable } from "../../../../components/ehr/Primitives";
 
 const medicationColumns = [
   { label: "Medication", accessor: "medication" },

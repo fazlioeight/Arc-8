@@ -20,22 +20,8 @@ export const ROUTES = {
     DOCUMENTS: "/member360/documents",
     ADMIN: "/member360/admin",
   },
-  CODING: {
-    LANDING: "/coding",
-    PLATFORM: "/coding/platform",
-    REVIEW_DASHBOARD: "/coding/review-dashboard",
-    GROUP_DASHBOARD: "/coding/group-dashboard",
-    MEMBERS: "/coding/members",
-    MEMBER_ROOT: "/coding/member",
-    MEMBER_DETAILS: "/coding/member-details",
-    PROVIDERS: "/coding/providers",
-    PROVIDER_MANAGEMENT: "/coding/provider-management",
-  },
-  RIDE_BOOKING: {
-    LANDING: "/ride-booking",
-    BOOK: "/ride-booking/book",
-    PARTNERS: "/ride-booking/partners",
-    PAYMENTS: "/ride-booking/payments",
+  PROVIDERS: {
+    LANDING: "/providers",
   },
   JOBS: {
     STATUS_CENTER: "/jobs/status-center",
@@ -43,10 +29,8 @@ export const ROUTES = {
   },
   DOCS: "/docs",
   SETTINGS: "/settings",
-  DASHBOARD: "/dashboard",
   CHAT: "/chat",
   ADMIN: {
     MASTER: "/admin/master",
-    CODING_ASSIGNMENTS: "/admin/coding-assignments",
   },
 };

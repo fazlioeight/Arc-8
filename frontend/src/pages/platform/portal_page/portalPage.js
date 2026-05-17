@@ -11,7 +11,7 @@ import {
   LoadingState,
 } from "../../../components/ehr/Primitives";
 import "../../../index.css";
-import "../coding/member/memberWorkspace.css";
+import "../../../styles/memberWorkspace.css";
 import { useMemberSearch } from "../../../hooks/useMemberSearch";
 import { usePortalOverview } from "../../../hooks/usePortalOverview";
 import { PORTAL_NAV_ITEMS } from "./portalNavItems";
@@ -97,7 +97,7 @@ const PortalPage = () => {
   } = useMemberSearch({
     token,
     tenant,
-    onNavigate: (memberId) => navigate(`/coding/member/${memberId}/chart`),
+    onNavigate: (memberId) => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${memberId}`),
   });
 
   const appCatalog = useMemo(
@@ -111,14 +111,6 @@ const PortalPage = () => {
         color: "#0ea5e9",
       },
       {
-        key: "coding",
-        label: "Coding Worklists",
-        desc: "Coding queues and chart review tools",
-        path: ROUTES.CODING.LANDING,
-        icon: "CD",
-        color: "#0f172a",
-      },
-      {
         key: "member360",
         label: "Member 360",
         desc: "Search and launch member charts",
@@ -127,12 +119,12 @@ const PortalPage = () => {
         color: "#0891b2",
       },
       {
-        key: "ride_booking",
-        label: "Ride Booking",
-        desc: "Transportation scheduling and tracking",
-        path: ROUTES.RIDE_BOOKING.LANDING,
-        icon: "RB",
-        color: "#2563eb",
+        key: "providers",
+        label: "Providers",
+        desc: "Search the provider directory",
+        path: ROUTES.PROVIDERS.LANDING,
+        icon: "PR",
+        color: "#0f172a",
       },
       {
         key: "job_center",
@@ -444,7 +436,7 @@ const PortalPage = () => {
                     <button
                       className="portal-ghost-button"
                       type="button"
-                      onClick={() => navigate(item.path || "/dashboard")}
+                      onClick={() => navigate(item.path || ROUTES.PORTAL.LANDING)}
                     >
                       Open
                     </button>
@@ -504,7 +496,7 @@ const PortalPage = () => {
                     <button
                       className="portal-ghost-button"
                       type="button"
-                      onClick={() => navigate(todo.path || "/dashboard")}
+                      onClick={() => navigate(todo.path || ROUTES.PORTAL.LANDING)}
                     >
                       View task
                     </button>

@@ -1,5 +1,5 @@
 import React from "react";
-import { SectionHeader, KeyValue } from "../../../../../components/ehr/Primitives";
+import { SectionHeader, KeyValue } from "../../../../components/ehr/Primitives";
 
 export default function SettingsPage() {
   return (

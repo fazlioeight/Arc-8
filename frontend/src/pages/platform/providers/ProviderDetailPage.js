@@ -1,4 +1,4 @@
-﻿import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
 import PortalPageHeader from '../../../components/PortalPageHeader';
@@ -8,10 +8,11 @@ import { AuthContext } from '../../../context/AuthContext';
 import { fetchCodingProviderDetail, fetchCodingProviders } from '../../../services/codingService';
 import BackLink from '../../../components/BackLink';
 import AlertShell from '../../../components/ui/AlertShell';
-import '../coding/member/memberWorkspace.css';
-import { CODING_NAV_ITEMS } from './codingNavItems';
+import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
+import { ROUTES } from '../../../constants/routes';
+import '../../../styles/memberWorkspace.css';
 
-const CodingProviderDetailPage = () => {
+const ProviderDetailPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -85,27 +86,26 @@ const CodingProviderDetailPage = () => {
 
   const layoutProps = useMemo(
     () => ({
-      backgroundClassName:
-        '',
+      backgroundClassName: '',
       maxWidthClassName: 'max-w-5xl',
       paddingClassName: 'px-4',
-      navItems: CODING_NAV_ITEMS,
+      navItems: PORTAL_NAV_ITEMS,
       currentNav: 'providers',
-      utilityBar: true,
+      navProps: { align: 'center', tone: 'surface' },
     }),
     []
   );
 
   const headerContent = (
     <PortalPageHeader
-      eyebrow="Coding"
+      eyebrow="Providers"
       title={provider?.name || 'Provider workspace'}
-      subtitle="Review coding partner profiles, locations, and contact information."
+      subtitle="Review partner profiles, locations, and contact information."
       actions={
         <div className="flex flex-wrap items-center gap-3">
           <PortalStat label="Members" value={provider?.member_count ?? 0} meta="Panel" tone="info" />
           <PortalStat label="Open gaps" value={provider?.open_gaps ?? 0} meta="Pending" tone="warning" />
-          <PortalStat label="ID" value={provider ? provider.id : '�'} meta="Provider" tone="success" />
+          <PortalStat label="ID" value={provider ? provider.id : '-'} meta="Provider" tone="success" />
         </div>
       }
     />
@@ -123,13 +123,13 @@ const CodingProviderDetailPage = () => {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <button className="portal-ghost-button" onClick={() => navigate(-1)}>&larr; Back</button>
-            <button className="portal-ghost-button" onClick={() => navigate('/coding/providers')}>
+            <button className="portal-ghost-button" onClick={() => navigate(ROUTES.PROVIDERS.LANDING)}>
               Browse providers
             </button>
           </div>
         }
       >
-        <BackLink fallback="/coding/providers">Back to care team directory</BackLink>
+        <BackLink fallback={ROUTES.PROVIDERS.LANDING}>Back to provider directory</BackLink>
         {referral?.fromMemberId ? (
           <AlertShell
             tone="info"
@@ -190,7 +190,7 @@ const CodingProviderDetailPage = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button className="portal-ghost-button" onClick={() => navigate('/coding/providers')}>
+              <button className="portal-ghost-button" onClick={() => navigate(ROUTES.PROVIDERS.LANDING)}>
                 Back to provider list
               </button>
             </div>
@@ -201,4 +201,4 @@ const CodingProviderDetailPage = () => {
   );
 };
 
-export default CodingProviderDetailPage;
+export default ProviderDetailPage;

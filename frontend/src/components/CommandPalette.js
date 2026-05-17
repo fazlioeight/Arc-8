@@ -89,7 +89,7 @@ const CommandPalette = ({ onThemeToggle }) => {
     const enabledSet = new Set(
       (availableApplications && availableApplications.length)
         ? availableApplications
-        : ['portal', 'settings', 'admin_console', 'dashboard', 'coding', 'member360', 'ride_booking', 'docs', 'job_center']
+        : ['portal', 'settings', 'admin_console', 'dashboard', 'providers', 'member360', 'docs', 'job_center']
     );
     const isEnabled = (key) => enabledSet.has(key) || key === 'portal';
     const commands = [];
@@ -108,23 +108,6 @@ const CommandPalette = ({ onThemeToggle }) => {
       disabled: !isNavItemEnabled('home'),
     });
     append({
-      id: 'nav-dashboard',
-      label: 'Open Analytics Dashboard',
-      category: 'Navigation',
-      keywords: 'metrics analytics raf',
-      shortcut: 'G D',
-      action: () => navigate(ROUTES.DASHBOARD),
-      disabled: !isAuthenticated || !isEnabled('dashboard') || !hasApplicationAccess?.('dashboard') || !isNavItemEnabled('analytics'),
-    });
-    append({
-      id: 'nav-coding',
-      label: 'Go to Coding Worklists',
-      category: 'Navigation',
-      keywords: 'coding charts members worklist',
-      action: () => navigate(ROUTES.CODING.LANDING),
-      disabled: !isAuthenticated || !isEnabled('coding') || !hasApplicationAccess?.('coding') || !isNavItemEnabled('coding'),
-    });
-    append({
       id: 'nav-member360',
       label: 'Open Member 360',
       category: 'Navigation',
@@ -133,20 +116,12 @@ const CommandPalette = ({ onThemeToggle }) => {
       disabled: !isAuthenticated || !isEnabled('member360') || !hasApplicationAccess?.('member360'),
     });
     append({
-      id: 'nav-ride-booking',
-      label: 'Open Ride Booking',
+      id: 'nav-providers',
+      label: 'Open Providers',
       category: 'Navigation',
-      keywords: 'transport rides partners scheduling',
-      action: () => navigate(ROUTES.RIDE_BOOKING.LANDING),
-      disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking') || !isNavItemEnabled('rideBooking'),
-    });
-    append({
-      id: 'nav-ride-payments',
-      label: 'Open Ride Payments and Billing',
-      category: 'Navigation',
-      keywords: 'payments billing invoices payouts ledger stripe',
-      action: () => navigate(ROUTES.RIDE_BOOKING.PAYMENTS),
-      disabled: !isAuthenticated || !isEnabled('ride_booking') || !hasApplicationAccess?.('ride_booking') || !isNavItemEnabled('rideBooking'),
+      keywords: 'providers directory care team npi',
+      action: () => navigate(ROUTES.PROVIDERS.LANDING),
+      disabled: !isAuthenticated || !isEnabled('providers') || !hasApplicationAccess?.('providers') || !isNavItemEnabled('providers'),
     });
     append({
       id: 'nav-docs',
@@ -293,7 +268,7 @@ const CommandPalette = ({ onThemeToggle }) => {
         label: `Member • ${displayName}`,
         category: 'Records',
         keywords: `${member.member_key} ${memberName} ${member.pcp_name || ''}`,
-        action: () => navigate(`/coding/member/${member.id}`, {
+        action: () => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${member.id}`, {
           state: {
             from: currentPath,
             breadcrumb: displayName,
@@ -312,7 +287,7 @@ const CommandPalette = ({ onThemeToggle }) => {
         label: `Care Team • ${provider.name}`,
         category: 'Providers',
         keywords: `${provider.name} ${provider.npi || ''}`,
-        action: () => navigate(`/coding/providers/${encodeURIComponent(identifier)}`, {
+        action: () => navigate(`${ROUTES.PROVIDERS.LANDING}/${encodeURIComponent(identifier)}`, {
           state: {
             from: currentPath,
             breadcrumb: provider.name,

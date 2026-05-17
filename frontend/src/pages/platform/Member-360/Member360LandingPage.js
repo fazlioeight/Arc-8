@@ -6,7 +6,7 @@ import { PORTAL_NAV_ITEMS } from "../portal_page/portalNavItems";
 import { ROUTES } from "../../../constants/routes";
 import { fetchMember360Members } from "../../../services/member360LabService";
 import { LabSubNav } from "../member360-lab/components";
-import "../coding/member/memberWorkspace.css";
+import "../../../styles/memberWorkspace.css";
 
 const MEMBER_CHART_BREADCRUMB = "Member chart";
 

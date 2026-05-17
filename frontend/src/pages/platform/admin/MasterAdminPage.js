@@ -9,7 +9,7 @@ import {
   ApplicationAccessService,
 } from "../../../services/adminService";
 import { ROUTES } from "../../../constants/routes";
-import "../coding/member/memberWorkspace.css";
+import "../../../styles/memberWorkspace.css";
 
 const API_ERROR_FALLBACK = "Unable to load admin data. Please try again.";
 

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalPageHeader from "../../../components/PortalPageHeader";
@@ -9,10 +9,11 @@ import { useUserPreferences } from "../../../context/UserPreferencesContext";
 import { fetchCodingProviderDetail, fetchCodingProviders } from "../../../services/codingService";
 import InfoTooltip from "../../../components/ui/InfoTooltip";
 import AlertShell from "../../../components/ui/AlertShell";
-import "../coding/member/memberWorkspace.css";
-import { CODING_NAV_ITEMS } from "./codingNavItems";
+import { PORTAL_NAV_ITEMS } from "../portal_page/portalNavItems";
+import { ROUTES } from "../../../constants/routes";
+import "../../../styles/memberWorkspace.css";
 
-const CodingProvidersPage = () => {
+const ProvidersPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { token, tenant, isAuthenticated } = useContext(AuthContext) || {};
@@ -53,7 +54,7 @@ const CodingProvidersPage = () => {
       try {
         const detail = await fetchCodingProviderDetail(token, tenant, providerId);
         setSelectedProvider(detail);
-        recordViewPreference("coding-providers", { search, lastSelected: providerId });
+        recordViewPreference("providers", { search, lastSelected: providerId });
       } catch (err) {
         setError(err.message || "Unable to load provider detail");
       } finally {
@@ -65,7 +66,7 @@ const CodingProvidersPage = () => {
 
   useEffect(() => {
     if (!isAuthenticated || !canQuery) return;
-    const saved = getViewPreference("coding-providers");
+    const saved = getViewPreference("providers");
     const initialSearch = saved?.search || "";
     setSearch(initialSearch);
     void loadProviders(initialSearch);
@@ -76,28 +77,27 @@ const CodingProvidersPage = () => {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    recordViewPreference("coding-providers", { search, lastSelected: selectedProvider?.id });
+    recordViewPreference("providers", { search, lastSelected: selectedProvider?.id });
     void loadProviders(search);
   };
 
   const layoutProps = useMemo(
     () => ({
-      backgroundClassName:
-        "",
+      backgroundClassName: "",
       maxWidthClassName: "max-w-6xl",
       paddingClassName: "px-4",
-      navItems: CODING_NAV_ITEMS,
+      navItems: PORTAL_NAV_ITEMS,
       currentNav: "providers",
-      utilityBar: true,
+      navProps: { align: "center", tone: "surface" },
     }),
     []
   );
 
   const headerContent = (
     <PortalPageHeader
-      eyebrow="Coding"
-      title="Coding providers"
-      subtitle="Search providers, open details, and pivot to assignments."
+      eyebrow="Providers"
+      title="Provider directory"
+      subtitle="Search providers and open details."
       actions={
         <div className="flex flex-wrap items-center gap-3">
           <PortalStat label="Providers" value={total} meta="Matching" tone="info" />
@@ -217,7 +217,7 @@ const CodingProvidersPage = () => {
           <AlertShell
             tone="info"
             title="Select a provider"
-            description="Choose a row above to preview provider detail and navigate to assignments."
+            description="Choose a row above to preview provider detail."
           />
         ) : null}
         {!detailLoading && selectedProvider ? (
@@ -248,7 +248,7 @@ const CodingProvidersPage = () => {
               <button
                 className="portal-ghost-button"
                 onClick={() =>
-                  navigate(`/coding/providers/${encodeURIComponent(selectedProvider.id)}`, {
+                  navigate(`${ROUTES.PROVIDERS.LANDING}/${encodeURIComponent(selectedProvider.id)}`, {
                     state: {
                       from: `${location.pathname}${location.search}`,
                       breadcrumb: selectedProvider.name || selectedProvider.id,
@@ -266,4 +266,4 @@ const CodingProvidersPage = () => {
   );
 };
 
-export default CodingProvidersPage;
+export default ProvidersPage;

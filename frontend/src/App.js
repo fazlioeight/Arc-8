@@ -1,12 +1,12 @@
 import React, { useContext, useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Route, Routes, useLocation, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { AuthContext, AuthProvider } from './context/AuthContext';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { UserPreferencesProvider } from './context/UserPreferencesContext';
 import { GuidedTourProvider } from './context/GuidedTourContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import './styles/commandPalette.css';
-import './pages/platform/coding/member/memberWorkspace.css';
+import './styles/memberWorkspace.css';
 import Navbar from './components/Navbar';
 import AppBreadcrumbs from './components/AppBreadcrumbs';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -36,41 +36,12 @@ const Member360LabCareOptionsPage = lazy(() => import('./pages/platform/member36
 const Member360LabMessagesPage = lazy(() => import('./pages/platform/member360-lab/Member360LabMessagesPage'));
 const Member360LabDocumentsPage = lazy(() => import('./pages/platform/member360-lab/Member360LabDocumentsPage'));
 const Member360LabAdminPage = lazy(() => import('./pages/platform/member360-lab/Member360LabAdminPage'));
-const RideBookingLandingPage = lazy(() => import('./pages/platform/ride_booking/RideBookingLandingPage'));
-const RideBooking = lazy(() => import('./pages/platform/ride_booking/RideBooking'));
-const RidePartnerManagementPage = lazy(() => import('./pages/platform/ride_booking/RidePartnerManagementPage'));
-const RideBookingPaymentsPage = lazy(() => import('./pages/platform/ride_booking/RideBookingPaymentsPage'));
 const Settings = lazy(() => import('./pages/platform/settings/Settings'));
-const Dashboard = lazy(() => import('./pages/platform/coding/admin/Dashboard'));
 const ChatPage = lazy(() => import('./pages/platform/chat/ChatPage'));
 const Docs = lazy(() => import('./pages/docs/Docs'));
-const CodingMembersPage = lazy(() => import('./pages/platform/coding/CodingMembersPage'));
-const CodingProvidersPage = lazy(() => import('./pages/platform/coding/CodingProvidersPage'));
-const CodingLandingPage = lazy(() => import('./pages/platform/coding/CodingLandingPage'));
-const CodingProviderDetailPage = lazy(() => import('./pages/platform/coding/CodingProviderDetailPage'));
+const ProvidersPage = lazy(() => import('./pages/platform/providers/ProvidersPage'));
+const ProviderDetailPage = lazy(() => import('./pages/platform/providers/ProviderDetailPage'));
 const MasterAdminPage = lazy(() => import('./pages/platform/admin/MasterAdminPage'));
-const CodingAssignmentsPage = lazy(() => import('./pages/platform/coding/admin/CodingAssignmentsPage'));
-const CodingCoderPlatformPage = lazy(() => import('./pages/platform/coding/CodingCoderPlatformPage'));
-const CodingReviewDashboardPage = lazy(() => import('./pages/platform/coding/CodingReviewDashboardPage'));
-const CodingProviderEducationPage = lazy(() => import('./pages/platform/coding/CodingProviderEducationPage'));
-const CodingGroupDashboardPage = lazy(() => import('./pages/platform/coding/CodingGroupDashboardPage'));
-const CodingMemberDetailsPage = lazy(() => import('./pages/platform/coding/CodingMemberDetailsPage'));
-const CodingMemberWorkbenchPage = lazy(() => import('./pages/platform/coding/CodingMemberWorkbenchPage'));
-const CodingProviderManagementPage = lazy(() => import('./pages/platform/coding/CodingProviderManagementPage'));
-const CodingMemberLayout = lazy(() => import('./pages/platform/coding/member/pages/CodingMemberLayout'));
-const OverviewPage = lazy(() => import('./pages/platform/coding/member/pages/OverviewPage'));
-const ProblemsHCCPage = lazy(() => import('./pages/platform/coding/member/pages/ProblemsHCCPage'));
-const MedicationsPage = lazy(() => import('./pages/platform/coding/member/pages/MedicationsPage'));
-const EncountersPage = lazy(() => import('./pages/platform/coding/member/pages/EncountersPage'));
-const LabsImagingPage = lazy(() => import('./pages/platform/coding/member/pages/LabsImagingPage'));
-const NotesPage = lazy(() => import('./pages/platform/coding/member/pages/NotesPage'));
-const CareGapsPage = lazy(() => import('./pages/platform/coding/member/pages/CareGapsPage'));
-const TasksMessagesPage = lazy(() => import('./pages/platform/coding/member/pages/TasksMessagesPage'));
-const EligibilityCoveragePage = lazy(() => import('./pages/platform/coding/member/pages/EligibilityCoveragePage'));
-const DocumentsPage = lazy(() => import('./pages/platform/coding/member/pages/DocumentsPage'));
-const AuditLogPage = lazy(() => import('./pages/platform/coding/member/pages/AuditLogPage'));
-const SharingPage = lazy(() => import('./pages/platform/coding/member/pages/SharingPage'));
-const SettingsPage = lazy(() => import('./pages/platform/coding/member/pages/SettingsPage'));
 const JobStatusCenter = lazy(() => import('./pages/platform/jobs/JobStatusCenter'));
 const ImportDataPage = lazy(() => import('./pages/platform/jobs/ImportDataPage'));
 const Mission = lazy(() => import('./pages/website/about/Mission'));
@@ -85,7 +56,6 @@ const PredictiveModeling = lazy(() => import('./pages/website/insights/Predictiv
 const CostSavings = lazy(() => import('./pages/website/insights/CostSavings'));
 const ContactFormPage = lazy(() => import('./pages/website/contact/ContactFormPage'));
 const CompanyInfo = lazy(() => import('./pages/website/contact/CompanyInfo'));
-// Section pages
 
 const RouteFallback = () => (
   <div className="py-12">
@@ -96,14 +66,6 @@ const RouteFallback = () => (
     />
   </div>
 );
-
-const LegacyMemberDetailRedirect = () => {
-  const { memberId } = useParams();
-  if (!memberId) {
-    return <Navigate to="/coding/members" replace />;
-  }
-  return <Navigate to={`/coding/member/${memberId}/chart`} replace />;
-};
 
 const LoginOnlySessionLockOverlay = () => {
   const location = useLocation();
@@ -130,11 +92,8 @@ const Shell = ({ themePreference, setThemePreference }) => {
     "/portalPage",
     ROUTES.MEMBER_360.LANDING,
     ROUTES.MEMBER360_LAB.DASHBOARD,
-    ROUTES.RIDE_BOOKING.LANDING,
-    "/rideBooking",
-    ROUTES.DASHBOARD,
+    ROUTES.PROVIDERS.LANDING,
     ROUTES.SETTINGS,
-    ROUTES.CODING.LANDING,
     "/admin",
     "/jobs",
     ROUTES.CHAT,
@@ -212,16 +171,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
               <Member360LabAdminPage />
             </ErrorBoundary>
           )} />
-          <Route path={ROUTES.RIDE_BOOKING.LANDING} element={<RideBookingLandingPage />} />
-          <Route path={ROUTES.RIDE_BOOKING.BOOK} element={<RideBooking />} />
-          <Route path={ROUTES.RIDE_BOOKING.PARTNERS} element={<RidePartnerManagementPage />} />
-          <Route path={ROUTES.RIDE_BOOKING.PAYMENTS} element={<RideBookingPaymentsPage />} />
-          <Route path="/rideBooking" element={<Navigate to={ROUTES.RIDE_BOOKING.LANDING} replace />} />
-          <Route path="/rideBooking/book" element={<Navigate to={ROUTES.RIDE_BOOKING.BOOK} replace />} />
-          <Route path="/rideBooking/partners" element={<Navigate to={ROUTES.RIDE_BOOKING.PARTNERS} replace />} />
-          <Route path="/rideBooking/payments" element={<Navigate to={ROUTES.RIDE_BOOKING.PAYMENTS} replace />} />
           <Route path={ROUTES.SETTINGS} element={<Settings themePreference={themePreference} setThemePreference={setThemePreference} />} />
-          <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
           <Route path={ROUTES.CHAT} element={(
             <ErrorBoundary title="Chat workspace failed to load" description="We couldn't open the chat workspace. Retry to attempt loading again.">
               <ChatPage />
@@ -241,82 +191,17 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/insights/cost-savings" element={<CostSavings />} />
           <Route path="/contact/form" element={<ContactFormPage />} />
           <Route path="/contact/info" element={<CompanyInfo />} />
-          <Route path="/coding" element={(
-            <ErrorBoundary title="Coding workspace failed to load" description="We couldn't open the coding workspace. Retry to attempt loading again.">
-              <CodingLandingPage />
-            </ErrorBoundary>
-          )} />
-          <Route path="/coding/members" element={(
-            <ErrorBoundary title="Coding members failed to load" description="Try again to reload member worklists or return home.">
-              <CodingMembersPage />
-            </ErrorBoundary>
-          )} />
-          <Route path="/coding/members/:memberId/*" element={<LegacyMemberDetailRedirect />} />
-          <Route path="/coding/providers" element={(
+          <Route path={ROUTES.PROVIDERS.LANDING} element={(
             <ErrorBoundary title="Provider list failed to load">
-              <CodingProvidersPage />
+              <ProvidersPage />
             </ErrorBoundary>
           )} />
-          <Route path="/coding/providers/:providerId" element={(
+          <Route path={`${ROUTES.PROVIDERS.LANDING}/:providerId`} element={(
             <ErrorBoundary title="Provider details unavailable">
-              <CodingProviderDetailPage />
-            </ErrorBoundary>
-          )} />
-          <Route path="/coding/platform" element={(
-            <ErrorBoundary title="Coder platform unavailable" description="We couldn't load the coder platform workspace. Try refreshing the page.">
-              <CodingCoderPlatformPage />
-            </ErrorBoundary>
-          )} />
-          <Route path="/coding/review-dashboard" element={(
-            <ErrorBoundary title="Review dashboard unavailable" description="An error occurred while loading review metrics.">
-              <CodingReviewDashboardPage />
-            </ErrorBoundary>
-          )} />
-          <Route path="/coding/provider-education" element={(
-            <ErrorBoundary title="Provider education dashboard unavailable">
-              <CodingProviderEducationPage />
-            </ErrorBoundary>
-          )} />
-          <Route path="/coding/group-dashboard" element={(
-            <ErrorBoundary title="Group dashboard unavailable">
-              <CodingGroupDashboardPage />
-            </ErrorBoundary>
-          )} />
-          <Route path="/coding/member-details" element={(
-            <ErrorBoundary title="Member details unavailable">
-              <CodingMemberDetailsPage />
-            </ErrorBoundary>
-          )} />
-          <Route path="/coding/member/:memberId" element={(
-            <ErrorBoundary title="Coder workbench unavailable" description="We could not load the member workbench. Try refreshing or return to the queue.">
-              <CodingMemberWorkbenchPage />
-            </ErrorBoundary>
-          )} />
-          <Route path="/coding/member/:memberId/chart" element={<CodingMemberLayout />}>
-            {/* Chart pages */}
-            <Route index element={<OverviewPage />} />
-            <Route path="problems" element={<ProblemsHCCPage />} />
-            <Route path="medications" element={<MedicationsPage />} />
-            <Route path="encounters" element={<EncountersPage />} />
-            <Route path="labs-imaging" element={<LabsImagingPage />} />
-            <Route path="notes" element={<NotesPage />} />
-            <Route path="care-gaps" element={<CareGapsPage />} />
-            <Route path="tasks-messages" element={<TasksMessagesPage />} />
-            <Route path="eligibility-coverage" element={<EligibilityCoveragePage />} />
-            <Route path="documents" element={<DocumentsPage />} />
-
-            {/* Utilities */}
-            <Route path="audit-log" element={<AuditLogPage />} />
-            <Route path="sharing" element={<SharingPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-          </Route>
-          <Route path="/coding/provider-management" element={(
-            <ErrorBoundary title="Provider management unavailable">
-              <CodingProviderManagementPage />
+              <ProviderDetailPage />
             </ErrorBoundary>
           )} />
           <Route path="/admin/master" element={<MasterAdminPage />} />
-        <Route path="/admin/coding-assignments" element={<CodingAssignmentsPage />} />
           <Route path="/jobs/import-data" element={<ImportDataPage />} />
           <Route path="/jobs/status-center" element={<JobStatusCenter />} />
         </Routes>
@@ -398,5 +283,3 @@ function App() {
 }
 
 export default App;
-
-

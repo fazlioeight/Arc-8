@@ -1,5 +1,5 @@
 import React from "react";
-import { SectionHeader, DataTable, Chip } from "../../../../../components/ehr/Primitives";
+import { SectionHeader, DataTable, Chip } from "../../../../components/ehr/Primitives";
 
 const careGapColumns = [
   { label: "Gap", accessor: "gap" },

@@ -8,10 +8,9 @@ export const SAMPLE_SESSION = {
   tenants: DEFAULT_TENANTS,
   applications: {
     ...DEFAULT_APPLICATIONS,
-    ride_booking: 'admin',
   },
-  purchased_applications: ['portal', 'dashboard', 'coding', 'member360', 'ride_booking', 'docs', 'settings', 'job_center', 'admin_console'],
-  available_applications: ['portal', 'dashboard', 'coding', 'member360', 'ride_booking', 'docs', 'settings', 'job_center', 'admin_console'],
+  purchased_applications: ['portal', 'dashboard', 'providers', 'member360', 'docs', 'settings', 'job_center', 'admin_console'],
+  available_applications: ['portal', 'dashboard', 'providers', 'member360', 'docs', 'settings', 'job_center', 'admin_console'],
   token: 'sample-prominence-token',
 };
 
@@ -153,12 +152,12 @@ export const SAMPLE_JOB_LOGS = {
     { ts: '11:04', line: 'Running inference batch 2/3 (segment ESRD).' },
   ],
   'job-003': [
-    { ts: '01:12', line: 'Export starting: ProminenceHealth coding queue (913 records).' },
+    { ts: '01:12', line: 'Export starting: ProminenceHealth provider directory (913 records).' },
     { ts: '01:18', line: 'Network warning – retrying upload (attempt 2).' },
     { ts: '01:21', line: 'Export failed. S3 responded AccessDenied (policy mismatch).' },
   ],
   'job-004': [
-    { ts: 'Pending', line: 'Job is waiting on upstream authorization from Ride Partner API.' },
+    { ts: 'Pending', line: 'Job is waiting on upstream authorization from partner API.' },
   ],
 };
 
@@ -169,9 +168,8 @@ export const SAMPLE_TENANT_COMMENTS = {
 export const SAMPLE_ADMIN_APPLICATIONS = [
   { key: 'portal', label: 'Portal Overview', description: 'Tenant home with key KPIs and announcements.', core: true, purchased: true },
   { key: 'dashboard', label: 'Analytics Dashboard', description: 'Deep dives into BUR, RAF, and quality metrics.', core: false, purchased: true },
-  { key: 'coding', label: 'Coding Worklists', description: 'Manage chart reviews and coder assignments.', core: false, purchased: true },
   { key: 'member360', label: 'Member 360', description: 'Search and launch member charts from a single hub.', core: false, purchased: true },
-  { key: 'ride_booking', label: 'Ride Booking', description: 'Coordinate member transportation and partner dispatch.', core: false, purchased: true },
+  { key: 'providers', label: 'Providers', description: 'Search the provider directory.', core: false, purchased: true },
   { key: 'job_center', label: 'Job Center', description: 'Monitor imports, exports, and model runs.', core: false, purchased: true },
   { key: 'docs', label: 'Docs Library', description: 'Internal documentation and SOPs.', core: false, purchased: true },
   { key: 'admin_console', label: 'Master Admin', description: 'Manage users, roles, and tenant branding.', core: true, purchased: true },
@@ -187,9 +185,8 @@ export const SAMPLE_ADMIN_USERS = [
     applications: {
       portal: 'admin',
       dashboard: 'admin',
-      coding: 'admin',
       member360: 'admin',
-      ride_booking: 'manager',
+      providers: 'admin',
       job_center: 'admin',
       docs: 'user',
       admin_console: 'admin',
@@ -203,9 +200,8 @@ export const SAMPLE_ADMIN_USERS = [
     applications: {
       portal: 'user',
       dashboard: 'user',
-      coding: 'user',
       member360: 'user',
-      ride_booking: 'user',
+      providers: 'user',
       job_center: 'user',
       docs: 'user',
       admin_console: 'none',
@@ -219,9 +215,8 @@ export const SAMPLE_ADMIN_USERS = [
     applications: {
       portal: 'user',
       dashboard: 'user',
-      coding: 'none',
       member360: 'none',
-      ride_booking: 'admin',
+      providers: 'user',
       job_center: 'user',
       docs: 'user',
       admin_console: 'none',

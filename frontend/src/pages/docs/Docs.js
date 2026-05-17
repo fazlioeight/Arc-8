@@ -6,7 +6,7 @@ import PortalHero from '../../components/PortalHero';
 import { AuthContext } from '../../context/AuthContext';
 import { ROUTES } from '../../constants/routes';
 import { searchDocsArticles } from '../../services/docsService';
-import '../platform/coding/member/memberWorkspace.css';
+import '../../styles/memberWorkspace.css';
 
 const useQuery = () => {
   const { search } = useLocation();

@@ -46,7 +46,7 @@ const renderBar = () => {
     tenant: 'prominencehealth',
     tenantInfo: { name: 'ProminenceHealth' },
     hasApplicationAccess: () => true,
-    availableApplications: ['portal', 'coding'],
+    availableApplications: ['portal', 'providers'],
     availableTenants: [],
     auditTrail: [],
     recordAuditEvent: jest.fn(),

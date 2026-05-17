@@ -15,9 +15,8 @@ export const DEFAULT_TENANTS = [
 export const DEFAULT_APPLICATIONS = {
   portal: 'admin',
   dashboard: 'admin',
-  coding: 'admin',
   member360: 'user',
-  ride_booking: 'manager',
+  providers: 'user',
   docs: 'user',
   settings: 'user',
   job_center: 'admin',

@@ -13,7 +13,7 @@ import PortalCard from "../../../components/PortalCard";
 import PortalStat from "../../../components/PortalStat";
 import { AuthContext } from "../../../context/AuthContext";
 import { useCommandPalette } from "../../../context/CommandPaletteContext";
-import "../coding/member/memberWorkspace.css";
+import "../../../styles/memberWorkspace.css";
 
 const IMPORT_ENTITIES = [
   { key: "members", label: "Members", description: "Demographics, eligibility, and attribution data." },
