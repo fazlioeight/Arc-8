@@ -141,6 +141,15 @@ class CareJourneyStageUpdate(BaseModel):
     description: Optional[str] = None
 
 
+class CareJourneyStageCreate(BaseModel):
+    """Append a stage to an existing journey. If ``sequence`` is omitted the
+    new stage lands at the end (max existing sequence + 1)."""
+    name: str
+    description: Optional[str] = None
+    status: str = "pending"
+    sequence: Optional[int] = None
+
+
 class SBAR(BaseModel):
     situation: Optional[str] = None
     background: Optional[str] = None

@@ -1598,6 +1598,50 @@ async def update_care_journey(
     return _serialize_journey(journey)
 
 
+async def add_care_journey_stage(
+    session: AsyncSession,
+    journey_id: int,
+    payload: dict,
+) -> Optional[dict]:
+    """Append (or insert-at-sequence) a stage on an existing journey.
+
+    When ``sequence`` is omitted, the new stage gets ``max(existing) + 1`` so
+    callers don't have to query the journey first. ``status`` is validated
+    against the same allow-list the update endpoint uses so a stage can't be
+    born in a state the state machine doesn't recognize.
+    """
+    journey = await session.scalar(
+        select(Member360CareJourney)
+        .where(Member360CareJourney.id == journey_id)
+        .options(selectinload(Member360CareJourney.stages))
+    )
+    if not journey:
+        return None
+    new_status = payload.get("status") or "pending"
+    if new_status not in _VALID_STAGE_STATUS:
+        raise ValueError(
+            f"Invalid stage status {new_status!r}; "
+            f"expected one of {sorted(_VALID_STAGE_STATUS)}"
+        )
+    sequence = payload.get("sequence")
+    if sequence is None:
+        sequence = (max((s.sequence for s in journey.stages), default=-1)) + 1
+    stage = Member360CareJourneyStage(
+        journey_id=journey.id,
+        sequence=int(sequence),
+        name=payload["name"],
+        description=payload.get("description"),
+        status=new_status,
+        completed_at=datetime.utcnow() if new_status == "completed" else None,
+    )
+    # Append to the loaded relationship rather than re-querying — re-querying
+    # returns the same identity-mapped instance whose ``stages`` collection
+    # SQLAlchemy already considers loaded, so selectinload won't refresh it.
+    journey.stages.append(stage)
+    await session.flush()
+    return _serialize_journey(journey)
+
+
 async def update_care_journey_stage(
     session: AsyncSession,
     journey_id: int,

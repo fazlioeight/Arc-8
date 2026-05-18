@@ -807,7 +807,7 @@ async def test_claim_and_risk_insight_import_resolve_by_member_key(fastapi_app):
 
 
 async def test_care_journey_stage_progression_state_machine(fastapi_app, seeded_member):
-    """Create journey → start stage 1 → complete stage 1 → reopen stage 1.
+    """Create journey → add stage via API → start → complete → reopen.
     Verify ``completed_at`` is stamped on completion and cleared on reopen."""
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
@@ -821,25 +821,17 @@ async def test_care_journey_stage_progression_state_machine(fastapi_app, seeded_
         assert create.status_code == 201, create.text
         journey_id = create.json()["id"]
 
-        # Add a stage by patching... actually stages are created by template
-        # copy on POST; freeform journeys have no stages. We need to add one
-        # directly via the DB for this test since there's no "add stage"
-        # endpoint yet — that's another GA gap.
-        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-        from app.core.config import get_settings
-        from app.models.member360 import Member360CareJourneyStage
-        uri = get_settings().DEFAULT_TENANT_DATABASE_URL.format(tenant_key=TENANT_KEY)
-        engine = create_async_engine(uri, future=True, echo=False)
-        factory = async_sessionmaker(engine, expire_on_commit=False)
-        async with factory() as session:
-            stage = Member360CareJourneyStage(
-                journey_id=journey_id, sequence=0, name="Intake", status="pending"
-            )
-            session.add(stage)
-            await session.commit()
-            await session.refresh(stage)
-            stage_id = stage.id
-        await engine.dispose()
+        # Add the stage via the public endpoint (also exercised below in
+        # test_add_care_journey_stage_appends_to_journey).
+        add = await client.post(
+            f"/api/member360/care-journeys/{journey_id}/stages",
+            json={"name": "Intake"},
+            headers=headers,
+        )
+        assert add.status_code == 201, add.text
+        added_stages = [s for s in add.json()["stages"] if s["name"] == "Intake"]
+        assert added_stages, f"stage missing from response: {add.json()}"
+        stage_id = added_stages[0]["id"]
 
         # pending → in_progress (no completed_at stamp)
         r1 = await client.patch(
@@ -875,6 +867,90 @@ async def test_care_journey_stage_progression_state_machine(fastapi_app, seeded_
         bad = await client.patch(
             f"/api/member360/care-journeys/{journey_id}/stages/{stage_id}",
             json={"status": "garbage"},
+            headers=headers,
+        )
+        assert bad.status_code == 400
+
+
+async def test_add_care_journey_stage_appends_to_journey(fastapi_app, seeded_member):
+    """Stages added without an explicit ``sequence`` should land at the end
+    of the journey in the order they were submitted."""
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = _auth_headers(token)
+        create = await client.post(
+            "/api/member360/care-journeys",
+            json={"member_id": seeded_member, "name": "Sequencing test"},
+            headers=headers,
+        )
+        journey_id = create.json()["id"]
+
+        for name in ("Intake", "Med rec", "Follow-up"):
+            r = await client.post(
+                f"/api/member360/care-journeys/{journey_id}/stages",
+                json={"name": name},
+                headers=headers,
+            )
+            assert r.status_code == 201, r.text
+
+        # The last response carries the full journey — assert ordering.
+        stages = r.json()["stages"]
+        assert [s["name"] for s in stages] == ["Intake", "Med rec", "Follow-up"]
+        assert [s["sequence"] for s in stages] == [0, 1, 2]
+
+
+async def test_add_care_journey_stage_honors_explicit_sequence_and_status(fastapi_app, seeded_member):
+    """When ``sequence`` is supplied it's used verbatim — the new endpoint
+    doesn't renumber existing stages. ``status='completed'`` should also
+    immediately stamp ``completed_at``."""
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = _auth_headers(token)
+        create = await client.post(
+            "/api/member360/care-journeys",
+            json={"member_id": seeded_member, "name": "Explicit-seq test"},
+            headers=headers,
+        )
+        journey_id = create.json()["id"]
+
+        r = await client.post(
+            f"/api/member360/care-journeys/{journey_id}/stages",
+            json={"name": "Already done", "sequence": 5, "status": "completed"},
+            headers=headers,
+        )
+        assert r.status_code == 201, r.text
+        stage = next(s for s in r.json()["stages"] if s["name"] == "Already done")
+        assert stage["sequence"] == 5
+        assert stage["status"] == "completed"
+        assert stage["completed_at"] is not None
+
+
+async def test_add_care_journey_stage_rejects_invalid_inputs(fastapi_app, seeded_member):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = _auth_headers(token)
+
+        # Unknown journey
+        missing = await client.post(
+            "/api/member360/care-journeys/999999/stages",
+            json={"name": "Doesn't matter"},
+            headers=headers,
+        )
+        assert missing.status_code == 404
+
+        # Bad status — service should refuse before inserting
+        create = await client.post(
+            "/api/member360/care-journeys",
+            json={"member_id": seeded_member, "name": "Bad-status target"},
+            headers=headers,
+        )
+        journey_id = create.json()["id"]
+        bad = await client.post(
+            f"/api/member360/care-journeys/{journey_id}/stages",
+            json={"name": "X", "status": "wat"},
             headers=headers,
         )
         assert bad.status_code == 400

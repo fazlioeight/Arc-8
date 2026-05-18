@@ -23,6 +23,7 @@ from ..schemas.member360 import (
     CareJourney,
     CareJourneyCreate,
     CareJourneyListResponse,
+    CareJourneyStageCreate,
     CareJourneyStageUpdate,
     CareJourneyTemplate,
     CareJourneyUpdate,
@@ -646,6 +647,40 @@ async def patch_care_journey(
         actor=current_user.email,
         event_type="member360.care_journey.update",
         payload={"journey_id": journey_id, "fields": list(data.keys())},
+    )
+    await session.commit()
+    await control_session.commit()
+    return journey
+
+
+@router.post(
+    "/care-journeys/{journey_id}/stages",
+    response_model=CareJourney,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_care_journey_stage(
+    journey_id: int,
+    payload: CareJourneyStageCreate,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    try:
+        journey = await member360_service.add_care_journey_stage(
+            session, journey_id, payload.model_dump()
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if not journey:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Care journey not found")
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.care_journey.stage_add",
+        payload={"journey_id": journey_id, "name": payload.name},
     )
     await session.commit()
     await control_session.commit()
