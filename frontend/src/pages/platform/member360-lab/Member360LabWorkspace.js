@@ -16,6 +16,8 @@ import {
   fetchMember360JourneyTemplates,
   fetchMember360MemberDetail,
   generateMember360SubmissionExport,
+  updateMember360CareJourney,
+  updateMember360CareJourneyStage,
   updateMember360Member,
   updateMember360Task,
 } from '../../../services/member360LabService';
@@ -299,6 +301,26 @@ const Member360LabWorkspace = () => {
     }
   };
 
+  const handleStageTransition = useCallback(async (journey, stage, nextStatus) => {
+    try {
+      await updateMember360CareJourneyStage(token, tenant, journey.id, stage.id, { status: nextStatus });
+      setActionMessage(`Stage "${stage.name}" → ${nextStatus.replace('_', ' ')}.`);
+      await reload();
+    } catch (err) {
+      setActionMessage(`Could not update stage: ${err.message || err}`);
+    }
+  }, [token, tenant, reload]);
+
+  const handleJourneyTransition = useCallback(async (journey, nextStatus) => {
+    try {
+      await updateMember360CareJourney(token, tenant, journey.id, { status: nextStatus });
+      setActionMessage(`Journey "${journey.name}" → ${nextStatus}.`);
+      await reload();
+    } catch (err) {
+      setActionMessage(`Could not update journey: ${err.message || err}`);
+    }
+  }, [token, tenant, reload]);
+
   const tabContent = useMemo(() => {
     if (!detail) return null;
     switch (tab) {
@@ -345,7 +367,12 @@ const Member360LabWorkspace = () => {
         return (
           <div className="space-y-3">
             {(detail.care_journeys || []).map((j) => (
-              <CareJourneyCard key={j.id} journey={j} />
+              <CareJourneyCard
+                key={j.id}
+                journey={j}
+                onStageTransition={handleStageTransition}
+                onJourneyTransition={handleJourneyTransition}
+              />
             ))}
             {(detail.care_journeys || []).length === 0 && <p className="text-xs coding-text-soft">No active care journey. Start one from the right panel.</p>}
             <h4 className="text-xs uppercase tracking-wider coding-text-muted mt-4">Tasks in this workspace</h4>
@@ -461,7 +488,7 @@ const Member360LabWorkspace = () => {
       default:
         return null;
     }
-  }, [detail, member, tab]);
+  }, [detail, member, tab, handleStageTransition, handleJourneyTransition]);
 
   if (loading) {
     return (

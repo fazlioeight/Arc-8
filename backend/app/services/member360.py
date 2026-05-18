@@ -24,10 +24,12 @@ from ..models.member360 import (
     Member360CareJourneyStage,
     Member360CareJourneyTemplate,
     Member360CareOption,
+    Member360Claim,
     Member360Document,
     Member360Member,
     Member360Message,
     Member360Note,
+    Member360OutreachChannel,
     Member360RiskInsight,
     Member360Savings,
     Member360Task,
@@ -579,10 +581,18 @@ async def create_message(session: AsyncSession, *, member_id: int, sender: Optio
         sender=payload.get("sender") or sender,
         recipient=payload.get("recipient") or member.preferred_channel or member.phone,
         body=payload.get("body", ""),
-        status="sent",
+        status="queued",
     )
     session.add(message)
     await session.flush()
+    # Outbound messages flow through the outreach delivery pipeline. Inbound
+    # rows are journaled as-is — they're already delivered by definition.
+    if message.direction == "outbound":
+        await deliver_message(session, message)
+        await session.flush()
+    else:
+        message.status = "received"
+        await session.flush()
     return {
         "id": message.id,
         "member_id": message.member_id,
@@ -1346,3 +1356,352 @@ async def list_risk_insights_all(
         for r, member in rows
     ]
     return items, int(total)
+
+
+# ---------- Batch ingest (members / claims / risk insights) ----------------
+# Upsert by natural key so the same batch can be re-POSTed without producing
+# duplicates. Members keyed by `member_key`; claims by `claim_number` (unique
+# within tenant); risk insights by `(member_id, domain)` — one row per domain
+# per member.
+
+_MEMBER_IMPORT_FIELDS = (
+    "first_name", "last_name", "date_of_birth", "gender", "plan_name",
+    "line_of_business", "phone", "email", "address_line1", "address_city",
+    "address_state", "address_zip", "preferred_language", "preferred_channel",
+    "primary_care_provider", "risk_score_composite", "risk_tier",
+    "clinical_risk_score", "utilization_risk_score", "cost_risk_score",
+    "engagement_risk_score", "open_care_gaps", "next_best_action",
+)
+
+
+async def import_members(session: AsyncSession, items: list[dict]) -> dict:
+    """Upsert members keyed by ``member_key``. Each item replaces non-None
+    fields on an existing row or creates a new one. Returns a count summary
+    plus per-row errors (e.g. missing ``member_key``)."""
+    created = 0
+    updated = 0
+    errors: list[dict] = []
+    for idx, item in enumerate(items):
+        key = (item.get("member_key") or "").strip()
+        if not key:
+            errors.append({"index": idx, "member_key": None, "detail": "member_key is required"})
+            continue
+        existing = await session.scalar(
+            select(Member360Member).where(Member360Member.member_key == key)
+        )
+        if existing:
+            for field in _MEMBER_IMPORT_FIELDS:
+                value = item.get(field)
+                if value is not None:
+                    setattr(existing, field, value)
+            updated += 1
+        else:
+            row = Member360Member(member_key=key)
+            for field in _MEMBER_IMPORT_FIELDS:
+                value = item.get(field)
+                if value is not None:
+                    setattr(row, field, value)
+            session.add(row)
+            # Flush per row so a duplicate key later in the same batch is
+            # detected as an update against the just-inserted row instead of
+            # creating a second record. Autoflush on async sessions isn't
+            # reliable across dialects.
+            await session.flush()
+            created += 1
+    return {"created": created, "updated": updated, "errors": errors}
+
+
+_CLAIM_IMPORT_FIELDS = (
+    "service_date", "provider", "category", "status",
+    "billed_amount", "paid_amount", "member_responsibility",
+)
+
+
+async def import_claims(session: AsyncSession, items: list[dict]) -> dict:
+    """Upsert claims keyed by ``claim_number``. Member resolution is by
+    ``member_key`` — claims for unknown members produce a per-row error
+    rather than failing the batch, so a partially-valid batch still lands."""
+    created = 0
+    updated = 0
+    errors: list[dict] = []
+    member_key_cache: dict[str, Optional[int]] = {}
+    for idx, item in enumerate(items):
+        member_key = (item.get("member_key") or "").strip()
+        claim_number = (item.get("claim_number") or "").strip()
+        if not member_key or not claim_number:
+            errors.append({
+                "index": idx,
+                "member_key": member_key or None,
+                "detail": "member_key and claim_number are required",
+            })
+            continue
+        if member_key not in member_key_cache:
+            mid = await session.scalar(
+                select(Member360Member.id).where(Member360Member.member_key == member_key)
+            )
+            member_key_cache[member_key] = mid
+        member_id = member_key_cache[member_key]
+        if member_id is None:
+            errors.append({
+                "index": idx,
+                "member_key": member_key,
+                "detail": f"member_key {member_key!r} not found",
+            })
+            continue
+        existing = await session.scalar(
+            select(Member360Claim).where(Member360Claim.claim_number == claim_number)
+        )
+        if existing:
+            existing.member_id = member_id
+            for field in _CLAIM_IMPORT_FIELDS:
+                value = item.get(field)
+                if value is not None:
+                    setattr(existing, field, value)
+            updated += 1
+        else:
+            row = Member360Claim(
+                member_id=member_id,
+                claim_number=claim_number,
+                status=item.get("status") or "paid",
+            )
+            for field in _CLAIM_IMPORT_FIELDS:
+                value = item.get(field)
+                if value is not None and field != "status":
+                    setattr(row, field, value)
+            session.add(row)
+            await session.flush()  # see import_members re: per-row flush
+            created += 1
+    return {"created": created, "updated": updated, "errors": errors}
+
+
+_RISK_IMPORT_FIELDS = ("score", "driver", "recommendation", "confidence")
+
+
+async def import_risk_insights(session: AsyncSession, items: list[dict]) -> dict:
+    """Upsert risk insights keyed by ``(member_key, domain)``."""
+    created = 0
+    updated = 0
+    errors: list[dict] = []
+    member_key_cache: dict[str, Optional[int]] = {}
+    for idx, item in enumerate(items):
+        member_key = (item.get("member_key") or "").strip()
+        domain = (item.get("domain") or "").strip()
+        if not member_key or not domain:
+            errors.append({
+                "index": idx,
+                "member_key": member_key or None,
+                "detail": "member_key and domain are required",
+            })
+            continue
+        if member_key not in member_key_cache:
+            mid = await session.scalar(
+                select(Member360Member.id).where(Member360Member.member_key == member_key)
+            )
+            member_key_cache[member_key] = mid
+        member_id = member_key_cache[member_key]
+        if member_id is None:
+            errors.append({
+                "index": idx,
+                "member_key": member_key,
+                "detail": f"member_key {member_key!r} not found",
+            })
+            continue
+        existing = await session.scalar(
+            select(Member360RiskInsight).where(
+                Member360RiskInsight.member_id == member_id,
+                Member360RiskInsight.domain == domain,
+            )
+        )
+        if existing:
+            for field in _RISK_IMPORT_FIELDS:
+                value = item.get(field)
+                if value is not None:
+                    setattr(existing, field, value)
+            existing.last_updated_at = datetime.utcnow()
+            updated += 1
+        else:
+            row = Member360RiskInsight(
+                member_id=member_id,
+                domain=domain,
+                score=float(item.get("score") or 0),
+                driver=item.get("driver"),
+                recommendation=item.get("recommendation"),
+                confidence=item.get("confidence"),
+            )
+            session.add(row)
+            await session.flush()  # see import_members re: per-row flush
+            created += 1
+    return {"created": created, "updated": updated, "errors": errors}
+
+
+# ---------- Care journey + stage progression -------------------------------
+# Stage state machine: pending → in_progress → completed. Completing a stage
+# stamps ``completed_at``; reopening (in_progress) clears it. Journey-level
+# updates also live here so the workspace can advance status / reassign.
+
+_JOURNEY_UPDATE_FIELDS = (
+    "name", "description", "status", "assigned_to",
+    "start_date", "target_completion_date",
+)
+
+_VALID_JOURNEY_STATUS = {"active", "paused", "completed", "cancelled"}
+_VALID_STAGE_STATUS = {"pending", "in_progress", "completed", "skipped"}
+
+
+def _serialize_journey(journey: Member360CareJourney, open_task_count: int = 0) -> dict:
+    return {
+        "id": journey.id,
+        "member_id": journey.member_id,
+        "name": journey.name,
+        "description": journey.description,
+        "status": journey.status,
+        "template_name": journey.template_name,
+        "source": journey.source,
+        "assigned_to": journey.assigned_to,
+        "created_by": journey.created_by,
+        "start_date": journey.start_date,
+        "target_completion_date": journey.target_completion_date,
+        "stages": [
+            {
+                "id": s.id,
+                "sequence": s.sequence,
+                "name": s.name,
+                "description": s.description,
+                "status": s.status,
+                "completed_at": s.completed_at,
+            }
+            for s in sorted(journey.stages, key=lambda x: x.sequence)
+        ],
+        "open_task_count": open_task_count,
+    }
+
+
+async def update_care_journey(
+    session: AsyncSession, journey_id: int, payload: dict
+) -> Optional[dict]:
+    journey = await session.scalar(
+        select(Member360CareJourney)
+        .where(Member360CareJourney.id == journey_id)
+        .options(selectinload(Member360CareJourney.stages))
+    )
+    if not journey:
+        return None
+    for field in _JOURNEY_UPDATE_FIELDS:
+        if field in payload and payload[field] is not None:
+            if field == "status" and payload[field] not in _VALID_JOURNEY_STATUS:
+                raise ValueError(
+                    f"Invalid journey status {payload[field]!r}; "
+                    f"expected one of {sorted(_VALID_JOURNEY_STATUS)}"
+                )
+            setattr(journey, field, payload[field])
+    await session.flush()
+    return _serialize_journey(journey)
+
+
+async def update_care_journey_stage(
+    session: AsyncSession,
+    journey_id: int,
+    stage_id: int,
+    payload: dict,
+) -> Optional[dict]:
+    stage = await session.scalar(
+        select(Member360CareJourneyStage).where(
+            Member360CareJourneyStage.id == stage_id,
+            Member360CareJourneyStage.journey_id == journey_id,
+        )
+    )
+    if not stage:
+        return None
+    new_status = payload.get("status")
+    if new_status is not None:
+        if new_status not in _VALID_STAGE_STATUS:
+            raise ValueError(
+                f"Invalid stage status {new_status!r}; "
+                f"expected one of {sorted(_VALID_STAGE_STATUS)}"
+            )
+        # Stamp/clear completed_at to match the new state. Completed stages
+        # carry a timestamp so timeline + reporting can show "completed on X".
+        if new_status == "completed" and stage.status != "completed":
+            stage.completed_at = datetime.utcnow()
+        elif new_status != "completed":
+            stage.completed_at = None
+        stage.status = new_status
+    if payload.get("name") is not None:
+        stage.name = payload["name"]
+    if payload.get("description") is not None:
+        stage.description = payload["description"]
+    await session.flush()
+
+    # Re-load the parent journey with stages so the caller can re-render.
+    journey = await session.scalar(
+        select(Member360CareJourney)
+        .where(Member360CareJourney.id == journey_id)
+        .options(selectinload(Member360CareJourney.stages))
+    )
+    return _serialize_journey(journey) if journey else None
+
+
+# ---------- Outreach delivery ---------------------------------------------
+# Resolves a matching Member360OutreachChannel for the message's channel_type
+# and dispatches to a provider stub. Providers update Message.status:
+#   queued → delivered            (success)
+#   queued → failed_no_provider   (channel configured but provider lacks creds)
+#   queued → skipped_no_channel   (no admin-config row for this channel_type)
+#   queued → skipped_inactive     (matching channel exists but is_active=False)
+# Real Twilio / SendGrid wiring slots in by adding a branch to ``_dispatch``.
+
+
+async def _resolve_outreach_channel(
+    session: AsyncSession, channel_type: str
+) -> Optional[Member360OutreachChannel]:
+    if not channel_type:
+        return None
+    return await session.scalar(
+        select(Member360OutreachChannel).where(
+            func.lower(Member360OutreachChannel.channel_type) == channel_type.lower()
+        ).order_by(Member360OutreachChannel.id.asc())
+    )
+
+
+def _dispatch_outreach(
+    channel: Member360OutreachChannel,
+    *,
+    body: str,
+    recipient: Optional[str],
+) -> tuple[str, Optional[str]]:
+    """Provider dispatch stub. Returns ``(status, error)``.
+
+    ``dryrun`` is the default for unconfigured environments — it logs the
+    payload and reports ``delivered`` so the message round-trips through
+    the UI. Real providers are stubbed to ``failed_no_provider`` until
+    their SDKs + secrets are wired through ``OutreachChannel.config``.
+    """
+    provider = (channel.provider or "").strip().lower() or "dryrun"
+    if provider in {"dryrun", "console", "noop"}:
+        return "delivered", None
+    # Real providers — placeholder until secrets/SDKs are integrated.
+    if provider in {"twilio", "sendgrid", "talkdesk"}:
+        return "failed_no_provider", (
+            f"Provider {provider!r} configured but delivery SDK is not wired."
+        )
+    return "failed_no_provider", f"Unknown provider {provider!r}."
+
+
+async def deliver_message(
+    session: AsyncSession, message: Member360Message
+) -> Member360Message:
+    """Attempt synchronous delivery for ``message`` and update its ``status``
+    in place. Always returns the message — callers don't have to inspect
+    success/failure because the status field carries the outcome."""
+    channel = await _resolve_outreach_channel(session, message.channel)
+    if channel is None:
+        message.status = "skipped_no_channel"
+        return message
+    if not channel.is_active:
+        message.status = "skipped_inactive"
+        return message
+    status_, _err = _dispatch_outreach(
+        channel, body=message.body, recipient=message.recipient
+    )
+    message.status = status_
+    return message

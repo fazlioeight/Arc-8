@@ -23,14 +23,19 @@ from ..schemas.member360 import (
     CareJourney,
     CareJourneyCreate,
     CareJourneyListResponse,
+    CareJourneyStageUpdate,
     CareJourneyTemplate,
+    CareJourneyUpdate,
     CareOption,
     CareOptionCreate,
     CareOptionListResponse,
+    ClaimImportRequest,
     DashboardResponse,
     DocumentListResponse,
     GapAnalysisResponse,
+    ImportResponse,
     MemberDetailResponse,
+    MemberImportRequest,
     MemberListResponse,
     MemberUpdate,
     Message,
@@ -38,6 +43,7 @@ from ..schemas.member360 import (
     MessageListResponse,
     Note,
     NoteCreate,
+    RiskInsightImportRequest,
     RiskInsightListResponse,
     SubmissionExportRequest,
     SubmissionExportResponse,
@@ -610,3 +616,164 @@ async def list_risk_insights(
     await session.commit()
     await control_session.commit()
     return {"items": items, "total": total}
+
+
+# ---- Care journey + stage progression --------------------------------------
+
+
+@router.patch("/care-journeys/{journey_id}", response_model=CareJourney)
+async def patch_care_journey(
+    journey_id: int,
+    payload: CareJourneyUpdate,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    data = payload.model_dump(exclude_none=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes provided")
+    try:
+        journey = await member360_service.update_care_journey(session, journey_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if not journey:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Care journey not found")
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.care_journey.update",
+        payload={"journey_id": journey_id, "fields": list(data.keys())},
+    )
+    await session.commit()
+    await control_session.commit()
+    return journey
+
+
+@router.patch("/care-journeys/{journey_id}/stages/{stage_id}", response_model=CareJourney)
+async def patch_care_journey_stage(
+    journey_id: int,
+    stage_id: int,
+    payload: CareJourneyStageUpdate,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    data = payload.model_dump(exclude_none=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes provided")
+    try:
+        journey = await member360_service.update_care_journey_stage(
+            session, journey_id, stage_id, data
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if not journey:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stage not found")
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.care_journey.stage_update",
+        payload={"journey_id": journey_id, "stage_id": stage_id, "fields": list(data.keys())},
+    )
+    await session.commit()
+    await control_session.commit()
+    return journey
+
+
+# ---- Batch ingest ----------------------------------------------------------
+# Idempotent upsert endpoints keyed by natural identifiers. Per-row errors
+# are returned in the response rather than rolling back the batch — callers
+# can fix the bad rows and resubmit without losing progress.
+
+
+@router.post("/import/members", response_model=ImportResponse)
+async def import_members(
+    payload: MemberImportRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    summary = await member360_service.import_members(
+        session, [item.model_dump() for item in payload.members]
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.import.members",
+        payload={
+            "submitted": len(payload.members),
+            "created": summary["created"],
+            "updated": summary["updated"],
+            "error_count": len(summary["errors"]),
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return summary
+
+
+@router.post("/import/claims", response_model=ImportResponse)
+async def import_claims(
+    payload: ClaimImportRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    summary = await member360_service.import_claims(
+        session, [item.model_dump() for item in payload.claims]
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.import.claims",
+        payload={
+            "submitted": len(payload.claims),
+            "created": summary["created"],
+            "updated": summary["updated"],
+            "error_count": len(summary["errors"]),
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return summary
+
+
+@router.post("/import/risk-insights", response_model=ImportResponse)
+async def import_risk_insights(
+    payload: RiskInsightImportRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    summary = await member360_service.import_risk_insights(
+        session, [item.model_dump() for item in payload.insights]
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.import.risk_insights",
+        payload={
+            "submitted": len(payload.insights),
+            "created": summary["created"],
+            "updated": summary["updated"],
+            "error_count": len(summary["errors"]),
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return summary

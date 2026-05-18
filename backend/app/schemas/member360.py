@@ -123,6 +123,24 @@ class CareJourneyCreate(BaseModel):
     target_completion_date: Optional[date] = None
 
 
+class CareJourneyUpdate(BaseModel):
+    """Partial update for a care journey. All fields optional."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    assigned_to: Optional[str] = None
+    start_date: Optional[date] = None
+    target_completion_date: Optional[date] = None
+
+
+class CareJourneyStageUpdate(BaseModel):
+    """Stage status transitions. ``status`` is the only required field but
+    callers can also rename a stage or rewrite its description if needed."""
+    status: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
 class SBAR(BaseModel):
     situation: Optional[str] = None
     background: Optional[str] = None
@@ -465,3 +483,93 @@ class RiskInsightListItem(RiskInsight, _MemberRef):
 class RiskInsightListResponse(BaseModel):
     items: list[RiskInsightListItem]
     total: int
+
+
+# ---- Batch ingest --------------------------------------------------------
+#
+# Upsert endpoints keyed on natural identifiers (`member_key`, `claim_number`,
+# `member_key + domain`). Reruns are idempotent — same input produces same
+# DB state — so callers can re-POST a corrected batch without cleanup.
+
+
+class MemberImportItem(BaseModel):
+    """Upsertable subset of Member360Member. ``member_key`` is the unique
+    natural key the upserter dedupes on. ``next_best_action`` and the four
+    risk scores are operator-controlled — they're included so an external
+    risk engine can write them through this endpoint."""
+    member_key: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    plan_name: Optional[str] = None
+    line_of_business: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_city: Optional[str] = None
+    address_state: Optional[str] = None
+    address_zip: Optional[str] = None
+    preferred_language: Optional[str] = None
+    preferred_channel: Optional[str] = None
+    primary_care_provider: Optional[str] = None
+    risk_score_composite: Optional[float] = None
+    risk_tier: Optional[str] = None
+    clinical_risk_score: Optional[float] = None
+    utilization_risk_score: Optional[float] = None
+    cost_risk_score: Optional[float] = None
+    engagement_risk_score: Optional[float] = None
+    open_care_gaps: Optional[int] = None
+    next_best_action: Optional[str] = None
+
+
+class MemberImportRequest(BaseModel):
+    members: list[MemberImportItem]
+
+
+class ClaimImportItem(BaseModel):
+    """Claim upsert. Keyed on ``claim_number`` (unique within a tenant).
+    ``member_key`` is required so the upserter can resolve the FK without
+    callers having to know our internal member ids."""
+    member_key: str
+    claim_number: str
+    service_date: Optional[date] = None
+    provider: Optional[str] = None
+    category: Optional[str] = None
+    status: str = "paid"
+    billed_amount: Optional[float] = None
+    paid_amount: Optional[float] = None
+    member_responsibility: Optional[float] = None
+
+
+class ClaimImportRequest(BaseModel):
+    claims: list[ClaimImportItem]
+
+
+class RiskInsightImportItem(BaseModel):
+    """Risk insight upsert. Keyed on ``(member_key, domain)`` — one row per
+    domain per member; reposting overwrites driver/score/recommendation."""
+    member_key: str
+    domain: str
+    score: float
+    driver: Optional[str] = None
+    recommendation: Optional[str] = None
+    confidence: Optional[float] = None
+
+
+class RiskInsightImportRequest(BaseModel):
+    insights: list[RiskInsightImportItem]
+
+
+class ImportError(BaseModel):
+    index: int
+    member_key: Optional[str] = None
+    detail: str
+
+
+class ImportResponse(BaseModel):
+    """Counts reflect the *final* outcome of the batch:
+    ``created`` + ``updated`` + ``len(errors)`` == total submitted."""
+    created: int = 0
+    updated: int = 0
+    errors: list[ImportError] = Field(default_factory=list)

@@ -107,6 +107,26 @@ export const fetchMember360JourneyTemplates = (token, tenant) =>
 export const createMember360CareJourney = (token, tenant, payload) =>
   post(token, tenant, '/api/member360/care-journeys', payload);
 
+export const updateMember360CareJourney = (token, tenant, journeyId, payload) =>
+  patch(token, tenant, `/api/member360/care-journeys/${journeyId}`, payload);
+
+export const updateMember360CareJourneyStage = (token, tenant, journeyId, stageId, payload) =>
+  patch(token, tenant, `/api/member360/care-journeys/${journeyId}/stages/${stageId}`, payload);
+
+// ------------------- Batch ingest -------------------
+// These are tenant-admin level surfaces. Each accepts up to a few hundred
+// rows per call (see backend route docs); large imports should chunk on the
+// caller side.
+
+export const importMember360Members = (token, tenant, members) =>
+  post(token, tenant, '/api/member360/import/members', { members });
+
+export const importMember360Claims = (token, tenant, claims) =>
+  post(token, tenant, '/api/member360/import/claims', { claims });
+
+export const importMember360RiskInsights = (token, tenant, insights) =>
+  post(token, tenant, '/api/member360/import/risk-insights', { insights });
+
 // ------------------- Aggregate (multi-member) endpoints -------------------
 //
 // Population-level list endpoints. Each returns { items, total } where every

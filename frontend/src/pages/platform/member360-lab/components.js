@@ -661,11 +661,12 @@ function Bar({ v }) {
   );
 }
 
-export function CareJourneyCard({ journey, onStageClick }) {
+export function CareJourneyCard({ journey, onStageTransition, onJourneyTransition }) {
   if (!journey) return null;
-  const completed = journey.stages?.filter((s) => s.status === 'complete').length || 0;
+  const completed = journey.stages?.filter((s) => s.status === 'completed').length || 0;
   const total = journey.stages?.length || 0;
   const pct = total ? (completed / total) * 100 : 0;
+  const journeyOpen = journey.status === 'active' || journey.status === 'paused';
   return (
     <div className="coding-surface-subtle rounded-lg p-3 space-y-2">
       <div className="flex items-center justify-between">
@@ -680,26 +681,67 @@ export function CareJourneyCard({ journey, onStageClick }) {
       </div>
       <ol className="space-y-1">
         {(journey.stages || []).map((s) => (
-          <li key={s.id}>
-            <button
-              type="button"
-              onClick={() => onStageClick?.(s)}
-              className="w-full flex items-center justify-between text-xs px-2 py-1 rounded coding-hoverable"
-            >
-              <span className="flex items-center gap-2">
-                <span className={joinClass(
-                  'inline-block h-2 w-2 rounded-full',
-                  s.status === 'complete' ? 'bg-emerald-500' :
-                  s.status === 'in_progress' ? 'bg-amber-500' :
-                  'bg-slate-300 dark:bg-slate-600'
-                )} />
-                <span className="coding-text-strong">{s.name}</span>
-              </span>
+          <li key={s.id} className="flex items-center justify-between text-xs px-2 py-1 rounded">
+            <span className="flex items-center gap-2 min-w-0">
+              <span className={joinClass(
+                'inline-block h-2 w-2 rounded-full shrink-0',
+                s.status === 'completed' ? 'bg-emerald-500' :
+                s.status === 'in_progress' ? 'bg-amber-500' :
+                s.status === 'skipped' ? 'bg-slate-400 dark:bg-slate-500' :
+                'bg-slate-300 dark:bg-slate-600'
+              )} />
+              <span className="coding-text-strong truncate">{s.name}</span>
+            </span>
+            <span className="flex items-center gap-1.5 shrink-0">
+              {s.status === 'pending' && (
+                <button
+                  type="button"
+                  onClick={() => onStageTransition?.(journey, s, 'in_progress')}
+                  className="rounded-md bg-white dark:bg-slate-800 coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-1.5 py-0.5 hover:opacity-80"
+                >Start</button>
+              )}
+              {s.status === 'in_progress' && (
+                <button
+                  type="button"
+                  onClick={() => onStageTransition?.(journey, s, 'completed')}
+                  className="rounded-md bg-emerald-600 text-white px-1.5 py-0.5 hover:opacity-90"
+                >Complete</button>
+              )}
+              {s.status === 'completed' && (
+                <button
+                  type="button"
+                  onClick={() => onStageTransition?.(journey, s, 'in_progress')}
+                  className="rounded-md coding-surface coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-1.5 py-0.5 hover:opacity-80"
+                >Reopen</button>
+              )}
               <span className="coding-text-muted capitalize">{s.status?.replace('_', ' ')}</span>
-            </button>
+            </span>
           </li>
         ))}
       </ol>
+      {journeyOpen && (
+        <div className="flex flex-wrap gap-1.5 pt-1 text-xs">
+          {journey.status === 'active' && (
+            <button
+              type="button"
+              onClick={() => onJourneyTransition?.(journey, 'paused')}
+              className="rounded-md coding-surface coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-2 py-1 hover:opacity-80"
+            >Pause</button>
+          )}
+          {journey.status === 'paused' && (
+            <button
+              type="button"
+              onClick={() => onJourneyTransition?.(journey, 'active')}
+              className="rounded-md coding-surface coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-2 py-1 hover:opacity-80"
+            >Resume</button>
+          )}
+          <button
+            type="button"
+            onClick={() => onJourneyTransition?.(journey, 'completed')}
+            className="rounded-md bg-emerald-600 text-white px-2 py-1 hover:opacity-90"
+          >Mark journey complete</button>
+        </div>
+      )}
     </div>
   );
 }
