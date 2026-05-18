@@ -185,6 +185,38 @@ async def list_audit_events(
     return list(rows), int(total)
 
 
+async def list_audit_events_for_member(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    member_id: int,
+    event_type_prefix: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[TenantAuditEvent], int]:
+    """Audit events whose JSON ``payload.member_id`` equals ``member_id``.
+
+    ``member_id`` lives inside the JSON ``payload`` rather than as its own
+    column because the audit table is shared across modules. We use the
+    portable ``as_integer()`` JSON accessor so the comparison happens with
+    numeric semantics — ``as_string()`` returns a JSON-encoded value on
+    PostgreSQL (with literal quotes for strings) which makes string compares
+    surprising. Events whose payload has no ``member_id`` or a non-numeric
+    one are filtered out cleanly because the projection is NULL.
+    """
+    payload_member = TenantAuditEvent.payload["member_id"].as_integer()
+    stmt = select(TenantAuditEvent).where(
+        TenantAuditEvent.tenant_id == tenant_id,
+        payload_member == member_id,
+    )
+    if event_type_prefix:
+        stmt = stmt.where(TenantAuditEvent.event_type.startswith(event_type_prefix))
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(TenantAuditEvent.created_at.desc()).limit(limit).offset(offset)
+    rows = (await session.execute(stmt)).scalars().all()
+    return list(rows), int(total)
+
+
 def serialize_audit(event: TenantAuditEvent) -> dict:
     return {
         "id": event.id,

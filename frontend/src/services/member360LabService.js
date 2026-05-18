@@ -104,6 +104,15 @@ export const createMember360CareOption = (token, tenant, payload) =>
 export const fetchMember360JourneyTemplates = (token, tenant) =>
   get(token, tenant, '/api/member360/care-journey-templates');
 
+export const fetchMember360MemberAudit = (token, tenant, memberId, filters = {}) => {
+  const query = toQuery({
+    event_type_prefix: filters.event_type_prefix,
+    limit: filters.limit,
+    offset: filters.offset,
+  });
+  return get(token, tenant, `/api/member360/members/${memberId}/audit${query}`);
+};
+
 export const createMember360CareJourney = (token, tenant, payload) =>
   post(token, tenant, '/api/member360/care-journeys', payload);
 

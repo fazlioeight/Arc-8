@@ -480,7 +480,7 @@ const Member360LabWorkspace = () => {
       case 'documents':
         return <DocumentsPage detail={detail} memberId={member?.id} onUploaded={reload} />;
       case 'audit_log':
-        return <AuditLogPage />;
+        return <AuditLogPage memberId={member?.id} />;
       case 'sharing':
         return <SharingPage />;
       case 'settings':

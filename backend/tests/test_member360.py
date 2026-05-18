@@ -1187,6 +1187,149 @@ def test_get_document_backend_dispatches_azure(monkeypatch):
         monkeypatch.setattr(settings, "MEMBER360_STORAGE_BACKEND", "local")
 
 
+async def test_member_audit_endpoint_filters_by_member_id(fastapi_app, seeded_member):
+    """The per-member audit endpoint should return only events whose JSON
+    ``payload.member_id`` matches the URL member id, ignoring tenant-wide
+    events for other members and events with no member context."""
+    from sqlalchemy import delete
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from app.core.config import get_settings
+    from app.models.tables import TenantAuditEvent
+
+    # Seed audit rows directly — the autouse `disable_audit` fixture has
+    # already patched record_audit_event to a no-op, so going through the
+    # routes wouldn't produce real audit rows during the test run.
+    control_uri = get_settings().CONTROL_DATABASE_URL
+    engine = create_async_engine(control_uri, future=True, echo=False)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    # Resolve the tenant id; we created one tenant in conftest bootstrap.
+    from app.models.tables import Tenant
+    from sqlalchemy import select
+    async with factory() as session:
+        tenant = await session.scalar(select(Tenant).where(Tenant.key == TENANT_KEY))
+        tenant_id = tenant.id
+
+    inserted_ids: list[int] = []
+    other_member_id = seeded_member + 9999
+    try:
+        async with factory() as session:
+            # Three events for the seeded member, two for a different member,
+            # one with no member_id at all (e.g. a list/dashboard view).
+            for ev in [
+                ("member360.task.create", {"member_id": seeded_member, "task_id": 1}),
+                ("member360.task.update", {"member_id": seeded_member, "task_id": 1, "fields": ["status"]}),
+                ("member360.document.upload", {"member_id": seeded_member, "document_id": 7}),
+                ("member360.task.create", {"member_id": other_member_id, "task_id": 2}),
+                ("member360.note.create", {"member_id": other_member_id}),
+                ("member360.dashboard.view", {}),
+                # Different event_type prefix — should be excluded by default.
+                ("coding.task.update", {"member_id": seeded_member}),
+            ]:
+                row = TenantAuditEvent(
+                    tenant_id=tenant_id, actor="user@example.com",
+                    event_type=ev[0], payload=ev[1],
+                )
+                session.add(row)
+            await session.commit()
+            # Capture the ids so we can clean them up afterwards.
+            seeded_rows = (await session.execute(
+                select(TenantAuditEvent).where(TenantAuditEvent.tenant_id == tenant_id)
+            )).scalars().all()
+            inserted_ids = [r.id for r in seeded_rows]
+
+        transport = ASGITransport(app=fastapi_app)
+        async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+            token = await _login(client)
+            headers = _auth_headers(token)
+
+            resp = await client.get(
+                f"/api/member360/members/{seeded_member}/audit",
+                headers=headers,
+            )
+            assert resp.status_code == 200, resp.text
+            body = resp.json()
+
+        # 3 member360.* events for seeded_member; the coding.* event is
+        # filtered out by the default member360. prefix.
+        assert body["total"] == 3
+        assert {item["event_type"] for item in body["items"]} == {
+            "member360.task.create",
+            "member360.task.update",
+            "member360.document.upload",
+        }
+        # Every returned event must reference the right member.
+        for item in body["items"]:
+            assert item["payload"]["member_id"] == seeded_member
+    finally:
+        async with factory() as session:
+            await session.execute(
+                delete(TenantAuditEvent).where(TenantAuditEvent.id.in_(inserted_ids))
+            )
+            await session.commit()
+        await engine.dispose()
+
+
+async def test_member_audit_endpoint_honors_pagination(fastapi_app, seeded_member):
+    """limit + offset should return distinct pages of the same filtered set."""
+    from sqlalchemy import delete, select
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from app.core.config import get_settings
+    from app.models.tables import Tenant, TenantAuditEvent
+
+    control_uri = get_settings().CONTROL_DATABASE_URL
+    engine = create_async_engine(control_uri, future=True, echo=False)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as session:
+        tenant = await session.scalar(select(Tenant).where(Tenant.key == TENANT_KEY))
+        tenant_id = tenant.id
+
+    inserted_ids: list[int] = []
+    try:
+        async with factory() as session:
+            for i in range(5):
+                row = TenantAuditEvent(
+                    tenant_id=tenant_id, actor="user@example.com",
+                    event_type="member360.task.update",
+                    payload={"member_id": seeded_member, "task_id": i},
+                )
+                session.add(row)
+            await session.commit()
+            inserted_ids = [r.id for r in (await session.execute(
+                select(TenantAuditEvent).where(
+                    TenantAuditEvent.tenant_id == tenant_id,
+                    TenantAuditEvent.event_type == "member360.task.update",
+                )
+            )).scalars().all()]
+
+        transport = ASGITransport(app=fastapi_app)
+        async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+            token = await _login(client)
+            headers = _auth_headers(token)
+            page1 = (await client.get(
+                f"/api/member360/members/{seeded_member}/audit?limit=2&offset=0",
+                headers=headers,
+            )).json()
+            page2 = (await client.get(
+                f"/api/member360/members/{seeded_member}/audit?limit=2&offset=2",
+                headers=headers,
+            )).json()
+        assert page1["total"] >= 5
+        assert len(page1["items"]) == 2
+        assert len(page2["items"]) == 2
+        # Different rows on each page.
+        ids1 = {it["id"] for it in page1["items"]}
+        ids2 = {it["id"] for it in page2["items"]}
+        assert ids1 & ids2 == set()
+    finally:
+        async with factory() as session:
+            await session.execute(
+                delete(TenantAuditEvent).where(TenantAuditEvent.id.in_(inserted_ids))
+            )
+            await session.commit()
+        await engine.dispose()
+
+
 def test_identity_summary_classifies_token_claims():
     """The startup probe decodes the access-token JWT to figure out which
     identity won the credential chain. Verify each branch: user (az login),

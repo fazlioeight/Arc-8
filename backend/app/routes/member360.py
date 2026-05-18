@@ -57,7 +57,9 @@ from ..schemas.member360 import (
     TaskListResponse,
     TaskUpdate,
 )
+from ..schemas.member360_admin import AuditEventListResponse
 from ..services import member360 as member360_service
+from ..services import member360_admin as member360_admin_service
 from ..utils.audit_logger import record_audit_event
 from ..utils.security import AuthenticatedUser, get_current_user, require_application
 
@@ -858,6 +860,40 @@ async def upload_document(
     await session.commit()
     await control_session.commit()
     return doc
+
+
+@router.get("/members/{member_id}/audit", response_model=AuditEventListResponse)
+async def list_member_audit(
+    member_id: int,
+    event_type_prefix: Optional[str] = Query(default="member360."),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Audit events scoped to a single member.
+
+    Reads from the control plane (where audit lives); the tenant session is
+    still requested so the ``require_application('member360')`` gate has the
+    full tenant context. Filters on the JSON ``payload.member_id`` field set
+    by every member-scoped audit call (task/note/message/care-option/journey
+    create + update, document upload/download, gap analysis view, etc.).
+    """
+    await _ensure(session)
+    rows, total = await member360_admin_service.list_audit_events_for_member(
+        control_session,
+        tenant_id=tenant.id,
+        member_id=member_id,
+        event_type_prefix=event_type_prefix or None,
+        limit=limit,
+        offset=offset,
+    )
+    return {
+        "items": [member360_admin_service.serialize_audit(r) for r in rows],
+        "total": total,
+    }
 
 
 @router.get("/documents/{document_id}/download")
