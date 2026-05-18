@@ -74,13 +74,16 @@ const statusTone = (active) =>
     ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-50 dark:ring-emerald-500/30"
     : "bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-600/20 dark:text-amber-50 dark:ring-amber-500/40";
 
-const CARD = "rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900";
-const CARD_EMPH = "rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900";
-const INPUT = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/30";
-const PRIMARY_BTN = "inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-sky-500 dark:hover:bg-sky-400 dark:focus:ring-sky-400";
-const GHOST_BTN = "inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-sky-500 dark:hover:text-sky-100 dark:focus:ring-sky-400";
+// Bespoke class constants kept for backwards compat with the existing 800-line
+// body. Each maps to the HubSpot pattern used elsewhere in the platform so
+// updates here cascade through every cell, button, and input.
+const CARD = "coding-surface rounded-2xl shadow-sm p-4";
+const CARD_EMPH = "coding-surface rounded-2xl shadow-sm p-5";
+const INPUT = "coding-input w-full rounded-md px-3 py-2 text-sm";
+const PRIMARY_BTN = "inline-flex items-center rounded-md bg-[var(--brand-primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
+const GHOST_BTN = "inline-flex items-center rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-3 py-1.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-60";
 const RADIO_CLASS = (active) =>
-  `flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${active ? "border-indigo-300 bg-indigo-50 text-indigo-800 dark:border-sky-500/50 dark:bg-sky-500/10 dark:text-sky-100" : "border-slate-200 hover:border-indigo-200 dark:border-slate-700 dark:hover:border-sky-500/50"}`;
+  `flex items-center gap-2 rounded-md ring-1 px-3 py-2 text-sm transition ${active ? "ring-[var(--brand-primary)] bg-brand-50 text-[var(--brand-primary)] dark:bg-brand-900/20" : "coding-border coding-text-strong hover:bg-[var(--coding-hover)]"}`;
 
 const MasterAdminPage = () => {
   const navigate = useNavigate();

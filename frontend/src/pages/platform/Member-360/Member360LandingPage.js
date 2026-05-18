@@ -6,6 +6,7 @@ import { PORTAL_NAV_ITEMS } from "../portal_page/portalNavItems";
 import { ROUTES } from "../../../constants/routes";
 import { fetchMember360Members } from "../../../services/member360LabService";
 import { LabSubNav } from "../member360-lab/components";
+import SearchInput from "../../../components/ui/SearchInput";
 import "../../../styles/memberWorkspace.css";
 
 const MEMBER_CHART_BREADCRUMB = "Member chart";
@@ -158,51 +159,32 @@ const Member360LandingPage = () => {
     >
       <LabSubNav />
 
-      <section className="rounded-2xl p-8 coding-surface">
-        <form onSubmit={handleMemberSearch} className="space-y-6">
-          <div className="space-y-3">
+      <section className="coding-surface rounded-2xl shadow-sm p-6 sm:p-8">
+        <form onSubmit={handleMemberSearch} className="space-y-5">
+          <div className="space-y-2">
             <label
               htmlFor="member-360-search-input"
-              className="block text-sm font-medium coding-text-strong"
+              className="block text-[11px] font-semibold uppercase tracking-wider coding-text-muted"
             >
               Member ID
             </label>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="relative flex-1">
-                <input
-                  id="member-360-search-input"
-                  type="search"
-                  autoComplete="off"
-                  placeholder="Search by member ID"
-                  value={memberQuery}
-                  onChange={(event) => {
-                    handleMemberQueryChange(event.target.value);
-                  }}
-                  list="member-360-suggestions"
-                  aria-describedby="member-360-search-status"
-                  className="coding-input w-full rounded-xl px-4 py-3 text-base"
-                />
-                {isLoading && (
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-sky-500">
-                    <svg
-                      className="h-5 w-5 animate-spin"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                    >
-                      <circle cx="12" cy="12" r="9" className="opacity-20" />
-                      <path d="M21 12a9 9 0 00-9-9" strokeLinecap="round" />
-                    </svg>
-                  </div>
-                )}
-              </div>
+              <SearchInput
+                id="member-360-search-input"
+                autoComplete="off"
+                placeholder="Search by member ID, name, or plan"
+                value={memberQuery}
+                onChange={(event) => handleMemberQueryChange(event.target.value)}
+                list="member-360-suggestions"
+                aria-describedby="member-360-search-status"
+                className="pl-9 pr-3 py-2.5 text-sm"
+              />
               <button
                 type="submit"
                 disabled={isLaunching}
-                className="inline-flex items-center justify-center rounded-xl bg-[var(--brand-primary)] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center justify-center rounded-md bg-[var(--brand-primary)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isLaunching ? "Opening..." : "Open member chart"}
+                {isLaunching ? "Opening..." : "Open chart"}
               </button>
             </div>
             <datalist id="member-360-suggestions">
@@ -214,31 +196,31 @@ const Member360LandingPage = () => {
             </datalist>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             <p
               id="member-360-search-status"
-              className={`text-sm font-medium ${statusTone}`}
+              className={`text-xs ${statusTone}`}
             >
               {statusMessage}
             </p>
 
             {memberOptions.length > 0 && (
-              <ul className="divide-y coding-divider overflow-hidden rounded-xl coding-surface-subtle">
+              <ul className="overflow-hidden rounded-md border coding-border">
                 {memberOptions.map((option) => (
-                  <li key={option.key}>
+                  <li key={option.key} className="border-b coding-border-subtle last:border-b-0">
                     <button
                       type="button"
                       onClick={() => handleSuggestionSelect(option)}
-                      className="flex w-full flex-col items-start gap-1 px-4 py-3 text-left transition coding-hoverable focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                      className="flex w-full flex-col items-start gap-0.5 px-4 py-2.5 text-left transition hover:bg-[var(--coding-hover)] focus-visible:outline-none focus-visible:bg-[var(--coding-hover)]"
                     >
-                      <span className="text-sm font-semibold coding-text-strong">
+                      <span className="text-sm font-medium coding-text-strong">
                         {[option.member.first_name, option.member.last_name]
                           .filter(Boolean)
                           .join(" ") || "Unknown member"}
                       </span>
                       {option.member.member_key && (
-                        <span className="text-xs uppercase tracking-wide coding-text-muted">
-                          Member ID: {option.member.member_key}
+                        <span className="text-[11px] coding-text-muted">
+                          {option.member.member_key}{option.member.plan_name ? ` · ${option.member.plan_name}` : ''}
                         </span>
                       )}
                     </button>

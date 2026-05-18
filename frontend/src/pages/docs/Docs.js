@@ -2,7 +2,8 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import PortalUtilityBar from '../../components/PortalUtilityBar';
-import PortalHero from '../../components/PortalHero';
+import SearchInput from '../../components/ui/SearchInput';
+import AlertShell from '../../components/ui/AlertShell';
 import { AuthContext } from '../../context/AuthContext';
 import { ROUTES } from '../../constants/routes';
 import { searchDocsArticles } from '../../services/docsService';
@@ -59,89 +60,93 @@ const Docs = () => {
   return (
     <div className="coding-member-workspace min-h-screen">
       {isAuthenticated && <PortalUtilityBar />}
-      <PortalHero
-        align="left"
-        title="Nexora Lab documentation"
-        subtitle="Search knowledge articles and implementation guides (coming soon)."
-        actions={(
+
+      <div className="mx-auto w-full max-w-4xl px-4 pt-8 pb-12 space-y-6">
+        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">Docs</p>
+            <h1 className="text-3xl font-semibold coding-text-strong">Nexora Lab documentation</h1>
+            <p className="text-sm coding-text-soft max-w-2xl">
+              Search knowledge articles and implementation guides.
+            </p>
+          </div>
           <button
             type="button"
-            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
             onClick={() => navigate(isAuthenticated ? ROUTES.PORTAL.LANDING : '/')}
+            className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-3 py-1.5 text-xs font-semibold shrink-0"
           >
             Back to portal
           </button>
-        )}
-        wave={false}
-      />
+        </header>
 
-      <div className="mx-auto mt-6 w-full max-w-4xl px-4">
-        <form
-          onSubmit={onSubmit}
-          className="mb-4 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:gap-3 dark:border-slate-700 dark:bg-slate-900/80"
-        >
-          <input
-            type="text"
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            placeholder="Search documentation"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-inner outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-          >
-            Search
-          </button>
-        </form>
+        <section className="coding-surface rounded-2xl shadow-sm">
+          <form onSubmit={onSubmit} className="p-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <SearchInput
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+              placeholder="Search documentation"
+            />
+            <button
+              type="submit"
+              className="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+            >
+              Search
+            </button>
+          </form>
+        </section>
 
         {qParam ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className="mb-2 text-sm text-slate-600 dark:text-slate-300">
-              Showing results for: <strong>{qParam}</strong>
+          <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+            <header className="px-5 py-3 border-b coding-border">
+              <p className="text-xs coding-text-soft">
+                Showing results for <span className="coding-text-strong font-medium">{qParam}</span>
+              </p>
+            </header>
+            <div className="p-5 space-y-3">
+              {isLoading && (
+                <p className="text-sm coding-text-soft">Searching documentation...</p>
+              )}
+              {!isLoading && searchError && (
+                <AlertShell tone="danger" title="Search failed" description={searchError} />
+              )}
+              {!isLoading && !searchError && articles.length > 0 && (
+                <div className="space-y-3">
+                  {articles.map((article) => (
+                    <article
+                      key={article.id}
+                      className="coding-surface-subtle rounded-md px-4 py-3"
+                    >
+                      <h2 className="text-base font-semibold coding-text-strong">{article.title}</h2>
+                      {article.summary && (
+                        <p className="mt-1 text-sm coding-text-soft">{article.summary}</p>
+                      )}
+                      {Array.isArray(article.tags) && article.tags.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {article.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-medium coding-text-muted"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+              {!isLoading && !searchError && articles.length === 0 && (
+                <p className="text-sm coding-text-soft italic">
+                  No indexed docs match this search yet.
+                </p>
+              )}
             </div>
-            {isLoading && (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                Searching documentation...
-              </div>
-            )}
-            {!isLoading && searchError && (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
-                {searchError}
-              </div>
-            )}
-            {!isLoading && !searchError && articles.length > 0 && (
-              <div className="space-y-3">
-                {articles.map((article) => (
-                  <article
-                    key={article.id}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-                  >
-                    <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{article.title}</h2>
-                    {article.summary && <p className="mt-1">{article.summary}</p>}
-                    {Array.isArray(article.tags) && article.tags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {article.tags.map((tag) => (
-                          <span key={tag} className="rounded-full bg-white px-2 py-1 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </article>
-                ))}
-              </div>
-            )}
-            {!isLoading && !searchError && articles.length === 0 && (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                <em>No indexed docs match this search yet.</em>
-              </div>
-            )}
-          </div>
+          </section>
         ) : (
-          <div className="text-sm text-slate-600 dark:text-slate-300">
-            Try a query above to search future docs.
-          </div>
+          <p className="text-sm coding-text-soft">
+            Try a query above to search the docs library.
+          </p>
         )}
       </div>
     </div>

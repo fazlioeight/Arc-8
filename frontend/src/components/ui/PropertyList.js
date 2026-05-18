@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const joinClassNames = (...parts) => parts.filter(Boolean).join(' ');
 
@@ -19,20 +19,93 @@ const PencilIcon = ({ className = '' }) => (
 );
 
 /**
- * Single row in a HubSpot-style property panel. The pencil icon is a visual
- * affordance only — wire `onEdit` if the parent wants click-to-edit.
+ * Single row in a HubSpot-style property panel.
+ *
+ * Props:
+ *   label            — caption
+ *   value            — current display value (string or ReactNode)
+ *   editable         — show the pencil affordance
+ *   onEdit           — async (or sync) handler that receives the new string
+ *                      value and commits it. Returning a rejected promise
+ *                      reverts the row.
+ *   editValue        — optional override of the value used to seed the input
+ *                      (useful when `value` is a JSX node, not a raw string)
+ *   labelWidthClass  — tailwind class controlling the label column width
  */
 export function PropertyRow({
   label,
   value,
   onEdit,
   editable = false,
+  editValue,
   labelWidthClass = 'w-24',
 }) {
-  const isEmpty = value == null || value === '' || value === '—';
   const showEdit = editable || typeof onEdit === 'function';
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const isEmpty = value == null || value === '' || value === '—';
+  const canEdit = showEdit && typeof onEdit === 'function';
+
+  const startEdit = () => {
+    if (!canEdit) return;
+    const seed = editValue != null
+      ? editValue
+      : typeof value === 'string' || typeof value === 'number'
+        ? String(value)
+        : '';
+    setDraft(seed);
+    setError(null);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setError(null);
+    setBusy(false);
+  };
+
+  const commitEdit = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onEdit(draft);
+      setEditing(false);
+    } catch (err) {
+      setError(err?.message || 'Could not save');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void commitEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelEdit();
+    }
+  };
+
   return (
-    <div className="group flex items-start gap-3 px-4 py-2 transition hover:bg-[var(--coding-hover)]">
+    <div
+      className={joinClassNames(
+        'group flex items-start gap-3 px-4 py-2 transition',
+        !editing && 'hover:bg-[var(--coding-hover)]'
+      )}
+    >
       <dt
         className={joinClassNames(
           'text-[11px] font-medium coding-text-muted shrink-0 pt-0.5',
@@ -41,18 +114,66 @@ export function PropertyRow({
       >
         {label}
       </dt>
-      <dd className="flex-1 min-w-0 text-sm coding-text-strong break-words">
-        {isEmpty ? <span className="coding-text-soft italic">Empty</span> : value}
-      </dd>
-      {showEdit && (
-        <button
-          type="button"
-          onClick={onEdit}
-          aria-label={`Edit ${label}`}
-          className="opacity-0 group-hover:opacity-100 transition coding-text-muted hover:text-[var(--brand-primary)]"
-        >
-          <PencilIcon />
-        </button>
+      {editing ? (
+        <dd className="flex-1 min-w-0">
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKey}
+            disabled={busy}
+            className="coding-input w-full rounded-md px-2 py-1 text-sm"
+          />
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <p className="text-[11px] coding-text-muted">
+              {busy ? 'Saving…' : error ? <span className="text-rose-600 dark:text-rose-300">{error}</span> : 'Enter to save · Esc to cancel'}
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={busy}
+                className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-2 py-0.5 text-[11px] font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={commitEdit}
+                disabled={busy}
+                className="rounded-md bg-[var(--brand-primary)] text-white px-2 py-0.5 text-[11px] font-semibold hover:bg-brand-700 disabled:opacity-60"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </dd>
+      ) : (
+        <>
+          <dd
+            className={joinClassNames(
+              'flex-1 min-w-0 text-sm coding-text-strong break-words',
+              canEdit && 'cursor-text'
+            )}
+            onClick={canEdit ? startEdit : undefined}
+          >
+            {isEmpty ? <span className="coding-text-soft italic">Empty</span> : value}
+          </dd>
+          {showEdit && (
+            <button
+              type="button"
+              onClick={startEdit}
+              disabled={!canEdit}
+              aria-label={`Edit ${label}`}
+              className={joinClassNames(
+                'opacity-0 group-hover:opacity-100 transition coding-text-muted hover:text-[var(--brand-primary)]',
+                !canEdit && 'cursor-not-allowed'
+              )}
+            >
+              <PencilIcon />
+            </button>
+          )}
+        </>
       )}
     </div>
   );
