@@ -18,29 +18,106 @@ const PencilIcon = ({ className = '' }) => (
   </svg>
 );
 
+const seedFromValue = (value, editValue) => {
+  if (editValue != null) return editValue;
+  if (value == null || value === '—') return '';
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  return '';
+};
+
+const renderEditor = ({ type, draft, setDraft, options, placeholder, busy, inputRef, onKey }) => {
+  const base = 'coding-input w-full rounded-md px-2 py-1 text-sm';
+
+  if (type === 'select') {
+    return (
+      <select
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={onKey}
+        disabled={busy}
+        className={base}
+      >
+        {(options || []).map((opt) => {
+          const value = typeof opt === 'string' ? opt : opt.value;
+          const label = typeof opt === 'string' ? opt : opt.label;
+          return (
+            <option key={value} value={value}>{label}</option>
+          );
+        })}
+      </select>
+    );
+  }
+
+  if (type === 'textarea') {
+    return (
+      <textarea
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={onKey}
+        disabled={busy}
+        placeholder={placeholder}
+        rows={3}
+        className={base}
+      />
+    );
+  }
+
+  const inputType = (
+    type === 'email' ? 'email' :
+    type === 'tel' ? 'tel' :
+    type === 'number' ? 'number' :
+    type === 'date' ? 'date' :
+    'text'
+  );
+
+  return (
+    <input
+      ref={inputRef}
+      type={inputType}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={onKey}
+      disabled={busy}
+      placeholder={placeholder}
+      className={base}
+    />
+  );
+};
+
 /**
  * Single row in a HubSpot-style property panel.
  *
  * Props:
  *   label            — caption
  *   value            — current display value (string or ReactNode)
- *   editable         — show the pencil affordance
- *   onEdit           — async (or sync) handler that receives the new string
- *                      value and commits it. Returning a rejected promise
- *                      reverts the row.
- *   editValue        — optional override of the value used to seed the input
- *                      (useful when `value` is a JSX node, not a raw string)
- *   labelWidthClass  — tailwind class controlling the label column width
+ *   editable         — show the pencil affordance even without onEdit
+ *   onEdit           — async handler receiving the new value. Reject (throw)
+ *                      to surface an error and keep the editor open
+ *   type             — 'text' (default) | 'email' | 'tel' | 'number' |
+ *                      'date' | 'select' | 'textarea'
+ *   options          — array of strings or { value, label } for select
+ *   placeholder      — placeholder text for the input
+ *   editValue        — seed the input when value is a JSX node (otherwise we
+ *                      use the stringified value)
+ *   validate         — optional (draft) => string | null; non-null = error
+ *   labelWidthClass  — tailwind class for the label column width
  */
 export function PropertyRow({
   label,
   value,
   onEdit,
   editable = false,
+  type = 'text',
+  options,
+  placeholder,
   editValue,
+  validate,
   labelWidthClass = 'w-24',
 }) {
-  const showEdit = editable || typeof onEdit === 'function';
+  const canEdit = typeof onEdit === 'function';
+  const showEdit = editable || canEdit;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -50,21 +127,15 @@ export function PropertyRow({
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus();
-      inputRef.current.select();
+      if (typeof inputRef.current.select === 'function') inputRef.current.select();
     }
   }, [editing]);
 
   const isEmpty = value == null || value === '' || value === '—';
-  const canEdit = showEdit && typeof onEdit === 'function';
 
   const startEdit = () => {
     if (!canEdit) return;
-    const seed = editValue != null
-      ? editValue
-      : typeof value === 'string' || typeof value === 'number'
-        ? String(value)
-        : '';
-    setDraft(seed);
+    setDraft(seedFromValue(value, editValue));
     setError(null);
     setEditing(true);
   };
@@ -77,10 +148,21 @@ export function PropertyRow({
 
   const commitEdit = async () => {
     if (busy) return;
+    if (typeof validate === 'function') {
+      const validationError = validate(draft);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+    }
     setBusy(true);
     setError(null);
     try {
-      await onEdit(draft);
+      // For number inputs, pass through as Number (or undefined for blank)
+      const normalized = type === 'number'
+        ? (draft === '' ? null : Number(draft))
+        : draft;
+      await onEdit(normalized);
       setEditing(false);
     } catch (err) {
       setError(err?.message || 'Could not save');
@@ -90,12 +172,15 @@ export function PropertyRow({
   };
 
   const handleKey = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && type !== 'textarea') {
       e.preventDefault();
       void commitEdit();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       cancelEdit();
+    } else if (e.key === 'Enter' && type === 'textarea' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      void commitEdit();
     }
   };
 
@@ -116,17 +201,16 @@ export function PropertyRow({
       </dt>
       {editing ? (
         <dd className="flex-1 min-w-0">
-          <input
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKey}
-            disabled={busy}
-            className="coding-input w-full rounded-md px-2 py-1 text-sm"
-          />
+          {renderEditor({ type, draft, setDraft, options, placeholder, busy, inputRef, onKey: handleKey })}
           <div className="mt-1.5 flex items-center justify-between gap-2">
             <p className="text-[11px] coding-text-muted">
-              {busy ? 'Saving…' : error ? <span className="text-rose-600 dark:text-rose-300">{error}</span> : 'Enter to save · Esc to cancel'}
+              {busy ? 'Saving…' : error ? (
+                <span className="text-rose-600 dark:text-rose-300">{error}</span>
+              ) : type === 'textarea' ? (
+                'Ctrl+Enter to save · Esc to cancel'
+              ) : (
+                'Enter to save · Esc to cancel'
+              )}
             </p>
             <div className="flex items-center gap-1.5">
               <button

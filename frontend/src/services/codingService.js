@@ -88,6 +88,24 @@ export const fetchCodingProviderDetail = async (token, tenant, providerId) => {
   return handleResponse(res);
 };
 
+export const updateCodingProvider = async (token, tenant, providerId, payload) => {
+  const res = await fetch(`${API_BASE}/api/coding/providers/${providerId}`, {
+    method: 'PATCH',
+    headers: buildHeaders(token, tenant),
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+};
+
+export const updateCodingChase = async (token, tenant, chaseId, payload) => {
+  const res = await fetch(`${API_BASE}/api/coding/chases/${chaseId}`, {
+    method: 'PATCH',
+    headers: buildHeaders(token, tenant),
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+};
+
 export class MemberSearchService {
   constructor({ token, tenant, fetchMembers = fetchCodingMembers, fetchMemberDetail = fetchCodingMemberDetail } = {}) {
     this.token = token;

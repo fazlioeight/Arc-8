@@ -42,6 +42,24 @@ class MemberDetail(MemberSummary):
     engagement_risk_score: Optional[float] = None
 
 
+class MemberUpdate(BaseModel):
+    """Editable subset of MemberDetail. All fields optional — partial PATCH."""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    gender: Optional[str] = None
+    plan_name: Optional[str] = None
+    line_of_business: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_city: Optional[str] = None
+    address_state: Optional[str] = None
+    address_zip: Optional[str] = None
+    preferred_language: Optional[str] = None
+    preferred_channel: Optional[str] = None
+    primary_care_provider: Optional[str] = None
+
+
 class RiskInsight(BaseModel):
     id: int
     domain: str

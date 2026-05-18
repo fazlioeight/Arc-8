@@ -486,6 +486,27 @@ async def create_task(session: AsyncSession, payload: dict) -> dict:
     return _task_to_dict(task, member)
 
 
+async def update_member(session: AsyncSession, member_id: int, payload: dict) -> Optional[dict]:
+    """Patch editable member fields. Returns the refreshed member detail
+    payload, or None if the member doesn't exist."""
+    member = await session.scalar(
+        select(Member360Member).where(Member360Member.id == member_id)
+    )
+    if not member:
+        return None
+    editable_fields = (
+        "first_name", "last_name", "gender", "plan_name", "line_of_business",
+        "phone", "email", "address_line1", "address_city", "address_state",
+        "address_zip", "preferred_language", "preferred_channel",
+        "primary_care_provider",
+    )
+    for field_name in editable_fields:
+        if field_name in payload and payload[field_name] is not None:
+            setattr(member, field_name, payload[field_name])
+    await session.flush()
+    return await get_member_detail(session, member_id)
+
+
 async def update_task(session: AsyncSession, task_id: int, payload: dict) -> Optional[dict]:
     task = await session.scalar(
         select(Member360Task).where(Member360Task.id == task_id)

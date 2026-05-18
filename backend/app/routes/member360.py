@@ -27,6 +27,7 @@ from ..schemas.member360 import (
     GapAnalysisResponse,
     MemberDetailResponse,
     MemberListResponse,
+    MemberUpdate,
     Message,
     MessageCreate,
     Note,
@@ -122,6 +123,34 @@ async def get_member(
         actor=current_user.email,
         event_type="member360.member.detail",
         payload={"member_id": member_id},
+    )
+    await session.commit()
+    await control_session.commit()
+    return detail
+
+
+@router.patch("/members/{member_id}", response_model=MemberDetailResponse)
+async def update_member(
+    member_id: int,
+    payload: MemberUpdate,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    data = payload.model_dump(exclude_none=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes provided")
+    detail = await member360_service.update_member(session, member_id, data)
+    if not detail:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.member.update",
+        payload={"member_id": member_id, "fields": list(data.keys())},
     )
     await session.commit()
     await control_session.commit()

@@ -200,7 +200,7 @@ export function RecordHeader({ member, gapCount, onAction, actions = [], onBack,
   );
 }
 
-export function MemberSummaryCard({ member, pcpHref, pcpState }) {
+export function MemberSummaryCard({ member, pcpHref, pcpState, onSaveField }) {
   if (!member) return null;
   const pcpValue = member.primary_care_provider;
   const pcpNode = pcpHref && pcpValue ? (
@@ -210,16 +210,13 @@ export function MemberSummaryCard({ member, pcpHref, pcpState }) {
   ) : pcpValue;
   const cityValue = member.address_city ? `${member.address_city}, ${member.address_state || ''}` : null;
 
-  const properties = [
-    { label: 'Plan', value: member.plan_name },
-    { label: 'Line of business', value: member.line_of_business },
-    { label: 'Phone', value: member.phone },
-    { label: 'Email', value: member.email },
-    { label: 'PCP', value: pcpNode },
-    { label: 'Channel', value: member.preferred_channel },
-    { label: 'Language', value: member.preferred_language },
-    { label: 'City', value: cityValue },
-  ];
+  // When onSaveField is supplied, build per-row save handlers. Without it,
+  // rows render as visual-only (editable pencil affordance but no commit).
+  const save = (field) => onSaveField
+    ? (value) => onSaveField(field, value === '' ? null : value)
+    : undefined;
+
+  const channelOptions = ['', 'SMS', 'Chat', 'Secure Message', 'Email', 'Phone', 'Internal'];
 
   return (
     <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
@@ -227,9 +224,41 @@ export function MemberSummaryCard({ member, pcpHref, pcpState }) {
         <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">About this member</h3>
       </header>
       <dl>
-        {properties.map((p) => (
-          <SharedPropertyRow key={p.label} label={p.label} value={p.value} editable />
-        ))}
+        <SharedPropertyRow label="Plan" value={member.plan_name} onEdit={save('plan_name')} editable />
+        <SharedPropertyRow label="Line of business" value={member.line_of_business} onEdit={save('line_of_business')} editable />
+        <SharedPropertyRow label="Phone" value={member.phone} type="tel" onEdit={save('phone')} editable />
+        <SharedPropertyRow
+          label="Email"
+          value={member.email}
+          type="email"
+          validate={(v) => v && !/.+@.+\..+/.test(v) ? 'Enter a valid email' : null}
+          onEdit={save('email')}
+          editable
+        />
+        <SharedPropertyRow
+          label="PCP"
+          value={pcpNode}
+          editValue={pcpValue || ''}
+          onEdit={save('primary_care_provider')}
+          editable
+        />
+        <SharedPropertyRow
+          label="Channel"
+          value={member.preferred_channel}
+          editValue={member.preferred_channel || ''}
+          type="select"
+          options={channelOptions}
+          onEdit={save('preferred_channel')}
+          editable
+        />
+        <SharedPropertyRow label="Language" value={member.preferred_language} onEdit={save('preferred_language')} editable />
+        <SharedPropertyRow
+          label="City"
+          value={cityValue}
+          editValue={member.address_city || ''}
+          onEdit={save('address_city')}
+          editable
+        />
       </dl>
 
       <PropertySection title="Quick stats">

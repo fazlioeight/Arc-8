@@ -13,6 +13,7 @@ import {
   fetchMember360GapAnalysis,
   fetchMember360MemberDetail,
   generateMember360SubmissionExport,
+  updateMember360Member,
   updateMember360Task,
 } from '../../../services/member360LabService';
 import {
@@ -92,6 +93,14 @@ const Member360LabWorkspace = () => {
       .then((res) => { setDetail(res); setError(null); })
       .catch((err) => setError(err.message || String(err)))
       .finally(() => setLoading(false));
+  }, [token, tenant, memberId]);
+
+  const saveMemberField = useCallback(async (field, value) => {
+    if (!memberId) return;
+    const updated = await updateMember360Member(token, tenant, Number(memberId), { [field]: value });
+    // Merge the canonical detail payload (member + nested arrays) back into
+    // local state so badges/quick-stats reflect the saved value immediately.
+    setDetail((prev) => prev ? { ...prev, ...(updated || {}) } : updated);
   }, [token, tenant, memberId]);
 
   useEffect(() => { reload(); }, [reload]);
@@ -431,7 +440,12 @@ const Member360LabWorkspace = () => {
       <div className="grid grid-cols-12 gap-4">
         {/* Left rail — properties */}
         <div className="col-span-12 xl:col-span-3 space-y-4">
-          <MemberSummaryCard member={member} pcpHref={pcpHref} pcpState={pcpState} />
+          <MemberSummaryCard
+            member={member}
+            pcpHref={pcpHref}
+            pcpState={pcpState}
+            onSaveField={saveMemberField}
+          />
 
           <SectionCard
             title="Coding actions"

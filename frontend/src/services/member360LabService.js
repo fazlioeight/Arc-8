@@ -71,6 +71,9 @@ export const createMember360Task = (token, tenant, payload) =>
 export const updateMember360Task = (token, tenant, taskId, payload) =>
   patch(token, tenant, `/api/member360/tasks/${taskId}`, payload);
 
+export const updateMember360Member = (token, tenant, memberId, payload) =>
+  patch(token, tenant, `/api/member360/members/${memberId}`, payload);
+
 export const createMember360Note = (token, tenant, memberId, payload) =>
   post(token, tenant, `/api/member360/members/${memberId}/notes`, payload);
 

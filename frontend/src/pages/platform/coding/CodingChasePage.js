@@ -7,7 +7,7 @@ import { PropertyRow, PropertySection } from '../../../components/ui/PropertyLis
 import AlertShell from '../../../components/ui/AlertShell';
 import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { AuthContext } from '../../../context/AuthContext';
-import { fetchCodingWorklist } from '../../../services/codingService';
+import { fetchCodingWorklist, updateCodingChase } from '../../../services/codingService';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import '../../../styles/memberWorkspace.css';
@@ -128,6 +128,15 @@ export default function CodingChasePage() {
     chase.service_date_from ? `DOS ${chase.service_date_from}` : null,
   ].filter(Boolean);
 
+  const saveChaseField = (field) => async (value) => {
+    if (!chase?.chase_id) return;
+    const payload = { [field]: value === '' ? null : value };
+    const updated = await updateCodingChase(token, tenant, chase.chase_id, payload);
+    // Backend returns the canonical chase shape; merge into local state so the
+    // header badges and other rows reflect the saved value immediately.
+    setChase((prev) => ({ ...(prev || {}), ...(updated || {}) }));
+  };
+
   const overdue = isOverdue(chase.due_date);
   const badges = (
     <>
@@ -202,13 +211,60 @@ export default function CodingChasePage() {
             </header>
             <dl>
               <PropertyRow label="Chase #" value={`#${chase.chase_id}`} />
-              <PropertyRow label="Status" value={<span className="capitalize">{formatStatus(chase.status)}</span>} editable />
-              <PropertyRow label="Priority" value={<span className="capitalize">{chase.priority}</span>} editable />
-              <PropertyRow label="HCC" value={chase.hcc_code} />
-              <PropertyRow label="DOS from" value={chase.service_date_from} />
-              <PropertyRow label="DOS to" value={chase.service_date_to} />
-              <PropertyRow label="Due date" value={chase.due_date} editable />
-              <PropertyRow label="Assignee" value={chase.assigned_coder_email} editable />
+              <PropertyRow
+                label="Status"
+                value={<span className="capitalize">{formatStatus(chase.status)}</span>}
+                editValue={chase.status || 'open'}
+                type="select"
+                options={[
+                  { value: 'open', label: 'Open' },
+                  { value: 'in_progress', label: 'In progress' },
+                  { value: 'pending_review', label: 'Pending review' },
+                  { value: 'audit_feedback', label: 'Audit feedback' },
+                  { value: 'query_pending', label: 'Query pending' },
+                  { value: 'completed', label: 'Completed' },
+                ]}
+                onEdit={saveChaseField('status')}
+              />
+              <PropertyRow
+                label="Priority"
+                value={<span className="capitalize">{chase.priority}</span>}
+                editValue={chase.priority || 'medium'}
+                type="select"
+                options={[
+                  { value: 'urgent', label: 'Urgent' },
+                  { value: 'high', label: 'High' },
+                  { value: 'medium', label: 'Medium' },
+                  { value: 'low', label: 'Low' },
+                ]}
+                onEdit={saveChaseField('priority')}
+              />
+              <PropertyRow label="HCC" value={chase.hcc_code} onEdit={saveChaseField('hcc_code')} />
+              <PropertyRow
+                label="DOS from"
+                value={chase.service_date_from}
+                type="date"
+                onEdit={saveChaseField('service_date_from')}
+              />
+              <PropertyRow
+                label="DOS to"
+                value={chase.service_date_to}
+                type="date"
+                onEdit={saveChaseField('service_date_to')}
+              />
+              <PropertyRow
+                label="Due date"
+                value={chase.due_date}
+                type="date"
+                onEdit={saveChaseField('due_date')}
+              />
+              <PropertyRow
+                label="Assignee"
+                value={chase.assigned_coder_email}
+                type="email"
+                validate={(v) => v && !/.+@.+\..+/.test(v) ? 'Enter a valid email' : null}
+                onEdit={saveChaseField('assigned_coder_email')}
+              />
               <PropertyRow label="Updated" value={chase.updated_at ? new Date(chase.updated_at).toLocaleString() : null} />
             </dl>
 

@@ -6,7 +6,7 @@ import PropertyList, { PropertyRow, PropertySection } from '../../../components/
 import AlertShell from '../../../components/ui/AlertShell';
 import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { AuthContext } from '../../../context/AuthContext';
-import { fetchCodingProviderDetail, fetchCodingProviders } from '../../../services/codingService';
+import { fetchCodingProviderDetail, fetchCodingProviders, updateCodingProvider } from '../../../services/codingService';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import '../../../styles/memberWorkspace.css';
@@ -82,6 +82,16 @@ const ProviderDetailPage = () => {
     void loadProvider();
     // eslint-disable-next-line
   }, [isAuthenticated, canQuery]);
+
+  const saveProviderField = (field) => async (value) => {
+    if (!provider?.id) return;
+    // Provider PATCH endpoint expects top-level contact fields. Location is
+    // stored on the provider record as flat columns (address_line1/city/etc.),
+    // so we route those through the same call.
+    const payload = { [field]: value === '' ? null : value };
+    const updated = await updateCodingProvider(token, tenant, provider.id, payload);
+    setProvider((prev) => ({ ...(prev || {}), ...(updated || {}) }));
+  };
 
   const locationText = useMemo(() => {
     if (!provider?.location) return null;
@@ -210,20 +220,31 @@ const ProviderDetailPage = () => {
               <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">About this provider</h3>
             </header>
             <dl>
-              <PropertyRow label="Name" value={provider.name} editable />
+              <PropertyRow label="Name" value={provider.name} onEdit={saveProviderField('name')} />
               <PropertyRow label="NPI" value={provider.npi} editable />
-              <PropertyRow label="Tax ID" value={provider.tax_id} editable />
-              <PropertyRow label="Phone" value={provider.phone} editable />
-              <PropertyRow label="Email" value={provider.email} editable />
+              <PropertyRow label="Tax ID" value={provider.tax_id} onEdit={saveProviderField('tax_id')} />
+              <PropertyRow label="Phone" value={provider.phone} type="tel" onEdit={saveProviderField('phone')} />
+              <PropertyRow
+                label="Email"
+                value={provider.email}
+                type="email"
+                validate={(v) => v && !/.+@.+\..+/.test(v) ? 'Enter a valid email' : null}
+                onEdit={saveProviderField('email')}
+              />
               <PropertyRow label="Queue" value={provider.queue_name} editable />
             </dl>
 
             <PropertySection title="Location">
               <dl>
-                <PropertyRow label="Address" value={provider.location?.address_line1} editable />
-                <PropertyRow label="City" value={provider.location?.city} editable />
-                <PropertyRow label="State" value={provider.location?.state} editable />
-                <PropertyRow label="Postal" value={provider.location?.postal_code} editable />
+                <PropertyRow label="Address" value={provider.location?.address_line1} onEdit={saveProviderField('address_line1')} />
+                <PropertyRow label="City" value={provider.location?.city} onEdit={saveProviderField('city')} />
+                <PropertyRow
+                  label="State"
+                  value={provider.location?.state}
+                  validate={(v) => v && v.length !== 2 ? 'Use 2-letter state code' : null}
+                  onEdit={saveProviderField('state')}
+                />
+                <PropertyRow label="Postal" value={provider.location?.postal_code} onEdit={saveProviderField('postal_code')} />
               </dl>
             </PropertySection>
           </section>
