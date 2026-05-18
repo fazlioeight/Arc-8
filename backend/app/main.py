@@ -31,6 +31,7 @@ from .routes import terminology as terminology_router
 from .routes import member_cost as member_cost_router
 from .routes import member_risk as member_risk_router
 from .routes import member360 as member360_router
+from .routes import member360_admin as member360_admin_router
 from .routes import portal as portal_router
 from .routes import ride_booking as ride_booking_router
 from .routes import settings as settings_router
@@ -434,6 +435,7 @@ app.include_router(member_cost_router.router)
 app.include_router(utilization_router.router)
 app.include_router(member_risk_router.router)
 app.include_router(member360_router.router)
+app.include_router(member360_admin_router.router)
 app.include_router(imports_router.router)
 app.include_router(ride_booking_router.router)
 app.include_router(docs_router.router)

@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useCommandPalette } from '../context/CommandPaletteContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
-import { SAMPLE_TENANT_COMMENTS } from '../utils/sampleData';
 import { ROUTES } from '../constants/routes';
 import Icon from './ui/Icon';
 
@@ -299,9 +298,6 @@ const PortalUtilityBar = () => {
                         <div className="mt-0.5 text-xs coding-text-muted">
                           {opt.region || 'Unknown region'} &middot; {opt.timezone || 'Timezone TBD'}
                         </div>
-                        {SAMPLE_TENANT_COMMENTS[opt.key] && (
-                          <div className="mt-0.5 text-xs text-sky-600 dark:text-sky-400">{SAMPLE_TENANT_COMMENTS[opt.key]}</div>
-                        )}
                       </button>
                     ))}
                   </div>

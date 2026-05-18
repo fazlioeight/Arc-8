@@ -132,8 +132,7 @@ const MasterAdminPage = () => {
         setPurchaseSelections(new Set(sortedApps.filter((app) => app.core || app.purchased).map((app) => app.key)));
         setPurchaseDirty(false);
         setUsers(sortedUsers);
-        const sampleActive = Boolean(appsResponse.isSample || usersResponse.__sample);
-        setSampleMode(sampleActive);
+        setSampleMode(false);
         if (sortedUsers.length) {
           const first = sortedUsers[0];
           setSelectedUserId(first.id);

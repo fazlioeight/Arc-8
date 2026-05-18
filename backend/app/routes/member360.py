@@ -45,7 +45,7 @@ router = APIRouter(prefix="/api/member360", tags=["member360"])
 
 
 async def _ensure(session: AsyncSession) -> None:
-    await member360_service.ensure_seeded(session)
+    await member360_service.ensure_ready(session)
 
 
 @router.get("/dashboard", response_model=DashboardResponse)

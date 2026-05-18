@@ -1,19 +1,18 @@
 """Service layer for Nexora Lab Member360.
 
 Responsibilities:
-- Lazy seeding of demo data on first request (per tenant DB).
+- Idempotent tenant schema setup (tables + PostgreSQL helper functions).
 - Query helpers used by route handlers.
 - Computation of dashboard rollups and risk insight summaries.
 
-The seed makes the demo workable on a freshly-migrated dev DB without
-requiring a separate seed script. It is idempotent: if any member already
-exists for the tenant, no seeding happens.
+No demo or synthetic data is created automatically. All pages read from
+whatever the tenant database contains; seeding is the operator's job via
+``scripts/seed_prominence.py`` or a real data import.
 """
 from __future__ import annotations
 
-import asyncio
 from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date
 from typing import Iterable, Optional
 
 from sqlalchemy import func, or_, select
@@ -21,13 +20,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..models.member360 import (
-    Member360Accumulator,
     Member360CareJourney,
-    Member360CareJourneyStage,
     Member360CareJourneyTemplate,
-    Member360CareOption,
-    Member360Claim,
-    Member360Document,
     Member360Member,
     Member360Message,
     Member360Note,
@@ -37,9 +31,6 @@ from ..models.member360 import (
 )
 
 
-_seed_lock = asyncio.Lock()
-
-
 def _compute_age(dob: Optional[date]) -> Optional[int]:
     if not dob:
         return None
@@ -47,560 +38,82 @@ def _compute_age(dob: Optional[date]) -> Optional[int]:
     return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
-async def ensure_seeded(session: AsyncSession) -> None:
-    """Seed demo data on first use. Idempotent."""
-    existing = await session.scalar(select(func.count(Member360Member.id)))
-    if existing:
+async def ensure_ready(session: AsyncSession) -> None:
+    """Ensure tenant tables and PostgreSQL helper functions exist.
+
+    Replaces the previous demo-data seeding behaviour: this function only
+    sets up *schema*, never data. Safe to call on every request — both
+    operations are idempotent.
+    """
+    await _ensure_tenant_schema(session)
+
+
+async def _ensure_tenant_schema(session: AsyncSession) -> None:
+    """Idempotently create any missing tenant tables (Member360 admin tables)
+    and the PostgreSQL helper functions used for rollups + worklists.
+    """
+    from ..models.tables import TenantDataBase
+
+    try:
+        async_conn = await session.connection()
+        await async_conn.run_sync(TenantDataBase.metadata.create_all)
+    except Exception:  # noqa: BLE001
+        # Schema creation should never block reads; the table likely exists.
+        pass
+    await _ensure_tenant_functions(session)
+
+
+_TENANT_FUNCTIONS_PATH = (
+    __file__.rsplit("services", 1)[0] + "db/tenant_functions.sql"
+)
+
+
+async def _ensure_tenant_functions(session: AsyncSession) -> None:
+    """Apply tenant-side stored functions. PostgreSQL only — silently skips
+    on SQLite (used in tests) and any other dialect."""
+    bind = session.get_bind()
+    dialect = getattr(bind, "dialect", None)
+    name = getattr(dialect, "name", "") if dialect else ""
+    if not name.startswith("postgres"):
         return
-    async with _seed_lock:
-        existing = await session.scalar(select(func.count(Member360Member.id)))
-        if existing:
+    try:
+        from pathlib import Path
+        from sqlalchemy import text
+
+        path = Path(_TENANT_FUNCTIONS_PATH)
+        if not path.exists():
             return
-        await _seed_demo_data(session)
-        await session.commit()
+        sql = path.read_text(encoding="utf-8")
+        async_conn = await session.connection()
+        for stmt in _split_sql(sql):
+            await async_conn.execute(text(stmt))
+    except Exception:  # noqa: BLE001
+        # Function creation failures are non-fatal — the python query
+        # fallbacks still work.
+        pass
 
 
-async def _seed_demo_data(session: AsyncSession) -> None:
-    """Populate tenant DB with demo members, journeys, tasks, care options, savings, etc."""
-    today = date.today()
-    now = datetime.utcnow()
+def _split_sql(sql: str) -> list[str]:
+    """Naive split on ``$$`` dollar-quoted function bodies + trailing ``;``."""
+    pieces: list[str] = []
+    buf: list[str] = []
+    in_dollar = False
+    for line in sql.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("--"):
+            continue
+        buf.append(line)
+        if "$$" in line:
+            # Count occurrences on this line — an odd count toggles state.
+            if line.count("$$") % 2 == 1:
+                in_dollar = not in_dollar
+        if not in_dollar and stripped.endswith(";"):
+            stmt = "\n".join(buf).strip()
+            if stmt and stmt != ";":
+                pieces.append(stmt.rstrip(";"))
+            buf = []
+    return pieces
 
-    # ---- Templates ----------------------------------------------------
-    templates = [
-        Member360CareJourneyTemplate(
-            name="High-Risk Member Outreach",
-            description="Structured engagement for members with composite risk in the high or critical tier.",
-            category="Risk Management",
-            recommended_for_risk_tier="High",
-            default_stages=[
-                {"name": "Identify drivers", "description": "Review claims and gaps."},
-                {"name": "Initial outreach", "description": "Call within 48 hours."},
-                {"name": "Care plan", "description": "Develop personalized plan."},
-                {"name": "Follow-up", "description": "Weekly check-ins."},
-            ],
-            default_tasks=[
-                {"title": "Call member", "priority": "high"},
-                {"title": "Schedule comprehensive assessment", "priority": "medium"},
-            ],
-        ),
-        Member360CareJourneyTemplate(
-            name="Post-Discharge Follow-Up",
-            description="48-72 hour outreach after inpatient discharge.",
-            category="Transitions of Care",
-            recommended_for_risk_tier="Moderate",
-            default_stages=[
-                {"name": "Discharge review", "description": "Read discharge summary."},
-                {"name": "Outreach call", "description": "Within 48 hours."},
-                {"name": "Med reconciliation", "description": "Review medications."},
-            ],
-            default_tasks=[
-                {"title": "Call member after discharge", "priority": "urgent"},
-                {"title": "Reconcile medications", "priority": "high"},
-            ],
-        ),
-        Member360CareJourneyTemplate(
-            name="Imaging Steerage",
-            description="Guide member to lower-cost, high-quality imaging facility.",
-            category="Care Options",
-            recommended_for_risk_tier="Moderate",
-            default_stages=[
-                {"name": "Confirm order", "description": "Verify imaging order."},
-                {"name": "Present options", "description": "Provide steered options."},
-                {"name": "Schedule", "description": "Help member schedule."},
-            ],
-            default_tasks=[
-                {"title": "Discuss imaging options with member", "priority": "high"},
-            ],
-        ),
-        Member360CareJourneyTemplate(
-            name="Chronic Condition Review",
-            description="Quarterly review of chronic condition management.",
-            category="Chronic Care",
-            recommended_for_risk_tier="High",
-            default_stages=[
-                {"name": "Review claims", "description": "Look at HCC trend."},
-                {"name": "Outreach", "description": "Connect with member."},
-                {"name": "PCP coordination", "description": "Sync with PCP."},
-            ],
-            default_tasks=[
-                {"title": "Review chronic condition trends", "priority": "medium"},
-            ],
-        ),
-        Member360CareJourneyTemplate(
-            name="Preventive Care Gap Closure",
-            description="Close preventive care gaps such as annual wellness or screenings.",
-            category="Preventive",
-            recommended_for_risk_tier="Low",
-            default_stages=[
-                {"name": "Identify gaps", "description": "Pull open HEDIS gaps."},
-                {"name": "Outreach", "description": "Member outreach."},
-                {"name": "Verify closure", "description": "Confirm services occurred."},
-            ],
-            default_tasks=[
-                {"title": "Outreach to schedule preventive visit", "priority": "medium"},
-            ],
-        ),
-    ]
-    session.add_all(templates)
-    await session.flush()
-
-    # ---- Members ------------------------------------------------------
-    seed_members = [
-        {
-            "member_key": "M360-0001",
-            "first_name": "Maria",
-            "last_name": "Hernandez",
-            "date_of_birth": date(1956, 3, 12),
-            "gender": "Female",
-            "plan_name": "ProminenceCare Gold",
-            "line_of_business": "Medicare Advantage",
-            "phone": "(702) 555-0142",
-            "email": "maria.hernandez@example.com",
-            "address_line1": "1245 Charleston Blvd",
-            "address_city": "Las Vegas",
-            "address_state": "NV",
-            "address_zip": "89102",
-            "preferred_language": "Spanish",
-            "preferred_channel": "Phone",
-            "primary_care_provider": "Dr. Aaron Whitley",
-            "risk_score_composite": 8.6,
-            "risk_tier": "Critical",
-            "clinical_risk_score": 9.1,
-            "utilization_risk_score": 8.2,
-            "cost_risk_score": 8.8,
-            "engagement_risk_score": 5.3,
-            "open_care_gaps": 4,
-            "next_best_action": "Schedule cardiology follow-up",
-        },
-        {
-            "member_key": "M360-0002",
-            "first_name": "James",
-            "last_name": "O'Connell",
-            "date_of_birth": date(1962, 8, 4),
-            "gender": "Male",
-            "plan_name": "ProminenceCare Silver",
-            "line_of_business": "Medicare Advantage",
-            "phone": "(702) 555-0188",
-            "email": "james.oconnell@example.com",
-            "address_city": "Reno",
-            "address_state": "NV",
-            "address_zip": "89509",
-            "preferred_language": "English",
-            "preferred_channel": "SMS",
-            "primary_care_provider": "Dr. Priya Shah",
-            "risk_score_composite": 7.4,
-            "risk_tier": "High",
-            "clinical_risk_score": 7.9,
-            "utilization_risk_score": 7.0,
-            "cost_risk_score": 6.5,
-            "engagement_risk_score": 4.0,
-            "open_care_gaps": 3,
-            "next_best_action": "Imaging steerage opportunity (MRI)",
-        },
-        {
-            "member_key": "M360-0003",
-            "first_name": "Linda",
-            "last_name": "Pham",
-            "date_of_birth": date(1971, 11, 22),
-            "gender": "Female",
-            "plan_name": "ProminenceCare PPO",
-            "line_of_business": "Commercial",
-            "phone": "(415) 555-0117",
-            "email": "linda.pham@example.com",
-            "address_city": "San Jose",
-            "address_state": "CA",
-            "address_zip": "95110",
-            "preferred_channel": "Secure Message",
-            "primary_care_provider": "Dr. Marcus Lee",
-            "risk_score_composite": 6.1,
-            "risk_tier": "High",
-            "clinical_risk_score": 6.7,
-            "utilization_risk_score": 5.5,
-            "cost_risk_score": 6.3,
-            "engagement_risk_score": 6.4,
-            "open_care_gaps": 2,
-            "next_best_action": "Confirm diabetes care plan",
-        },
-        {
-            "member_key": "M360-0004",
-            "first_name": "Robert",
-            "last_name": "Carter",
-            "date_of_birth": date(1980, 5, 30),
-            "gender": "Male",
-            "plan_name": "ProminenceCare HMO",
-            "line_of_business": "Commercial",
-            "phone": "(415) 555-0103",
-            "email": "robert.carter@example.com",
-            "address_city": "Oakland",
-            "address_state": "CA",
-            "address_zip": "94612",
-            "preferred_channel": "Chat",
-            "primary_care_provider": "Dr. Sandra Yi",
-            "risk_score_composite": 4.2,
-            "risk_tier": "Moderate",
-            "clinical_risk_score": 4.0,
-            "utilization_risk_score": 4.5,
-            "cost_risk_score": 4.1,
-            "engagement_risk_score": 5.2,
-            "open_care_gaps": 1,
-            "next_best_action": "Annual wellness visit",
-        },
-        {
-            "member_key": "M360-0005",
-            "first_name": "Emily",
-            "last_name": "Nakamura",
-            "date_of_birth": date(1993, 1, 18),
-            "gender": "Female",
-            "plan_name": "ProminenceCare PPO",
-            "line_of_business": "Commercial",
-            "phone": "(702) 555-0211",
-            "email": "emily.nakamura@example.com",
-            "address_city": "Henderson",
-            "address_state": "NV",
-            "address_zip": "89014",
-            "preferred_channel": "Chat",
-            "primary_care_provider": "Dr. Aaron Whitley",
-            "risk_score_composite": 2.1,
-            "risk_tier": "Low",
-            "clinical_risk_score": 2.0,
-            "utilization_risk_score": 2.4,
-            "cost_risk_score": 2.0,
-            "engagement_risk_score": 7.5,
-            "open_care_gaps": 0,
-            "next_best_action": "Send preventive care reminder",
-        },
-        {
-            "member_key": "M360-0006",
-            "first_name": "Daniel",
-            "last_name": "Adeyemi",
-            "date_of_birth": date(1949, 9, 8),
-            "gender": "Male",
-            "plan_name": "ProminenceCare Gold",
-            "line_of_business": "Medicare Advantage",
-            "phone": "(702) 555-0144",
-            "email": "daniel.adeyemi@example.com",
-            "address_city": "Sparks",
-            "address_state": "NV",
-            "address_zip": "89431",
-            "preferred_channel": "Phone",
-            "primary_care_provider": "Dr. Priya Shah",
-            "risk_score_composite": 8.9,
-            "risk_tier": "Critical",
-            "clinical_risk_score": 9.3,
-            "utilization_risk_score": 8.7,
-            "cost_risk_score": 9.0,
-            "engagement_risk_score": 3.2,
-            "open_care_gaps": 5,
-            "next_best_action": "Urgent: post-ED outreach",
-        },
-        {
-            "member_key": "M360-0007",
-            "first_name": "Sophia",
-            "last_name": "Rivera",
-            "date_of_birth": date(1968, 2, 14),
-            "gender": "Female",
-            "plan_name": "ProminenceCare Silver",
-            "line_of_business": "Medicare Advantage",
-            "phone": "(702) 555-0177",
-            "email": "sophia.rivera@example.com",
-            "address_city": "Las Vegas",
-            "address_state": "NV",
-            "address_zip": "89148",
-            "preferred_channel": "Phone",
-            "primary_care_provider": "Dr. Marcus Lee",
-            "risk_score_composite": 5.8,
-            "risk_tier": "Moderate",
-            "clinical_risk_score": 5.6,
-            "utilization_risk_score": 6.0,
-            "cost_risk_score": 5.5,
-            "engagement_risk_score": 6.1,
-            "open_care_gaps": 2,
-            "next_best_action": "Confirm imaging steerage",
-        },
-        {
-            "member_key": "M360-0008",
-            "first_name": "Michael",
-            "last_name": "Stewart",
-            "date_of_birth": date(1955, 7, 25),
-            "gender": "Male",
-            "plan_name": "ProminenceCare Gold",
-            "line_of_business": "Medicare Advantage",
-            "phone": "(702) 555-0199",
-            "email": "michael.stewart@example.com",
-            "address_city": "Reno",
-            "address_state": "NV",
-            "address_zip": "89502",
-            "preferred_channel": "SMS",
-            "primary_care_provider": "Dr. Sandra Yi",
-            "risk_score_composite": 7.0,
-            "risk_tier": "High",
-            "clinical_risk_score": 7.4,
-            "utilization_risk_score": 6.8,
-            "cost_risk_score": 6.9,
-            "engagement_risk_score": 5.6,
-            "open_care_gaps": 3,
-            "next_best_action": "Schedule comprehensive assessment",
-        },
-    ]
-    member_objs: list[Member360Member] = []
-    for spec in seed_members:
-        m = Member360Member(**spec, last_interaction_at=now - timedelta(days=2))
-        session.add(m)
-        member_objs.append(m)
-    await session.flush()
-
-    # ---- Risk Insights ----------------------------------------------
-    insight_specs = [
-        ("Clinical", "Uncontrolled HbA1c trend (>9)", "Schedule diabetes coaching", 0.92),
-        ("Utilization", "2 ED visits in last 90 days", "Care manager outreach within 48h", 0.88),
-        ("Cost", "Imaging cost variance vs network median", "Steerage to lower-cost facility", 0.81),
-        ("Engagement", "No outbound contact in 60 days", "Try preferred channel and language", 0.74),
-    ]
-    for member in member_objs:
-        for domain, driver, recommendation, confidence in insight_specs:
-            # Score derived from per-domain field on member
-            score = {
-                "Clinical": float(member.clinical_risk_score or 0),
-                "Utilization": float(member.utilization_risk_score or 0),
-                "Cost": float(member.cost_risk_score or 0),
-                "Engagement": float(member.engagement_risk_score or 0),
-            }[domain]
-            session.add(
-                Member360RiskInsight(
-                    member_id=member.id,
-                    domain=domain,
-                    score=score,
-                    driver=driver,
-                    recommendation=recommendation,
-                    confidence=confidence,
-                )
-            )
-
-    # ---- Care Journeys (assign one to first three high/critical members) -----
-    journey_assignments = [
-        (member_objs[0], templates[0], "active"),
-        (member_objs[1], templates[2], "active"),
-        (member_objs[5], templates[1], "active"),
-        (member_objs[7], templates[3], "active"),
-    ]
-    for member, template, status in journey_assignments:
-        journey = Member360CareJourney(
-            member_id=member.id,
-            template_id=template.id,
-            name=template.name,
-            description=template.description,
-            status=status,
-            template_name=template.name,
-            source="seed",
-            assigned_to="admin@admin.com",
-            created_by="seed",
-            start_date=today - timedelta(days=5),
-            target_completion_date=today + timedelta(days=21),
-        )
-        session.add(journey)
-        await session.flush()
-        for idx, stage_spec in enumerate(template.default_stages or []):
-            session.add(
-                Member360CareJourneyStage(
-                    journey_id=journey.id,
-                    sequence=idx,
-                    name=stage_spec.get("name", f"Stage {idx + 1}"),
-                    description=stage_spec.get("description"),
-                    status="complete" if idx == 0 else "in_progress" if idx == 1 else "pending",
-                    completed_at=now - timedelta(days=3) if idx == 0 else None,
-                )
-            )
-
-    await session.flush()
-
-    # ---- Tasks ------------------------------------------------------
-    task_seed = [
-        (member_objs[0], "Call member re: cardiology follow-up", "urgent", "open",
-         "Member identified as critical risk with uncontrolled CHF.",
-         "Two CHF-related ED visits in past 6 months; missed cardiology follow-up.",
-         "High likelihood of decompensation without near-term intervention.",
-         "Outbound call today, escalate to RN if no answer.",
-         "Auto-prioritized due to Critical risk tier"),
-        (member_objs[1], "Discuss MRI imaging steerage", "high", "open",
-         "Member calling about MRI options for shoulder.",
-         "PCP ordered MRI; member on PPO with $850 deductible remaining.",
-         "Steered facility saves est. $620 with equal quality score.",
-         "Send care option report and SMS link to scheduling.",
-         "Imaging steerage opportunity detected on inbound call"),
-        (member_objs[2], "Confirm diabetes care plan", "medium", "in_progress",
-         "Type 2 diabetes management review.",
-         "HbA1c trending up; last reading 8.4.",
-         "Medication adherence gap.",
-         "Coordinate with PCP and schedule diabetes coach.",
-         None),
-        (member_objs[5], "Urgent post-ED outreach", "urgent", "open",
-         "Member discharged from ED 24 hours ago.",
-         "ED visit for chest pain; admitted overnight.",
-         "Risk of readmission elevated.",
-         "Call within next 12 hours to verify med reconciliation.",
-         "Post-discharge automation triggered"),
-        (member_objs[7], "Schedule comprehensive assessment", "high", "open",
-         "New high-risk identification.",
-         "Multiple chronic conditions, missed last AWV.",
-         "Comprehensive assessment overdue.",
-         "Offer in-home assessment as primary option.",
-         "AI flagged: chronic care review template recommended"),
-    ]
-    for member, title, priority, status, situation, background, assessment, recommendation, reason in task_seed:
-        session.add(
-            Member360Task(
-                member_id=member.id,
-                title=title,
-                priority=priority,
-                status=status,
-                due_date=today + timedelta(days=2),
-                sbar_situation=situation,
-                sbar_background=background,
-                sbar_assessment=assessment,
-                sbar_recommendation=recommendation,
-                recommended_next_action=recommendation,
-                auto_generated_reason=reason,
-                assigned_user="admin@admin.com",
-                assigned_queue="Care Coordination",
-            )
-        )
-
-    # ---- Notes ------------------------------------------------------
-    for member in member_objs[:5]:
-        session.add(
-            Member360Note(
-                member_id=member.id,
-                author_email="admin@admin.com",
-                author_name="Care Coordinator",
-                channel="Phone",
-                note_type="Outreach",
-                body=f"Spoke with {member.first_name}. Reviewed care plan and confirmed next steps.",
-            )
-        )
-
-    # ---- Messages ---------------------------------------------------
-    for member in member_objs[:5]:
-        session.add(
-            Member360Message(
-                member_id=member.id,
-                channel=member.preferred_channel or "SMS",
-                direction="outbound",
-                sender="ProminenceCare",
-                recipient=member.phone or member.email or member.member_key,
-                body=f"Hi {member.first_name}, this is your care team. Let us know a good time to talk this week.",
-                status="delivered",
-            )
-        )
-        session.add(
-            Member360Message(
-                member_id=member.id,
-                channel=member.preferred_channel or "SMS",
-                direction="inbound",
-                sender=member.member_key,
-                recipient="ProminenceCare",
-                body="Thanks - tomorrow afternoon works.",
-                status="received",
-            )
-        )
-
-    # ---- Claims & Accumulators -------------------------------------
-    for idx, member in enumerate(member_objs):
-        session.add_all(
-            [
-                Member360Claim(
-                    member_id=member.id,
-                    claim_number=f"CLM-{member.member_key}-A",
-                    service_date=today - timedelta(days=30 + idx),
-                    provider="Mountain View Imaging" if idx % 2 == 0 else "Desert Cardiology",
-                    category="Imaging" if idx % 2 == 0 else "Cardiology",
-                    status="paid",
-                    billed_amount=1280.0 + idx * 110,
-                    paid_amount=720.0 + idx * 65,
-                    member_responsibility=180.0 + idx * 15,
-                ),
-                Member360Claim(
-                    member_id=member.id,
-                    claim_number=f"CLM-{member.member_key}-B",
-                    service_date=today - timedelta(days=14 + idx),
-                    provider="Primary Care Group",
-                    category="Office Visit",
-                    status="processed",
-                    billed_amount=240.0,
-                    paid_amount=180.0,
-                    member_responsibility=60.0,
-                ),
-            ]
-        )
-        session.add(
-            Member360Accumulator(
-                member_id=member.id,
-                deductible=2500.0,
-                deductible_met=420.0 + idx * 75,
-                out_of_pocket_max=7500.0,
-                out_of_pocket_met=1100.0 + idx * 130,
-                plan_year_start=date(today.year, 1, 1),
-            )
-        )
-
-    # ---- Care Options + Savings ------------------------------------
-    care_options = [
-        (member_objs[1], "MRI - Shoulder", "Pacific Imaging Center", "Pacific Imaging Center",
-         640.0, 4.7, 5.2, "In Network", 620.0,
-         "Same MRI protocol with equivalent radiology read at 49% lower cost.",
-         "We found a high-quality imaging center 5 miles away that costs $620 less than your original facility."),
-        (member_objs[6], "MRI - Knee", "ValleyOrtho Imaging", "ValleyOrtho Imaging",
-         580.0, 4.6, 3.1, "In Network", 480.0,
-         "Lower-cost imaging facility with comparable quality and shorter wait time.",
-         "ValleyOrtho can see you sooner and saves about $480 vs the originally ordered facility."),
-        (member_objs[2], "Endocrinologist Consult", "Bay Endocrine Associates", "Bay Endocrine Associates",
-         220.0, 4.8, 6.5, "In Network", 95.0,
-         "Highest-rated endocrinologist accepting new patients within 4 weeks.",
-         "We found an endocrinologist with great reviews who is available soon."),
-    ]
-    for spec in care_options:
-        member, service_type, provider, facility, cost, quality, distance, network, savings, rationale, member_facing = spec
-        opt = Member360CareOption(
-            member_id=member.id,
-            service_type=service_type,
-            recommended_provider=provider,
-            facility_name=facility,
-            cost_estimate=cost,
-            quality_score=quality,
-            distance_miles=distance,
-            network_status=network,
-            potential_savings=savings,
-            rationale=rationale,
-            member_facing_explanation=member_facing,
-            status="recommended",
-        )
-        session.add(opt)
-        await session.flush()
-        session.add(
-            Member360Savings(
-                member_id=member.id,
-                care_option_id=opt.id,
-                original_expected_cost=cost + savings,
-                steered_option_cost=cost,
-                estimated_savings=savings,
-                claim_received=False,
-                savings_validated=False,
-                validation_status="pending",
-            )
-        )
-
-    # ---- Documents ---------------------------------------------------
-    for member in member_objs[:4]:
-        session.add(
-            Member360Document(
-                member_id=member.id,
-                file_name=f"{member.member_key}_care_waiver.pdf",
-                document_type="Care Waiver",
-                uploaded_by="admin@admin.com",
-                status="active",
-            )
-        )
-
-    # Update aggregate counters that the UI uses (open_task_count comes from query).
 
 
 # ---------------------- Query helpers --------------------------------------

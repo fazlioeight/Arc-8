@@ -141,6 +141,66 @@ class FhirImportJob(ControlBase):
     tenant: Mapped[Tenant] = relationship()
 
 
+class DataImportJob(ControlBase):
+    """Unified import job tracking for file uploads, FHIR pulls, and other sources.
+
+    Backs the Job Status Center and Import Data pages. File uploads land here
+    with source_type='upload'; FHIR pulls remain in fhir_import_jobs but are
+    mirrored to this table so the Job Status Center can show a unified feed.
+    """
+
+    __tablename__ = "data_import_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(32), nullable=False, default="upload", index=True)
+    entity: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    file_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    mime_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="queued", nullable=False, index=True)
+    progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    records_processed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    records_failed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    initiated_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    job_metadata: Mapped[Dict[str, str]] = mapped_column("metadata", JSON, default=dict)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    tenant: Mapped[Tenant] = relationship()
+    logs: Mapped[list["DataImportJobLog"]] = relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+        order_by="DataImportJobLog.created_at",
+    )
+
+
+class DataImportJobLog(ControlBase):
+    __tablename__ = "data_import_job_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("data_import_jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    level: Mapped[str] = mapped_column(String(16), default="info", nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+    )
+
+    job: Mapped[DataImportJob] = relationship(back_populates="logs")
+
+
 class PortalSavedItem(ControlBase):
     __tablename__ = "portal_saved_items"
 

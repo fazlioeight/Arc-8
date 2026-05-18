@@ -4,7 +4,6 @@ import { AuthContext } from '../context/AuthContext';
 import { useCommandPalette } from '../context/CommandPaletteContext';
 import { useGuidedTour } from '../context/GuidedTourContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
-import { SAMPLE_CODING_MEMBERS, SAMPLE_ADMIN_APPLICATIONS } from '../utils/sampleData';
 import { ROUTES } from '../constants/routes';
 
 const CATEGORY_ORDER = ['Favorites', 'Records', 'Providers', 'Knowledge', 'Navigation', 'Workspace', 'Tenant', 'Data', 'Actions', 'Admin', 'Support'];
@@ -51,19 +50,6 @@ const CommandPalette = ({ onThemeToggle }) => {
     return location.pathname || 'Current page';
   }, [location.pathname]);
   const currentPagePinned = isFavorite(currentPath);
-  const sampleProviders = useMemo(() => {
-    const map = new Map();
-    SAMPLE_CODING_MEMBERS.forEach((member) => {
-      if (!member.pcp_name) return;
-      const key = (member.pcp_npi || member.pcp_name || '').toLowerCase();
-      if (!key || map.has(key)) return;
-      map.set(key, {
-        name: member.pcp_name,
-        npi: member.pcp_npi,
-      });
-    });
-    return Array.from(map.values());
-  }, []);
 
   const paletteThemeVars = useMemo(() => ({
     '--sfdc-surface': 'var(--bg-card)',
@@ -240,81 +226,11 @@ const CommandPalette = ({ onThemeToggle }) => {
   ]);
 
   useEffect(() => {
-    const term = query.trim().toLowerCase();
-    if (!isOpen || term.length < 2) {
-      setSearchCommands([]);
-      return;
-    }
-    const commands = [];
-    SAMPLE_CODING_MEMBERS.filter((member) => {
-      const haystack = [
-        member.first_name,
-        member.last_name,
-        member.member_key,
-        member.pcp_name,
-        member.pcp_npi,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(term);
-    }).slice(0, 5).forEach((member) => {
-      const memberName = [member.first_name, member.last_name]
-        .filter(Boolean)
-        .join(' ');
-      const displayName = memberName || member.member_key;
-      commands.push({
-        id: `search-member-${member.id}`,
-        label: `Member • ${displayName}`,
-        category: 'Records',
-        keywords: `${member.member_key} ${memberName} ${member.pcp_name || ''}`,
-        action: () => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${member.id}`, {
-          state: {
-            from: currentPath,
-            breadcrumb: displayName,
-          },
-        }),
-      });
-    });
-
-    sampleProviders.filter((provider) => {
-      const haystack = [provider.name, provider.npi].filter(Boolean).join(' ').toLowerCase();
-      return haystack.includes(term);
-    }).slice(0, 4).forEach((provider) => {
-      const identifier = provider.npi || provider.name;
-      commands.push({
-        id: `search-provider-${identifier}`,
-        label: `Care Team • ${provider.name}`,
-        category: 'Providers',
-        keywords: `${provider.name} ${provider.npi || ''}`,
-        action: () => navigate(`${ROUTES.PROVIDERS.LANDING}/${encodeURIComponent(identifier)}`, {
-          state: {
-            from: currentPath,
-            breadcrumb: provider.name,
-          },
-        }),
-      });
-    });
-
-    SAMPLE_ADMIN_APPLICATIONS.filter((resource) => {
-      const haystack = `${resource.label} ${resource.description || ''}`.toLowerCase();
-      return haystack.includes(term);
-    }).slice(0, 4).forEach((resource) => {
-      commands.push({
-        id: `search-doc-${resource.key}`,
-        label: `Resource • ${resource.label}`,
-        category: 'Knowledge',
-        keywords: `${resource.label} ${resource.description || ''}`,
-        action: () => navigate('/docs', {
-          state: {
-            breadcrumb: resource.label,
-          },
-        }),
-      });
-    });
-
-    setSearchCommands(commands);
-  }, [currentPath, isOpen, navigate, query, sampleProviders]);
+    // Quick-search command results (members/providers/resources) require a
+    // server-side index. Until that's wired, the palette relies on the static
+    // navigation commands above plus any dynamic commands pushed by pages.
+    setSearchCommands([]);
+  }, [isOpen, query]);
 
   const combinedCommands = useMemo(() => {
     if (searchCommands.length) {

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalCard from "../../../components/PortalCard";
@@ -6,7 +6,12 @@ import KpiTile from "../../../components/ui/KpiTile";
 import SearchInput from "../../../components/ui/SearchInput";
 import { AuthContext } from "../../../context/AuthContext";
 import { useCommandPalette } from "../../../context/CommandPaletteContext";
-import { SAMPLE_JOBS, SAMPLE_JOB_LOGS, sampleDownload } from "../../../utils/sampleData";
+import {
+  downloadImportJobLogs,
+  fetchImportJob,
+  fetchImportJobs,
+  retryImportJob,
+} from "../../../services/importsService";
 import "../../../styles/memberWorkspace.css";
 
 const STATUS_OPTIONS = [
@@ -16,6 +21,8 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Completed" },
   { value: "failed", label: "Failed" },
 ];
+
+const REFRESH_MS = 4000;
 
 const badgeTone = (status) => {
   switch (status) {
@@ -34,76 +41,137 @@ const badgeTone = (status) => {
 
 const JOB_CENTER_COMMAND_SCOPE = "job-center-commands";
 
+const normaliseJob = (row) => ({
+  id: row.id,
+  name: row.name || row.file_name || row.entity || row.id,
+  status: row.status,
+  progress: row.progress ?? 0,
+  tenant: row.tenant_id != null ? String(row.tenant_id) : "",
+  startedAt: row.started_at,
+  finishedAt: row.completed_at,
+  initiatedBy: row.initiated_by || "system",
+  recordsProcessed: row.records_processed ?? 0,
+  recordsFailed: row.records_failed ?? 0,
+  error: row.error,
+  sourceType: row.source_type,
+  entity: row.entity,
+  fileName: row.file_name,
+});
+
 const JobStatusCenter = () => {
-  const { tenant, availableTenants = [], recordAuditEvent } = useContext(AuthContext) || {};
+  const { token, tenant, availableTenants = [], recordAuditEvent } = useContext(AuthContext) || {};
   const navigate = useNavigate();
   const { registerCommands } = useCommandPalette();
 
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedJobId, setSelectedJobId] = useState(null);
+  const [selectedJobDetail, setSelectedJobDetail] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [tenantFilter, setTenantFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRows, setSelectedRows] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [page, setPage] = useState(1);
+  const [error, setError] = useState(null);
   const pageSize = 6;
 
-  const handleDownload = useCallback(
-    (jobId) => {
-      sampleDownload(jobId);
-      recordAuditEvent?.("job_center.download_logs", { jobId });
+  const loadJobs = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!silent) setLoading(true);
+      try {
+        const data = await fetchImportJobs(token, tenant, {
+          status: statusFilter || undefined,
+          search: searchTerm || undefined,
+          limit: 200,
+        });
+        const rows = (data.items || []).map(normaliseJob);
+        setJobs(rows);
+        setError(null);
+      } catch (err) {
+        setError(err.message || "Unable to load jobs");
+        if (!silent) setJobs([]);
+      } finally {
+        setLoading(false);
+        setLastUpdated(new Date());
+      }
     },
-    [recordAuditEvent]
+    [token, tenant, statusFilter, searchTerm],
+  );
+
+  useEffect(() => {
+    loadJobs();
+  }, [loadJobs]);
+
+  // Background refresh when something is in flight
+  useEffect(() => {
+    const hasInFlight = jobs.some((j) => j.status === "running" || j.status === "queued");
+    if (!hasInFlight) return undefined;
+    const timer = window.setInterval(() => loadJobs({ silent: true }), REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [jobs, loadJobs]);
+
+  // Load job detail when selection changes
+  useEffect(() => {
+    if (!selectedJobId) {
+      setSelectedJobDetail(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const detail = await fetchImportJob(token, tenant, selectedJobId);
+        if (!cancelled) setSelectedJobDetail(detail);
+      } catch (err) {
+        if (!cancelled) setSelectedJobDetail({ error: err.message });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedJobId, token, tenant, jobs]);
+
+  const handleDownload = useCallback(
+    async (jobId) => {
+      try {
+        await downloadImportJobLogs(token, tenant, jobId);
+        recordAuditEvent?.("job_center.download_logs", { jobId });
+      } catch (err) {
+        setError(err.message || "Unable to download logs");
+      }
+    },
+    [token, tenant, recordAuditEvent],
   );
 
   const handleRetry = useCallback(
-    (job) => {
-      setJobs((prev) =>
-        prev.map((item) =>
-          item.id === job.id ? { ...item, status: "queued", progress: 0, error: undefined } : item
-        )
-      );
-      recordAuditEvent?.("job_center.retry_job", { jobId: job.id });
+    async (job) => {
+      try {
+        await retryImportJob(token, tenant, job.id);
+        recordAuditEvent?.("job_center.retry_job", { jobId: job.id });
+        await loadJobs({ silent: true });
+      } catch (err) {
+        setError(err.message || "Unable to retry job");
+      }
     },
-    [recordAuditEvent]
+    [token, tenant, recordAuditEvent, loadJobs],
   );
 
   const toggleRow = useCallback((jobId) => {
     setSelectedRows((prev) => (prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]));
   }, []);
 
-  const bulkRetry = useCallback(() => {
-    setJobs((prev) =>
-      prev.map((job) =>
-        selectedRows.includes(job.id)
-          ? { ...job, status: "queued", progress: 0, error: undefined }
-          : job
-      )
-    );
-    if (selectedRows.length) {
-      recordAuditEvent?.("job_center.bulk_retry", { count: selectedRows.length });
+  const bulkRetry = useCallback(async () => {
+    for (const jobId of selectedRows) {
+      try {
+        await retryImportJob(token, tenant, jobId);
+      } catch (err) {
+        /* ignore individual failures; surfaced via reload */
+      }
     }
-  }, [recordAuditEvent, selectedRows]);
-
-  useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      const expanded = Array.from({ length: 12 }, (_, idx) => {
-        const base = SAMPLE_JOBS[idx % SAMPLE_JOBS.length];
-        return {
-          ...base,
-          id: `${base.id}-${idx}`,
-          name: idx === 0 ? base.name : `${base.name} (${idx})`,
-        };
-      });
-      setJobs(expanded);
-      setLoading(false);
-      setLastUpdated(new Date());
-    }, 400);
-    return () => clearTimeout(timer);
-  }, []);
+    if (selectedRows.length) recordAuditEvent?.("job_center.bulk_retry", { count: selectedRows.length });
+    setSelectedRows([]);
+    await loadJobs({ silent: true });
+  }, [selectedRows, token, tenant, recordAuditEvent, loadJobs]);
 
   useEffect(() => {
     const unregister = registerCommands(
@@ -139,7 +207,7 @@ const JobStatusCenter = () => {
             }
           : null,
       ].filter(Boolean),
-      { id: JOB_CENTER_COMMAND_SCOPE }
+      { id: JOB_CENTER_COMMAND_SCOPE },
     );
     return unregister;
   }, [registerCommands, selectedJobId, handleDownload, navigate]);
@@ -167,24 +235,9 @@ const JobStatusCenter = () => {
   const selectedJob = useMemo(() => jobs.find((job) => job.id === selectedJobId) || null, [jobs, selectedJobId]);
 
   const handleRefresh = useCallback(() => {
-    setLoading(true);
-    setTimeout(() => {
-      setJobs((prev) =>
-        prev.map((job) =>
-          job.status === "running"
-            ? {
-                ...job,
-                progress: Math.min(job.progress + Math.floor(Math.random() * 18) + 12, 100),
-                status: job.progress >= 92 ? "completed" : job.status,
-              }
-            : job
-        )
-      );
-      setLoading(false);
-      setLastUpdated(new Date());
-      recordAuditEvent?.("job_center.refresh");
-    }, 350);
-  }, [recordAuditEvent]);
+    recordAuditEvent?.("job_center.refresh");
+    loadJobs();
+  }, [recordAuditEvent, loadJobs]);
 
   const allVisibleSelected = paginatedJobs.length > 0 && paginatedJobs.every((job) => selectedRows.includes(job.id));
 
@@ -208,12 +261,11 @@ const JobStatusCenter = () => {
 
   const layoutProps = useMemo(
     () => ({
-      backgroundClassName:
-        "",
+      backgroundClassName: "",
       maxWidthClassName: "max-w-6xl",
       paddingClassName: "px-4",
     }),
-    []
+    [],
   );
 
   const headerContent = (
@@ -240,9 +292,17 @@ const JobStatusCenter = () => {
     return "info";
   }, [selectedJob]);
 
+  const detailLogs = selectedJobDetail?.logs || [];
+
   return (
     <PortalPageLayout {...layoutProps} headerContent={headerContent}>
       {kpiStrip}
+
+      {error && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+          {error}
+        </div>
+      )}
 
       <section className="coding-surface rounded-2xl shadow-sm">
         <div className="p-3 flex flex-col lg:flex-row gap-2 lg:items-center">
@@ -383,7 +443,7 @@ const JobStatusCenter = () => {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Job</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Progress</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Tenant</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Source</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Started</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Owner</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">Actions</th>
@@ -403,13 +463,13 @@ const JobStatusCenter = () => {
                       <div className="space-y-2">
                         <h3 className="text-base font-semibold">No jobs match your filters</h3>
                         <p className="text-sm text-slate-500 dark:text-slate-300">
-                          Need data to explore? Load the sandbox tenant to view sample jobs.
+                          Queue an import from the Import Data page to see it appear here.
                         </p>
                         <button
                           className="portal-ghost-button"
-                          onClick={() => setTenantFilter(tenant || "prominencehealth")}
+                          onClick={() => navigate("/jobs/import-data")}
                         >
-                          Show my tenant jobs
+                          Go to Import Data
                         </button>
                       </div>
                     </td>
@@ -454,7 +514,7 @@ const JobStatusCenter = () => {
                         <span className="text-xs text-slate-600 dark:text-slate-300">{job.progress}%</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-800 dark:text-slate-100">{job.tenant}</td>
+                    <td className="px-4 py-3 text-sm text-slate-800 dark:text-slate-100">{job.sourceType || "-"}</td>
                     <td className="px-4 py-3 text-sm text-slate-800 dark:text-slate-100">
                       {job.startedAt ? new Date(job.startedAt).toLocaleTimeString() : "-"}
                     </td>
@@ -470,7 +530,7 @@ const JobStatusCenter = () => {
                         >
                           Logs
                         </button>
-                        {job.status === "failed" && (
+                        {(job.status === "failed" || job.status === "completed") && (
                           <button
                             className="portal-ghost-button"
                             onClick={(event) => {
@@ -501,7 +561,7 @@ const JobStatusCenter = () => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
                 <span className="portal-pill portal-pill--solid">{selectedJob.status}</span>
-                <span className="portal-pill portal-pill--ghost">{selectedJob.tenant}</span>
+                {selectedJob.sourceType && <span className="portal-pill portal-pill--ghost">{selectedJob.sourceType}</span>}
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-300">
                 Last activity {selectedJob.finishedAt ? new Date(selectedJob.finishedAt).toLocaleTimeString() : "In progress"}
@@ -519,7 +579,7 @@ const JobStatusCenter = () => {
               <div>
                 <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Records</dt>
                 <dd>
-                  {selectedJob.recordsProcessed.toLocaleString()} processed
+                  {(selectedJob.recordsProcessed || 0).toLocaleString()} processed
                   {typeof selectedJob.recordsFailed === "number" && selectedJob.recordsFailed > 0 && (
                     <span className="ml-2 text-rose-600 dark:text-rose-300">{selectedJob.recordsFailed} failed</span>
                   )}
@@ -544,7 +604,7 @@ const JobStatusCenter = () => {
               <button className="portal-ghost-button" onClick={() => handleDownload(selectedJob.id)}>
                 Download detailed logs
               </button>
-              {selectedJob.status === "failed" && (
+              {(selectedJob.status === "failed" || selectedJob.status === "completed") && (
                 <button className="portal-ghost-button" onClick={() => handleRetry(selectedJob)}>
                   Retry job
                 </button>
@@ -553,15 +613,20 @@ const JobStatusCenter = () => {
             <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 shadow-inner dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Recent log lines</h3>
               <ul className="space-y-1">
-                {(SAMPLE_JOB_LOGS[selectedJob.id.split("-")[0]] || []).map((entry, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-xs">
-                    <span className="text-slate-500 dark:text-slate-300">{entry.ts}</span>
-                    <span>{entry.line}</span>
+                {detailLogs.length === 0 && (
+                  <li className="text-xs text-slate-500 dark:text-slate-300">
+                    {selectedJobDetail?.error ? selectedJobDetail.error : "No log lines yet."}
+                  </li>
+                )}
+                {detailLogs.map((entry) => (
+                  <li key={entry.id} className="flex items-start gap-2 text-xs">
+                    <span className="text-slate-500 dark:text-slate-300">
+                      {entry.created_at ? new Date(entry.created_at).toLocaleTimeString() : ""}
+                    </span>
+                    <span className="text-slate-400 dark:text-slate-500 uppercase">{entry.level}</span>
+                    <span>{entry.message}</span>
                   </li>
                 ))}
-                {!SAMPLE_JOB_LOGS[selectedJob.id.split("-")[0]] && (
-                  <li className="text-xs text-slate-500 dark:text-slate-300">No logs available for this synthetic job yet.</li>
-                )}
               </ul>
             </div>
           </div>

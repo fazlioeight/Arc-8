@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   useCallback,
   useContext,
   useEffect,
@@ -12,6 +12,12 @@ import PortalCard from "../../../components/PortalCard";
 import KpiTile from "../../../components/ui/KpiTile";
 import { AuthContext } from "../../../context/AuthContext";
 import { useCommandPalette } from "../../../context/CommandPaletteContext";
+import {
+  fetchImportJobs,
+  queueFhirImportJob,
+  testFhirImportConnection,
+  uploadImportFile,
+} from "../../../services/importsService";
 import "../../../styles/memberWorkspace.css";
 
 const IMPORT_ENTITIES = [
@@ -26,6 +32,7 @@ const ACCEPTED_EXTENSIONS = ["txt", "csv", "xlsx"];
 const ACCEPT_ATTR = ".txt,.csv,.xlsx";
 const STATUS_VARIANTS = {
   queued: "bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-100 dark:ring-amber-500/30",
+  running: "bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-100 dark:ring-sky-500/30",
   processing: "bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-100 dark:ring-sky-500/30",
   completed: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-100 dark:ring-emerald-500/30",
   failed: "bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-100 dark:ring-rose-500/30",
@@ -48,6 +55,7 @@ const FHIR_STATUS_VARIANTS = {
 };
 
 const IMPORT_DATA_COMMAND_SCOPE = "import-data-commands";
+const QUEUE_REFRESH_MS = 4000;
 
 const formatBytes = (size) => {
   if (!size && size !== 0) return "-";
@@ -66,7 +74,7 @@ const getExtension = (fileName = "") => fileName.split(".").pop()?.toLowerCase()
 
 const ImportDataPage = () => {
   const navigate = useNavigate();
-  const { tenant, recordAuditEvent } = useContext(AuthContext) || {};
+  const { token, tenant, recordAuditEvent } = useContext(AuthContext) || {};
   const { registerCommands } = useCommandPalette();
 
   const [selectedFiles, setSelectedFiles] = useState({});
@@ -74,6 +82,7 @@ const ImportDataPage = () => {
   const [errors, setErrors] = useState({});
   const [queue, setQueue] = useState([]);
   const [dropTarget, setDropTarget] = useState(null);
+  const [uploadingEntity, setUploadingEntity] = useState(null);
   const [fhirConfig, setFhirConfig] = useState({
     baseUrl: "",
     tokenUrl: "",
@@ -88,20 +97,39 @@ const ImportDataPage = () => {
     message: "Provide your FHIR base URL and OAuth details to begin.",
   });
   const [isTestingFhir, setIsTestingFhir] = useState(false);
+  const [pageError, setPageError] = useState(null);
   const timersRef = useRef([]);
+
+  const refreshQueue = useCallback(async () => {
+    try {
+      const data = await fetchImportJobs(token, tenant, { limit: 50 });
+      setQueue(data.items || []);
+    } catch (err) {
+      setPageError(err.message || "Unable to load import jobs");
+    }
+  }, [token, tenant]);
 
   useEffect(() => {
     recordAuditEvent?.("import_data.visit", { tenant });
+    refreshQueue();
     return () => {
       timersRef.current.forEach((id) => window.clearTimeout(id));
       timersRef.current = [];
     };
-  }, [recordAuditEvent, tenant]);
+  }, [recordAuditEvent, tenant, refreshQueue]);
+
+  // Background refresh when any job is in flight
+  useEffect(() => {
+    const hasInFlight = queue.some((j) => j.status === "queued" || j.status === "running");
+    if (!hasInFlight) return undefined;
+    const t = window.setInterval(refreshQueue, QUEUE_REFRESH_MS);
+    return () => window.clearInterval(t);
+  }, [queue, refreshQueue]);
 
   const summary = useMemo(() => {
     const total = queue.length;
     const completed = queue.filter((item) => item.status === "completed").length;
-    const processing = queue.filter((item) => item.status === "processing").length;
+    const processing = queue.filter((item) => item.status === "running" || item.status === "queued").length;
     const failed = queue.filter((item) => item.status === "failed").length;
     const latest = queue.find((item) => item.status === "completed");
     return { total, completed, processing, failed, latest };
@@ -161,7 +189,7 @@ const ImportDataPage = () => {
       setSelectedFiles((prev) => ({ ...prev, [entityKey]: file }));
       readPreview(entityKey, file);
     },
-    [readPreview]
+    [readPreview],
   );
 
   const handleFileInput = useCallback(
@@ -170,7 +198,7 @@ const ImportDataPage = () => {
       acceptFile(entityKey, file);
       event.target.value = "";
     },
-    [acceptFile]
+    [acceptFile],
   );
 
   const handleDrop = useCallback(
@@ -181,116 +209,99 @@ const ImportDataPage = () => {
       const file = event.dataTransfer?.files?.[0];
       acceptFile(entityKey, file);
     },
-    [acceptFile]
-  );
-
-  const simulateUpload = useCallback(
-    (uploadId, metadata) => {
-      const step = () => {
-        let shouldContinue = false;
-        setQueue((prev) =>
-          prev.map((item) => {
-            if (item.id !== uploadId) return item;
-            const nextProgress = Math.min(100, item.progress + Math.floor(Math.random() * 18) + 12);
-            const isDone = nextProgress >= 100;
-            if (isDone) {
-              recordAuditEvent?.("import_data.completed", {
-                entity: item.entityKey,
-                fileName: item.fileName,
-                tenant: metadata.tenant,
-              });
-              return {
-                ...item,
-                status: "completed",
-                progress: 100,
-                completedAt: new Date().toISOString(),
-              };
-            }
-            shouldContinue = true;
-            return { ...item, progress: nextProgress, status: "processing" };
-          })
-        );
-        if (shouldContinue) {
-          const nextTimer = window.setTimeout(step, Math.floor(Math.random() * 800) + 600);
-          timersRef.current.push(nextTimer);
-        }
-      };
-      const timerId = window.setTimeout(step, Math.floor(Math.random() * 600) + 400);
-      timersRef.current.push(timerId);
-    },
-    [recordAuditEvent]
+    [acceptFile],
   );
 
   const startImport = useCallback(
-    (entityKey) => {
+    async (entityKey) => {
       const file = selectedFiles[entityKey];
       if (!file) return;
-      const uploadId = `${entityKey}-${Date.now().toString(36)}`;
-      const upload = {
-        id: uploadId,
-        entityKey,
-        entityLabel: IMPORT_ENTITIES.find((item) => item.key === entityKey)?.label || entityKey,
-        fileName: file.name,
-        size: file.size,
-        extension: getExtension(file.name),
-        status: "queued",
-        progress: 0,
-        tenant: tenant || "prominencehealth",
-        startedAt: new Date().toISOString(),
-      };
-      recordAuditEvent?.("import_data.queued", {
-        entity: entityKey,
-        fileName: file.name,
-        size: file.size,
-        tenant,
-      });
-      setQueue((prev) => [upload, ...prev]);
-      simulateUpload(uploadId, { tenant });
+      setUploadingEntity(entityKey);
+      setErrors((prev) => ({ ...prev, [entityKey]: "" }));
+      try {
+        const job = await uploadImportFile(token, tenant, { entity: entityKey, file });
+        recordAuditEvent?.("import_data.queued", {
+          entity: entityKey,
+          fileName: file.name,
+          size: file.size,
+          jobId: job.id,
+          tenant,
+        });
+        setSelectedFiles((prev) => ({ ...prev, [entityKey]: null }));
+        setPreviews((prev) => ({ ...prev, [entityKey]: "" }));
+        await refreshQueue();
+      } catch (err) {
+        setErrors((prev) => ({
+          ...prev,
+          [entityKey]: err.message || "Upload failed.",
+        }));
+      } finally {
+        setUploadingEntity(null);
+      }
     },
-    [recordAuditEvent, selectedFiles, simulateUpload, tenant]
+    [recordAuditEvent, refreshQueue, selectedFiles, tenant, token],
   );
+
+  const removeQueueItem = useCallback((uploadId) => {
+    // Server is the source of truth; just hide locally until next refresh.
+    setQueue((prev) => prev.filter((item) => item.id !== uploadId));
+  }, []);
 
   const clearCompleted = useCallback(() => {
     setQueue((prev) => prev.filter((item) => item.status !== "completed"));
-  }, []);
-
-  const removeQueueItem = useCallback((uploadId) => {
-    setQueue((prev) => prev.filter((item) => item.id !== uploadId));
   }, []);
 
   const updateFhirConfig = (key, value) => {
     setFhirConfig((prev) => ({ ...prev, [key]: value }));
   };
 
-  const toggleFhirResource = useCallback(
-    (resourceKey) => {
-      setFhirResources((prev) =>
-        prev.includes(resourceKey) ? prev.filter((r) => r !== resourceKey) : [...prev, resourceKey]
-      );
-    },
-    []
+  const toggleFhirResource = useCallback((resourceKey) => {
+    setFhirResources((prev) =>
+      prev.includes(resourceKey) ? prev.filter((r) => r !== resourceKey) : [...prev, resourceKey],
+    );
+  }, []);
+
+  const buildFhirPayload = useCallback(
+    () => ({
+      baseUrl: fhirConfig.baseUrl,
+      tokenUrl: fhirConfig.tokenUrl || undefined,
+      clientId: fhirConfig.clientId || undefined,
+      clientSecret: fhirConfig.clientSecret || undefined,
+      scopes: fhirConfig.scopes || undefined,
+      since: fhirConfig.since || undefined,
+      resources: fhirResources,
+    }),
+    [fhirConfig, fhirResources],
   );
 
-  const testFhirConnection = useCallback(() => {
+  const testFhirConnection = useCallback(async () => {
+    if (!fhirConfig.baseUrl.trim()) {
+      setFhirStatus({ state: "error", message: "Base URL is required before testing." });
+      return;
+    }
     setIsTestingFhir(true);
     setFhirStatus({ state: "testing", message: "Validating FHIR metadata and OAuth scope coverage..." });
-    const timer = window.setTimeout(() => {
-      setIsTestingFhir(false);
+    try {
+      await testFhirImportConnection(token, tenant, buildFhirPayload());
       setFhirStatus({
         state: "connected",
-        message: `Connected to ${fhirConfig.baseUrl} - ${fhirResources.length} resource${fhirResources.length === 1 ? "" : "s"} selected.`,
+        message: `Connected to ${fhirConfig.baseUrl} - ${fhirResources.length} resource${
+          fhirResources.length === 1 ? "" : "s"
+        } selected.`,
       });
       recordAuditEvent?.("import_data.fhir_test", {
         baseUrl: fhirConfig.baseUrl,
-        tokenUrl: fhirConfig.tokenUrl,
         resources: fhirResources,
         tenant,
       });
-    }, 700);
-    timersRef.current.push(timer);
-  }, [fhirConfig.baseUrl, fhirConfig.tokenUrl, fhirResources, recordAuditEvent, tenant]);
+    } catch (err) {
+      setFhirStatus({ state: "error", message: err.message || "FHIR test failed" });
+    } finally {
+      setIsTestingFhir(false);
+    }
+  }, [buildFhirPayload, fhirConfig, fhirResources, recordAuditEvent, tenant, token]);
 
-  const startFhirImport = useCallback(() => {
+  const startFhirImport = useCallback(async () => {
     if (!fhirConfig.baseUrl.trim()) {
       setFhirStatus({ state: "error", message: "Base URL is required before queuing a FHIR import." });
       return;
@@ -299,40 +310,19 @@ const ImportDataPage = () => {
       setFhirStatus({ state: "error", message: "Select at least one FHIR resource type to sync." });
       return;
     }
-    const uploadId = `fhir-${Date.now().toString(36)}`;
-    const resourceList = fhirResources.slice(0, 3).join(", ");
-    const extraCount = Math.max(0, fhirResources.length - 3);
-    const fileName = extraCount
-      ? `${resourceList} (+${extraCount}) via FHIR`
-      : `${resourceList || "FHIR resources"} via FHIR`;
-    const upload = {
-      id: uploadId,
-      entityKey: "fhir",
-      entityLabel: "FHIR API",
-      fileName,
-      size: 0,
-      extension: "fhir",
-      status: "processing",
-      progress: 15,
-      tenant: tenant || "prominencehealth",
-      startedAt: new Date().toISOString(),
-      metadata: {
+    try {
+      await queueFhirImportJob(token, tenant, buildFhirPayload());
+      setFhirStatus({ state: "queued", message: `Queued FHIR import from ${fhirConfig.baseUrl}` });
+      recordAuditEvent?.("import_data.fhir_queued", {
         baseUrl: fhirConfig.baseUrl,
-        tokenUrl: fhirConfig.tokenUrl,
-        scopes: fhirConfig.scopes,
-        since: fhirConfig.since,
         resources: fhirResources,
-      },
-    };
-    recordAuditEvent?.("import_data.fhir_queued", {
-      baseUrl: fhirConfig.baseUrl,
-      resources: fhirResources,
-      tenant,
-    });
-    setQueue((prev) => [upload, ...prev]);
-    setFhirStatus({ state: "queued", message: `Queued FHIR import from ${fhirConfig.baseUrl}` });
-    simulateUpload(uploadId, { tenant, baseUrl: fhirConfig.baseUrl });
-  }, [fhirConfig, fhirResources, recordAuditEvent, simulateUpload, tenant]);
+        tenant,
+      });
+      await refreshQueue();
+    } catch (err) {
+      setFhirStatus({ state: "error", message: err.message || "FHIR queue failed" });
+    }
+  }, [buildFhirPayload, fhirConfig.baseUrl, fhirResources, recordAuditEvent, refreshQueue, tenant, token]);
 
   useEffect(() => {
     const unregister = registerCommands(
@@ -364,19 +354,18 @@ const ImportDataPage = () => {
             }
           : null,
       ].filter(Boolean),
-      { id: IMPORT_DATA_COMMAND_SCOPE }
+      { id: IMPORT_DATA_COMMAND_SCOPE },
     );
     return unregister;
   }, [clearCompleted, navigate, queue, registerCommands, startFhirImport, testFhirConnection]);
 
   const layoutProps = useMemo(
     () => ({
-      backgroundClassName:
-        "",
+      backgroundClassName: "",
       maxWidthClassName: "max-w-6xl",
       paddingClassName: "px-4",
     }),
-    []
+    [],
   );
 
   const headerContent = (
@@ -394,9 +383,14 @@ const ImportDataPage = () => {
       mainClassName="space-y-6"
       utilityBar
     >
+      {pageError && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100">
+          {pageError}
+        </div>
+      )}
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiTile label="Queued" value={summary.total} hint="Total" />
-        <KpiTile label="Processing" value={summary.processing} tone="warning" hint="In flight" />
+        <KpiTile label="In flight" value={summary.processing} tone="warning" hint="Running/queued" />
         <KpiTile label="Completed" value={summary.completed} tone="success" hint="Finished" />
         <KpiTile label="Failed" value={summary.failed} tone="critical" hint="Attention" />
       </section>
@@ -559,11 +553,11 @@ const ImportDataPage = () => {
         <PortalCard title="Import summary" subtitle="Quick metrics across all imports." compact>
           <div className="grid grid-cols-2 gap-3 text-sm text-slate-700 dark:text-slate-200">
             <div>
-              <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total queued</div>
+              <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total</div>
               <div className="text-lg font-semibold">{summary.total}</div>
             </div>
             <div>
-              <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Processing</div>
+              <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">In flight</div>
               <div className="text-lg font-semibold">{summary.processing}</div>
             </div>
             <div>
@@ -576,7 +570,7 @@ const ImportDataPage = () => {
             </div>
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-300">
-            Last completed: {summary.latest ? `${summary.latest.entityLabel} - ${summary.latest.fileName}` : "None yet"}
+            Last completed: {summary.latest ? `${summary.latest.entity || summary.latest.source_type} - ${summary.latest.file_name || summary.latest.name}` : "None yet"}
           </div>
         </PortalCard>
 
@@ -585,6 +579,7 @@ const ImportDataPage = () => {
           const preview = previews[entity.key];
           const error = errors[entity.key];
           const dropActive = dropTarget === entity.key;
+          const isUploading = uploadingEntity === entity.key;
 
           return (
             <PortalCard key={entity.key} title={entity.label} subtitle={entity.description} compact>
@@ -652,10 +647,10 @@ const ImportDataPage = () => {
                 <div className="flex flex-wrap gap-2">
                   <button
                     className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-                    disabled={!file}
+                    disabled={!file || isUploading}
                     onClick={() => startImport(entity.key)}
                   >
-                    Queue import
+                    {isUploading ? "Uploading..." : "Queue import"}
                   </button>
                   <button
                     className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
@@ -679,13 +674,19 @@ const ImportDataPage = () => {
             disabled={!queue.some((item) => item.status === "completed")}
             onClick={clearCompleted}
           >
-            Clear completed
+            Hide completed
           </button>
           <button
             className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
             onClick={() => navigate("/jobs/status-center")}
           >
             Open status center
+          </button>
+          <button
+            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+            onClick={refreshQueue}
+          >
+            Refresh
           </button>
         </div>
 
@@ -709,7 +710,7 @@ const ImportDataPage = () => {
                     Size
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                    Tenant
+                    Owner
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
                     Progress
@@ -726,35 +727,35 @@ const ImportDataPage = () => {
                 {queue.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
                     <td className="px-4 py-3">
-                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.entityLabel}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-300 uppercase">{item.extension}</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{item.entity || item.source_type}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-300 uppercase">{item.source_type}</div>
                     </td>
-                    <td className="px-4 py-3 text-slate-800 dark:text-slate-100">{item.fileName}</td>
-                    <td className="px-4 py-3 text-slate-800 dark:text-slate-100">{formatBytes(item.size)}</td>
-                    <td className="px-4 py-3 text-slate-800 dark:text-slate-100">{item.tenant || "-"}</td>
+                    <td className="px-4 py-3 text-slate-800 dark:text-slate-100">{item.file_name || item.name}</td>
+                    <td className="px-4 py-3 text-slate-800 dark:text-slate-100">{formatBytes(item.file_size || 0)}</td>
+                    <td className="px-4 py-3 text-slate-800 dark:text-slate-100">{item.initiated_by || "system"}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800">
                           <div
                             className="h-full rounded-full bg-sky-500 transition"
-                            style={{ width: `${item.progress}%` }}
+                            style={{ width: `${item.progress || 0}%` }}
                           />
                         </div>
-                        <span className="text-xs text-slate-600 dark:text-slate-300">{item.progress}%</span>
+                        <span className="text-xs text-slate-600 dark:text-slate-300">{item.progress || 0}%</span>
                       </div>
                       <span className={`mt-1 inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${STATUS_VARIANTS[item.status] || STATUS_VARIANTS.queued}`}>
                         {item.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-800 dark:text-slate-100">
-                      {item.startedAt ? new Date(item.startedAt).toLocaleTimeString() : "-"}
+                      {item.started_at ? new Date(item.started_at).toLocaleTimeString() : "-"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
                         onClick={() => removeQueueItem(item.id)}
                       >
-                        Remove
+                        Hide
                       </button>
                     </td>
                   </tr>
@@ -769,4 +770,3 @@ const ImportDataPage = () => {
 };
 
 export default ImportDataPage;
-

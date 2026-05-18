@@ -343,3 +343,67 @@ class Member360Document(TenantDataBase):
     status: Mapped[str] = mapped_column(String(32), default="active")
 
     member: Mapped[Member360Member] = relationship(back_populates="documents")
+
+
+# ---------------------- Admin / configuration tables -------------------------
+# Backs Member360LabAdminPage. These are tenant-scoped (per-tenant DB) so each
+# customer can tune their own catalog without coordinating with us.
+
+
+class Member360RiskRule(TenantDataBase):
+    __tablename__ = "m360_risk_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    domain: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    weight: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False, default=1.0)
+    threshold: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    recommendation_template: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Member360TaskQueue(TenantDataBase):
+    __tablename__ = "m360_task_queues"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sla_priority_hours: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    escalation_queue: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    routing_rules: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Member360OutreachChannel(TenantDataBase):
+    __tablename__ = "m360_outreach_channels"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    provider: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    config: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    consent_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    preferred_languages: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Member360CareOptionPolicy(TenantDataBase):
+    __tablename__ = "m360_care_option_policies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    service_type: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    line_of_business: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    max_distance_miles: Mapped[Optional[float]] = mapped_column(Numeric(6, 2), nullable=True)
+    min_quality_score: Mapped[Optional[float]] = mapped_column(Numeric(4, 2), nullable=True)
+    min_savings_threshold: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    network_tier: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
