@@ -234,4 +234,5 @@ def disable_audit(monkeypatch):
 
     monkeypatch.setattr('app.utils.audit_logger.record_audit_event', _noop)
     monkeypatch.setattr('app.routes.coding.record_audit_event', _noop)
+    monkeypatch.setattr('app.routes.member360.record_audit_event', _noop)
     monkeypatch.setattr('app.main.record_audit_event', _noop)
