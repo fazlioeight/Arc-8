@@ -70,6 +70,10 @@ jest.mock("../../../../services/member360LabService", () => ({
   createMember360Message: jest.fn(),
   createMember360CareOption: jest.fn(),
   generateMember360SubmissionExport: jest.fn(),
+  // Templates load on mount for the Start Journey dialog. Return an empty
+  // list so the workspace still renders when the dialog is not opened.
+  fetchMember360JourneyTemplates: jest.fn(() => Promise.resolve([])),
+  createMember360CareJourney: jest.fn(),
 }));
 
 // Chart sub-pages live in `./chart/*.jsx`. CRA's Jest defaults don't
