@@ -20,6 +20,8 @@ from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
 from ..dependencies.tenant import get_tenant_context, get_tenant_session
 from ..schemas.member360 import (
+    CareJourney,
+    CareJourneyCreate,
     CareJourneyListResponse,
     CareJourneyTemplate,
     CareOption,
@@ -305,6 +307,41 @@ async def create_care_option(
     await session.commit()
     await control_session.commit()
     return result
+
+
+@router.post("/care-journeys", response_model=CareJourney, status_code=status.HTTP_201_CREATED)
+async def create_care_journey(
+    payload: CareJourneyCreate,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    try:
+        journey = await member360_service.create_care_journey(
+            session,
+            payload.model_dump(),
+            created_by=current_user.email,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if not journey:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.care_journey.create",
+        payload={
+            "member_id": journey["member_id"],
+            "journey_id": journey["id"],
+            "template_id": payload.template_id,
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return journey
 
 
 @router.get("/care-journey-templates", response_model=list[CareJourneyTemplate])

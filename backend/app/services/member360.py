@@ -21,6 +21,7 @@ from sqlalchemy.orm import selectinload
 
 from ..models.member360 import (
     Member360CareJourney,
+    Member360CareJourneyStage,
     Member360CareJourneyTemplate,
     Member360CareOption,
     Member360Document,
@@ -784,6 +785,103 @@ async def build_dashboard(session: AsyncSession) -> dict:
         "top_risk_drivers": top_risk_drivers,
         "recent_activity": recent_activity,
         "upcoming_actions": upcoming_actions,
+    }
+
+
+async def create_care_journey(
+    session: AsyncSession,
+    payload: dict,
+    *,
+    created_by: Optional[str] = None,
+) -> Optional[dict]:
+    """Create a care journey for a member, optionally scaffolded from a template.
+
+    When ``template_id`` is provided we copy the template's ``default_stages``
+    onto the new journey (preserving order via ``sequence``) and capture the
+    template name so the UI can show provenance even if the template is later
+    renamed/deleted.
+    """
+    member = await session.scalar(
+        select(Member360Member).where(Member360Member.id == payload["member_id"])
+    )
+    if not member:
+        return None
+
+    template = None
+    template_id = payload.get("template_id")
+    if template_id is not None:
+        template = await session.scalar(
+            select(Member360CareJourneyTemplate).where(
+                Member360CareJourneyTemplate.id == template_id
+            )
+        )
+        if not template:
+            raise ValueError("Care journey template not found")
+
+    name = payload.get("name") or (template.name if template else None)
+    if not name:
+        raise ValueError("Care journey name is required when no template is selected")
+
+    journey = Member360CareJourney(
+        member_id=payload["member_id"],
+        template_id=template.id if template else None,
+        name=name,
+        description=payload.get("description") or (template.description if template else None),
+        status=payload.get("status") or "active",
+        created_by=created_by,
+        assigned_to=payload.get("assigned_to"),
+        start_date=payload.get("start_date") or date.today(),
+        target_completion_date=payload.get("target_completion_date"),
+        source=payload.get("source"),
+        template_name=template.name if template else None,
+    )
+    session.add(journey)
+    await session.flush()
+
+    if template and template.default_stages:
+        for idx, stage in enumerate(template.default_stages):
+            if not isinstance(stage, dict):
+                continue
+            session.add(
+                Member360CareJourneyStage(
+                    journey_id=journey.id,
+                    sequence=int(stage.get("sequence", idx)),
+                    name=str(stage.get("name") or f"Stage {idx + 1}"),
+                    description=stage.get("description"),
+                    status=stage.get("status") or "pending",
+                )
+            )
+        await session.flush()
+
+    journey = await session.scalar(
+        select(Member360CareJourney)
+        .where(Member360CareJourney.id == journey.id)
+        .options(selectinload(Member360CareJourney.stages))
+    )
+    return {
+        "id": journey.id,
+        "member_id": journey.member_id,
+        "name": journey.name,
+        "description": journey.description,
+        "status": journey.status,
+        "template_name": journey.template_name,
+        "source": journey.source,
+        "assigned_to": journey.assigned_to,
+        "created_by": journey.created_by,
+        "start_date": journey.start_date,
+        "target_completion_date": journey.target_completion_date,
+        "stages": [
+            {
+                "id": s.id,
+                "sequence": s.sequence,
+                "name": s.name,
+                "description": s.description,
+                "status": s.status,
+                "completed_at": s.completed_at,
+            }
+            for s in journey.stages
+        ],
+        "open_task_count": 0,
     }
 
 

@@ -7,11 +7,13 @@ import ErrorBoundary from '../../../components/ErrorBoundary';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import {
+  createMember360CareJourney,
   createMember360CareOption,
   createMember360Message,
   createMember360Note,
   createMember360Task,
   fetchMember360GapAnalysis,
+  fetchMember360JourneyTemplates,
   fetchMember360MemberDetail,
   generateMember360SubmissionExport,
   updateMember360Member,
@@ -87,6 +89,7 @@ const Member360LabWorkspace = () => {
   const [actionMessage, setActionMessage] = useState(null);
   const [submissionState, setSubmissionState] = useState('idle');
   const [submissionResult, setSubmissionResult] = useState(null);
+  const [journeyTemplates, setJourneyTemplates] = useState([]);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -114,6 +117,18 @@ const Member360LabWorkspace = () => {
       .catch(() => { if (!cancelled) setGap(null); });
     return () => { cancelled = true; };
   }, [token, tenant, memberId]);
+
+  // Care journey templates are fetched once per tenant and reused by the
+  // Start Journey dialog. Failure is non-fatal — the dialog still lets the
+  // user create a freeform journey when no templates are available.
+  useEffect(() => {
+    let cancelled = false;
+    if (!token || !tenant) return undefined;
+    fetchMember360JourneyTemplates(token, tenant)
+      .then((res) => { if (!cancelled) setJourneyTemplates(Array.isArray(res) ? res : []); })
+      .catch(() => { if (!cancelled) setJourneyTemplates([]); });
+    return () => { cancelled = true; };
+  }, [token, tenant]);
 
   const member = detail?.member;
   const missingHccCount = (gap?.missing_hcc || []).length;
@@ -231,16 +246,49 @@ const Member360LabWorkspace = () => {
         });
         setActionMessage(`Care option created: ${opt.service_type}.`);
       } else if (actionDialog.key === 'start_journey') {
-        setActionMessage('Care journey scaffolded from triage. Detailed journey editor coming in next phase.');
+        const recommendation = actionDialog.payload?.recommendation;
+        const templateId = data.template_id ? Number(data.template_id) : null;
+        const template = templateId ? journeyTemplates.find((t) => t.id === templateId) : null;
+        const journey = await createMember360CareJourney(token, tenant, {
+          member_id: member.id,
+          template_id: templateId || undefined,
+          name: data.name || template?.name || (recommendation?.summary?.slice(0, 80)) || 'Care journey',
+          description: data.description || recommendation?.summary || null,
+          assigned_to: data.assigned_to || null,
+          start_date: data.start_date || undefined,
+          target_completion_date: data.target_completion_date || undefined,
+          source: recommendation ? 'guided_triage' : 'manual',
+        });
+        setActionMessage(`Care journey started: ${journey.name}.`);
       } else if (actionDialog.key === 'escalate') {
-        setActionMessage('Escalation flag captured. Will route to RN queue in next phase.');
+        // Escalation is modeled as an urgent task with status='escalated'. The
+        // existing /tasks route already enforces member existence + SBAR.
+        const recommendation = actionDialog.payload?.recommendation;
+        const reason = data.reason || recommendation?.summary || 'Escalated by case manager';
+        const task = await createMember360Task(token, tenant, {
+          member_id: member.id,
+          title: data.title || `Escalation: ${reason.slice(0, 60)}`,
+          priority: data.priority || 'urgent',
+          status: 'escalated',
+          assigned_queue: data.assigned_queue || 'RN',
+          due_date: data.due_date || undefined,
+          sbar: {
+            situation: reason,
+            background: null,
+            assessment: null,
+            recommendation: data.recommendation || reason,
+          },
+          recommended_next_action: data.recommendation || reason,
+          auto_generated_reason: recommendation ? 'Escalated from guided triage' : 'Manual escalation',
+        });
+        setActionMessage(`Escalation routed to ${task.assigned_queue || 'RN'} queue.`);
       }
       setActionDialog(null);
       reload();
     } catch (err) {
       setActionMessage(`Error: ${err.message || err}`);
     }
-  }, [actionDialog, member, token, tenant, reload]);
+  }, [actionDialog, member, token, tenant, reload, journeyTemplates]);
 
   const handleTaskStatus = async (task, status) => {
     try {
@@ -566,6 +614,7 @@ const Member360LabWorkspace = () => {
         <ActionDialog
           dialog={actionDialog}
           member={member}
+          journeyTemplates={journeyTemplates}
           onSubmit={submitDialog}
           onCancel={() => setActionDialog(null)}
         />
@@ -574,7 +623,7 @@ const Member360LabWorkspace = () => {
   );
 };
 
-function ActionDialog({ dialog, member, onSubmit, onCancel }) {
+function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCancel }) {
   const [form, setForm] = useState(() => {
     const rec = dialog.payload?.recommendation;
     if (dialog.key === 'create_task') {
@@ -607,6 +656,25 @@ function ActionDialog({ dialog, member, onSubmit, onCancel }) {
         potential_savings: '',
         rationale: rec?.summary || '',
         member_facing_explanation: rec?.summary || '',
+      };
+    }
+    if (dialog.key === 'start_journey') {
+      return {
+        template_id: '',
+        name: rec?.summary?.slice(0, 80) || '',
+        description: rec?.summary || '',
+        assigned_to: '',
+        start_date: '',
+        target_completion_date: '',
+      };
+    }
+    if (dialog.key === 'escalate') {
+      return {
+        reason: rec?.summary || '',
+        priority: 'urgent',
+        assigned_queue: 'RN',
+        due_date: '',
+        recommendation: rec?.summary || '',
       };
     }
     return {};
@@ -699,8 +767,56 @@ function ActionDialog({ dialog, member, onSubmit, onCancel }) {
         </div>
       )}
 
-      {(dialog.key === 'start_journey' || dialog.key === 'escalate') && (
-        <p className="text-sm coding-text-soft">This will be recorded against the member and surfaced in the workspace. Detailed editing UI is part of the next phase.</p>
+      {dialog.key === 'start_journey' && (
+        <div className="space-y-3">
+          {journeyTemplates.length > 0 ? (
+            <label className="block">
+              <span className="block text-[11px] font-semibold coding-text-muted uppercase tracking-wider mb-1">Template</span>
+              <select
+                value={form.template_id || ''}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  const tpl = journeyTemplates.find((t) => String(t.id) === id);
+                  setForm((prev) => ({
+                    ...prev,
+                    template_id: id,
+                    name: prev.name || tpl?.name || '',
+                    description: prev.description || tpl?.description || '',
+                  }));
+                }}
+                className="coding-input w-full rounded-md px-2 py-1.5 text-sm"
+              >
+                <option value="">— No template (freeform) —</option>
+                {journeyTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}{t.recommended_for_risk_tier ? ` · ${t.recommended_for_risk_tier} risk` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p className="text-[11px] coding-text-muted">No templates configured. Creating a freeform journey.</p>
+          )}
+          <Input label="Name" value={form.name} onChange={(v) => update('name', v)} placeholder="Heart failure stabilization" />
+          <Textarea label="Description" value={form.description} onChange={(v) => update('description', v)} rows={3} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input type="date" label="Start date" value={form.start_date} onChange={(v) => update('start_date', v)} />
+            <Input type="date" label="Target completion" value={form.target_completion_date} onChange={(v) => update('target_completion_date', v)} />
+          </div>
+          <Input label="Assigned to (email)" value={form.assigned_to} onChange={(v) => update('assigned_to', v)} placeholder="rn@plan.com" />
+        </div>
+      )}
+
+      {dialog.key === 'escalate' && (
+        <div className="space-y-3">
+          <Textarea label="Reason for escalation" value={form.reason} onChange={(v) => update('reason', v)} rows={3} />
+          <div className="grid grid-cols-2 gap-3">
+            <Select label="Priority" value={form.priority} onChange={(v) => update('priority', v)} options={['urgent', 'high', 'medium']} />
+            <Select label="Queue" value={form.assigned_queue} onChange={(v) => update('assigned_queue', v)} options={['RN', 'MD', 'Pharmacy', 'Behavioral Health', 'Care Management']} />
+          </div>
+          <Input type="date" label="Due date" value={form.due_date} onChange={(v) => update('due_date', v)} />
+          <Textarea label="Recommended next action" value={form.recommendation} onChange={(v) => update('recommendation', v)} rows={2} />
+        </div>
       )}
     </WorkspaceDrawer>
   );

@@ -434,3 +434,174 @@ async def test_care_journey_templates_list(fastapi_app):
         )
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
+
+
+# ---- Care journey create + escalation flow (action-dialog wiring) ----------
+#
+# These exercise the surfaces that back the workspace's "Start Journey" and
+# "Escalate" action dialogs. Start Journey is a fresh endpoint; Escalate
+# reuses the existing /tasks endpoint with status='escalated' so we just
+# verify the contract holds end-to-end.
+
+
+async def test_care_journey_create_freeform(fastapi_app, seeded_member):
+    """Start Journey without a template — backend should accept name+description
+    alone and return a journey row with no scaffolded stages."""
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        resp = await client.post(
+            "/api/member360/care-journeys",
+            json={
+                "member_id": seeded_member,
+                "name": "Heart failure stabilization",
+                "description": "30-day post-discharge support",
+                "source": "manual",
+            },
+            headers=_auth_headers(token),
+        )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    assert body["member_id"] == seeded_member
+    assert body["name"] == "Heart failure stabilization"
+    assert body["status"] == "active"
+    assert body["source"] == "manual"
+    assert body["stages"] == []
+
+
+async def test_care_journey_create_from_template_copies_stages(fastapi_app, seeded_member):
+    """When a template_id is supplied, the template's default_stages should
+    be copied verbatim onto the new journey (preserving order)."""
+    from sqlalchemy import delete
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.core.config import get_settings
+    from app.models.member360 import Member360CareJourneyTemplate
+
+    uri = get_settings().DEFAULT_TENANT_DATABASE_URL.format(tenant_key=TENANT_KEY)
+    engine = create_async_engine(uri, future=True, echo=False)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    template_id = None
+    try:
+        async with factory() as session:
+            template = Member360CareJourneyTemplate(
+                name="CHF 30-day",
+                description="Post-discharge CHF protocol",
+                category="Cardiac",
+                recommended_for_risk_tier="High",
+                default_stages=[
+                    {"sequence": 0, "name": "Intake", "status": "pending"},
+                    {"sequence": 1, "name": "Medication reconciliation", "status": "pending"},
+                    {"sequence": 2, "name": "PCP follow-up", "status": "pending"},
+                ],
+                default_tasks=[],
+            )
+            session.add(template)
+            await session.commit()
+            await session.refresh(template)
+            template_id = template.id
+
+        transport = ASGITransport(app=fastapi_app)
+        async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+            token = await _login(client)
+            resp = await client.post(
+                "/api/member360/care-journeys",
+                json={"member_id": seeded_member, "template_id": template_id},
+                headers=_auth_headers(token),
+            )
+        assert resp.status_code == 201, resp.text
+        body = resp.json()
+        # When no name is supplied, the template name is used.
+        assert body["name"] == "CHF 30-day"
+        assert body["template_name"] == "CHF 30-day"
+        # Stages copied in order.
+        assert [s["name"] for s in body["stages"]] == [
+            "Intake", "Medication reconciliation", "PCP follow-up",
+        ]
+        assert all(s["status"] == "pending" for s in body["stages"])
+    finally:
+        async with factory() as session:
+            await session.execute(
+                delete(Member360CareJourneyTemplate).where(
+                    Member360CareJourneyTemplate.id == template_id
+                )
+            )
+            await session.commit()
+        await engine.dispose()
+
+
+async def test_care_journey_create_rejects_unknown_member(fastapi_app):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        resp = await client.post(
+            "/api/member360/care-journeys",
+            json={"member_id": 999999, "name": "Will not stick"},
+            headers=_auth_headers(token),
+        )
+    assert resp.status_code == 404
+
+
+async def test_care_journey_create_rejects_unknown_template(fastapi_app, seeded_member):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        resp = await client.post(
+            "/api/member360/care-journeys",
+            json={"member_id": seeded_member, "template_id": 9999999},
+            headers=_auth_headers(token),
+        )
+    assert resp.status_code == 400
+
+
+async def test_care_journey_create_requires_name_without_template(fastapi_app, seeded_member):
+    """With no template and no name, there's nothing to label the journey —
+    the service should refuse rather than create an unnamed row."""
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        resp = await client.post(
+            "/api/member360/care-journeys",
+            json={"member_id": seeded_member},
+            headers=_auth_headers(token),
+        )
+    assert resp.status_code == 400
+
+
+async def test_escalation_creates_task_with_escalated_status(fastapi_app, seeded_member):
+    """The Escalate dialog routes through POST /tasks with status='escalated'
+    and priority='urgent'. The aggregate /tasks list should surface it."""
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = _auth_headers(token)
+        resp = await client.post(
+            "/api/member360/tasks",
+            json={
+                "member_id": seeded_member,
+                "title": "Escalation: HF readmit risk",
+                "priority": "urgent",
+                "status": "escalated",
+                "assigned_queue": "RN",
+                "sbar": {
+                    "situation": "Member missed follow-up; weight trending up.",
+                    "recommendation": "RN outreach within 24h.",
+                },
+                "auto_generated_reason": "Manual escalation",
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 201, resp.text
+        task_id = resp.json()["id"]
+        assert resp.json()["status"] == "escalated"
+        assert resp.json()["priority"] == "urgent"
+        assert resp.json()["assigned_queue"] == "RN"
+
+        agg = await client.get(
+            f"/api/member360/tasks?member_id={seeded_member}&status=escalated",
+            headers=headers,
+        )
+    assert agg.status_code == 200
+    rows = agg.json()["items"]
+    assert any(r["id"] == task_id for r in rows), "escalated task missing from filtered list"

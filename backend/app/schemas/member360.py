@@ -105,6 +105,24 @@ class CareJourneyTemplate(BaseModel):
     default_tasks: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class CareJourneyCreate(BaseModel):
+    """Payload for ``POST /api/member360/care-journeys``.
+
+    If ``template_id`` is supplied, the template's ``default_stages`` are
+    copied onto the new journey verbatim and ``template_name`` is captured
+    from the template. ``name`` falls back to the template name when omitted.
+    """
+    member_id: int
+    name: Optional[str] = None
+    description: Optional[str] = None
+    template_id: Optional[int] = None
+    status: str = "active"
+    source: Optional[str] = None
+    assigned_to: Optional[str] = None
+    start_date: Optional[date] = None
+    target_completion_date: Optional[date] = None
+
+
 class SBAR(BaseModel):
     situation: Optional[str] = None
     background: Optional[str] = None

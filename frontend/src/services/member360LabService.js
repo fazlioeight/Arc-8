@@ -104,6 +104,9 @@ export const createMember360CareOption = (token, tenant, payload) =>
 export const fetchMember360JourneyTemplates = (token, tenant) =>
   get(token, tenant, '/api/member360/care-journey-templates');
 
+export const createMember360CareJourney = (token, tenant, payload) =>
+  post(token, tenant, '/api/member360/care-journeys', payload);
+
 // ------------------- Aggregate (multi-member) endpoints -------------------
 //
 // Population-level list endpoints. Each returns { items, total } where every
