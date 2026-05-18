@@ -82,6 +82,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def probe_member360_storage() -> None:
+    """Verify the document storage backend can talk to its target on boot.
+
+    For the Azure backend, this logs which identity (managed identity,
+    service principal, or az-login user) actually won the credential
+    chain — saves a lot of "is the right principal making the call"
+    detective work later. Non-fatal: a failure logs an error but doesn't
+    block startup, because the rest of the app shouldn't go dark over a
+    misconfigured optional subsystem.
+    """
+    if (settings.MEMBER360_STORAGE_BACKEND or "local").lower() != "azure":
+        return
+    import logging
+
+    log = logging.getLogger("member360.storage")
+    try:
+        from .services import member360_storage
+
+        backend = member360_storage.get_document_backend()
+        probe = getattr(backend, "probe", None)
+        if probe is None:
+            return
+        result = await probe()
+        if result.get("ok"):
+            log.info("member360_storage_ready", extra={"probe": result})
+        else:
+            log.error("member360_storage_probe_failed", extra={"probe": result})
+    except Exception as exc:  # noqa: BLE001
+        log.error("member360_storage_probe_exception", extra={"error": str(exc)})
+
+
 @app.on_event("shutdown")
 async def shutdown_connections() -> None:
     await tenant_connection_manager.close_all()

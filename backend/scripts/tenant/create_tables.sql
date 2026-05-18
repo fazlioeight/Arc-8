@@ -696,13 +696,27 @@ CREATE TABLE IF NOT EXISTS m360_savings (
 CREATE INDEX IF NOT EXISTS ix_m360_savings_member_id ON m360_savings(member_id);
 
 CREATE TABLE IF NOT EXISTS m360_documents (
-    id              SERIAL        PRIMARY KEY,
-    member_id       INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
-    file_name       VARCHAR(255)  NOT NULL,
-    document_type   VARCHAR(64),
-    uploaded_by     VARCHAR(255),
-    uploaded_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status          VARCHAR(32)   NOT NULL DEFAULT 'active'
+    id                SERIAL        PRIMARY KEY,
+    member_id         INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    file_name         VARCHAR(255)  NOT NULL,
+    document_type     VARCHAR(64),
+    uploaded_by       VARCHAR(255),
+    uploaded_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    status            VARCHAR(32)   NOT NULL DEFAULT 'active',
+    storage_backend   VARCHAR(32),
+    storage_path      VARCHAR(512),
+    content_type      VARCHAR(128),
+    size_bytes        INTEGER,
+    sha256            VARCHAR(64)
 );
+
+-- Storage columns are nullable so document rows imported with metadata only
+-- (no uploaded file) still validate. ADD COLUMN IF NOT EXISTS lets tenant
+-- DBs that pre-date document upload pick up the new columns on next deploy.
+ALTER TABLE m360_documents ADD COLUMN IF NOT EXISTS storage_backend VARCHAR(32);
+ALTER TABLE m360_documents ADD COLUMN IF NOT EXISTS storage_path    VARCHAR(512);
+ALTER TABLE m360_documents ADD COLUMN IF NOT EXISTS content_type    VARCHAR(128);
+ALTER TABLE m360_documents ADD COLUMN IF NOT EXISTS size_bytes      INTEGER;
+ALTER TABLE m360_documents ADD COLUMN IF NOT EXISTS sha256          VARCHAR(64);
 
 CREATE INDEX IF NOT EXISTS ix_m360_documents_member_id ON m360_documents(member_id);

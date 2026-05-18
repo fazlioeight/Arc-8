@@ -341,6 +341,15 @@ class Member360Document(TenantDataBase):
     uploaded_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     status: Mapped[str] = mapped_column(String(32), default="active")
+    # Populated when the document was uploaded through the API (vs. a row
+    # imported with metadata only). ``storage_backend`` names the backend
+    # (``local`` / ``s3``) so a future migration to S3 can leave old rows
+    # readable from disk. ``storage_path`` is the backend-specific key.
+    storage_backend: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    storage_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    content_type: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    size_bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     member: Mapped[Member360Member] = relationship(back_populates="documents")
 

@@ -478,7 +478,7 @@ const Member360LabWorkspace = () => {
       case 'care_gaps':
         return <CareGapsPage gap={gap} member={member} />;
       case 'documents':
-        return <DocumentsPage detail={detail} />;
+        return <DocumentsPage detail={detail} memberId={member?.id} onUploaded={reload} />;
       case 'audit_log':
         return <AuditLogPage />;
       case 'sharing':
@@ -488,7 +488,7 @@ const Member360LabWorkspace = () => {
       default:
         return null;
     }
-  }, [detail, member, tab, handleStageTransition, handleJourneyTransition]);
+  }, [detail, member, tab, handleStageTransition, handleJourneyTransition, reload]);
 
   if (loading) {
     return (

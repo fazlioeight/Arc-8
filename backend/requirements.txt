@@ -19,6 +19,7 @@ azure-keyvault-secrets
 azure-monitor-opentelemetry
 azure-servicebus
 azure-storage-blob
+aiohttp  # async HTTP transport for azure-storage-blob.aio / azure-identity.aio
 pandas
 requests
 streamlit

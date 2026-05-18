@@ -127,6 +127,55 @@ export const importMember360Claims = (token, tenant, claims) =>
 export const importMember360RiskInsights = (token, tenant, insights) =>
   post(token, tenant, '/api/member360/import/risk-insights', { insights });
 
+// ------------------- Document upload / download -------------------
+// Uploads use multipart/form-data so they bypass the JSON `post` helper.
+// Downloads stream binary content; we return a Blob the caller turns into
+// a download URL (see DocumentsPage for the click handler).
+
+export const uploadMember360Document = async (token, tenant, memberId, file, { documentType } = {}) => {
+  const form = new FormData();
+  form.append('file', file);
+  if (documentType) form.append('document_type', documentType);
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(tenant ? { 'X-Tenant-Key': tenant } : {}),
+  };
+  // Do NOT set Content-Type — the browser sets the multipart boundary.
+  const res = await fetch(`${API_BASE}/api/member360/members/${memberId}/documents`, {
+    method: 'POST',
+    headers,
+    body: form,
+  });
+  return handleResponse(res);
+};
+
+export const downloadMember360Document = async (token, tenant, documentId) => {
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(tenant ? { 'X-Tenant-Key': tenant } : {}),
+  };
+  const res = await fetch(`${API_BASE}/api/member360/documents/${documentId}/download`, {
+    headers,
+  });
+  if (res.status === 401 || res.status === 403) throw new Error('Unauthorized');
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+  return {
+    blob: await res.blob(),
+    filename: parseContentDispositionFilename(res.headers.get('Content-Disposition')),
+  };
+};
+
+// `attachment; filename="foo.pdf"` → `foo.pdf`. Returns null when absent so
+// the caller can fall back to a default name.
+function parseContentDispositionFilename(header) {
+  if (!header) return null;
+  const match = /filename\s*=\s*"?([^";]+)"?/i.exec(header);
+  return match ? match[1] : null;
+}
+
 // ------------------- Aggregate (multi-member) endpoints -------------------
 //
 // Population-level list endpoints. Each returns { items, total } where every

@@ -76,6 +76,8 @@ jest.mock("../../../../services/member360LabService", () => ({
   createMember360CareJourney: jest.fn(),
   updateMember360CareJourney: jest.fn(),
   updateMember360CareJourneyStage: jest.fn(),
+  uploadMember360Document: jest.fn(),
+  downloadMember360Document: jest.fn(),
 }));
 
 // Chart sub-pages live in `./chart/*.jsx`. CRA's Jest defaults don't

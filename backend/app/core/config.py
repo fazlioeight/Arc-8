@@ -54,6 +54,21 @@ class Settings(BaseSettings):
     S3_BUCKET_PREFIX: Optional[str] = None
     BACKGROUND_QUEUE_URL: Optional[str] = None
 
+    # Member360 document upload. Each tenant gets its own subtree of the
+    # storage root (``local``) or its own container (``azure``) so two
+    # tenants can never see one another's files. ``s3`` / ``gcs`` are
+    # reserved but unimplemented.
+    MEMBER360_STORAGE_BACKEND: str = "local"
+    MEMBER360_STORAGE_ROOT: str = "data/member360"
+    MEMBER360_STORAGE_MAX_UPLOAD_MB: int = 25
+
+    # Azure Blob backend. Auth is via DefaultAzureCredential (managed
+    # identity in prod; az login / VS Code / env vars for dev) — no
+    # connection string or account key needed. Account name is provided
+    # per deployment (e.g. ``nexorachatstor53684``).
+    AZURE_STORAGE_ACCOUNT_NAME: Optional[str] = None
+    AZURE_STORAGE_CONTAINER_PREFIX: str = "m360-"
+
     FEATURE_FLAG_DEFAULTS: Dict[str, bool] = {"analytics": True}
 
     PORTAL_APPLICATIONS: Dict[str, Dict[str, str]] = {

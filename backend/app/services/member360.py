@@ -19,6 +19,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+import hashlib
+
 from ..models.member360 import (
     Member360CareJourney,
     Member360CareJourneyStage,
@@ -34,6 +36,7 @@ from ..models.member360 import (
     Member360Savings,
     Member360Task,
 )
+from . import member360_storage
 
 
 def _compute_age(dob: Optional[date]) -> Optional[int]:
@@ -415,18 +418,23 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
         "accumulator": accumulator_payload,
         "care_options": care_options_payload,
         "savings": savings_payload,
-        "documents": [
-            {
-                "id": d.id,
-                "member_id": d.member_id,
-                "file_name": d.file_name,
-                "document_type": d.document_type,
-                "uploaded_by": d.uploaded_by,
-                "uploaded_at": d.uploaded_at,
-                "status": d.status,
-            }
-            for d in member.documents
-        ],
+        "documents": [_serialize_document(d) for d in member.documents],
+    }
+
+
+def _serialize_document(d: Member360Document) -> dict:
+    return {
+        "id": d.id,
+        "member_id": d.member_id,
+        "file_name": d.file_name,
+        "document_type": d.document_type,
+        "uploaded_by": d.uploaded_by,
+        "uploaded_at": d.uploaded_at,
+        "status": d.status,
+        "storage_backend": d.storage_backend,
+        "content_type": d.content_type,
+        "size_bytes": d.size_bytes,
+        "sha256": d.sha256,
     }
 
 
@@ -1238,16 +1246,7 @@ async def list_documents_all(
     stmt = stmt.limit(limit).offset(offset)
     rows = (await session.execute(stmt)).all()
     items = [
-        {
-            "id": d.id,
-            "member_id": d.member_id,
-            "file_name": d.file_name,
-            "document_type": d.document_type,
-            "uploaded_by": d.uploaded_by,
-            "uploaded_at": d.uploaded_at,
-            "status": d.status,
-            **_member_ref(member),
-        }
+        {**_serialize_document(d), **_member_ref(member)}
         for d, member in rows
     ]
     return items, int(total)
@@ -1749,3 +1748,82 @@ async def deliver_message(
     )
     message.status = status_
     return message
+
+
+# ---------- Document upload + retrieval -----------------------------------
+# Two-phase write: insert the row first to claim an id, then write to the
+# storage backend keyed on that id (so two documents with the same filename
+# never collide), then flush the storage metadata back onto the row. If the
+# storage write fails the transaction rolls back and no orphan row remains.
+
+
+async def create_document(
+    session: AsyncSession,
+    *,
+    tenant_key: str,
+    member_id: int,
+    file_name: str,
+    content_type: str,
+    body: bytes,
+    uploaded_by: Optional[str],
+    document_type: Optional[str] = None,
+) -> Optional[dict]:
+    member = await session.scalar(
+        select(Member360Member).where(Member360Member.id == member_id)
+    )
+    if not member:
+        return None
+
+    digest = hashlib.sha256(body).hexdigest()
+    row = Member360Document(
+        member_id=member_id,
+        file_name=(file_name or "file")[:255],
+        document_type=document_type,
+        uploaded_by=uploaded_by,
+        status="active",
+        content_type=(content_type or "application/octet-stream")[:128],
+        size_bytes=len(body),
+        sha256=digest,
+    )
+    session.add(row)
+    await session.flush()  # populates row.id
+
+    backend = member360_storage.get_document_backend()
+    storage_path = await backend.write(
+        tenant_key=tenant_key,
+        member_id=member_id,
+        doc_id=row.id,
+        file_name=row.file_name,
+        body=body,
+    )
+    row.storage_backend = backend.name
+    row.storage_path = storage_path
+    await session.flush()
+    return _serialize_document(row)
+
+
+async def read_document(
+    session: AsyncSession,
+    *,
+    tenant_key: str,
+    document_id: int,
+) -> Optional[tuple[dict, bytes]]:
+    """Look up a document row + load its bytes from the backend.
+
+    Returns ``None`` if the document doesn't exist, has no storage record
+    (legacy metadata-only row), or its bytes can't be read. The caller
+    surfaces the 404 — we avoid leaking ``DocumentStorageError`` to the
+    HTTP layer because we don't want to distinguish "row missing" from
+    "bytes missing" in the response (both look like 404 to the user).
+    """
+    row = await session.scalar(
+        select(Member360Document).where(Member360Document.id == document_id)
+    )
+    if not row or not row.storage_path:
+        return None
+    backend = member360_storage.get_document_backend()
+    try:
+        body = await backend.read(tenant_key=tenant_key, storage_path=row.storage_path)
+    except member360_storage.DocumentStorageError:
+        return None
+    return _serialize_document(row), body

@@ -56,6 +56,7 @@ async def seeded_member():
     from app.core.config import get_settings
     from app.models.member360 import (
         Member360CareOption,
+        Member360Document,
         Member360Member,
         Member360Note,
         Member360Savings,
@@ -100,6 +101,7 @@ async def seeded_member():
             await session.execute(delete(Member360CareOption))
             await session.execute(delete(Member360Note))
             await session.execute(delete(Member360Task))
+            await session.execute(delete(Member360Document))
             await session.execute(delete(Member360Member).where(Member360Member.id == member_id))
             await session.commit()
         await engine.dispose()
@@ -997,6 +999,247 @@ async def test_care_journey_update_validates_status(fastapi_app, seeded_member):
 # create_message now resolves an OutreachChannel and dispatches via a provider
 # stub. We seed an admin channel row directly (admin endpoints require admin
 # role; the seed user is analyst) and verify the resulting Message.status.
+
+
+# ---- Document upload + download --------------------------------------------
+#
+# Local filesystem backend keyed on tenant_key. We point the storage root at
+# a per-test ``tmp_path`` so uploads don't pollute the repo and so we can
+# inspect the on-disk layout for tenant isolation.
+
+
+@pytest.fixture
+def storage_tmp_root(tmp_path, monkeypatch):
+    """Repoint the document storage root at a tmp dir and reset the
+    backend singleton so the new setting takes effect for this test."""
+    from app.core.config import get_settings
+    from app.services import member360_storage
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "MEMBER360_STORAGE_ROOT", str(tmp_path))
+    monkeypatch.setattr(settings, "MEMBER360_STORAGE_BACKEND", "local")
+    member360_storage.reset_document_backend()
+    yield tmp_path
+    member360_storage.reset_document_backend()
+
+
+async def test_document_upload_download_roundtrip(fastapi_app, seeded_member, storage_tmp_root):
+    """POST /members/{id}/documents stores bytes; GET /documents/{id}/download
+    returns the same bytes with the original filename in Content-Disposition."""
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = _auth_headers(token)
+        payload = b"%PDF-1.4 fake bytes for test\n"
+        files = {"file": ("consent.pdf", payload, "application/pdf")}
+        up = await client.post(
+            f"/api/member360/members/{seeded_member}/documents",
+            files=files,
+            data={"document_type": "Consent"},
+            headers=headers,
+        )
+        assert up.status_code == 201, up.text
+        doc = up.json()
+        assert doc["file_name"] == "consent.pdf"
+        assert doc["document_type"] == "Consent"
+        assert doc["size_bytes"] == len(payload)
+        assert doc["content_type"] == "application/pdf"
+        assert doc["storage_backend"] == "local"
+
+        dl = await client.get(
+            f"/api/member360/documents/{doc['id']}/download",
+            headers=headers,
+        )
+    assert dl.status_code == 200
+    assert dl.content == payload
+    assert dl.headers["content-type"].startswith("application/pdf")
+    assert "consent.pdf" in dl.headers.get("content-disposition", "")
+
+
+async def test_document_lands_in_tenant_scoped_directory(fastapi_app, seeded_member, storage_tmp_root):
+    """The on-disk file must be under ``{root}/{tenant_key}/m360/documents/``
+    so a second tenant could never read it even with a crafted path."""
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        files = {"file": ("note.txt", b"hello", "text/plain")}
+        up = await client.post(
+            f"/api/member360/members/{seeded_member}/documents",
+            files=files,
+            headers=_auth_headers(token),
+        )
+        assert up.status_code == 201, up.text
+
+    tenant_dir = storage_tmp_root / TENANT_KEY / "m360" / "documents" / str(seeded_member)
+    assert tenant_dir.exists(), f"expected tenant dir at {tenant_dir}"
+    contents = list(tenant_dir.iterdir())
+    assert len(contents) == 1
+    # File name follows the {doc_id}_{safe_filename} convention.
+    assert contents[0].name.endswith("_note.txt")
+    assert contents[0].read_bytes() == b"hello"
+
+    # And nothing landed at the *root* of the storage tree (i.e. no leak
+    # outside the tenant prefix).
+    root_files = [p for p in storage_tmp_root.iterdir() if p.is_file()]
+    assert root_files == []
+
+
+async def test_document_upload_rejects_unknown_member(fastapi_app, storage_tmp_root):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        resp = await client.post(
+            "/api/member360/members/999999/documents",
+            files={"file": ("x.txt", b"x", "text/plain")},
+            headers=_auth_headers(token),
+        )
+    assert resp.status_code == 404
+
+
+async def test_document_upload_rejects_empty_file(fastapi_app, seeded_member, storage_tmp_root):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        resp = await client.post(
+            f"/api/member360/members/{seeded_member}/documents",
+            files={"file": ("empty.txt", b"", "text/plain")},
+            headers=_auth_headers(token),
+        )
+    assert resp.status_code == 400
+
+
+async def test_document_upload_rejects_oversized_file(fastapi_app, seeded_member, storage_tmp_root, monkeypatch):
+    """The size cap comes from settings.MEMBER360_STORAGE_MAX_UPLOAD_MB. We
+    drop it to 1 MB and submit something larger to trigger the 413."""
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "MEMBER360_STORAGE_MAX_UPLOAD_MB", 1)
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        big = b"x" * (2 * 1024 * 1024)
+        resp = await client.post(
+            f"/api/member360/members/{seeded_member}/documents",
+            files={"file": ("huge.bin", big, "application/octet-stream")},
+            headers=_auth_headers(token),
+        )
+    assert resp.status_code == 413
+
+
+async def test_document_download_404_for_unknown_id(fastapi_app, storage_tmp_root):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        resp = await client.get(
+            "/api/member360/documents/999999/download",
+            headers=_auth_headers(token),
+        )
+    assert resp.status_code == 404
+
+
+# ---- Azure Blob backend (offline) ------------------------------------------
+#
+# These exercise the dispatch + sanitization logic without making network
+# calls — DefaultAzureCredential is instantiated but never invoked since we
+# never call .write/.read. A live integration test against a real storage
+# account would need AZURE creds and lives outside the unit-test path.
+
+
+def test_azure_container_name_sanitization():
+    """Azure container names: 3-63 chars, lowercase, [a-z0-9-], no
+    consecutive dashes, no leading/trailing dash. The sanitizer must coerce
+    arbitrary tenant keys to that shape."""
+    from app.services.member360_storage import sanitize_container_name as san
+
+    # Happy path: clean tenant key just gets prefixed.
+    assert san("m360-", "prominencehealth") == "m360-prominencehealth"
+    # Mixed-case + special chars → lowercased + collapsed.
+    assert san("m360-", "Acme_Health.Plan") == "m360-acme-health-plan"
+    # Consecutive dashes collapse, leading/trailing dashes strip.
+    assert san("m360-", "--acme--") == "m360-acme"
+    # Pathological short tenant key still produces a >=3 char name.
+    assert len(san("", "a")) >= 3
+    # Cap at 63 chars.
+    long_key = "x" * 100
+    assert len(san("m360-", long_key)) <= 63
+
+
+def test_get_document_backend_dispatches_azure(monkeypatch):
+    """When MEMBER360_STORAGE_BACKEND=azure the dispatcher should return
+    an AzureBlobBackend bound to the configured account name."""
+    from app.core.config import get_settings
+    from app.services import member360_storage
+    from app.services.member360_storage import AzureBlobBackend
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "MEMBER360_STORAGE_BACKEND", "azure")
+    monkeypatch.setattr(settings, "AZURE_STORAGE_ACCOUNT_NAME", "nexorachatstor53684")
+    monkeypatch.setattr(settings, "AZURE_STORAGE_CONTAINER_PREFIX", "m360-")
+    member360_storage.reset_document_backend()
+    try:
+        backend = member360_storage.get_document_backend()
+        assert isinstance(backend, AzureBlobBackend)
+        assert backend.name == "azure"
+        # Sanitization is wired through the instance method too.
+        assert backend._container_name("prominencehealth") == "m360-prominencehealth"
+    finally:
+        member360_storage.reset_document_backend()
+        monkeypatch.setattr(settings, "MEMBER360_STORAGE_BACKEND", "local")
+
+
+def test_identity_summary_classifies_token_claims():
+    """The startup probe decodes the access-token JWT to figure out which
+    identity won the credential chain. Verify each branch: user (az login),
+    service principal (SP secret), managed identity (azure-hosted)."""
+    import base64
+    import json
+
+    from app.services.member360_storage import _identity_summary_from_token
+
+    def _encode(claims: dict) -> str:
+        # We only need a parseable JWT shape; signature can be empty bytes.
+        payload = base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=").decode()
+        return f"header.{payload}.sig"
+
+    user = _identity_summary_from_token(_encode({
+        "idtyp": "user", "upn": "alex@example.com", "oid": "u-1", "tid": "t",
+    }))
+    assert user["identity_type"] == "user"
+    assert user["identity"] == "alex@example.com"
+
+    sp = _identity_summary_from_token(_encode({
+        "idtyp": "app", "appid": "c-123", "oid": "o-1", "tid": "t",
+    }))
+    assert sp["identity_type"] == "service_principal"
+    assert sp["identity"] == "c-123"
+
+    mi = _identity_summary_from_token(_encode({
+        "idtyp": "app", "appid": "c-456", "oid": "o-2", "tid": "t",
+        "xms_mirid": "/subscriptions/x/resourceGroups/y/...",
+    }))
+    assert mi["identity_type"] == "managed_identity"
+
+    # Garbage token doesn't crash the probe.
+    junk = _identity_summary_from_token("not-a-jwt")
+    assert junk["identity_type"] == "unknown"
+
+
+def test_azure_backend_requires_account_name(monkeypatch):
+    """Selecting azure without an account name should fail loudly at
+    backend resolution rather than at the first upload attempt."""
+    from app.core.config import get_settings
+    from app.services import member360_storage
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "MEMBER360_STORAGE_BACKEND", "azure")
+    monkeypatch.setattr(settings, "AZURE_STORAGE_ACCOUNT_NAME", None)
+    member360_storage.reset_document_backend()
+    try:
+        with pytest.raises(member360_storage.DocumentStorageError):
+            member360_storage.get_document_backend()
+    finally:
+        member360_storage.reset_document_backend()
+        monkeypatch.setattr(settings, "MEMBER360_STORAGE_BACKEND", "local")
 
 
 async def test_outreach_delivery_status_transitions(fastapi_app, seeded_member):

@@ -13,8 +13,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..core.config import get_settings
 
 from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
@@ -31,6 +34,7 @@ from ..schemas.member360 import (
     CareOptionCreate,
     CareOptionListResponse,
     ClaimImportRequest,
+    Document,
     DashboardResponse,
     DocumentListResponse,
     GapAnalysisResponse,
@@ -783,6 +787,110 @@ async def import_claims(
     await session.commit()
     await control_session.commit()
     return summary
+
+
+# ---- Document upload + download --------------------------------------------
+# Uploads land in a per-tenant prefix on the configured storage backend
+# (local FS by default). Each tenant has its own directory tree, so two
+# tenants can never read one another's files even with a crafted
+# ``storage_path``. See services.member360_storage for the layout.
+
+
+@router.post(
+    "/members/{member_id}/documents",
+    response_model=Document,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_document(
+    member_id: int,
+    file: UploadFile = File(...),
+    document_type: Optional[str] = Form(default=None),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    settings = get_settings()
+    max_bytes = max(1, settings.MEMBER360_STORAGE_MAX_UPLOAD_MB) * 1024 * 1024
+    body = await file.read()
+    if len(body) == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty upload")
+    if len(body) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds {settings.MEMBER360_STORAGE_MAX_UPLOAD_MB} MB limit",
+        )
+    try:
+        doc = await member360_service.create_document(
+            session,
+            tenant_key=tenant.key,
+            member_id=member_id,
+            file_name=file.filename or "file",
+            content_type=file.content_type or "application/octet-stream",
+            body=body,
+            uploaded_by=current_user.email,
+            document_type=document_type,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Storage failures roll back the row insert so we never leave an
+        # orphan DB row pointing at nothing. The error is logged via the
+        # request-logging middleware; surface a 500 to the caller.
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Document upload failed: {exc}",
+        ) from exc
+    if doc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.document.upload",
+        payload={
+            "member_id": member_id,
+            "document_id": doc["id"],
+            "size_bytes": doc["size_bytes"],
+            "content_type": doc["content_type"],
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return doc
+
+
+@router.get("/documents/{document_id}/download")
+async def download_document(
+    document_id: int,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    result = await member360_service.read_document(
+        session, tenant_key=tenant.key, document_id=document_id
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    doc, body = result
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.document.download",
+        payload={"document_id": document_id, "member_id": doc["member_id"]},
+    )
+    await control_session.commit()
+    return Response(
+        content=body,
+        media_type=doc.get("content_type") or "application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{doc["file_name"]}"',
+            "X-Document-SHA256": doc.get("sha256") or "",
+        },
+    )
 
 
 @router.post("/import/risk-insights", response_model=ImportResponse)
