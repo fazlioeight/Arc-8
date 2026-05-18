@@ -48,16 +48,21 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+# Suppress benign "WARNING: ..." stderr lines from the Azure CLI's
+# containerapp / postgres extensions. Windows PowerShell 5.1 wraps every
+# native-command stderr line as a NativeCommandError, and combined with
+# $ErrorActionPreference="Stop" above the script aborts on lines like
+#   "WARNING: The behavior of this command has been altered by the
+#    following extension: containerapp"
+# which are not actual errors. AZURE_CORE_ONLY_SHOW_ERRORS keeps real
+# errors visible while silencing the warnings.
+$env:AZURE_CORE_ONLY_SHOW_ERRORS = "true"
+
 # Force UTF-8 stdout so 'az acr build' log streaming doesn't crash with
 # 'charmap codec can't encode' when Docker prints non-ASCII chars.
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
 $OutputEncoding = [System.Text.UTF8Encoding]::new()
 $env:PYTHONIOENCODING = "utf-8"
-
-# Suppress containerapp extension WARNING lines on stderr — under PS 5.1 with
-# $ErrorActionPreference="Stop", those warnings get wrapped as ErrorRecords
-# and abort the script even on exit code 0.
-$env:AZURE_CORE_ONLY_SHOW_ERRORS = "true"
 
 function Write-Phase([string]$Title) {
     Write-Host ""

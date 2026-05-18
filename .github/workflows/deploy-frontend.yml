@@ -12,6 +12,13 @@ concurrency:
   group: deploy-frontend
   cancel-in-progress: true
 
+# Force Node 20 actions (actions/checkout@v4, actions/setup-node@v4,
+# Azure/static-web-apps-deploy@v1) onto the Node 24 runtime so we don't
+# fail when GitHub removes Node 20 from the runner on 2026-09-16. Remove
+# this once the action authors publish Node-24-native major versions.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   test:
     runs-on: ubuntu-latest
