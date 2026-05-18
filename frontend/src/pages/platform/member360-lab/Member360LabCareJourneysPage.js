@@ -6,10 +6,12 @@ import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import {
-  fetchMember360AllJourneys,
+  fetchMember360CareJourneys,
   fetchMember360JourneyTemplates,
 } from '../../../services/member360LabService';
-import { CareJourneyCard, LabSubNav, RiskBadge } from './components';
+import { CareJourneyCard, LabSubNav, Pagination, RiskBadge } from './components';
+
+const PAGE_SIZE = 100;
 import FilterDropdown from '../../../components/ui/FilterDropdown';
 import KpiTile from '../../../components/ui/KpiTile';
 import SearchInput from '../../../components/ui/SearchInput';
@@ -26,6 +28,8 @@ const Member360LabCareJourneysPage = () => {
   const { token, tenant } = useContext(AuthContext) || {};
   const [templates, setTemplates] = useState([]);
   const [journeys, setJourneys] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [statuses, setStatuses] = useState(['active']);
   const [search, setSearch] = useState('');
@@ -37,19 +41,20 @@ const Member360LabCareJourneysPage = () => {
     setLoading(true);
     Promise.all([
       fetchMember360JourneyTemplates(token, tenant),
-      fetchMember360AllJourneys(token, tenant),
+      fetchMember360CareJourneys(token, tenant, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
     ])
-      .then(([tpl, js]) => {
+      .then(([tpl, res]) => {
         if (cancelled) return;
         setTemplates(tpl || []);
-        setJourneys(js || []);
+        setJourneys(res?.items || []);
+        setTotal(res?.total || 0);
         setSelectedTemplateId((prev) => prev ?? (tpl && tpl[0]?.id) ?? null);
         setError(null);
       })
       .catch((err) => { if (!cancelled) setError(err.message || String(err)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [token, tenant]);
+  }, [token, tenant, page]);
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === selectedTemplateId) || null,
@@ -246,6 +251,7 @@ const Member360LabCareJourneysPage = () => {
                     <p className="text-sm coding-text-soft col-span-full text-center py-8">No journeys match the current filters.</p>
                   )}
                 </div>
+                <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} label="journeys" />
               </section>
             </div>
           </div>

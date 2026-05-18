@@ -703,3 +703,55 @@ export function CareJourneyCard({ journey, onStageClick }) {
     </div>
   );
 }
+
+/**
+ * Pagination control for population list pages. Stateless — caller owns
+ * the current page in component state. `total` is the full row count from
+ * the server (the value returned alongside `items`); `pageSize` is the
+ * client's chosen page size (defaults to 50 on the backend).
+ */
+export function Pagination({ page = 1, pageSize = 50, total = 0, onPageChange, label = 'rows' }) {
+  const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const first = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const last = Math.min(safePage * pageSize, total);
+  const canPrev = safePage > 1;
+  const canNext = safePage < totalPages;
+
+  const goTo = (p) => {
+    if (!onPageChange) return;
+    const next = Math.min(Math.max(1, p), totalPages);
+    if (next !== safePage) onPageChange(next);
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-2 text-xs coding-text-muted">
+      <span>
+        {total === 0
+          ? `No ${label}`
+          : `Showing ${first}–${last} of ${total.toLocaleString()} ${label}`}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => goTo(safePage - 1)}
+          disabled={!canPrev}
+          className="rounded-md ring-1 ring-black/5 dark:ring-white/10 coding-surface coding-text-strong px-2 py-1 hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          ← Prev
+        </button>
+        <span className="px-2">
+          Page {safePage} of {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => goTo(safePage + 1)}
+          disabled={!canNext}
+          className="rounded-md ring-1 ring-black/5 dark:ring-white/10 coding-surface coding-text-strong px-2 py-1 hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Next →
+        </button>
+      </div>
+    </div>
+  );
+}

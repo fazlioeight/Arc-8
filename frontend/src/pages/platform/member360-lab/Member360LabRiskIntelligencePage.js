@@ -6,10 +6,17 @@ import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import {
-  fetchMember360AllRiskInsights,
   fetchMember360Members,
+  fetchMember360RiskInsights,
 } from '../../../services/member360LabService';
 import { LabSubNav, RiskBadge } from './components';
+
+// Risk intelligence is an analytics page (tier distribution, domain averages,
+// driver rollups) rather than a row-by-row list, so it intentionally fetches
+// up to 500 members and 500 risk insights in one shot rather than paginating.
+// Real customer scale will want server-side rollup endpoints — until then we
+// surface the cap below as an honest footnote.
+const ANALYTICS_SAMPLE_SIZE = 500;
 import FilterDropdown from '../../../components/ui/FilterDropdown';
 import KpiTile from '../../../components/ui/KpiTile';
 
@@ -27,7 +34,9 @@ const Member360LabRiskIntelligencePage = () => {
   const navigate = useNavigate();
   const { token, tenant } = useContext(AuthContext) || {};
   const [members, setMembers] = useState([]);
+  const [memberTotal, setMemberTotal] = useState(0);
   const [insights, setInsights] = useState([]);
+  const [insightTotal, setInsightTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [domain, setDomain] = useState(null);
@@ -36,19 +45,24 @@ const Member360LabRiskIntelligencePage = () => {
     let cancelled = false;
     setLoading(true);
     Promise.all([
-      fetchMember360Members(token, tenant, { limit: 500 }),
-      fetchMember360AllRiskInsights(token, tenant),
+      fetchMember360Members(token, tenant, { limit: ANALYTICS_SAMPLE_SIZE }),
+      fetchMember360RiskInsights(token, tenant, { limit: ANALYTICS_SAMPLE_SIZE }),
     ])
-      .then(([memberRes, insightRows]) => {
+      .then(([memberRes, insightRes]) => {
         if (cancelled) return;
         setMembers(memberRes.items || []);
-        setInsights(insightRows || []);
+        setMemberTotal(memberRes.total || 0);
+        setInsights(insightRes.items || []);
+        setInsightTotal(insightRes.total || 0);
         setError(null);
       })
       .catch((err) => { if (!cancelled) setError(err.message || String(err)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [token, tenant]);
+
+  const membersCapped = memberTotal > members.length;
+  const insightsCapped = insightTotal > insights.length;
 
   const tierBreakdown = useMemo(() => {
     const counts = Object.fromEntries(TIER_ORDER.map((t) => [t, 0]));
@@ -119,6 +133,14 @@ const Member360LabRiskIntelligencePage = () => {
 
       {loading && <LoadingState title="Loading risk insights" />}
       {error && <ErrorState title="Risk data unavailable" description={error} />}
+
+      {!loading && !error && (membersCapped || insightsCapped) && (
+        <div className="rounded-md border coding-border bg-amber-50/60 dark:bg-amber-900/10 px-3 py-2 text-[11px] coding-text-muted">
+          Showing analytics across the first {ANALYTICS_SAMPLE_SIZE.toLocaleString()} {membersCapped ? `members (of ${memberTotal.toLocaleString()})` : 'members'}
+          {insightsCapped ? ` and ${ANALYTICS_SAMPLE_SIZE.toLocaleString()} risk insights (of ${insightTotal.toLocaleString()})` : ''}.
+          Larger populations will get a dedicated server-side rollup endpoint.
+        </div>
+      )}
 
       {!loading && !error && (
         <>

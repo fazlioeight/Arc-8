@@ -6,7 +6,9 @@ import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { fetchMember360Members } from '../../../services/member360LabService';
-import { LabSubNav, RiskBadge } from './components';
+import { LabSubNav, Pagination, RiskBadge } from './components';
+
+const PAGE_SIZE = 100;
 import FilterDropdown from '../../../components/ui/FilterDropdown';
 import SavedViewsBar from '../../../components/ui/SavedViewsBar';
 import SearchInput from '../../../components/ui/SearchInput';
@@ -36,6 +38,7 @@ const Member360LabMembersPage = () => {
   const [activeView, setActiveView] = useState('all');
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -45,12 +48,20 @@ const Member360LabMembersPage = () => {
     setSelectedTiers(view?.tiers || []);
     setJourneyFilter(view?.journey || 'any');
     setTaskFilter(view?.task || 'any');
+    setPage(1);
   };
 
   const activeFilterCount =
     (selectedTiers.length > 0 ? 1 : 0) +
     (journeyFilter !== 'any' ? 1 : 0) +
     (taskFilter !== 'any' ? 1 : 0);
+
+  // Reset to page 1 whenever the server-side filters change so the user always
+  // lands on the first page of the new result set instead of, say, page 7 of
+  // a much smaller filtered set.
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedTiers, journeyFilter, taskFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,14 +71,15 @@ const Member360LabMembersPage = () => {
       risk_tier: selectedTiers.length ? selectedTiers : undefined,
       has_active_journey: journeyFilter === 'any' ? undefined : journeyFilter === 'yes',
       has_open_task: taskFilter === 'any' ? undefined : taskFilter === 'yes',
-      limit: 200,
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
     };
     fetchMember360Members(token, tenant, filters)
       .then((res) => { if (!cancelled) { setItems(res.items || []); setTotal(res.total || (res.items || []).length); setError(null); } })
       .catch((err) => { if (!cancelled) setError(err.message || String(err)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [token, tenant, search, selectedTiers, journeyFilter, taskFilter]);
+  }, [token, tenant, search, selectedTiers, journeyFilter, taskFilter, page]);
 
   const sorted = useMemo(() => {
     const copy = [...items];
@@ -223,6 +235,7 @@ const Member360LabMembersPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} label="members" />
         </section>
       )}
     </PortalPageLayout>

@@ -20,22 +20,28 @@ from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
 from ..dependencies.tenant import get_tenant_context, get_tenant_session
 from ..schemas.member360 import (
+    CareJourneyListResponse,
+    CareJourneyTemplate,
     CareOption,
     CareOptionCreate,
-    CareJourneyTemplate,
+    CareOptionListResponse,
     DashboardResponse,
+    DocumentListResponse,
     GapAnalysisResponse,
     MemberDetailResponse,
     MemberListResponse,
     MemberUpdate,
     Message,
     MessageCreate,
+    MessageListResponse,
     Note,
     NoteCreate,
+    RiskInsightListResponse,
     SubmissionExportRequest,
     SubmissionExportResponse,
     Task,
     TaskCreate,
+    TaskListResponse,
     TaskUpdate,
 )
 from ..services import member360 as member360_service
@@ -368,3 +374,202 @@ async def export_submission(
     await session.commit()
     await control_session.commit()
     return result
+
+
+# ---- Aggregate (multi-member) list endpoints --------------------------------
+#
+# Each endpoint returns a flat, paginated list across all members in the
+# tenant. Rows include denormalized member fields (name, key, risk tier, plan,
+# preferred channel) so list pages don't need to fan out per member. These
+# replace the client-side `fetchMember360All*` fan-out helpers that capped
+# silently at 500 members.
+
+
+@router.get("/tasks", response_model=TaskListResponse)
+async def list_tasks(
+    member_id: Optional[int] = Query(default=None),
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    priority: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    items, total = await member360_service.list_tasks(
+        session,
+        limit=limit,
+        offset=offset,
+        member_id=member_id,
+        status=status_filter,
+        priority=priority,
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.tasks.list",
+        payload={"count": len(items), "total": total, "filters": {"member_id": member_id, "status": status_filter, "priority": priority}},
+    )
+    await session.commit()
+    await control_session.commit()
+    return {"items": items, "total": total}
+
+
+@router.get("/messages", response_model=MessageListResponse)
+async def list_messages(
+    member_id: Optional[int] = Query(default=None),
+    channel: Optional[str] = Query(default=None),
+    direction: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    items, total = await member360_service.list_messages(
+        session,
+        limit=limit,
+        offset=offset,
+        member_id=member_id,
+        channel=channel,
+        direction=direction,
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.messages.list",
+        payload={"count": len(items), "total": total, "filters": {"member_id": member_id, "channel": channel, "direction": direction}},
+    )
+    await session.commit()
+    await control_session.commit()
+    return {"items": items, "total": total}
+
+
+@router.get("/care-options", response_model=CareOptionListResponse)
+async def list_care_options(
+    member_id: Optional[int] = Query(default=None),
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    items, total = await member360_service.list_care_options_all(
+        session,
+        limit=limit,
+        offset=offset,
+        member_id=member_id,
+        status=status_filter,
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.care_options.list",
+        payload={"count": len(items), "total": total, "filters": {"member_id": member_id, "status": status_filter}},
+    )
+    await session.commit()
+    await control_session.commit()
+    return {"items": items, "total": total}
+
+
+@router.get("/documents", response_model=DocumentListResponse)
+async def list_documents(
+    member_id: Optional[int] = Query(default=None),
+    document_type: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    items, total = await member360_service.list_documents_all(
+        session,
+        limit=limit,
+        offset=offset,
+        member_id=member_id,
+        document_type=document_type,
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.documents.list",
+        payload={"count": len(items), "total": total, "filters": {"member_id": member_id, "document_type": document_type}},
+    )
+    await session.commit()
+    await control_session.commit()
+    return {"items": items, "total": total}
+
+
+@router.get("/care-journeys", response_model=CareJourneyListResponse)
+async def list_care_journeys(
+    member_id: Optional[int] = Query(default=None),
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    items, total = await member360_service.list_care_journeys_all(
+        session,
+        limit=limit,
+        offset=offset,
+        member_id=member_id,
+        status=status_filter,
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.care_journeys.list",
+        payload={"count": len(items), "total": total, "filters": {"member_id": member_id, "status": status_filter}},
+    )
+    await session.commit()
+    await control_session.commit()
+    return {"items": items, "total": total}
+
+
+@router.get("/risk-insights", response_model=RiskInsightListResponse)
+async def list_risk_insights(
+    member_id: Optional[int] = Query(default=None),
+    domain: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    items, total = await member360_service.list_risk_insights_all(
+        session,
+        limit=limit,
+        offset=offset,
+        member_id=member_id,
+        domain=domain,
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.risk_insights.list",
+        payload={"count": len(items), "total": total, "filters": {"member_id": member_id, "domain": domain}},
+    )
+    await session.commit()
+    await control_session.commit()
+    return {"items": items, "total": total}

@@ -5,8 +5,10 @@ import { AuthContext } from '../../../context/AuthContext';
 import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
-import { fetchMember360AllDocuments } from '../../../services/member360LabService';
-import { LabSubNav, RiskBadge } from './components';
+import { fetchMember360Documents } from '../../../services/member360LabService';
+import { LabSubNav, Pagination, RiskBadge } from './components';
+
+const PAGE_SIZE = 100;
 import FilterDropdown from '../../../components/ui/FilterDropdown';
 import KpiTile from '../../../components/ui/KpiTile';
 import SavedViewsBar from '../../../components/ui/SavedViewsBar';
@@ -29,6 +31,8 @@ const Member360LabDocumentsPage = () => {
   const navigate = useNavigate();
   const { token, tenant } = useContext(AuthContext) || {};
   const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
@@ -41,12 +45,17 @@ const Member360LabDocumentsPage = () => {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchMember360AllDocuments(token, tenant)
-      .then((items) => { if (!cancelled) { setRows(items); setError(null); } })
+    fetchMember360Documents(token, tenant, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE })
+      .then((res) => {
+        if (cancelled) return;
+        setRows(res.items || []);
+        setTotal(res.total || 0);
+        setError(null);
+      })
       .catch((err) => { if (!cancelled) setError(err.message || String(err)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [token, tenant]);
+  }, [token, tenant, page]);
 
   const allTypes = useMemo(() => {
     const set = new Set();
@@ -210,7 +219,10 @@ const Member360LabDocumentsPage = () => {
       {!loading && !error && (
         <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
           <div className="px-4 py-2.5 flex items-center justify-between text-xs coding-text-muted border-b coding-border">
-            <span>{filtered.length} document{filtered.length === 1 ? '' : 's'}{rows.length !== filtered.length ? ` of ${rows.length}` : ''}</span>
+            <span>
+              {filtered.length} document{filtered.length === 1 ? '' : 's'} shown
+              {rows.length !== filtered.length ? ` (filtered from ${rows.length} on this page)` : ''}
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -257,6 +269,7 @@ const Member360LabDocumentsPage = () => {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} label="documents" />
           <p className="text-[11px] coding-text-muted px-4 py-2 border-t coding-border">
             Upload, preview, and audit workflows arrive in a future phase — this surface indexes existing files attached to member workspaces.
           </p>

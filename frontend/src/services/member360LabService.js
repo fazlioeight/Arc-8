@@ -104,91 +104,47 @@ export const createMember360CareOption = (token, tenant, payload) =>
 export const fetchMember360JourneyTemplates = (token, tenant) =>
   get(token, tenant, '/api/member360/care-journey-templates');
 
-// ------------------- Aggregate (multi-member) helpers -------------------
-// These fan out across the member list and per-member detail endpoints since
-// there is no aggregate endpoint server-side yet. Fine for a lab-scale
-// tenant; switch to a dedicated endpoint when row counts grow.
+// ------------------- Aggregate (multi-member) endpoints -------------------
+//
+// Population-level list endpoints. Each returns { items, total } where every
+// item is already enriched with the denormalized member fields the UI needs
+// (member_name, member_key, risk_tier, plan_name, preferred_channel) — so
+// the list pages don't have to fan out per-member detail requests like the
+// previous client-side helpers did (which capped silently at 500 members).
+//
+// All accept `limit` (default 50, max 500), `offset` (default 0), plus
+// optional `member_id` and per-collection filters. See routes/member360.py
+// for the full filter list per endpoint.
 
-const memberLookup = (members) => {
-  const map = new Map();
-  members.forEach((m) => map.set(m.id, m));
-  return map;
+const buildListParams = (filters = {}) => {
+  const out = { limit: filters.limit, offset: filters.offset };
+  if (filters.member_id != null) out.member_id = filters.member_id;
+  if (filters.status) out.status = filters.status;
+  if (filters.priority) out.priority = filters.priority;
+  if (filters.channel) out.channel = filters.channel;
+  if (filters.direction) out.direction = filters.direction;
+  if (filters.document_type) out.document_type = filters.document_type;
+  if (filters.domain) out.domain = filters.domain;
+  return out;
 };
 
-const attachMemberSummary = (row, member) => ({
-  ...row,
-  member_id: row.member_id ?? member?.id,
-  member_name: member ? `${member.first_name || ''} ${member.last_name || ''}`.trim() : row.member_name,
-  member_key: member?.member_key || null,
-  risk_tier: member?.risk_tier || row.risk_tier || null,
-  plan_name: member?.plan_name || null,
-  preferred_channel: member?.preferred_channel || null,
-});
+export const fetchMember360Tasks = (token, tenant, filters = {}) =>
+  get(token, tenant, `/api/member360/tasks${toQuery(buildListParams(filters))}`);
 
-const fanOutDetails = async (token, tenant) => {
-  const list = await fetchMember360Members(token, tenant, { limit: 500 });
-  const members = list.items || [];
-  const details = await Promise.all(
-    members.map((m) =>
-      fetchMember360MemberDetail(token, tenant, m.id).catch(() => null),
-    ),
-  );
-  return { members, details: details.filter(Boolean) };
-};
+export const fetchMember360Messages = (token, tenant, filters = {}) =>
+  get(token, tenant, `/api/member360/messages${toQuery(buildListParams(filters))}`);
 
-export const fetchMember360AllTasks = async (token, tenant) => {
-  const { details } = await fanOutDetails(token, tenant);
-  const rows = [];
-  details.forEach((d) => {
-    (d.tasks || []).forEach((t) => rows.push(attachMemberSummary(t, d.member)));
-  });
-  return rows;
-};
+export const fetchMember360CareOptions = (token, tenant, filters = {}) =>
+  get(token, tenant, `/api/member360/care-options${toQuery(buildListParams(filters))}`);
 
-export const fetchMember360AllMessages = async (token, tenant) => {
-  const { details } = await fanOutDetails(token, tenant);
-  const rows = [];
-  details.forEach((d) => {
-    (d.messages || []).forEach((m) => rows.push(attachMemberSummary(m, d.member)));
-  });
-  return rows;
-};
+export const fetchMember360Documents = (token, tenant, filters = {}) =>
+  get(token, tenant, `/api/member360/documents${toQuery(buildListParams(filters))}`);
 
-export const fetchMember360AllCareOptions = async (token, tenant) => {
-  const { details } = await fanOutDetails(token, tenant);
-  const rows = [];
-  details.forEach((d) => {
-    (d.care_options || []).forEach((o) => rows.push(attachMemberSummary(o, d.member)));
-  });
-  return rows;
-};
+export const fetchMember360CareJourneys = (token, tenant, filters = {}) =>
+  get(token, tenant, `/api/member360/care-journeys${toQuery(buildListParams(filters))}`);
 
-export const fetchMember360AllDocuments = async (token, tenant) => {
-  const { details } = await fanOutDetails(token, tenant);
-  const rows = [];
-  details.forEach((d) => {
-    (d.documents || []).forEach((doc) => rows.push(attachMemberSummary(doc, d.member)));
-  });
-  return rows;
-};
-
-export const fetchMember360AllJourneys = async (token, tenant) => {
-  const { details } = await fanOutDetails(token, tenant);
-  const rows = [];
-  details.forEach((d) => {
-    (d.care_journeys || []).forEach((j) => rows.push(attachMemberSummary(j, d.member)));
-  });
-  return rows;
-};
-
-export const fetchMember360AllRiskInsights = async (token, tenant) => {
-  const { details } = await fanOutDetails(token, tenant);
-  const rows = [];
-  details.forEach((d) => {
-    (d.risk_insights || []).forEach((i) => rows.push(attachMemberSummary(i, d.member)));
-  });
-  return rows;
-};
+export const fetchMember360RiskInsights = (token, tenant, filters = {}) =>
+  get(token, tenant, `/api/member360/risk-insights${toQuery(buildListParams(filters))}`);
 
 // ------------------- Gap analysis & submission export -------------------
 

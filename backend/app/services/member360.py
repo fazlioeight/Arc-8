@@ -22,6 +22,8 @@ from sqlalchemy.orm import selectinload
 from ..models.member360 import (
     Member360CareJourney,
     Member360CareJourneyTemplate,
+    Member360CareOption,
+    Member360Document,
     Member360Member,
     Member360Message,
     Member360Note,
@@ -969,3 +971,280 @@ async def generate_submission_export(
         "record_count": len(rows),
         "csv": csv_content,
     }
+
+
+# ---------- Aggregate (multi-member) list endpoints --------------------------
+# Each helper returns ``(items, total)`` where ``items`` is a list of dicts
+# already enriched with the member fields the UI lists need (member_name,
+# member_key, risk_tier, plan_name, preferred_channel) so the frontend
+# doesn't have to fan out and refetch each member detail.
+
+
+def _member_ref(member: Optional[Member360Member]) -> dict:
+    """Denormalized member fields attached to every aggregate row."""
+    if member is None:
+        return {
+            "member_name": None,
+            "member_key": None,
+            "risk_tier": None,
+            "plan_name": None,
+            "preferred_channel": None,
+        }
+    return {
+        "member_name": " ".join(p for p in (member.first_name, member.last_name) if p) or None,
+        "member_key": member.member_key,
+        "risk_tier": member.risk_tier,
+        "plan_name": member.plan_name,
+        "preferred_channel": member.preferred_channel,
+    }
+
+
+async def list_tasks(
+    session: AsyncSession,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    member_id: Optional[int] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    stmt = select(Member360Task, Member360Member).join(
+        Member360Member, Member360Task.member_id == Member360Member.id
+    )
+    if member_id is not None:
+        stmt = stmt.where(Member360Task.member_id == member_id)
+    if status:
+        stmt = stmt.where(Member360Task.status == status)
+    if priority:
+        stmt = stmt.where(Member360Task.priority == priority)
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(Member360Task.due_date.asc().nullslast(), Member360Task.id.desc())
+    stmt = stmt.limit(limit).offset(offset)
+    rows = (await session.execute(stmt)).all()
+    items = [{**_task_to_dict(t, m), **_member_ref(m)} for t, m in rows]
+    return items, int(total)
+
+
+async def list_messages(
+    session: AsyncSession,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    member_id: Optional[int] = None,
+    channel: Optional[str] = None,
+    direction: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    stmt = select(Member360Message, Member360Member).join(
+        Member360Member, Member360Message.member_id == Member360Member.id
+    )
+    if member_id is not None:
+        stmt = stmt.where(Member360Message.member_id == member_id)
+    if channel:
+        stmt = stmt.where(Member360Message.channel == channel)
+    if direction:
+        stmt = stmt.where(Member360Message.direction == direction)
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(Member360Message.timestamp.desc(), Member360Message.id.desc())
+    stmt = stmt.limit(limit).offset(offset)
+    rows = (await session.execute(stmt)).all()
+    items = [
+        {
+            "id": msg.id,
+            "member_id": msg.member_id,
+            "channel": msg.channel,
+            "direction": msg.direction,
+            "sender": msg.sender,
+            "recipient": msg.recipient,
+            "body": msg.body,
+            "status": msg.status,
+            "timestamp": msg.timestamp,
+            **_member_ref(member),
+        }
+        for msg, member in rows
+    ]
+    return items, int(total)
+
+
+async def list_care_options_all(
+    session: AsyncSession,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    member_id: Optional[int] = None,
+    status: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    stmt = select(Member360CareOption, Member360Member).join(
+        Member360Member, Member360CareOption.member_id == Member360Member.id
+    )
+    if member_id is not None:
+        stmt = stmt.where(Member360CareOption.member_id == member_id)
+    if status:
+        stmt = stmt.where(Member360CareOption.status == status)
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(Member360CareOption.created_at.desc(), Member360CareOption.id.desc())
+    stmt = stmt.limit(limit).offset(offset)
+    rows = (await session.execute(stmt)).all()
+    items = [
+        {
+            "id": o.id,
+            "member_id": o.member_id,
+            "service_type": o.service_type,
+            "recommended_provider": o.recommended_provider,
+            "facility_name": o.facility_name,
+            "cost_estimate": float(o.cost_estimate) if o.cost_estimate is not None else None,
+            "quality_score": o.quality_score,
+            "distance_miles": o.distance_miles,
+            "network_status": o.network_status,
+            "potential_savings": float(o.potential_savings) if o.potential_savings is not None else None,
+            "rationale": o.rationale,
+            "member_facing_explanation": o.member_facing_explanation,
+            "status": o.status,
+            **_member_ref(member),
+        }
+        for o, member in rows
+    ]
+    return items, int(total)
+
+
+async def list_documents_all(
+    session: AsyncSession,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    member_id: Optional[int] = None,
+    document_type: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    stmt = select(Member360Document, Member360Member).join(
+        Member360Member, Member360Document.member_id == Member360Member.id
+    )
+    if member_id is not None:
+        stmt = stmt.where(Member360Document.member_id == member_id)
+    if document_type:
+        stmt = stmt.where(Member360Document.document_type == document_type)
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(Member360Document.uploaded_at.desc(), Member360Document.id.desc())
+    stmt = stmt.limit(limit).offset(offset)
+    rows = (await session.execute(stmt)).all()
+    items = [
+        {
+            "id": d.id,
+            "member_id": d.member_id,
+            "file_name": d.file_name,
+            "document_type": d.document_type,
+            "uploaded_by": d.uploaded_by,
+            "uploaded_at": d.uploaded_at,
+            "status": d.status,
+            **_member_ref(member),
+        }
+        for d, member in rows
+    ]
+    return items, int(total)
+
+
+async def list_care_journeys_all(
+    session: AsyncSession,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    member_id: Optional[int] = None,
+    status: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    stmt = (
+        select(Member360CareJourney, Member360Member)
+        .join(Member360Member, Member360CareJourney.member_id == Member360Member.id)
+        .options(selectinload(Member360CareJourney.stages))
+    )
+    if member_id is not None:
+        stmt = stmt.where(Member360CareJourney.member_id == member_id)
+    if status:
+        stmt = stmt.where(Member360CareJourney.status == status)
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(Member360CareJourney.start_date.desc().nullslast(), Member360CareJourney.id.desc())
+    stmt = stmt.limit(limit).offset(offset)
+    rows = (await session.execute(stmt)).all()
+
+    journey_ids = [j.id for j, _ in rows]
+    open_task_by_journey: dict[int, int] = defaultdict(int)
+    if journey_ids:
+        task_rows = await session.execute(
+            select(Member360Task.journey_id, func.count(Member360Task.id))
+            .where(
+                Member360Task.journey_id.in_(journey_ids),
+                Member360Task.status.in_(["open", "in_progress", "waiting"]),
+            )
+            .group_by(Member360Task.journey_id)
+        )
+        open_task_by_journey = defaultdict(int, {jid: cnt for jid, cnt in task_rows.all()})
+
+    items = [
+        {
+            "id": j.id,
+            "member_id": j.member_id,
+            "name": j.name,
+            "description": j.description,
+            "status": j.status,
+            "template_name": j.template_name,
+            "source": j.source,
+            "assigned_to": j.assigned_to,
+            "created_by": j.created_by,
+            "start_date": j.start_date,
+            "target_completion_date": j.target_completion_date,
+            "stages": [
+                {
+                    "id": s.id,
+                    "sequence": s.sequence,
+                    "name": s.name,
+                    "description": s.description,
+                    "status": s.status,
+                    "completed_at": s.completed_at,
+                }
+                for s in j.stages
+            ],
+            "open_task_count": open_task_by_journey.get(j.id, 0),
+            **_member_ref(member),
+        }
+        for j, member in rows
+    ]
+    return items, int(total)
+
+
+async def list_risk_insights_all(
+    session: AsyncSession,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    member_id: Optional[int] = None,
+    domain: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    stmt = select(Member360RiskInsight, Member360Member).join(
+        Member360Member, Member360RiskInsight.member_id == Member360Member.id
+    )
+    if member_id is not None:
+        stmt = stmt.where(Member360RiskInsight.member_id == member_id)
+    if domain:
+        stmt = stmt.where(Member360RiskInsight.domain == domain)
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(Member360RiskInsight.score.desc(), Member360RiskInsight.id.desc())
+    stmt = stmt.limit(limit).offset(offset)
+    rows = (await session.execute(stmt)).all()
+    items = [
+        {
+            "id": r.id,
+            "member_id": r.member_id,
+            "domain": r.domain,
+            "score": r.score,
+            "driver": r.driver,
+            "recommendation": r.recommendation,
+            "confidence": r.confidence,
+            "last_updated_at": r.last_updated_at,
+            **_member_ref(member),
+        }
+        for r, member in rows
+    ]
+    return items, int(total)

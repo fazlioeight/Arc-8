@@ -5,8 +5,10 @@ import { AuthContext } from '../../../context/AuthContext';
 import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
-import { fetchMember360AllMessages } from '../../../services/member360LabService';
-import { LabSubNav, RiskBadge } from './components';
+import { fetchMember360Messages } from '../../../services/member360LabService';
+import { LabSubNav, Pagination, RiskBadge } from './components';
+
+const PAGE_SIZE = 100;
 import FilterDropdown from '../../../components/ui/FilterDropdown';
 import KpiTile from '../../../components/ui/KpiTile';
 import SavedViewsBar from '../../../components/ui/SavedViewsBar';
@@ -34,6 +36,8 @@ const Member360LabMessagesPage = () => {
   const navigate = useNavigate();
   const { token, tenant } = useContext(AuthContext) || {};
   const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
@@ -45,12 +49,17 @@ const Member360LabMessagesPage = () => {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchMember360AllMessages(token, tenant)
-      .then((items) => { if (!cancelled) { setRows(items); setError(null); } })
+    fetchMember360Messages(token, tenant, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE })
+      .then((res) => {
+        if (cancelled) return;
+        setRows(res.items || []);
+        setTotal(res.total || 0);
+        setError(null);
+      })
       .catch((err) => { if (!cancelled) setError(err.message || String(err)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [token, tenant]);
+  }, [token, tenant, page]);
 
   const applySavedView = (key) => {
     const view = SAVED_VIEWS.find((v) => v.key === key);
@@ -197,7 +206,10 @@ const Member360LabMessagesPage = () => {
       {!loading && !error && (
         <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
           <div className="px-4 py-2.5 flex items-center justify-between text-xs coding-text-muted border-b coding-border">
-            <span>{filtered.length} message{filtered.length === 1 ? '' : 's'}{rows.length !== filtered.length ? ` of ${rows.length}` : ''}</span>
+            <span>
+              {filtered.length} message{filtered.length === 1 ? '' : 's'} shown
+              {rows.length !== filtered.length ? ` (filtered from ${rows.length} on this page)` : ''}
+            </span>
           </div>
           <ul>
             {filtered.map((m) => (
@@ -228,6 +240,7 @@ const Member360LabMessagesPage = () => {
               <li className="px-3 py-12 text-center text-sm coding-text-soft">No messages match the current filters.</li>
             )}
           </ul>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} label="messages" />
         </section>
       )}
     </PortalPageLayout>

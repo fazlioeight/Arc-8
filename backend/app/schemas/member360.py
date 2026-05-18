@@ -375,3 +375,75 @@ class SubmissionExportResponse(BaseModel):
     submission_year: int
     record_count: int
     csv: str
+
+
+# ---- Aggregate (multi-member) list endpoints ------------------------------
+#
+# Each aggregate row carries the same handful of denormalized member fields
+# (member_name, member_key, risk_tier, plan_name, preferred_channel) so the
+# population pages don't have to fan out and refetch member detail per row.
+# `RiskInsight` and `Message` previously omitted `member_id` from their
+# schemas; the list variants add it back since it is needed to deep-link
+# from a population row back to the member workspace.
+
+
+class _MemberRef(BaseModel):
+    member_name: Optional[str] = None
+    member_key: Optional[str] = None
+    risk_tier: Optional[str] = None
+    plan_name: Optional[str] = None
+    preferred_channel: Optional[str] = None
+
+
+class TaskListItem(Task, _MemberRef):
+    pass
+
+
+class TaskListResponse(BaseModel):
+    items: list[TaskListItem]
+    total: int
+
+
+class MessageListItem(Message, _MemberRef):
+    pass
+
+
+class MessageListResponse(BaseModel):
+    items: list[MessageListItem]
+    total: int
+
+
+class CareOptionListItem(CareOption, _MemberRef):
+    pass
+
+
+class CareOptionListResponse(BaseModel):
+    items: list[CareOptionListItem]
+    total: int
+
+
+class DocumentListItem(Document, _MemberRef):
+    pass
+
+
+class DocumentListResponse(BaseModel):
+    items: list[DocumentListItem]
+    total: int
+
+
+class CareJourneyListItem(CareJourney, _MemberRef):
+    pass
+
+
+class CareJourneyListResponse(BaseModel):
+    items: list[CareJourneyListItem]
+    total: int
+
+
+class RiskInsightListItem(RiskInsight, _MemberRef):
+    member_id: int
+
+
+class RiskInsightListResponse(BaseModel):
+    items: list[RiskInsightListItem]
+    total: int
