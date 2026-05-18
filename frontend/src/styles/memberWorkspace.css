@@ -23,7 +23,6 @@
   --border: var(--lm-border);
   --text: var(--lm-text);
   --text-muted: var(--lm-text-muted);
-  --brand-primary: var(--brand-primary);
   --shadow: var(--shadow-sm);
   background: var(--bg);
   color: var(--text);
@@ -38,7 +37,6 @@
   --border: var(--dm-border);
   --text: var(--dm-text);
   --text-muted: #a8b3bd;
-  --brand-primary: var(--brand-primary);
   --shadow: var(--shadow-sm);
 }
 
