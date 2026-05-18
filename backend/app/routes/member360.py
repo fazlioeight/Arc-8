@@ -40,9 +40,18 @@ from ..schemas.member360 import (
 )
 from ..services import member360 as member360_service
 from ..utils.audit_logger import record_audit_event
-from ..utils.security import AuthenticatedUser, get_current_user
+from ..utils.security import AuthenticatedUser, get_current_user, require_application
 
-router = APIRouter(prefix="/api/member360", tags=["member360"])
+# All member360 routes require the tenant to have the `member360` app
+# purchased AND the calling user to have at least `user`-level access
+# on that app key. Matches the gating pattern used by routes/coding.py.
+# Without this gate, any authenticated user in any tenant could reach
+# /api/member360/* by knowing the URL.
+router = APIRouter(
+    prefix="/api/member360",
+    tags=["member360"],
+    dependencies=[Depends(require_application("member360"))],
+)
 
 
 async def _ensure(session: AsyncSession) -> None:

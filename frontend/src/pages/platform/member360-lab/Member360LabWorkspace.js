@@ -135,6 +135,27 @@ const Member360LabWorkspace = () => {
     };
   }, [member]);
 
+  // Trigger a browser download of the CSV embedded in a submission export
+  // response. The backend returns CSV as a string field on the JSON response
+  // (not a binary stream) so we wrap it in a Blob client-side and synthesize
+  // a download via a temporary anchor. Safe to call repeatedly.
+  const downloadSubmissionCsv = useCallback((response, memberKey) => {
+    if (!response?.csv) return;
+    const year = response.submission_year || new Date().getFullYear();
+    const batch = response.batch_id != null ? `-batch-${response.batch_id}` : '';
+    const member = memberKey ? `-${memberKey}` : '';
+    const filename = `member360-submission-${year}${member}${batch}.csv`;
+    const blob = new Blob([response.csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, []);
+
   const onSubmitToPayer = useCallback(async () => {
     if (!token || !tenant || !memberId) return;
     setSubmissionState('working');
@@ -144,11 +165,12 @@ const Member360LabWorkspace = () => {
       const response = await generateMember360SubmissionExport(token, tenant, year, [Number(memberId)]);
       setSubmissionResult(response);
       setSubmissionState('done');
+      downloadSubmissionCsv(response, member?.member_key);
     } catch (err) {
       setSubmissionState('error');
       setActionMessage(`Submission preview failed: ${err.message || err}`);
     }
-  }, [token, tenant, memberId]);
+  }, [token, tenant, memberId, member, downloadSubmissionCsv]);
 
   const handleAction = useCallback((key, payload = {}) => {
     setActionMessage(null);
@@ -460,12 +482,23 @@ const Member360LabWorkspace = () => {
               {submissionState === 'working' ? 'Generating export...' : 'Submit to Payer (Preview)'}
             </button>
             {submissionResult?.batch_id && (
-              <p className="mt-2 text-[11px] coding-text-muted">
-                Last batch {submissionResult.batch_id}
-                {submissionResult.record_count != null
-                  ? ` · ${submissionResult.record_count} record${submissionResult.record_count === 1 ? '' : 's'}`
-                  : ''}
-              </p>
+              <div className="mt-2 space-y-1">
+                <p className="text-[11px] coding-text-muted">
+                  Last batch {submissionResult.batch_id}
+                  {submissionResult.record_count != null
+                    ? ` · ${submissionResult.record_count} record${submissionResult.record_count === 1 ? '' : 's'}`
+                    : ''}
+                </p>
+                {submissionResult.csv && (
+                  <button
+                    type="button"
+                    onClick={() => downloadSubmissionCsv(submissionResult, member?.member_key)}
+                    className="text-[11px] font-semibold text-[var(--brand-primary)] hover:underline"
+                  >
+                    Download CSV again
+                  </button>
+                )}
+              </div>
             )}
           </SectionCard>
         </div>
