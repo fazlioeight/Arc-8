@@ -18,6 +18,10 @@ jest.mock("../../../services/codingService", () => {
   };
 });
 
+jest.mock("../../../services/member360LabService", () => ({
+  fetchMember360Members: jest.fn(() => Promise.resolve({ items: [], total: 0 })),
+}));
+
 jest.mock("../../../context/UserPreferencesContext", () => ({
   useUserPreferences: () => ({
     favorites: [],
