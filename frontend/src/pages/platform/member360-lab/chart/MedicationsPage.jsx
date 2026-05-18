@@ -1,7 +1,7 @@
 import React from "react";
 import { ChartTabHeader, ChartTable } from "./chartPrimitives";
 
-const medicationColumns = [
+const MEDICATION_COLUMNS = [
   { label: "Medication", accessor: "medication" },
   { label: "Sig", accessor: "sig" },
   { label: "Start", accessor: "start" },
@@ -9,30 +9,22 @@ const medicationColumns = [
   { label: "Prescriber", accessor: "prescriber" },
 ];
 
-const medicationRows = [
-  {
-    id: "rx-1",
-    medication: "Metformin XR 500 mg",
-    sig: "1 tablet by mouth twice daily with meals",
-    start: "Jan 04, 2025",
-    end: "Current",
-    prescriber: "Dr. Harper (PCP)",
-  },
-  {
-    id: "rx-2",
-    medication: "Spironolactone 25 mg",
-    sig: "1 tablet daily",
-    start: "Aug 18, 2025",
-    end: "Nov 18, 2025",
-    prescriber: "Dr. Nguyen (Cardiology)",
-  },
-];
-
+// Member360 does not yet ingest pharmacy / fills data. When that lands
+// (likely from the existing php_pharmacy import pipeline), this page should
+// fetch and render it. Until then the tab shows an empty state — rendering
+// hardcoded prescriptions for every member is a clinical confidence risk.
 export default function MedicationsPage() {
   return (
     <div>
-      <ChartTabHeader title="Medications" subtitle="Active and historical prescriptions" />
-      <ChartTable columns={medicationColumns} rows={medicationRows} />
+      <ChartTabHeader
+        title="Medications"
+        subtitle="Active and historical prescriptions"
+      />
+      <ChartTable
+        columns={MEDICATION_COLUMNS}
+        rows={[]}
+        emptyMessage="Pharmacy data integration is pending."
+      />
     </div>
   );
 }

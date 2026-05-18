@@ -1,7 +1,7 @@
 import React from "react";
 import { ChartTabHeader, ChartTable } from "./chartPrimitives";
 
-const labColumns = [
+const LAB_COLUMNS = [
   { label: "Date", accessor: "date" },
   { label: "Test", accessor: "test" },
   { label: "Result", accessor: "result" },
@@ -9,30 +9,23 @@ const labColumns = [
   { label: "Ordering", accessor: "ordering" },
 ];
 
-const labRows = [
-  {
-    id: "lab-1",
-    date: "Oct 05, 2025",
-    test: "HbA1c",
-    result: "7.4 %",
-    reference: "Goal < 7.0 %",
-    ordering: "Dr. Kim (Endocrinology)",
-  },
-  {
-    id: "lab-2",
-    date: "Sep 22, 2025",
-    test: "Chest CT (low dose)",
-    result: "Stable pulmonary nodules",
-    reference: "Prior study 06/2025",
-    ordering: "Dr. Singh (Pulmonology)",
-  },
-];
-
+// Member360 does not yet ingest lab results or imaging studies. When that
+// data lands (likely from a FHIR Observation feed), this page should fetch
+// and render it. Until then the tab shows an empty state instead of fake
+// values; rendering hardcoded lab results for every member is a clinical
+// confidence risk.
 export default function LabsImagingPage() {
   return (
     <div>
-      <ChartTabHeader title="Labs & Imaging" subtitle="Recent results and studies" />
-      <ChartTable columns={labColumns} rows={labRows} />
+      <ChartTabHeader
+        title="Labs & Imaging"
+        subtitle="Recent results and studies"
+      />
+      <ChartTable
+        columns={LAB_COLUMNS}
+        rows={[]}
+        emptyMessage="Lab and imaging integration is pending."
+      />
     </div>
   );
 }

@@ -1,48 +1,39 @@
 import React from "react";
 import { ChartTabHeader, ChartTable } from "./chartPrimitives";
 
-const documentColumns = [
-  { label: "Date", accessor: "date" },
-  { label: "Type", accessor: "type" },
-  { label: "Description", accessor: "description" },
-  { label: "Source", accessor: "source" },
-  {
-    label: "Action",
-    render: (row) => (
-      <button
-        type="button"
-        className="text-xs font-medium text-[var(--brand-primary)] hover:underline"
-      >
-        {row.actionLabel}
-      </button>
-    ),
-  },
+const DOCUMENT_COLUMNS = [
+  { label: "Uploaded", accessor: "uploaded_at" },
+  { label: "Type", accessor: "document_type" },
+  { label: "File", accessor: "file_name" },
+  { label: "Uploaded by", accessor: "uploaded_by" },
+  { label: "Status", accessor: "status" },
 ];
 
-const documentRows = [
-  {
-    id: "doc-1",
-    date: "Oct 15, 2025",
-    type: "Clinical Note",
-    description: "PCP follow-up visit documenting CHF exacerbation.",
-    source: "Uploaded by S. Patel",
-    actionLabel: "Open PDF",
-  },
-  {
-    id: "doc-2",
-    date: "Sep 29, 2025",
-    type: "Hospital Discharge",
-    description: "Discharge summary from St. Mary's for COPD admission.",
-    source: "Faxed by Central Intake",
-    actionLabel: "Preview",
-  },
-];
+const formatDate = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString();
+};
 
-export default function DocumentsPage() {
+export default function DocumentsPage({ detail }) {
+  const rows = (detail?.documents || []).map((d) => ({
+    id: d.id,
+    uploaded_at: formatDate(d.uploaded_at),
+    document_type: d.document_type || "—",
+    file_name: d.file_name,
+    uploaded_by: d.uploaded_by || "—",
+    status: d.status || "active",
+  }));
+
   return (
     <div>
-      <ChartTabHeader title="Documents" subtitle="Charts, PDFs and uploads" />
-      <ChartTable columns={documentColumns} rows={documentRows} />
+      <ChartTabHeader title="Documents" subtitle="Charts, PDFs and uploads attached to this member" />
+      <ChartTable
+        columns={DOCUMENT_COLUMNS}
+        rows={rows}
+        emptyMessage="No documents have been attached to this member yet."
+      />
     </div>
   );
 }

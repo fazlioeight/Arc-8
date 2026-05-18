@@ -12,7 +12,7 @@ whatever the tenant database contains; seeding is the operator's job via
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
 from typing import Iterable, Optional
 
 from sqlalchemy import func, or_, select

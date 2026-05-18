@@ -378,15 +378,15 @@ const Member360LabWorkspace = () => {
       case 'labs_imaging':
         return <LabsImagingPage />;
       case 'care_gaps':
-        return <CareGapsPage />;
+        return <CareGapsPage gap={gap} member={member} />;
       case 'documents':
-        return <DocumentsPage />;
+        return <DocumentsPage detail={detail} />;
       case 'audit_log':
         return <AuditLogPage />;
       case 'sharing':
         return <SharingPage />;
       case 'settings':
-        return <SettingsPage />;
+        return <SettingsPage member={member} />;
       default:
         return null;
     }

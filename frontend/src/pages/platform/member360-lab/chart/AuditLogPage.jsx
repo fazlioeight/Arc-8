@@ -1,7 +1,7 @@
 import React from "react";
 import { ChartTabHeader, ChartTable } from "./chartPrimitives";
 
-const auditLogColumns = [
+const AUDIT_LOG_COLUMNS = [
   { label: "Time", accessor: "time" },
   { label: "User", accessor: "user" },
   { label: "Action", accessor: "action" },
@@ -9,30 +9,25 @@ const auditLogColumns = [
   { label: "Details", accessor: "details" },
 ];
 
-const auditLogRows = [
-  {
-    id: "audit-1",
-    time: "Oct 18, 2025 · 1:42 PM",
-    user: "M. Ramirez",
-    action: "Updated diagnosis",
-    entity: "Encounter #48392",
-    details: "Mapped E11.9 to HCC 19 after chart review.",
-  },
-  {
-    id: "audit-2",
-    time: "Oct 17, 2025 · 9:15 AM",
-    user: "S. Patel",
-    action: "Uploaded document",
-    entity: "Care gap evidence",
-    details: "Attached cardiology visit summary dated 09/29/2025.",
-  },
-];
-
+// Audit events for every authenticated route already land in the control
+// plane's `tenant_audit_events` table (see record_audit_event +
+// app/routes/member360.py). This tab needs a dedicated backend endpoint that
+// reads those rows filtered by tenant_id + member_id + a sensible window.
+// Until that endpoint exists the tab shows an empty state. Hardcoded sample
+// audit rows are deliberately removed — pretending to surface audit history
+// for compliance review is worse than showing nothing.
 export default function AuditLogPage() {
   return (
     <div>
-      <ChartTabHeader title="Audit log" subtitle="Who did what, and when" />
-      <ChartTable columns={auditLogColumns} rows={auditLogRows} />
+      <ChartTabHeader
+        title="Audit log"
+        subtitle="Who did what, and when"
+      />
+      <ChartTable
+        columns={AUDIT_LOG_COLUMNS}
+        rows={[]}
+        emptyMessage="Per-member audit endpoint is pending. Tenant-wide audit events are captured in the control plane."
+      />
     </div>
   );
 }

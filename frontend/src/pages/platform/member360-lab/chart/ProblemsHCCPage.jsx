@@ -1,41 +1,31 @@
 import React from "react";
-import { ChartTabHeader, ChartTable, ChartChip } from "./chartPrimitives";
+import { ChartTabHeader, ChartTable } from "./chartPrimitives";
 
-const problemColumns = [
+const PROBLEM_COLUMNS = [
   { label: "Problem", accessor: "problem" },
   { label: "HCC", accessor: "hcc" },
   { label: "Evidence", accessor: "evidence" },
   { label: "Last seen", accessor: "lastSeen" },
-  {
-    label: "Status",
-    render: (row) => (row.flag ? <ChartChip label={row.flag} /> : null),
-  },
+  { label: "Status", accessor: "status" },
 ];
 
-const problemRows = [
-  {
-    id: "prob-1",
-    problem: "Chronic systolic heart failure",
-    hcc: "HCC 85",
-    evidence: "Cardiology note 10/05/2025 — BNP 980",
-    lastSeen: "Oct 12, 2025",
-    flag: "High",
-  },
-  {
-    id: "prob-2",
-    problem: "Type 2 diabetes with nephropathy",
-    hcc: "HCC 18",
-    evidence: "Nephrology visit 09/22/2025",
-    lastSeen: "Sep 22, 2025",
-    flag: "Lab follow-up",
-  },
-];
-
+// Member360 does not yet model a problem list / conditions table. When that
+// data lands (problems backed by ICD-10 + HCC mapping per encounter), this
+// page should fetch it via a dedicated endpoint and render the rows. For now
+// the tab shows an honest empty state instead of fabricated patient data —
+// rendering hardcoded conditions for every member is a HIPAA-confidence risk.
 export default function ProblemsHCCPage() {
   return (
     <div>
-      <ChartTabHeader title="Problem List / HCC" subtitle="Active problems mapped to HCCs" />
-      <ChartTable columns={problemColumns} rows={problemRows} />
+      <ChartTabHeader
+        title="Problem List / HCC"
+        subtitle="Active problems mapped to HCCs"
+      />
+      <ChartTable
+        columns={PROBLEM_COLUMNS}
+        rows={[]}
+        emptyMessage="Problem list integration is pending. See the Care Gaps tab for HCC gaps derived from claims."
+      />
     </div>
   );
 }
