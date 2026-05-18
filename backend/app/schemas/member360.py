@@ -334,6 +334,57 @@ class MemberListResponse(BaseModel):
     total: int
 
 
+class Problem(BaseModel):
+    id: int
+    member_id: int
+    code: str
+    code_system: str
+    description: Optional[str] = None
+    status: str
+    severity: Optional[str] = None
+    is_primary: bool = False
+    onset_date: Optional[date] = None
+    resolved_date: Optional[date] = None
+    recorded_by: Optional[str] = None
+
+
+class Medication(BaseModel):
+    id: int
+    member_id: int
+    rx_number: str
+    ndc_code: Optional[str] = None
+    drug_name: str
+    generic_name: Optional[str] = None
+    dose: Optional[str] = None
+    dose_unit: Optional[str] = None
+    route: Optional[str] = None
+    frequency: Optional[str] = None
+    days_supply: Optional[int] = None
+    refills_remaining: Optional[int] = None
+    prescriber: Optional[str] = None
+    pharmacy: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    last_fill_date: Optional[date] = None
+    status: str
+
+
+class Lab(BaseModel):
+    id: int
+    member_id: int
+    loinc_code: str
+    test_name: str
+    result_value: Optional[str] = None
+    result_unit: Optional[str] = None
+    reference_range_low: Optional[float] = None
+    reference_range_high: Optional[float] = None
+    abnormal_flag: Optional[str] = None
+    result_date: date
+    ordering_provider: Optional[str] = None
+    performing_lab: Optional[str] = None
+    status: str
+
+
 class MemberDetailResponse(BaseModel):
     member: MemberDetail
     risk_insights: list[RiskInsight] = Field(default_factory=list)
@@ -346,6 +397,9 @@ class MemberDetailResponse(BaseModel):
     care_options: list[CareOption] = Field(default_factory=list)
     savings: list[SavingsRecord] = Field(default_factory=list)
     documents: list[Document] = Field(default_factory=list)
+    problems: list[Problem] = Field(default_factory=list)
+    medications: list[Medication] = Field(default_factory=list)
+    labs: list[Lab] = Field(default_factory=list)
 
 
 class DashboardMetric(BaseModel):
@@ -574,6 +628,71 @@ class RiskInsightImportItem(BaseModel):
 
 class RiskInsightImportRequest(BaseModel):
     insights: list[RiskInsightImportItem]
+
+
+class ProblemImportItem(BaseModel):
+    """Problem upsert keyed on ``(member_key, code, code_system)``."""
+    member_key: str
+    code: str
+    code_system: str = "ICD-10"
+    description: Optional[str] = None
+    status: Optional[str] = None
+    severity: Optional[str] = None
+    is_primary: Optional[bool] = None
+    onset_date: Optional[date] = None
+    resolved_date: Optional[date] = None
+    recorded_by: Optional[str] = None
+
+
+class ProblemImportRequest(BaseModel):
+    problems: list[ProblemImportItem]
+
+
+class MedicationImportItem(BaseModel):
+    """Medication upsert keyed on ``(member_key, rx_number)``. Reposting the
+    same rx_number with updated ``last_fill_date`` / ``refills_remaining``
+    advances the existing row instead of creating a new fill record."""
+    member_key: str
+    rx_number: str
+    drug_name: str
+    ndc_code: Optional[str] = None
+    generic_name: Optional[str] = None
+    dose: Optional[str] = None
+    dose_unit: Optional[str] = None
+    route: Optional[str] = None
+    frequency: Optional[str] = None
+    days_supply: Optional[int] = None
+    refills_remaining: Optional[int] = None
+    prescriber: Optional[str] = None
+    pharmacy: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    last_fill_date: Optional[date] = None
+    status: Optional[str] = None
+
+
+class MedicationImportRequest(BaseModel):
+    medications: list[MedicationImportItem]
+
+
+class LabImportItem(BaseModel):
+    """Lab upsert keyed on ``(member_key, loinc_code, result_date)``."""
+    member_key: str
+    loinc_code: str
+    test_name: str
+    result_date: date
+    result_value: Optional[str] = None
+    result_unit: Optional[str] = None
+    reference_range_low: Optional[float] = None
+    reference_range_high: Optional[float] = None
+    abnormal_flag: Optional[str] = None
+    ordering_provider: Optional[str] = None
+    performing_lab: Optional[str] = None
+    status: Optional[str] = None
+
+
+class LabImportRequest(BaseModel):
+    labs: list[LabImportItem]
 
 
 class ImportError(BaseModel):

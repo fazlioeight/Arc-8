@@ -136,6 +136,15 @@ export const importMember360Claims = (token, tenant, claims) =>
 export const importMember360RiskInsights = (token, tenant, insights) =>
   post(token, tenant, '/api/member360/import/risk-insights', { insights });
 
+export const importMember360Problems = (token, tenant, problems) =>
+  post(token, tenant, '/api/member360/import/problems', { problems });
+
+export const importMember360Medications = (token, tenant, medications) =>
+  post(token, tenant, '/api/member360/import/medications', { medications });
+
+export const importMember360Labs = (token, tenant, labs) =>
+  post(token, tenant, '/api/member360/import/labs', { labs });
+
 // ------------------- Document upload / download -------------------
 // Uploads use multipart/form-data so they bypass the JSON `post` helper.
 // Downloads stream binary content; we return a Blob the caller turns into

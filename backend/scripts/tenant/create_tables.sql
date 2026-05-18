@@ -720,3 +720,76 @@ ALTER TABLE m360_documents ADD COLUMN IF NOT EXISTS size_bytes      INTEGER;
 ALTER TABLE m360_documents ADD COLUMN IF NOT EXISTS sha256          VARCHAR(64);
 
 CREATE INDEX IF NOT EXISTS ix_m360_documents_member_id ON m360_documents(member_id);
+
+-- Clinical data tables --------------------------------------------------------
+-- Problems / medications / labs are all member-scoped, all upsertable by
+-- natural key. See app/models/member360.py for the corresponding ORM models.
+
+CREATE TABLE IF NOT EXISTS m360_problems (
+    id              SERIAL        PRIMARY KEY,
+    member_id       INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    code            VARCHAR(32)   NOT NULL,
+    code_system     VARCHAR(16)   NOT NULL DEFAULT 'ICD-10',
+    description     VARCHAR(255),
+    status          VARCHAR(16)   NOT NULL DEFAULT 'active',
+    severity        VARCHAR(16),
+    is_primary      BOOLEAN       NOT NULL DEFAULT FALSE,
+    onset_date      DATE,
+    resolved_date   DATE,
+    recorded_by     VARCHAR(255),
+    created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_problems_member_id ON m360_problems(member_id);
+CREATE INDEX IF NOT EXISTS ix_m360_problems_code      ON m360_problems(code);
+CREATE INDEX IF NOT EXISTS ix_m360_problems_status    ON m360_problems(status);
+
+CREATE TABLE IF NOT EXISTS m360_medications (
+    id                 SERIAL        PRIMARY KEY,
+    member_id          INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    rx_number          VARCHAR(64)   NOT NULL,
+    ndc_code           VARCHAR(16),
+    drug_name          VARCHAR(255)  NOT NULL,
+    generic_name       VARCHAR(255),
+    dose               VARCHAR(64),
+    dose_unit          VARCHAR(32),
+    route              VARCHAR(32),
+    frequency          VARCHAR(64),
+    days_supply        INTEGER,
+    refills_remaining  INTEGER,
+    prescriber         VARCHAR(160),
+    pharmacy           VARCHAR(160),
+    start_date         DATE,
+    end_date           DATE,
+    last_fill_date     DATE,
+    status             VARCHAR(16)   NOT NULL DEFAULT 'active',
+    created_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_medications_member_id ON m360_medications(member_id);
+CREATE INDEX IF NOT EXISTS ix_m360_medications_rx_number ON m360_medications(rx_number);
+CREATE INDEX IF NOT EXISTS ix_m360_medications_status    ON m360_medications(status);
+
+CREATE TABLE IF NOT EXISTS m360_labs (
+    id                    SERIAL        PRIMARY KEY,
+    member_id             INTEGER       NOT NULL REFERENCES m360_members(id) ON DELETE CASCADE,
+    loinc_code            VARCHAR(16)   NOT NULL,
+    test_name             VARCHAR(160)  NOT NULL,
+    result_value          VARCHAR(64),
+    result_unit           VARCHAR(32),
+    reference_range_low   DOUBLE PRECISION,
+    reference_range_high  DOUBLE PRECISION,
+    abnormal_flag         VARCHAR(4),
+    result_date           DATE          NOT NULL,
+    ordering_provider     VARCHAR(160),
+    performing_lab        VARCHAR(160),
+    status                VARCHAR(16)   NOT NULL DEFAULT 'final',
+    created_at            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_m360_labs_member_id   ON m360_labs(member_id);
+CREATE INDEX IF NOT EXISTS ix_m360_labs_loinc_code  ON m360_labs(loinc_code);
+CREATE INDEX IF NOT EXISTS ix_m360_labs_result_date ON m360_labs(result_date);

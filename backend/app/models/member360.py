@@ -93,6 +93,15 @@ class Member360Member(TenantDataBase):
     documents: Mapped[list["Member360Document"]] = relationship(
         back_populates="member", cascade="all, delete-orphan"
     )
+    problems: Mapped[list["Member360Problem"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
+    medications: Mapped[list["Member360Medication"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
+    labs: Mapped[list["Member360Lab"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
 
 
 class Member360RiskInsight(TenantDataBase):
@@ -352,6 +361,97 @@ class Member360Document(TenantDataBase):
     sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     member: Mapped[Member360Member] = relationship(back_populates="documents")
+
+
+# ---------------------- Clinical data tables --------------------------------
+# Members carry three core clinical collections — problems (diagnosis list,
+# including HCC mapping), medications (Rx fills), and labs (LOINC-coded
+# observations). All three are upsertable by natural key so a daily feed from
+# the EHR re-POSTs the same batch without producing duplicates.
+
+
+class Member360Problem(TenantDataBase):
+    """Diagnosis/problem entry. ``code`` + ``code_system`` is the natural key
+    within a member; reposting the same combo updates the existing row."""
+    __tablename__ = "m360_problems"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_members.id", ondelete="CASCADE"), index=True
+    )
+    code: Mapped[str] = mapped_column(String(32), index=True)
+    code_system: Mapped[str] = mapped_column(String(16), default="ICD-10")
+    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    severity: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    onset_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    resolved_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    recorded_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    member: Mapped[Member360Member] = relationship(back_populates="problems")
+
+
+class Member360Medication(TenantDataBase):
+    """Prescription record. ``rx_number`` is the natural key — one row per
+    prescription within a member; refills update fields (last_fill_date,
+    refills_remaining) on the same row."""
+    __tablename__ = "m360_medications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_members.id", ondelete="CASCADE"), index=True
+    )
+    rx_number: Mapped[str] = mapped_column(String(64), index=True)
+    ndc_code: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    drug_name: Mapped[str] = mapped_column(String(255))
+    generic_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    dose: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    dose_unit: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    route: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    frequency: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    days_supply: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    refills_remaining: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    prescriber: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    pharmacy: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    last_fill_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    member: Mapped[Member360Member] = relationship(back_populates="medications")
+
+
+class Member360Lab(TenantDataBase):
+    """LOINC-coded lab observation. Natural key is
+    ``(member_id, loinc_code, result_date)`` — same test, same day, same
+    member is treated as a correction/update of the prior result rather
+    than a duplicate."""
+    __tablename__ = "m360_labs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_members.id", ondelete="CASCADE"), index=True
+    )
+    loinc_code: Mapped[str] = mapped_column(String(16), index=True)
+    test_name: Mapped[str] = mapped_column(String(160))
+    result_value: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    result_unit: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    reference_range_low: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    reference_range_high: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    abnormal_flag: Mapped[Optional[str]] = mapped_column(String(4), nullable=True)
+    result_date: Mapped[date] = mapped_column(Date, index=True)
+    ordering_provider: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    performing_lab: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="final")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    member: Mapped[Member360Member] = relationship(back_populates="labs")
 
 
 # ---------------------- Admin / configuration tables -------------------------

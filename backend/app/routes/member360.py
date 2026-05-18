@@ -39,6 +39,8 @@ from ..schemas.member360 import (
     DocumentListResponse,
     GapAnalysisResponse,
     ImportResponse,
+    LabImportRequest,
+    MedicationImportRequest,
     MemberDetailResponse,
     MemberImportRequest,
     MemberListResponse,
@@ -48,6 +50,7 @@ from ..schemas.member360 import (
     MessageListResponse,
     Note,
     NoteCreate,
+    ProblemImportRequest,
     RiskInsightImportRequest,
     RiskInsightListResponse,
     SubmissionExportRequest,
@@ -948,6 +951,93 @@ async def import_risk_insights(
         event_type="member360.import.risk_insights",
         payload={
             "submitted": len(payload.insights),
+            "created": summary["created"],
+            "updated": summary["updated"],
+            "error_count": len(summary["errors"]),
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return summary
+
+
+@router.post("/import/problems", response_model=ImportResponse)
+async def import_problems(
+    payload: ProblemImportRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    summary = await member360_service.import_problems(
+        session, [item.model_dump() for item in payload.problems]
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.import.problems",
+        payload={
+            "submitted": len(payload.problems),
+            "created": summary["created"],
+            "updated": summary["updated"],
+            "error_count": len(summary["errors"]),
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return summary
+
+
+@router.post("/import/medications", response_model=ImportResponse)
+async def import_medications(
+    payload: MedicationImportRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    summary = await member360_service.import_medications(
+        session, [item.model_dump() for item in payload.medications]
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.import.medications",
+        payload={
+            "submitted": len(payload.medications),
+            "created": summary["created"],
+            "updated": summary["updated"],
+            "error_count": len(summary["errors"]),
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    return summary
+
+
+@router.post("/import/labs", response_model=ImportResponse)
+async def import_labs(
+    payload: LabImportRequest,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    await _ensure(session)
+    summary = await member360_service.import_labs(
+        session, [item.model_dump() for item in payload.labs]
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.import.labs",
+        payload={
+            "submitted": len(payload.labs),
             "created": summary["created"],
             "updated": summary["updated"],
             "error_count": len(summary["errors"]),

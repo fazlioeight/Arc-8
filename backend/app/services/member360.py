@@ -28,10 +28,13 @@ from ..models.member360 import (
     Member360CareOption,
     Member360Claim,
     Member360Document,
+    Member360Lab,
+    Member360Medication,
     Member360Member,
     Member360Message,
     Member360Note,
     Member360OutreachChannel,
+    Member360Problem,
     Member360RiskInsight,
     Member360Savings,
     Member360Task,
@@ -249,6 +252,9 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
             selectinload(Member360Member.care_options),
             selectinload(Member360Member.savings),
             selectinload(Member360Member.documents),
+            selectinload(Member360Member.problems),
+            selectinload(Member360Member.medications),
+            selectinload(Member360Member.labs),
         )
     )
     member = await session.scalar(stmt)
@@ -419,6 +425,73 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
         "care_options": care_options_payload,
         "savings": savings_payload,
         "documents": [_serialize_document(d) for d in member.documents],
+        "problems": [_serialize_problem(p) for p in sorted(
+            member.problems, key=lambda x: (x.status != "active", x.onset_date or date.min),
+            reverse=False,
+        )],
+        "medications": [_serialize_medication(m) for m in sorted(
+            member.medications, key=lambda x: x.last_fill_date or date.min, reverse=True,
+        )],
+        "labs": [_serialize_lab(l) for l in sorted(
+            member.labs, key=lambda x: x.result_date, reverse=True,
+        )],
+    }
+
+
+def _serialize_problem(p: Member360Problem) -> dict:
+    return {
+        "id": p.id,
+        "member_id": p.member_id,
+        "code": p.code,
+        "code_system": p.code_system,
+        "description": p.description,
+        "status": p.status,
+        "severity": p.severity,
+        "is_primary": p.is_primary,
+        "onset_date": p.onset_date,
+        "resolved_date": p.resolved_date,
+        "recorded_by": p.recorded_by,
+    }
+
+
+def _serialize_medication(m: Member360Medication) -> dict:
+    return {
+        "id": m.id,
+        "member_id": m.member_id,
+        "rx_number": m.rx_number,
+        "ndc_code": m.ndc_code,
+        "drug_name": m.drug_name,
+        "generic_name": m.generic_name,
+        "dose": m.dose,
+        "dose_unit": m.dose_unit,
+        "route": m.route,
+        "frequency": m.frequency,
+        "days_supply": m.days_supply,
+        "refills_remaining": m.refills_remaining,
+        "prescriber": m.prescriber,
+        "pharmacy": m.pharmacy,
+        "start_date": m.start_date,
+        "end_date": m.end_date,
+        "last_fill_date": m.last_fill_date,
+        "status": m.status,
+    }
+
+
+def _serialize_lab(l: Member360Lab) -> dict:
+    return {
+        "id": l.id,
+        "member_id": l.member_id,
+        "loinc_code": l.loinc_code,
+        "test_name": l.test_name,
+        "result_value": l.result_value,
+        "result_unit": l.result_unit,
+        "reference_range_low": l.reference_range_low,
+        "reference_range_high": l.reference_range_high,
+        "abnormal_flag": l.abnormal_flag,
+        "result_date": l.result_date,
+        "ordering_provider": l.ordering_provider,
+        "performing_lab": l.performing_lab,
+        "status": l.status,
     }
 
 
@@ -1529,6 +1602,194 @@ async def import_risk_insights(session: AsyncSession, items: list[dict]) -> dict
             )
             session.add(row)
             await session.flush()  # see import_members re: per-row flush
+            created += 1
+    return {"created": created, "updated": updated, "errors": errors}
+
+
+# ---------- Clinical data ingestion (problems / medications / labs) --------
+# Each follows the same pattern as import_claims: resolve member by
+# member_key, upsert by natural key, per-row errors collected rather than
+# rolled back. The natural-key tuple differs per domain so we share the
+# member-lookup cache helper inline rather than refactoring.
+
+
+def _resolve_member_id_cached(
+    cache: dict[str, Optional[int]],
+    session: AsyncSession,
+):
+    """Returns an async resolver bound to a session-local cache so a batch
+    that mentions the same ``member_key`` 100 times only hits the DB once."""
+    async def resolve(member_key: str) -> Optional[int]:
+        if member_key not in cache:
+            cache[member_key] = await session.scalar(
+                select(Member360Member.id).where(Member360Member.member_key == member_key)
+            )
+        return cache[member_key]
+    return resolve
+
+
+_PROBLEM_FIELDS = (
+    "description", "status", "severity", "is_primary",
+    "onset_date", "resolved_date", "recorded_by",
+)
+
+
+async def import_problems(session: AsyncSession, items: list[dict]) -> dict:
+    """Upsert problems by ``(member_id, code, code_system)``."""
+    created = 0
+    updated = 0
+    errors: list[dict] = []
+    cache: dict[str, Optional[int]] = {}
+    resolve = _resolve_member_id_cached(cache, session)
+    for idx, item in enumerate(items):
+        member_key = (item.get("member_key") or "").strip()
+        code = (item.get("code") or "").strip()
+        code_system = (item.get("code_system") or "ICD-10").strip()
+        if not member_key or not code:
+            errors.append({"index": idx, "member_key": member_key or None,
+                           "detail": "member_key and code are required"})
+            continue
+        member_id = await resolve(member_key)
+        if member_id is None:
+            errors.append({"index": idx, "member_key": member_key,
+                           "detail": f"member_key {member_key!r} not found"})
+            continue
+        existing = await session.scalar(
+            select(Member360Problem).where(
+                Member360Problem.member_id == member_id,
+                Member360Problem.code == code,
+                Member360Problem.code_system == code_system,
+            )
+        )
+        if existing:
+            for field in _PROBLEM_FIELDS:
+                value = item.get(field)
+                if value is not None:
+                    setattr(existing, field, value)
+            updated += 1
+        else:
+            row = Member360Problem(
+                member_id=member_id, code=code, code_system=code_system,
+                status=item.get("status") or "active",
+                is_primary=bool(item.get("is_primary")),
+            )
+            for field in _PROBLEM_FIELDS:
+                value = item.get(field)
+                if value is not None and field not in ("status", "is_primary"):
+                    setattr(row, field, value)
+            session.add(row)
+            await session.flush()  # see import_members re: per-row flush
+            created += 1
+    return {"created": created, "updated": updated, "errors": errors}
+
+
+_MEDICATION_FIELDS = (
+    "ndc_code", "drug_name", "generic_name", "dose", "dose_unit", "route",
+    "frequency", "days_supply", "refills_remaining", "prescriber", "pharmacy",
+    "start_date", "end_date", "last_fill_date", "status",
+)
+
+
+async def import_medications(session: AsyncSession, items: list[dict]) -> dict:
+    """Upsert medications by ``(member_id, rx_number)``."""
+    created = 0
+    updated = 0
+    errors: list[dict] = []
+    cache: dict[str, Optional[int]] = {}
+    resolve = _resolve_member_id_cached(cache, session)
+    for idx, item in enumerate(items):
+        member_key = (item.get("member_key") or "").strip()
+        rx_number = (item.get("rx_number") or "").strip()
+        drug_name = (item.get("drug_name") or "").strip()
+        if not member_key or not rx_number or not drug_name:
+            errors.append({"index": idx, "member_key": member_key or None,
+                           "detail": "member_key, rx_number, and drug_name are required"})
+            continue
+        member_id = await resolve(member_key)
+        if member_id is None:
+            errors.append({"index": idx, "member_key": member_key,
+                           "detail": f"member_key {member_key!r} not found"})
+            continue
+        existing = await session.scalar(
+            select(Member360Medication).where(
+                Member360Medication.member_id == member_id,
+                Member360Medication.rx_number == rx_number,
+            )
+        )
+        if existing:
+            for field in _MEDICATION_FIELDS:
+                value = item.get(field)
+                if value is not None:
+                    setattr(existing, field, value)
+            updated += 1
+        else:
+            row = Member360Medication(
+                member_id=member_id, rx_number=rx_number, drug_name=drug_name,
+                status=item.get("status") or "active",
+            )
+            for field in _MEDICATION_FIELDS:
+                value = item.get(field)
+                if value is not None and field not in ("drug_name", "status"):
+                    setattr(row, field, value)
+            session.add(row)
+            await session.flush()
+            created += 1
+    return {"created": created, "updated": updated, "errors": errors}
+
+
+_LAB_FIELDS = (
+    "test_name", "result_value", "result_unit", "reference_range_low",
+    "reference_range_high", "abnormal_flag", "ordering_provider",
+    "performing_lab", "status",
+)
+
+
+async def import_labs(session: AsyncSession, items: list[dict]) -> dict:
+    """Upsert labs by ``(member_id, loinc_code, result_date)``."""
+    created = 0
+    updated = 0
+    errors: list[dict] = []
+    cache: dict[str, Optional[int]] = {}
+    resolve = _resolve_member_id_cached(cache, session)
+    for idx, item in enumerate(items):
+        member_key = (item.get("member_key") or "").strip()
+        loinc_code = (item.get("loinc_code") or "").strip()
+        result_date = item.get("result_date")
+        test_name = (item.get("test_name") or "").strip()
+        if not member_key or not loinc_code or not result_date or not test_name:
+            errors.append({"index": idx, "member_key": member_key or None,
+                           "detail": "member_key, loinc_code, test_name, and result_date are required"})
+            continue
+        member_id = await resolve(member_key)
+        if member_id is None:
+            errors.append({"index": idx, "member_key": member_key,
+                           "detail": f"member_key {member_key!r} not found"})
+            continue
+        existing = await session.scalar(
+            select(Member360Lab).where(
+                Member360Lab.member_id == member_id,
+                Member360Lab.loinc_code == loinc_code,
+                Member360Lab.result_date == result_date,
+            )
+        )
+        if existing:
+            for field in _LAB_FIELDS:
+                value = item.get(field)
+                if value is not None:
+                    setattr(existing, field, value)
+            updated += 1
+        else:
+            row = Member360Lab(
+                member_id=member_id, loinc_code=loinc_code,
+                test_name=test_name, result_date=result_date,
+                status=item.get("status") or "final",
+            )
+            for field in _LAB_FIELDS:
+                value = item.get(field)
+                if value is not None and field not in ("test_name", "status"):
+                    setattr(row, field, value)
+            session.add(row)
+            await session.flush()
             created += 1
     return {"created": created, "updated": updated, "errors": errors}
 

@@ -470,11 +470,11 @@ const Member360LabWorkspace = () => {
       case 'portal':
         return <PortalPreview detail={detail} />;
       case 'problems_hcc':
-        return <ProblemsHCCPage />;
+        return <ProblemsHCCPage detail={detail} />;
       case 'medications':
-        return <MedicationsPage />;
+        return <MedicationsPage detail={detail} />;
       case 'labs_imaging':
-        return <LabsImagingPage />;
+        return <LabsImagingPage detail={detail} />;
       case 'care_gaps':
         return <CareGapsPage gap={gap} member={member} />;
       case 'documents':

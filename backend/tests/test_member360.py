@@ -57,8 +57,11 @@ async def seeded_member():
     from app.models.member360 import (
         Member360CareOption,
         Member360Document,
+        Member360Lab,
+        Member360Medication,
         Member360Member,
         Member360Note,
+        Member360Problem,
         Member360Savings,
         Member360Task,
     )
@@ -102,6 +105,9 @@ async def seeded_member():
             await session.execute(delete(Member360Note))
             await session.execute(delete(Member360Task))
             await session.execute(delete(Member360Document))
+            await session.execute(delete(Member360Lab))
+            await session.execute(delete(Member360Medication))
+            await session.execute(delete(Member360Problem))
             await session.execute(delete(Member360Member).where(Member360Member.id == member_id))
             await session.commit()
         await engine.dispose()
@@ -803,6 +809,209 @@ async def test_claim_and_risk_insight_import_resolve_by_member_key(fastapi_app):
             await session.commit()
     finally:
         await engine.dispose()
+
+
+# ---- Clinical data ingestion (problems / medications / labs) --------------
+#
+# All three follow the upsert pattern claims/risk-insights already use, so
+# the per-domain tests just exercise the contract: create → update by
+# natural key → bad input lands in errors[] → row shows up in member detail.
+
+
+async def test_problem_import_upsert_and_detail(fastapi_app, seeded_member):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = _auth_headers(token)
+
+        first = await client.post(
+            "/api/member360/import/problems",
+            json={"problems": [
+                {"member_key": "T360-001", "code": "E11.9", "code_system": "ICD-10",
+                 "description": "Type 2 diabetes mellitus", "status": "active",
+                 "is_primary": True, "onset_date": "2024-01-15"},
+                {"member_key": "T360-001", "code": "I10", "code_system": "ICD-10",
+                 "description": "Essential hypertension", "status": "active"},
+                {"member_key": "T360-001", "code": "", "code_system": "ICD-10"},
+            ]},
+            headers=headers,
+        )
+        assert first.status_code == 200, first.text
+        body = first.json()
+        assert body["created"] == 2
+        assert body["updated"] == 0
+        assert len(body["errors"]) == 1
+
+        # Re-post with one mutation: same (code, code_system) → update.
+        again = await client.post(
+            "/api/member360/import/problems",
+            json={"problems": [
+                {"member_key": "T360-001", "code": "E11.9",
+                 "code_system": "ICD-10", "description": "T2DM (updated)"},
+            ]},
+            headers=headers,
+        )
+        assert again.json()["updated"] == 1
+        assert again.json()["created"] == 0
+
+        detail = await client.get(
+            f"/api/member360/members/{seeded_member}",
+            headers=headers,
+        )
+    body = detail.json()
+    assert len(body["problems"]) == 2
+    primary = next(p for p in body["problems"] if p["code"] == "E11.9")
+    assert primary["is_primary"] is True
+    assert primary["description"] == "T2DM (updated)"
+
+
+async def test_medication_import_upsert_and_detail(fastapi_app, seeded_member):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = _auth_headers(token)
+
+        first = await client.post(
+            "/api/member360/import/medications",
+            json={"medications": [
+                {"member_key": "T360-001", "rx_number": "RX-001",
+                 "drug_name": "Metformin", "dose": "500", "dose_unit": "mg",
+                 "route": "PO", "frequency": "BID", "refills_remaining": 5,
+                 "last_fill_date": "2026-04-01", "prescriber": "Dr. Test"},
+                {"member_key": "T360-001", "rx_number": "RX-002",
+                 "drug_name": "Lisinopril", "dose": "10", "dose_unit": "mg"},
+                # Missing rx_number → per-row error.
+                {"member_key": "T360-001", "rx_number": "", "drug_name": "X"},
+            ]},
+            headers=headers,
+        )
+        assert first.status_code == 200, first.text
+        body = first.json()
+        assert body["created"] == 2
+        assert len(body["errors"]) == 1
+
+        # Same rx_number with a newer last_fill_date should update, not create.
+        refill = await client.post(
+            "/api/member360/import/medications",
+            json={"medications": [
+                {"member_key": "T360-001", "rx_number": "RX-001",
+                 "drug_name": "Metformin", "last_fill_date": "2026-05-01",
+                 "refills_remaining": 4},
+            ]},
+            headers=headers,
+        )
+        assert refill.json()["updated"] == 1
+        assert refill.json()["created"] == 0
+
+        detail = await client.get(
+            f"/api/member360/members/{seeded_member}",
+            headers=headers,
+        )
+    body = detail.json()
+    assert len(body["medications"]) == 2
+    metformin = next(m for m in body["medications"] if m["rx_number"] == "RX-001")
+    assert metformin["last_fill_date"] == "2026-05-01"
+    assert metformin["refills_remaining"] == 4
+
+
+async def test_lab_import_upsert_and_detail(fastapi_app, seeded_member):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = _auth_headers(token)
+
+        first = await client.post(
+            "/api/member360/import/labs",
+            json={"labs": [
+                {"member_key": "T360-001", "loinc_code": "4548-4",
+                 "test_name": "HbA1c", "result_date": "2026-04-15",
+                 "result_value": "8.2", "result_unit": "%",
+                 "reference_range_high": 5.7, "abnormal_flag": "H"},
+                {"member_key": "T360-001", "loinc_code": "2345-7",
+                 "test_name": "Glucose", "result_date": "2026-04-15",
+                 "result_value": "180", "result_unit": "mg/dL"},
+                # Missing loinc_code → per-row error.
+                {"member_key": "T360-001", "loinc_code": "",
+                 "test_name": "X", "result_date": "2026-04-15"},
+            ]},
+            headers=headers,
+        )
+        assert first.status_code == 200, first.text
+        body = first.json()
+        assert body["created"] == 2
+        assert len(body["errors"]) == 1
+
+        # Same (loinc_code, result_date) on the same member is an update
+        # (corrected lab), not a new row.
+        correction = await client.post(
+            "/api/member360/import/labs",
+            json={"labs": [
+                {"member_key": "T360-001", "loinc_code": "4548-4",
+                 "test_name": "HbA1c", "result_date": "2026-04-15",
+                 "result_value": "8.5", "status": "corrected"},
+            ]},
+            headers=headers,
+        )
+        assert correction.json()["updated"] == 1
+        assert correction.json()["created"] == 0
+
+        # A different date on the same LOINC IS a new row.
+        followup = await client.post(
+            "/api/member360/import/labs",
+            json={"labs": [
+                {"member_key": "T360-001", "loinc_code": "4548-4",
+                 "test_name": "HbA1c", "result_date": "2026-07-15",
+                 "result_value": "7.4"},
+            ]},
+            headers=headers,
+        )
+        assert followup.json()["created"] == 1
+
+        detail = await client.get(
+            f"/api/member360/members/{seeded_member}",
+            headers=headers,
+        )
+    body = detail.json()
+    assert len(body["labs"]) == 3
+    # Most recent first per service-side sort.
+    assert body["labs"][0]["result_date"] == "2026-07-15"
+    hba1c_apr = next(
+        l for l in body["labs"]
+        if l["loinc_code"] == "4548-4" and l["result_date"] == "2026-04-15"
+    )
+    assert hba1c_apr["result_value"] == "8.5"
+    assert hba1c_apr["status"] == "corrected"
+
+
+async def test_clinical_imports_reject_unknown_member_key(fastapi_app, seeded_member):
+    """Cross-domain regression: any clinical import row with an unknown
+    member_key should produce a per-row error rather than failing the
+    whole batch or crashing on the FK.
+
+    ``seeded_member`` is taken for its side effect (inserts a real member
+    into the DB) so we know the GHOST key is genuinely unknown rather than
+    the DB simply being empty."""
+    assert seeded_member  # confirm fixture ran
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = _auth_headers(token)
+
+        for path, body in [
+            ("/api/member360/import/problems",
+             {"problems": [{"member_key": "GHOST", "code": "E11.9"}]}),
+            ("/api/member360/import/medications",
+             {"medications": [{"member_key": "GHOST", "rx_number": "X", "drug_name": "X"}]}),
+            ("/api/member360/import/labs",
+             {"labs": [{"member_key": "GHOST", "loinc_code": "X",
+                        "test_name": "X", "result_date": "2026-01-01"}]}),
+        ]:
+            resp = await client.post(path, json=body, headers=headers)
+            assert resp.status_code == 200, resp.text
+            out = resp.json()
+            assert out["created"] == 0
+            assert len(out["errors"]) == 1
+            assert "GHOST" in out["errors"][0]["detail"]
 
 
 # ---- Care journey stage progression ----------------------------------------

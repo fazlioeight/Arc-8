@@ -51,6 +51,9 @@ jest.mock("../../../../services/member360LabService", () => ({
       care_options: [],
       savings: [],
       documents: [],
+      problems: [],
+      medications: [],
+      labs: [],
     })
   ),
   fetchMember360GapAnalysis: jest.fn(() =>
