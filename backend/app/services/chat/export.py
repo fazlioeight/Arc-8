@@ -153,6 +153,16 @@ def export_to_pptx(
             Inches, Pt, RGBColor,
         )
 
+    # Stamp page numbers on every slide except the cover. We do this in a
+    # post-pass so the per-slide builders don't need to know the deck's
+    # total length — that's only knowable after all messages have been
+    # rendered.
+    total = len(prs.slides)
+    for idx, slide in enumerate(prs.slides, start=1):
+        if idx == 1:
+            continue  # cover gets the orange band, not a page number
+        _pptx_add_page_number_footer(slide, idx, total, Inches, Pt, RGBColor)
+
     buf = io.BytesIO()
     try:
         prs.save(buf)
@@ -805,6 +815,38 @@ def _pdf_render_table(story, table_node, inch, colors, Paragraph, Table, TableSt
 
 
 # ── PPTX renderer ───────────────────────────────────────────────────────────
+#
+# Programmatic styling, no template file. The constants below are the deck's
+# single source of truth — change them here and every slide picks up the new
+# look. We deliberately avoid layout placeholders for content slides and use
+# a Blank layout + manual shapes so the same brand applies across PowerPoint
+# versions (placeholder behaviour varies between Office 2016 / 365 / online).
+
+# Nexora brand palette. The chat UI uses #d97706 as the AI/assistant accent,
+# so we carry that through to the deck.
+_PPTX_BRAND_PRIMARY = (0xD9, 0x77, 0x06)        # Nexora orange
+_PPTX_BRAND_PRIMARY_DARK = (0xB4, 0x53, 0x09)   # darker orange for hover/border
+_PPTX_TEXT_PRIMARY = (0x11, 0x18, 0x27)         # near-black slate
+_PPTX_TEXT_SECONDARY = (0x4B, 0x55, 0x63)       # medium slate
+_PPTX_TEXT_MUTED = (0x9C, 0xA3, 0xAF)           # light slate
+_PPTX_BORDER = (0xE5, 0xE7, 0xEB)               # light gray hairline
+_PPTX_ROW_ALT = (0xF9, 0xFA, 0xFB)              # very light gray for zebra rows
+_PPTX_TABLE_HEADER_BG = (0x1F, 0x29, 0x37)      # dark slate for table headers
+_PPTX_WHITE = (0xFF, 0xFF, 0xFF)
+
+# Typography — Calibri ships with every Office install since 2007 so the
+# deck renders identically on Mac, Windows, web, and PowerPoint Online.
+_PPTX_FONT_DISPLAY = "Calibri"
+_PPTX_FONT_BODY = "Calibri"
+_PPTX_FONT_MONO = "Consolas"
+
+# Layout constants in inches. Slide is 13.333 × 7.5 (16:9).
+_PPTX_MARGIN_X = 0.5
+_PPTX_HEADER_HEIGHT = 1.0   # title bar
+_PPTX_FOOTER_HEIGHT = 0.4   # page number band
+_PPTX_CONTENT_TOP = 1.2     # below header
+_PPTX_CONTENT_BOTTOM = 7.0  # above footer
+_PPTX_ACCENT_BAR_HEIGHT = 0.06  # thin orange line under title
 
 
 def _find_preceding_user(messages: list[ExportMessage], assistant_idx: int) -> Optional[str]:
@@ -829,18 +871,235 @@ def _truncate(text: str, limit: int) -> str:
     return (cut or text[:limit]) + "…"
 
 
+def _pptx_add_rect_fill(slide, MSO_SHAPE, RGBColor, *, left, top, width, height, fill_rgb) -> None:
+    """Add a filled rectangle with no border. The thin shapes our brand layout
+    uses (accent bars, underlines) all share this primitive."""
+    shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = RGBColor(*fill_rgb)
+    shape.line.fill.background()  # remove the default 1pt black border
+    shape.shadow.inherit = False
+
+
+def _pptx_set_text(
+    text_frame,
+    text: str,
+    *,
+    Pt,
+    RGBColor,
+    font: str = _PPTX_FONT_BODY,
+    size: int = 14,
+    bold: bool = False,
+    italic: bool = False,
+    color: tuple[int, int, int] = _PPTX_TEXT_PRIMARY,
+    align: Optional[str] = None,
+    letter_spacing: int = 0,
+) -> None:
+    """Set the first paragraph of ``text_frame`` to ``text`` with the given
+    style. Subsequent calls clear the frame first (helpers shouldn't leak
+    runs from a previous use).
+
+    ``letter_spacing`` is in 100ths of a percent (per OOXML's spc attribute);
+    pass e.g. 200 for a slight track-out on eyebrow labels.
+    """
+    try:
+        from pptx.enum.text import PP_ALIGN
+    except ImportError:  # pragma: no cover
+        PP_ALIGN = None
+
+    # Wipe any existing content.
+    text_frame.clear()
+    p = text_frame.paragraphs[0]
+    if align == "center" and PP_ALIGN is not None:
+        p.alignment = PP_ALIGN.CENTER
+    elif align == "right" and PP_ALIGN is not None:
+        p.alignment = PP_ALIGN.RIGHT
+    run = p.add_run()
+    run.text = text
+    run.font.name = font
+    run.font.size = Pt(size)
+    run.font.bold = bold
+    run.font.italic = italic
+    run.font.color.rgb = RGBColor(*color)
+    if letter_spacing:
+        # python-pptx doesn't expose spc on Run.font, so set the XML attr
+        # directly. The namespace handling is brittle — guarded with a
+        # try so a future SDK change doesn't crash the export.
+        try:
+            rPr = run.font._rPr  # noqa: SLF001
+            rPr.set("spc", str(letter_spacing))
+        except Exception:
+            pass
+
+
+def _pptx_add_brand_header(slide, title_text: str, Inches, Pt, RGBColor) -> None:
+    """Title bar at the top of every content slide: title text + thin orange
+    underline. Replaces the stock Title placeholder used by layout 5 so we
+    have full control over typography and spacing."""
+    # Title text (slightly indented from the left edge).
+    title_box = slide.shapes.add_textbox(
+        Inches(_PPTX_MARGIN_X), Inches(0.35),
+        Inches(13.333 - 2 * _PPTX_MARGIN_X), Inches(0.7),
+    )
+    _pptx_set_text(
+        title_box.text_frame, title_text,
+        Pt=Pt, RGBColor=RGBColor,
+        font=_PPTX_FONT_DISPLAY, size=24, bold=True,
+        color=_PPTX_TEXT_PRIMARY,
+    )
+
+    # Thin orange underline accent — same width as the visual title block
+    # would be, not the full page (keeps the look modern).
+    try:
+        from pptx.enum.shapes import MSO_SHAPE
+    except ImportError:  # pragma: no cover
+        return
+    _pptx_add_rect_fill(
+        slide, MSO_SHAPE, RGBColor,
+        left=Inches(_PPTX_MARGIN_X), top=Inches(1.05),
+        width=Inches(2.0), height=Inches(_PPTX_ACCENT_BAR_HEIGHT),
+        fill_rgb=_PPTX_BRAND_PRIMARY,
+    )
+
+
+def _pptx_add_page_number_footer(slide, page_idx: int, total: int, Inches, Pt, RGBColor) -> None:
+    """Thin hairline + 'NEXORA  ·  N / M' at the bottom-right of content
+    slides. Page numbers are 1-indexed and INCLUDE the title slide so users
+    can reference 'slide 4 of 12' verbally."""
+    try:
+        from pptx.enum.shapes import MSO_SHAPE
+    except ImportError:  # pragma: no cover
+        return
+
+    # Hairline divider above the footer text.
+    _pptx_add_rect_fill(
+        slide, MSO_SHAPE, RGBColor,
+        left=Inches(_PPTX_MARGIN_X), top=Inches(_PPTX_CONTENT_BOTTOM + 0.05),
+        width=Inches(13.333 - 2 * _PPTX_MARGIN_X), height=Inches(0.012),
+        fill_rgb=_PPTX_BORDER,
+    )
+
+    # Left-aligned brand mark.
+    brand = slide.shapes.add_textbox(
+        Inches(_PPTX_MARGIN_X), Inches(_PPTX_CONTENT_BOTTOM + 0.15),
+        Inches(4.0), Inches(_PPTX_FOOTER_HEIGHT),
+    )
+    _pptx_set_text(
+        brand.text_frame, "NEXORA",
+        Pt=Pt, RGBColor=RGBColor,
+        font=_PPTX_FONT_DISPLAY, size=9, bold=True,
+        color=_PPTX_BRAND_PRIMARY, letter_spacing=200,
+    )
+
+    # Right-aligned page number.
+    page = slide.shapes.add_textbox(
+        Inches(13.333 - _PPTX_MARGIN_X - 3.5), Inches(_PPTX_CONTENT_BOTTOM + 0.15),
+        Inches(3.5), Inches(_PPTX_FOOTER_HEIGHT),
+    )
+    _pptx_set_text(
+        page.text_frame, f"{page_idx} / {total}",
+        Pt=Pt, RGBColor=RGBColor,
+        font=_PPTX_FONT_BODY, size=9, color=_PPTX_TEXT_MUTED,
+        align="right",
+    )
+
+
 def _pptx_add_title_slide(prs, title: Optional[str], message_count: int, Inches, Pt, RGBColor) -> None:
-    """First slide of the deck: title + generation metadata."""
-    layout = prs.slide_layouts[0]  # Title Slide
-    slide = prs.slides.add_slide(layout)
-    slide.shapes.title.text = title or "Nexora Chat Transcript"
-    # Subtitle placeholder index varies by template; index 1 is the
-    # canonical subtitle in the built-in default theme.
-    if len(slide.placeholders) > 1:
-        slide.placeholders[1].text = (
-            f"Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n"
-            f"{message_count} message{'s' if message_count != 1 else ''}"
-        )
+    """Cover slide: brand-styled title with accent bars, no placeholder slop.
+
+    Uses the Blank layout + manual shapes so the look is identical across
+    Office versions (default layout 0 inherits Microsoft template defaults
+    we don't control).
+    """
+    try:
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.enum.text import PP_ALIGN
+    except ImportError as exc:  # pragma: no cover
+        raise ExportError("python-pptx enum imports failed") from exc
+
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank
+
+    slide_w_in = prs.slide_width / 914400  # EMUs per inch
+    slide_h_in = prs.slide_height / 914400
+
+    # Top thin orange accent bar (full width, 4pt).
+    _pptx_add_rect_fill(
+        slide, MSO_SHAPE, RGBColor,
+        left=Inches(0), top=Inches(0),
+        width=Inches(slide_w_in), height=Inches(0.08),
+        fill_rgb=_PPTX_BRAND_PRIMARY,
+    )
+
+    # Eyebrow label ("NEXORA").
+    eyebrow = slide.shapes.add_textbox(
+        Inches(_PPTX_MARGIN_X), Inches(1.2),
+        Inches(slide_w_in - 2 * _PPTX_MARGIN_X), Inches(0.45),
+    )
+    _pptx_set_text(
+        eyebrow.text_frame, "NEXORA",
+        Pt=Pt, RGBColor=RGBColor,
+        font=_PPTX_FONT_DISPLAY, size=16, bold=True,
+        color=_PPTX_BRAND_PRIMARY, letter_spacing=200,
+    )
+
+    # Main title.
+    title_box = slide.shapes.add_textbox(
+        Inches(_PPTX_MARGIN_X), Inches(1.9),
+        Inches(slide_w_in - 2 * _PPTX_MARGIN_X), Inches(1.4),
+    )
+    _pptx_set_text(
+        title_box.text_frame,
+        title or "Chat Transcript",
+        Pt=Pt, RGBColor=RGBColor,
+        font=_PPTX_FONT_DISPLAY, size=44, bold=True,
+        color=_PPTX_TEXT_PRIMARY,
+    )
+
+    # Short accent underline below the title (~3" wide).
+    _pptx_add_rect_fill(
+        slide, MSO_SHAPE, RGBColor,
+        left=Inches(_PPTX_MARGIN_X), top=Inches(3.5),
+        width=Inches(2.5), height=Inches(0.06),
+        fill_rgb=_PPTX_BRAND_PRIMARY,
+    )
+
+    # Metadata block.
+    meta_box = slide.shapes.add_textbox(
+        Inches(_PPTX_MARGIN_X), Inches(3.85),
+        Inches(slide_w_in - 2 * _PPTX_MARGIN_X), Inches(1.2),
+    )
+    meta_tf = meta_box.text_frame
+    meta_tf.word_wrap = True
+    _pptx_set_text(
+        meta_tf,
+        f"Generated {datetime.now(timezone.utc).strftime('%B %d, %Y at %H:%M UTC')}",
+        Pt=Pt, RGBColor=RGBColor,
+        font=_PPTX_FONT_BODY, size=14, color=_PPTX_TEXT_SECONDARY,
+    )
+    p2 = meta_tf.add_paragraph()
+    run = p2.add_run()
+    run.text = f"{message_count} message{'s' if message_count != 1 else ''} · AI-assisted transcript"
+    run.font.name = _PPTX_FONT_BODY
+    run.font.size = Pt(12)
+    run.font.color.rgb = RGBColor(*_PPTX_TEXT_MUTED)
+
+    # Bottom orange band as the cover's signature element.
+    _pptx_add_rect_fill(
+        slide, MSO_SHAPE, RGBColor,
+        left=Inches(0), top=Inches(slide_h_in - 0.45),
+        width=Inches(slide_w_in), height=Inches(0.45),
+        fill_rgb=_PPTX_BRAND_PRIMARY,
+    )
+    # Bottom-band caption (sits on top of the orange).
+    caption = slide.shapes.add_textbox(
+        Inches(_PPTX_MARGIN_X), Inches(slide_h_in - 0.42),
+        Inches(slide_w_in - 2 * _PPTX_MARGIN_X), Inches(0.42),
+    )
+    _pptx_set_text(
+        caption.text_frame, "Nexora Lab  ·  Confidential  ·  Internal use",
+        Pt=Pt, RGBColor=RGBColor,
+        font=_PPTX_FONT_BODY, size=10, color=_PPTX_WHITE, letter_spacing=80,
+    )
 
 
 def _pptx_extract_artifacts(msg_content: str) -> tuple["BeautifulSoup", list[dict]]:  # type: ignore[name-defined]
@@ -928,29 +1187,45 @@ def _pptx_add_assistant_slides(
 
 
 def _pptx_add_text_slide(prs, tree, slide_title: str, msg: ExportMessage, Inches, Pt, RGBColor) -> None:
-    """Layout 5 (Title Only) + a single textbox below the title.
+    """Branded content slide: header bar + content textbox + (optional) message
+    metadata strip + footer (added in post-processing).
 
-    We walk the HTML tree and emit one paragraph per block-level node
-    (skipping tables and chart sentinels — those get their own slides).
-    Lists become bullet-prefixed paragraphs; headings become bold runs.
+    Uses the Blank layout (not Title Only) because we draw the title bar
+    manually for full control. The content textbox auto-shrinks long bodies
+    to fit the page.
     """
-    layout = prs.slide_layouts[5]  # Title Only
-    slide = prs.slides.add_slide(layout)
-    slide.shapes.title.text = slide_title
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank
+    _pptx_add_brand_header(slide, slide_title, Inches, Pt, RGBColor)
 
-    # Footer metadata — model + filename if attached.
-    if msg.model or msg.file:
-        _pptx_add_footer(slide, msg, Inches, Pt, RGBColor)
+    # Optional metadata strip directly under the accent line.
+    body_top = _PPTX_CONTENT_TOP
+    if msg.model or msg.timestamp or msg.file:
+        meta_box = slide.shapes.add_textbox(
+            Inches(_PPTX_MARGIN_X), Inches(body_top),
+            Inches(13.333 - 2 * _PPTX_MARGIN_X), Inches(0.3),
+        )
+        parts: list[str] = []
+        if msg.model:
+            parts.append(msg.model)
+        if msg.timestamp:
+            parts.append(msg.timestamp)
+        if msg.file:
+            parts.append(f"file: {msg.file}")
+        _pptx_set_text(
+            meta_box.text_frame, "  ·  ".join(parts),
+            Pt=Pt, RGBColor=RGBColor,
+            font=_PPTX_FONT_BODY, size=10, color=_PPTX_TEXT_MUTED,
+        )
+        body_top += 0.35
 
-    # Content textbox. Slide is 13.333 × 7.5 inches; title placeholder
-    # occupies the top ~1.2"; leave 0.4" margins side-and-bottom.
-    left, top = Inches(0.5), Inches(1.4)
-    width, height = Inches(12.333), Inches(5.7)
-    tb = slide.shapes.add_textbox(left, top, width, height)
+    # Content textbox spans from below the metadata to just above the footer.
+    body_height = _PPTX_CONTENT_BOTTOM - body_top
+    tb = slide.shapes.add_textbox(
+        Inches(_PPTX_MARGIN_X), Inches(body_top),
+        Inches(13.333 - 2 * _PPTX_MARGIN_X), Inches(body_height),
+    )
     tf = tb.text_frame
     tf.word_wrap = True
-    # Enables PowerPoint's "Shrink text on overflow" so long messages
-    # don't spill off the slide. Users can override per their template.
     try:
         from pptx.enum.text import MSO_AUTO_SIZE
         tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
@@ -1129,45 +1404,83 @@ def _pptx_add_footer(slide, msg: ExportMessage, Inches, Pt, RGBColor) -> None:
 
 
 def _pptx_add_chart_slide(prs, title_text: str, image_bytes: Optional[bytes], Inches, Pt, RGBColor) -> None:
-    """Per-chart slide: title at top, image centred below."""
-    layout = prs.slide_layouts[5]  # Title Only
-    slide = prs.slides.add_slide(layout)
-    slide.shapes.title.text = title_text
+    """Per-chart slide: branded header + centred image with hairline frame.
+
+    The framed look (thin border around the chart) reads more polished than
+    a bare image floating on white — clinicians shared early feedback that
+    untrimmed Chart.js exports looked "raw" in decks.
+    """
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank
+    _pptx_add_brand_header(slide, title_text, Inches, Pt, RGBColor)
 
     if image_bytes is None:
-        # Placeholder textbox if the client didn't capture the chart image.
-        tb = slide.shapes.add_textbox(Inches(0.5), Inches(3.5), Inches(12.333), Inches(0.5))
-        tb.text_frame.text = f"[Chart image not captured: {title_text}]"
-        for r in tb.text_frame.paragraphs[0].runs:
-            r.font.italic = True
-            r.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
-            r.font.size = Pt(14)
+        tb = slide.shapes.add_textbox(
+            Inches(_PPTX_MARGIN_X), Inches(3.5),
+            Inches(13.333 - 2 * _PPTX_MARGIN_X), Inches(0.5),
+        )
+        _pptx_set_text(
+            tb.text_frame, f"[Chart image not captured: {title_text}]",
+            Pt=Pt, RGBColor=RGBColor,
+            font=_PPTX_FONT_BODY, size=14, italic=True, color=_PPTX_TEXT_MUTED,
+            align="center",
+        )
         return
 
-    # Centre a 10" wide image at the slide centre. Aspect ratio is preserved
-    # by python-pptx when only width is given.
+    # Hairline frame behind the image — same width as the image (10"), gives
+    # the chart a subtle "card" look.
+    try:
+        from pptx.enum.shapes import MSO_SHAPE
+    except ImportError:  # pragma: no cover
+        MSO_SHAPE = None
+
+    image_left_in = (13.333 - 10) / 2  # centre horizontally
+    image_top_in = 1.65
+
+    if MSO_SHAPE is not None:
+        # Soft background card.
+        _pptx_add_rect_fill(
+            slide, MSO_SHAPE, RGBColor,
+            left=Inches(image_left_in - 0.15), top=Inches(image_top_in - 0.15),
+            width=Inches(10.3), height=Inches(4.7),
+            fill_rgb=_PPTX_ROW_ALT,
+        )
+
     try:
         slide.shapes.add_picture(
             io.BytesIO(image_bytes),
-            left=Inches(1.667),  # (13.333 - 10) / 2
-            top=Inches(1.6),
+            left=Inches(image_left_in),
+            top=Inches(image_top_in),
             width=Inches(10),
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("pptx_chart_embed_failed", extra={"error": str(exc)})
-        tb = slide.shapes.add_textbox(Inches(0.5), Inches(3.5), Inches(12.333), Inches(0.5))
-        tb.text_frame.text = f"[Chart image failed to embed: {title_text}]"
+        tb = slide.shapes.add_textbox(
+            Inches(_PPTX_MARGIN_X), Inches(3.5),
+            Inches(13.333 - 2 * _PPTX_MARGIN_X), Inches(0.5),
+        )
+        _pptx_set_text(
+            tb.text_frame, f"[Chart image failed to embed: {title_text}]",
+            Pt=Pt, RGBColor=RGBColor,
+            font=_PPTX_FONT_BODY, size=14, italic=True, color=_PPTX_TEXT_MUTED,
+            align="center",
+        )
 
 
 def _pptx_add_table_slide(prs, title_text: str, table_node, Inches, Pt, RGBColor) -> None:
-    """Per-table slide: title at top, native pptx table centred below.
+    """Per-table slide: branded header + polished table.
+
+    Polishing:
+      * Header row: dark slate fill, white bold text, larger font.
+      * Body rows: zebra striping (white / very light gray) for scanability.
+      * Right-align cells that look numeric so columns of figures line up.
+      * Hairline borders (delivered by the default pptx Table; we don't
+        try to override the XML).
 
     Rows that vary in column count (LLM output is messy) are padded to the
     widest row's column count so the pptx grid has no holes.
     """
-    layout = prs.slide_layouts[5]
-    slide = prs.slides.add_slide(layout)
-    slide.shapes.title.text = title_text
+    slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank
+    _pptx_add_brand_header(slide, title_text, Inches, Pt, RGBColor)
 
     rows = table_node.find_all("tr")
     if not rows:
@@ -1176,43 +1489,81 @@ def _pptx_add_table_slide(prs, title_text: str, table_node, Inches, Pt, RGBColor
     if col_count == 0:
         return
 
-    # Cap table dimensions to fit the content area. Width is generous; height
-    # is computed proportional to row count, capped at the available space.
-    available_width = Inches(12.333)
-    available_height = Inches(5.7)
-    row_height = max(Inches(0.35), min(Inches(0.6), Inches(5.7 / max(len(rows), 1))))
-    table_height = row_height * len(rows)
-    if table_height > available_height:
-        table_height = available_height
+    # Layout the table to fill the content area.
+    available_width = Inches(13.333 - 2 * _PPTX_MARGIN_X)
+    available_height = _PPTX_CONTENT_BOTTOM - _PPTX_CONTENT_TOP
+    row_height = max(0.4, min(0.7, available_height / max(len(rows), 1)))
+    table_height = Inches(row_height * len(rows))
+    if table_height > Inches(available_height):
+        table_height = Inches(available_height)
 
-    left = Inches(0.5)
-    top = Inches(1.4)
-    shape = slide.shapes.add_table(len(rows), col_count, left, top, available_width, table_height)
+    shape = slide.shapes.add_table(
+        len(rows), col_count,
+        Inches(_PPTX_MARGIN_X), Inches(_PPTX_CONTENT_TOP),
+        available_width, table_height,
+    )
     table = shape.table
 
-    header_row = rows[0].find_all("th")
-    has_header = bool(header_row)
+    has_header = bool(rows[0].find_all("th"))
+
+    # Heuristic: detect numeric columns from the first body row so we can
+    # right-align them. Imperfect — currencies with $ prefix won't isnumeric()
+    # — but a decent default that improves the common case (counts, scores).
+    numeric_cols: set[int] = set()
+    body_start = 1 if has_header else 0
+    if len(rows) > body_start:
+        sample_cells = rows[body_start].find_all(["td", "th"])
+        for c_idx, c in enumerate(sample_cells):
+            text = c.get_text(strip=True).replace(",", "").replace("%", "").replace("$", "").lstrip("-")
+            if text and (text.replace(".", "", 1).isdigit()):
+                numeric_cols.add(c_idx)
+
+    try:
+        from pptx.enum.text import PP_ALIGN
+    except ImportError:
+        PP_ALIGN = None
 
     for r_idx, tr in enumerate(rows):
         cells = tr.find_all(["td", "th"])
+        is_header_row = has_header and r_idx == 0
+        is_alt_row = (not is_header_row) and ((r_idx - body_start) % 2 == 1)
+
         for c_idx in range(col_count):
             cell = table.cell(r_idx, c_idx)
             text = cells[c_idx].get_text(strip=True) if c_idx < len(cells) else ""
             cell.text = text
-            # Header styling
-            if has_header and r_idx == 0:
-                for p in cell.text_frame.paragraphs:
-                    for run in p.runs:
+
+            # Background fill.
+            if is_header_row:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = RGBColor(*_PPTX_TABLE_HEADER_BG)
+            elif is_alt_row:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = RGBColor(*_PPTX_ROW_ALT)
+            else:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = RGBColor(*_PPTX_WHITE)
+
+            # Cell padding — defaults are tight, but a small bump reads
+            # better on screen.
+            cell.margin_left = Inches(0.08)
+            cell.margin_right = Inches(0.08)
+            cell.margin_top = Inches(0.04)
+            cell.margin_bottom = Inches(0.04)
+
+            # Text styling.
+            for p in cell.text_frame.paragraphs:
+                if PP_ALIGN is not None and c_idx in numeric_cols and not is_header_row:
+                    p.alignment = PP_ALIGN.RIGHT
+                for run in p.runs:
+                    run.font.name = _PPTX_FONT_BODY
+                    if is_header_row:
                         run.font.bold = True
                         run.font.size = Pt(11)
-                        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-                # Header background — soft brand teal.
-                cell.fill.solid()
-                cell.fill.fore_color.rgb = RGBColor(0x33, 0x4E, 0x68)
-            else:
-                for p in cell.text_frame.paragraphs:
-                    for run in p.runs:
-                        run.font.size = Pt(10)
+                        run.font.color.rgb = RGBColor(*_PPTX_WHITE)
+                    else:
+                        run.font.size = Pt(10.5)
+                        run.font.color.rgb = RGBColor(*_PPTX_TEXT_PRIMARY)
 
 
 def _pdf_insert_chart(
