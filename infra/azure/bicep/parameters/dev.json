@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": {
+      "value": "nexora-dev"
+    },
+    "location": {
+      "value": "westus3"
+    },
+    "vnetId": {
+      "value": "/subscriptions/c6ae45b3-8336-440f-a851-edbf7effa486/resourceGroups/rg-nexora-dev/providers/Microsoft.Network/virtualNetworks/nexora-dev-vnet"
+    },
+    "privateEndpointSubnetId": {
+      "value": "/subscriptions/c6ae45b3-8336-440f-a851-edbf7effa486/resourceGroups/rg-nexora-dev/providers/Microsoft.Network/virtualNetworks/nexora-dev-vnet/subnets/pe-subnet"
+    },
+    "containerAppPrincipalId": {
+      "value": "d3ebec55-45ed-4962-97ba-e5a67e63224d"
+    },
+    "openAiEmbeddingCapacity": {
+      "value": 100
+    }
+  }
+}

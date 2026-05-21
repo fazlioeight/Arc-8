@@ -1,0 +1,166 @@
+/* AI Assistant panel styling.
+ *
+ * Lives next to the component (Bootstrap/Tailwind/custom in this codebase
+ * mix freely). Variables come from designSystem.css so the panel matches
+ * the rest of the platform's chrome.
+ */
+
+.ai-assistant-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md, 1rem);
+  padding: var(--space-md, 1rem) var(--space-lg, 1.5rem);
+  background: var(--canvas-panel, #ffffff);
+  border: 1px solid var(--canvas-border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: var(--box-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.08));
+  max-width: 420px;
+  width: 100%;
+  font-family: inherit;
+}
+
+.ai-assistant-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm, 0.5rem);
+}
+
+.ai-assistant-panel__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--canvas-ink, #0f172a);
+  margin: 0;
+}
+
+.ai-assistant-panel__close {
+  background: transparent;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--canvas-muted, #475569);
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+.ai-assistant-panel__close:hover {
+  color: var(--canvas-ink, #0f172a);
+}
+
+.ai-assistant-panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.5rem);
+}
+
+.ai-assistant-panel__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--canvas-muted, #475569);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ai-assistant-panel__textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  border: 1px solid var(--canvas-border, #e2e8f0);
+  border-radius: 8px;
+  resize: vertical;
+  min-height: 64px;
+  background: var(--canvas-soft, #f8fafc);
+  color: var(--canvas-ink, #0f172a);
+}
+.ai-assistant-panel__textarea:focus {
+  outline: 2px solid var(--brand-500, #4338ca);
+  outline-offset: 1px;
+}
+
+.ai-assistant-panel__actions {
+  display: flex;
+  gap: var(--space-sm, 0.5rem);
+}
+
+.ai-assistant-panel__submit,
+.ai-assistant-panel__reset {
+  padding: 0.45rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.ai-assistant-panel__submit {
+  background: var(--brand-600, #4338ca);
+  color: #fff;
+}
+.ai-assistant-panel__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ai-assistant-panel__reset {
+  background: transparent;
+  color: var(--canvas-muted, #475569);
+  border-color: var(--canvas-border, #e2e8f0);
+}
+
+.ai-assistant-panel__error {
+  padding: 0.6rem 0.8rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.ai-assistant-panel__warning {
+  font-size: 0.85rem;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+}
+
+.ai-assistant-panel__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 0.5rem);
+}
+
+.ai-assistant-panel__answer {
+  white-space: pre-wrap;
+  line-height: 1.55;
+  color: var(--canvas-ink, #0f172a);
+}
+
+.ai-assistant-panel__footer small {
+  color: var(--canvas-muted, #475569);
+  font-size: 0.75rem;
+}
+
+/* Citation chip — small inline pill alongside the bracketed marker. */
+.ai-citation-chip {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0.15rem;
+  padding: 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  background: var(--brand-50, #eef2ff);
+  color: var(--brand-700, #3730a3);
+  border: 1px solid var(--brand-100, #e0e7ff);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.ai-citation-chip:hover {
+  background: var(--brand-100, #e0e7ff);
+  color: var(--brand-800, #312e81);
+}
+.ai-citation-chip:focus {
+  outline: 2px solid var(--brand-500, #4338ca);
+  outline-offset: 1px;
+}

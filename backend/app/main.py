@@ -19,6 +19,7 @@ from .middleware.security_headers import SecurityHeadersMiddleware
 from .middleware.tenant import TenantMiddleware
 from .models.tables import User
 from .routes import admin as admin_router
+from .routes import ai as ai_router
 from .routes import analytics as analytics_router
 from .routes import auth as auth_router
 from .routes import chat as chat_router
@@ -473,4 +474,5 @@ app.include_router(ride_booking_router.router)
 app.include_router(docs_router.router)
 app.include_router(settings_router.router)
 app.include_router(chat_router.router)
+app.include_router(ai_router.router)
 

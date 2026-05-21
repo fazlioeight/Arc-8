@@ -129,6 +129,55 @@ class Settings(BaseSettings):
     ALLOWED_DATA_RESIDENCIES: List[str] = ["us", "us-east-1", "us-west-2", "eu", "eu-west-1"]
     DEFAULT_DATA_RESIDENCY: str = "us"
 
+    # ── AI semantic layer (Azure-native) ─────────────────────────────────────
+    # All endpoints below resolve to private-endpoint FQDNs in production. Auth
+    # is via DefaultAzureCredential — never an account key or connection
+    # string — so secrets here are limited to non-credential identifiers.
+    #
+    # Azure OpenAI: used for embeddings (and optionally chat). The chat path
+    # continues to use Anthropic by default (per architecture decision
+    # 2026-05-19) but the embeddings path is non-negotiable Azure OpenAI
+    # because AI Search vectorization integrations expect it.
+    AZURE_OPENAI_ENDPOINT: Optional[str] = None  # e.g. "https://nexora-oai.openai.azure.com"
+    AZURE_OPENAI_API_VERSION: str = "2024-10-21"
+    AZURE_OPENAI_EMBEDDING_DEPLOYMENT: str = "text-embedding-3-large"
+    AZURE_OPENAI_EMBEDDING_DIMENSIONS: int = 3072
+    # Tokens per minute we'll send to the embedding endpoint. Embedding-3-large
+    # is rate-limited at 350k TPM on default deployments; stay well under so
+    # bulk backfills don't starve live ingestion.
+    AZURE_OPENAI_EMBEDDING_TPM_BUDGET: int = 250_000
+
+    # Azure AI Search: hybrid (BM25 + vector) retrieval.
+    AZURE_SEARCH_ENDPOINT: Optional[str] = None  # e.g. "https://nexora-search.search.windows.net"
+    AZURE_SEARCH_MEMBERS_INDEX: str = "idx-members-v1"
+    AZURE_SEARCH_DOCUMENTS_INDEX: str = "idx-documents-v1"
+    AZURE_SEARCH_DEFAULT_TOP_K: int = 8
+
+    # Cosmos DB: event snapshots, computed features, semantic objects.
+    AZURE_COSMOS_ENDPOINT: Optional[str] = None  # e.g. "https://nexora-cosmos.documents.azure.com:443/"
+    AZURE_COSMOS_DATABASE: str = "nexora"
+    AZURE_COSMOS_SNAPSHOTS_CONTAINER: str = "event_snapshots"
+    AZURE_COSMOS_SEMANTIC_MEMBER_CONTAINER: str = "semantic_member"
+    AZURE_COSMOS_RAG_CHUNKS_CONTAINER: str = "rag_chunks"
+
+    # Event Hub: CDC + domain events fan-out.
+    AZURE_EVENT_HUB_NAMESPACE: Optional[str] = None  # FQDN, e.g. "nexora-eh.servicebus.windows.net"
+    AZURE_EVENT_HUB_MEMBERS_TOPIC: str = "nexora.member.changed.v1"
+    AZURE_EVENT_HUB_CONSUMER_GROUP_RAG: str = "rag-processor"
+    # Outbox publisher polling cadence + batch size. A 1s poll keeps p99 lag
+    # under 2s for low-traffic tenants; high-traffic tenants typically have
+    # multiple rows ready each tick, so batches are bounded to avoid Event
+    # Hub message-size limits (1 MB per batch on Standard tier).
+    EVENT_OUTBOX_POLL_INTERVAL_SECONDS: float = 1.0
+    EVENT_OUTBOX_BATCH_SIZE: int = 100
+
+    # AI assistant rate-limits — separate from chat (which has its own).
+    # Healthcare context: lower default than chat because each RAG call hits
+    # a third-party LLM with PHI, which we want to limit aggressively.
+    AI_ASK_RATE_LIMIT_PER_MINUTE: int = 10
+    AI_ASK_MAX_QUESTION_CHARS: int = 1_000
+    AI_ASK_MAX_CONTEXT_CHUNKS: int = 8
+
     model_config = SettingsConfigDict(
         case_sensitive=True,
         env_file=".env",
