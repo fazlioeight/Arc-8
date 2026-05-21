@@ -535,9 +535,46 @@ const Member360LabWorkspace = () => {
         </div>
       )}
 
+      <section className="coding-surface rounded-2xl shadow-sm">
+        <WorkspaceTabs tabs={TABS} activeKey={tab} onChange={setTab} />
+        <div className="p-4">
+          {/* Scope an error boundary to each tab so a broken sub-page
+              (e.g. a chart sub-page that throws on unexpected detail
+              shape) doesn't blank the whole workspace. `key={tab}`
+              resets the boundary whenever the user switches tabs, so a
+              previously-broken tab works again on next visit if the
+              underlying data has recovered. */}
+          <ErrorBoundary
+            key={tab}
+            fallback={({ error, resetError }) => (
+              <div className="rounded-lg ring-1 ring-rose-200 dark:ring-rose-700/40 bg-rose-50/60 dark:bg-rose-900/15 px-3 py-3 text-sm">
+                <p className="font-semibold coding-text-strong">This tab failed to render.</p>
+                <p className="text-xs coding-text-soft mt-0.5">
+                  The other tabs are unaffected. Switch tabs or click "Try again" below.
+                </p>
+                {error?.message && (
+                  <pre className="mt-2 max-h-32 overflow-auto rounded bg-rose-100/60 dark:bg-rose-900/30 px-2 py-1.5 text-[11px] coding-text-strong">
+                    {error.message}
+                  </pre>
+                )}
+                <button
+                  type="button"
+                  onClick={resetError}
+                  className="mt-2 inline-flex items-center rounded-md bg-[var(--brand-primary)] text-white px-2.5 py-1 text-xs font-semibold hover:bg-brand-700"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+          >
+            {tabContent}
+          </ErrorBoundary>
+        </div>
+      </section>
+
       <div className="grid grid-cols-12 gap-4">
         {/* Left rail — properties */}
-        <div className="col-span-12 xl:col-span-3 space-y-4">
+        <div className="col-span-12 xl:col-span-6 space-y-4">
           <MemberSummaryCard
             member={member}
             pcpHref={pcpHref}
@@ -579,48 +616,8 @@ const Member360LabWorkspace = () => {
           </SectionCard>
         </div>
 
-        {/* Center — activity */}
-        <div className="col-span-12 xl:col-span-6 space-y-4">
-          <section className="coding-surface rounded-2xl shadow-sm">
-            <WorkspaceTabs tabs={TABS} activeKey={tab} onChange={setTab} />
-            <div className="p-4">
-              {/* Scope an error boundary to each tab so a broken sub-page
-                  (e.g. a chart sub-page that throws on unexpected detail
-                  shape) doesn't blank the whole workspace. `key={tab}`
-                  resets the boundary whenever the user switches tabs, so a
-                  previously-broken tab works again on next visit if the
-                  underlying data has recovered. */}
-              <ErrorBoundary
-                key={tab}
-                fallback={({ error, resetError }) => (
-                  <div className="rounded-lg ring-1 ring-rose-200 dark:ring-rose-700/40 bg-rose-50/60 dark:bg-rose-900/15 px-3 py-3 text-sm">
-                    <p className="font-semibold coding-text-strong">This tab failed to render.</p>
-                    <p className="text-xs coding-text-soft mt-0.5">
-                      The other tabs are unaffected. Switch tabs or click "Try again" below.
-                    </p>
-                    {error?.message && (
-                      <pre className="mt-2 max-h-32 overflow-auto rounded bg-rose-100/60 dark:bg-rose-900/30 px-2 py-1.5 text-[11px] coding-text-strong">
-                        {error.message}
-                      </pre>
-                    )}
-                    <button
-                      type="button"
-                      onClick={resetError}
-                      className="mt-2 inline-flex items-center rounded-md bg-[var(--brand-primary)] text-white px-2.5 py-1 text-xs font-semibold hover:bg-brand-700"
-                    >
-                      Try again
-                    </button>
-                  </div>
-                )}
-              >
-                {tabContent}
-              </ErrorBoundary>
-            </div>
-          </section>
-        </div>
-
         {/* Right rail — associations */}
-        <div className="col-span-12 xl:col-span-3 space-y-4">
+        <div className="col-span-12 xl:col-span-6 space-y-4">
           <GuidedTriagePanel member={member} onAction={(key, payload) => handleAction(key, payload)} />
           <RiskInsightsCard member={member} insights={detail.risk_insights} />
           <SectionCard title="Recommended care options" subtitle="Steer toward lower-cost, high-quality providers.">
