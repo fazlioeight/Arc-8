@@ -43,6 +43,7 @@ from ..services.chat.export import (
     ExportMessage,
     export_to_docx,
     export_to_pdf,
+    export_to_pptx,
 )
 from ..schemas.chat_export import ChatExportRequest
 from ..utils.audit_logger import record_audit_event
@@ -142,8 +143,9 @@ def _check_export_rate_limit(user_email: str) -> None:
 _EXPORT_CONTENT_TYPES = {
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "pdf": "application/pdf",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
-_EXPORT_EXTENSIONS = {"docx": "docx", "pdf": "pdf"}
+_EXPORT_EXTENSIONS = {"docx": "docx", "pdf": "pdf", "pptx": "pptx"}
 
 
 def _safe_filename_part(value: str) -> str:
@@ -213,6 +215,8 @@ async def export_conversation(
     try:
         if body.format == "docx":
             blob = export_to_docx(messages=messages, charts=body.charts, title=body.title)
+        elif body.format == "pptx":
+            blob = export_to_pptx(messages=messages, charts=body.charts, title=body.title)
         else:
             blob = export_to_pdf(messages=messages, charts=body.charts, title=body.title)
     except ExportError as exc:

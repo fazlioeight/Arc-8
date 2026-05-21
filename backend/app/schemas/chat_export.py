@@ -47,11 +47,12 @@ class ChatExportRequest(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    format: Literal["docx", "pdf"] = Field(
+    format: Literal["docx", "pdf", "pptx"] = Field(
         ...,
         description=(
-            "Output container. Both share the same content rendering; only the "
-            "final write step differs."
+            "Output container. ``docx`` and ``pdf`` share a flat-document "
+            "rendering; ``pptx`` uses a deck-shaped layout where charts and "
+            "tables get their own slides."
         ),
     )
     title: Optional[str] = Field(

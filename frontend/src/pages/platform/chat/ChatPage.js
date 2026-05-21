@@ -620,6 +620,15 @@ const ChatPage = () => {
               >
                 {exporting ? '...' : 'export .pdf'}
               </button>
+              <button
+                type="button"
+                className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#3a3a3a] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => handleExport('pptx')}
+                disabled={!messages.length || exporting}
+                title="Export the conversation as a PowerPoint deck (one slide per chart and table)"
+              >
+                {exporting ? '...' : 'export .pptx'}
+              </button>
               <div className="flex items-center gap-1.5 rounded-[3px] border border-[#2a2a2a] px-2 py-0.5 text-[11px] text-[#4ade80]" aria-label="Service active">
                 <span className="h-[5px] w-[5px] rounded-full bg-[#4ade80]" aria-hidden="true" />
                 active
