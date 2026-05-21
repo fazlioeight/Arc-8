@@ -46,6 +46,17 @@ from ..services.chat.export import (
     export_to_pptx,
 )
 from ..schemas.chat_export import ChatExportRequest
+from ..schemas.chat_history import (
+    ConversationDetail,
+    ConversationListResponse,
+    ConversationSummary,
+    CreateConversationRequest,
+    ChatHistoryMessageOut,
+    RenameConversationRequest,
+    SendMessageRequest,
+    SendMessageResponse,
+)
+from ..services.chat import history as history_svc
 from ..utils.audit_logger import record_audit_event
 from ..db.session import control_session
 from ..utils.security import AuthenticatedUser, get_current_user
@@ -883,3 +894,333 @@ async def list_dataset_loads(
     session: AsyncSession = Depends(get_tenant_session),
 ):
     return {"loads": await dataset_svc.recent_loads(session, table_name=table, limit=25)}
+
+
+# ── Conversation history ────────────────────────────────────────────────────
+#
+# Per-tenant persisted history. All endpoints below scope to the calling
+# user — a user can only see / write their own conversations even within
+# the same tenant. The history.py service enforces the ownership invariant
+# and collapses "not yours" / "not exists" / "soft-deleted" into a single
+# 404 so we don't leak the existence of other users' conversations.
+
+
+def _convo_to_summary(convo) -> ConversationSummary:
+    """Map the SQLAlchemy row to the wire shape. We use ``from_attributes``
+    in the Pydantic config but call it explicitly here so the field that
+    aren't 1:1 (none currently, but defensive) stay obvious."""
+    return ConversationSummary.model_validate(convo)
+
+
+def _convo_to_detail(convo) -> ConversationDetail:
+    return ConversationDetail.model_validate(
+        {
+            "id": convo.id,
+            "title": convo.title,
+            "model": convo.model,
+            "message_count": convo.message_count,
+            "created_at": convo.created_at,
+            "updated_at": convo.updated_at,
+            "messages": [
+                ChatHistoryMessageOut.model_validate(m)
+                for m in sorted(convo.messages, key=lambda m: m.created_at)
+            ],
+        }
+    )
+
+
+@router.get("/conversations", response_model=ConversationListResponse)
+async def list_my_conversations(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    page = await history_svc.list_conversations(session, user_id=current_user.id)
+    return ConversationListResponse(
+        conversations=[_convo_to_summary(c) for c in page.items]
+    )
+
+
+@router.post("/conversations", response_model=ConversationSummary, status_code=201)
+async def create_conversation(
+    body: CreateConversationRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    convo = await history_svc.create_conversation(
+        session,
+        user_id=current_user.id,
+        user_email=current_user.email,
+        title=body.title,
+    )
+    await session.commit()
+    return _convo_to_summary(convo)
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
+async def get_conversation_detail(
+    conversation_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        convo = await history_svc.get_conversation(
+            session, conversation_id=conversation_id, user_id=current_user.id
+        )
+    except history_svc.ConversationNotFound:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    return _convo_to_detail(convo)
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationSummary)
+async def rename_conversation(
+    conversation_id: str,
+    body: RenameConversationRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        convo = await history_svc.rename_conversation(
+            session,
+            conversation_id=conversation_id,
+            user_id=current_user.id,
+            title=body.title,
+        )
+    except history_svc.ConversationNotFound:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    await session.commit()
+    return _convo_to_summary(convo)
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+async def delete_conversation(
+    conversation_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        await history_svc.archive_conversation(
+            session, conversation_id=conversation_id, user_id=current_user.id
+        )
+    except history_svc.ConversationNotFound:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    await session.commit()
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=SendMessageResponse,
+)
+async def send_message_to_conversation(
+    conversation_id: str,
+    body: SendMessageRequest,
+    request: Request,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+) -> SendMessageResponse:
+    """Combined endpoint: persist user message, call Claude with full
+    conversation context, persist assistant reply, return both rows.
+
+    All three operations land in the same transaction — if the LLM call
+    fails, the user message is rolled back too. This is the behaviour the
+    sidebar UX wants: a turn either fully lands or doesn't, no half-saved
+    state to clean up.
+    """
+    _check_client()
+    rid = _request_id(request)
+    client = get_client()
+    model = resolve_model(body.model)
+
+    if body.workbook_id and body.dataset:
+        raise HTTPException(
+            status_code=400,
+            detail="workbook_id and dataset cannot be combined on the same request.",
+        )
+
+    # 1) Persist the user turn (also bumps title + counters).
+    try:
+        user_msg = await history_svc.append_message(
+            session,
+            conversation_id=conversation_id,
+            user_id=current_user.id,
+            role="user",
+            content=body.content,
+            workbook_id=body.workbook_id,
+        )
+    except history_svc.ConversationNotFound:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+
+    # 2) Build the message list the LLM expects, including the just-appended
+    #    user turn.
+    messages_for_llm = await history_svc.list_messages_for_llm(
+        session, conversation_id=conversation_id, user_id=current_user.id
+    )
+
+    logger.info(
+        "chat_conversation_request",
+        extra={
+            "request_id": rid,
+            "user": current_user.email,
+            "model": model,
+            "conversation_id": conversation_id,
+            "message_count": len(messages_for_llm),
+        },
+    )
+
+    # 3) Call Claude.
+    try:
+        response = await client.messages.create(
+            model=model,
+            max_tokens=max_tokens(model, streaming=False),
+            system=DEFAULT_SYSTEM_PROMPT,
+            messages=messages_for_llm,
+        )
+        reply = extract_text_blocks(response)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "chat_conversation_failed",
+            extra={"request_id": rid, "conversation_id": conversation_id},
+        )
+        # Roll back the user-message insert so the sidebar count doesn't
+        # advance on a failed turn.
+        await session.rollback()
+        is_dev = settings.ENVIRONMENT.lower() != "production"
+        detail = f"Chat request failed: {exc}" if is_dev else "Chat request failed."
+        raise HTTPException(status_code=500, detail=detail)
+
+    # 4) Persist the assistant reply with model + token counts when available.
+    usage = getattr(response, "usage", None)
+    tokens_in = getattr(usage, "input_tokens", None) if usage else None
+    tokens_out = getattr(usage, "output_tokens", None) if usage else None
+    assistant_msg = await history_svc.append_message(
+        session,
+        conversation_id=conversation_id,
+        user_id=current_user.id,
+        role="assistant",
+        content=reply,
+        model=model,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+    )
+
+    # Reload the conversation summary so the response includes the bumped
+    # message_count + updated_at.
+    convo = await history_svc.get_conversation(
+        session,
+        conversation_id=conversation_id,
+        user_id=current_user.id,
+        include_messages=False,
+    )
+    await session.commit()
+
+    return SendMessageResponse(
+        conversation=_convo_to_summary(convo),
+        user_message=ChatHistoryMessageOut.model_validate(user_msg),
+        assistant_message=ChatHistoryMessageOut.model_validate(assistant_msg),
+    )
+
+
+@router.post("/conversations/{conversation_id}/messages/stream")
+async def stream_message_to_conversation(
+    conversation_id: str,
+    body: SendMessageRequest,
+    request: Request,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_tenant_context),
+) -> StreamingResponse:
+    """Streaming variant. The SSE generator opens its own DB session
+    because the Depends-injected one is closed before SSE begins
+    yielding.
+
+    Sequence:
+      1. Open session inside the generator.
+      2. Persist user message + commit.
+      3. Stream Claude response, accumulating text.
+      4. Persist assistant message + commit when stream completes.
+      5. Yield ``[DONE]``.
+
+    If the stream is cancelled mid-way (client navigates away), the user
+    message stays persisted; the partial assistant text is discarded. The
+    user can re-ask without seeing duplicates.
+    """
+    _check_client()
+    rid = _request_id(request)
+    client = get_client()
+    model = resolve_model(body.model)
+
+    async def _generate() -> AsyncIterator[str]:
+        accumulated: list[str] = []
+        try:
+            # Step 1+2: persist user message and prepare the LLM payload.
+            async with tenant_connection_manager.get_session(tenant) as session:
+                try:
+                    await history_svc.append_message(
+                        session,
+                        conversation_id=conversation_id,
+                        user_id=current_user.id,
+                        role="user",
+                        content=body.content,
+                        workbook_id=body.workbook_id,
+                    )
+                except history_svc.ConversationNotFound:
+                    yield f"data: {json.dumps({'error': 'Conversation not found.'})}\n\n"
+                    return
+                messages_for_llm = await history_svc.list_messages_for_llm(
+                    session,
+                    conversation_id=conversation_id,
+                    user_id=current_user.id,
+                )
+                await session.commit()
+
+            # Step 3: stream from Claude.
+            usage_block: dict = {}
+            async with client.messages.stream(
+                model=model,
+                max_tokens=max_tokens(model, streaming=True),
+                system=DEFAULT_SYSTEM_PROMPT,
+                messages=messages_for_llm,
+            ) as stream:
+                async for text in stream.text_stream:
+                    accumulated.append(text)
+                    yield f"data: {json.dumps({'delta': text})}\n\n"
+                # Capture usage when the stream has fully completed.
+                try:
+                    final_message = await stream.get_final_message()
+                    if final_message and getattr(final_message, "usage", None):
+                        usage_block = {
+                            "tokens_in": final_message.usage.input_tokens,
+                            "tokens_out": final_message.usage.output_tokens,
+                        }
+                except Exception:
+                    pass
+
+            # Step 4: persist the assistant message.
+            full_text = "".join(accumulated)
+            if full_text.strip():
+                async with tenant_connection_manager.get_session(tenant) as session:
+                    await history_svc.append_message(
+                        session,
+                        conversation_id=conversation_id,
+                        user_id=current_user.id,
+                        role="assistant",
+                        content=full_text,
+                        model=model,
+                        tokens_in=usage_block.get("tokens_in"),
+                        tokens_out=usage_block.get("tokens_out"),
+                    )
+                    await session.commit()
+
+            yield "data: [DONE]\n\n"
+        except Exception:
+            logger.exception(
+                "chat_conversation_stream_failed",
+                extra={"request_id": rid, "conversation_id": conversation_id},
+            )
+            yield f"data: {json.dumps({'error': 'Stream interrupted. Please retry.'})}\n\n"
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

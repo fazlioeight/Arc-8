@@ -196,6 +196,132 @@ export const exportConversation = async ({
   return { blob, filename };
 };
 
+// ── Conversation history ────────────────────────────────────────────────────
+// Per-tenant, per-user persisted chat history. The sidebar in ChatPage uses
+// these endpoints to list past conversations, open one, send a new turn
+// (which persists both user + assistant messages), rename, and soft-delete.
+
+export const listConversations = async ({ token, tenant }) => {
+  const res = await fetch(`${API_BASE}/api/chat/conversations`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const createConversation = async ({ token, tenant, title }) => {
+  const res = await fetch(`${API_BASE}/api/chat/conversations`, {
+    method: 'POST',
+    headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ title: title || null }),
+  });
+  return handleResponse(res);
+};
+
+export const getConversation = async ({ token, tenant, conversationId }) => {
+  const res = await fetch(`${API_BASE}/api/chat/conversations/${conversationId}`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const renameConversation = async ({ token, tenant, conversationId, title }) => {
+  const res = await fetch(`${API_BASE}/api/chat/conversations/${conversationId}`, {
+    method: 'PATCH',
+    headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ title }),
+  });
+  return handleResponse(res);
+};
+
+export const deleteConversation = async ({ token, tenant, conversationId }) => {
+  const res = await fetch(`${API_BASE}/api/chat/conversations/${conversationId}`, {
+    method: 'DELETE',
+    headers: buildHeaders(token, tenant),
+  });
+  if (!res.ok && res.status !== 204) {
+    const detail = await res.text();
+    throw new Error(detail || 'Delete failed');
+  }
+  return { deleted: conversationId };
+};
+
+/**
+ * Persisted, non-streaming send. Returns {conversation, user_message, assistant_message}
+ * so the caller can update the sidebar's last-message timestamp + the open
+ * conversation's message list from a single response.
+ */
+export const sendConversationMessage = async ({
+  token, tenant, conversationId, content, model, workbookId, dataset,
+}) => {
+  const res = await fetch(
+    `${API_BASE}/api/chat/conversations/${conversationId}/messages`,
+    {
+      method: 'POST',
+      headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        content,
+        model: model || null,
+        workbook_id: workbookId || null,
+        dataset: Boolean(dataset),
+      }),
+    },
+  );
+  return handleResponse(res);
+};
+
+/**
+ * Streaming variant. Persists the user message + assistant reply server-side
+ * while yielding tokens to the client via SSE. Same surface as streamChat()
+ * above, plus a conversationId parameter.
+ */
+export const streamConversationMessage = async ({
+  token, tenant, conversationId, content, model, workbookId, dataset,
+  onDelta, onError, signal,
+}) => {
+  const res = await fetch(
+    `${API_BASE}/api/chat/conversations/${conversationId}/messages/stream`,
+    {
+      method: 'POST',
+      headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        content,
+        model: model || null,
+        workbook_id: workbookId || null,
+        dataset: Boolean(dataset),
+      }),
+      signal,
+    },
+  );
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(detail || 'Stream failed');
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+    for (const evt of events) {
+      const line = evt.trim();
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (payload === '[DONE]') return;
+      try {
+        const parsed = JSON.parse(payload);
+        if (parsed.error && onError) onError(parsed.error);
+        else if (parsed.delta && onDelta) onDelta(parsed.delta);
+      } catch (e) {
+        // ignore malformed line
+      }
+    }
+  }
+};
+
+
 /**
  * Trigger a browser download for a Blob using an in-memory <a download> link.
  * Cleanup is intentional — failing to revokeObjectURL leaks memory until the

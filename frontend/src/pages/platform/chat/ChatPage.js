@@ -7,15 +7,21 @@ import PortalUtilityBar from '../../../components/PortalUtilityBar';
 import { AuthContext } from '../../../context/AuthContext';
 import {
   chatWithFile,
+  createConversation,
+  deleteConversation,
   deleteWorkbook,
   downloadBlob,
   exportConversation,
+  getConversation,
   listChatModels,
+  listConversations,
   listDatasetTables,
   listWorkbooks,
   loadDatasetTable,
+  renameConversation,
   sendChat,
   streamChat,
+  streamConversationMessage,
   uploadWorkbook,
 } from '../../../services/chatService';
 import './ChatPage.css';
@@ -241,6 +247,11 @@ const ChatPage = () => {
   const [workbookModalOpen, setWorkbookModalOpen] = useState(false);
   const [datasetModalOpen, setDatasetModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  // Conversation history — list = sidebar items, activeId = currently open
+  // conversation (null = ephemeral mode where nothing persists).
+  const [conversations, setConversations] = useState([]);
+  const [activeConversationId, setActiveConversationId] = useState(null);
+  const [loadingConversation, setLoadingConversation] = useState(false);
   const [bg, setBg] = useState(() => {
     try { return localStorage.getItem('nexoraChatBackground') || '#0a0a0a'; } catch (e) { return '#0a0a0a'; }
   });
@@ -354,12 +365,97 @@ const ChatPage = () => {
     return () => clearInterval(handle);
   }, [datasetModalOpen, refreshDatasetTables]);
 
-  const handleNewChat = () => {
-    setMessages([]);
+  // ── Conversation history ─────────────────────────────────────────────────
+  // Best-effort load on mount. If the API is down (e.g. before the migration
+  // has been applied for this tenant) we leave the sidebar empty and the
+  // chat falls back to ephemeral mode.
+  const refreshConversations = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await listConversations({ token, tenant: tenantKey });
+      setConversations(data?.conversations || []);
+    } catch (e) {
+      // Silent: an empty sidebar is the right fallback.
+      setConversations([]);
+    }
+  }, [token, tenantKey]);
+
+  useEffect(() => {
+    refreshConversations();
+  }, [refreshConversations]);
+
+  const handleSelectConversation = useCallback(async (id) => {
+    if (!token || !id) return;
+    if (busy) return;
+    setLoadingConversation(true);
+    setError(null);
+    try {
+      const detail = await getConversation({ token, tenant: tenantKey, conversationId: id });
+      const msgs = (detail?.messages || []).map((m) => ({
+        role: m.role,
+        content: m.content,
+        model: m.model,
+        file: m.attached_file_name,
+      }));
+      setMessages(msgs);
+      setActiveConversationId(detail.id);
+      setAttachedFile(null);
+      setDraft('');
+    } catch (e) {
+      setError(e.message || 'Failed to load conversation');
+    } finally {
+      setLoadingConversation(false);
+    }
+  }, [token, tenantKey, busy]);
+
+  const handleNewChat = async () => {
+    if (busy) return;
     setError(null);
     setAttachedFile(null);
     setDraft('');
+    // Create a persisted conversation if we have a token. The first send
+    // will fill in the title from the user's first message. If the create
+    // call fails (e.g. API down), fall back to ephemeral mode.
+    if (token) {
+      try {
+        const convo = await createConversation({ token, tenant: tenantKey });
+        setActiveConversationId(convo.id);
+        setMessages([]);
+        setConversations((prev) => [convo, ...prev]);
+        return;
+      } catch (e) {
+        // Silent fallback to ephemeral.
+      }
+    }
+    setActiveConversationId(null);
+    setMessages([]);
   };
+
+  const handleDeleteConversation = useCallback(async (id) => {
+    if (!token || !id) return;
+    try {
+      await deleteConversation({ token, tenant: tenantKey, conversationId: id });
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (activeConversationId === id) {
+        setActiveConversationId(null);
+        setMessages([]);
+      }
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [token, tenantKey, activeConversationId]);
+
+  const handleRenameConversation = useCallback(async (id, nextTitle) => {
+    if (!token || !id || !nextTitle?.trim()) return;
+    try {
+      const updated = await renameConversation({
+        token, tenant: tenantKey, conversationId: id, title: nextTitle.trim(),
+      });
+      setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [token, tenantKey]);
 
   const handlePickPrompt = (prompt) => {
     setDraft(prompt);
@@ -396,7 +492,26 @@ const ChatPage = () => {
           messages: nextMessages, workbookId: activeWorkbookId, dataset: datasetMode,
         });
         setMessages([...nextMessages, { role: 'assistant', content: res.reply }]);
+      } else if (activeConversationId) {
+        // Persisted streaming path. Server writes the user message + the
+        // final assistant message; client just renders deltas.
+        let buffer = '';
+        await streamConversationMessage({
+          token, tenant: tenantKey, model,
+          conversationId: activeConversationId,
+          content: userMsg.content,
+          onDelta: (delta) => {
+            buffer += delta;
+            setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
+          },
+          onError: (err) => setError(err),
+        });
+        if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
+        // Refresh the sidebar so this conversation jumps to the top and
+        // any auto-generated title appears.
+        refreshConversations();
       } else {
+        // Ephemeral mode — existing stateless stream.
         let buffer = '';
         await streamChat({
           token, tenant: tenantKey, model,
@@ -415,7 +530,7 @@ const ChatPage = () => {
     } finally {
       setBusy(false);
     }
-  }, [busy, draft, attachedFile, messages, token, tenantKey, model, activeWorkbookId, datasetMode]);
+  }, [busy, draft, attachedFile, messages, token, tenantKey, model, activeWorkbookId, datasetMode, activeConversationId, refreshConversations]);
 
   const handleKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -516,6 +631,57 @@ const ChatPage = () => {
           >
             <span aria-hidden="true">+</span> new chat
           </button>
+
+          {conversations.length > 0 && (
+            <SidebarSection label="History">
+              <ul className="flex flex-col gap-0.5" aria-label="Past conversations">
+                {conversations.map((c) => (
+                  <li key={c.id} className="group flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectConversation(c.id)}
+                      disabled={busy || loadingConversation}
+                      className={`flex-1 truncate rounded-[3px] px-1.5 py-1 text-left text-[11px] transition hover:bg-[#1e1e1e] disabled:cursor-not-allowed ${
+                        activeConversationId === c.id
+                          ? 'bg-[#1e1e1e] text-[#d4d4d4]'
+                          : 'text-[#9a9a9a]'
+                      }`}
+                      title={c.title || 'Untitled conversation'}
+                    >
+                      {c.title || 'Untitled conversation'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = window.prompt('Rename conversation', c.title || '');
+                        if (next && next.trim() && next !== c.title) {
+                          handleRenameConversation(c.id, next);
+                        }
+                      }}
+                      className="opacity-0 transition group-hover:opacity-100 rounded-[3px] border border-transparent px-1 text-[10px] text-[#666] hover:border-[#2a2a2a] hover:text-[#d4d4d4]"
+                      title="Rename"
+                      aria-label={`Rename conversation ${c.title || 'untitled'}`}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(`Delete "${c.title || 'this conversation'}"?`)) {
+                          handleDeleteConversation(c.id);
+                        }
+                      }}
+                      className="opacity-0 transition group-hover:opacity-100 rounded-[3px] border border-transparent px-1 text-[10px] text-[#666] hover:border-[#2a2a2a] hover:text-[#f87171]"
+                      title="Delete"
+                      aria-label={`Delete conversation ${c.title || 'untitled'}`}
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </SidebarSection>
+          )}
 
           <SidebarSection label="Model">
             <select
