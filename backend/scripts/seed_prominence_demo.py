@@ -142,6 +142,23 @@ _PCPS = (
 )
 _RISK_TIERS = ("low", "low", "low", "rising", "rising", "high", "high", "complex")
 
+
+def _naive_utcnow() -> datetime:
+    """Return a naive (no tzinfo) UTC datetime.
+
+    The Member360 model uses ``DateTime`` (without ``timezone=True``) for
+    ``last_interaction_at`` and ``Member360CareJourneyStage.completed_at``.
+    Postgres + asyncpg rejects aware datetimes for those columns ("can't
+    subtract offset-naive and offset-aware datetimes"). SQLite tolerates
+    the mix, which is why the local smoke test passed but the first
+    Container App job execution against Postgres did not.
+
+    We use the modern ``datetime.now(tz).replace(tzinfo=None)`` idiom
+    instead of the deprecated ``datetime.utcnow()`` so the script keeps
+    working on Python 3.13+.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 # Claim categories with status weighting and billed-amount ranges. Lower-
 # acuity categories get higher weight so the dataset doesn't end up dominated
 # by inpatient stays.
@@ -374,7 +391,7 @@ def _gen_member(rng: random.Random, seq: int) -> dict:
             "Refer to care management",
             "Close open coding gaps",
         )),
-        "last_interaction_at": datetime.now(timezone.utc) - timedelta(days=rng.randint(0, 180)),
+        "last_interaction_at": _naive_utcnow() - timedelta(days=rng.randint(0, 180)),
     }
 
 
@@ -602,7 +619,7 @@ def _gen_care_journey_for_member(
                 "description": None,
                 "status": "completed" if i < progressed else "pending",
                 "completed_at": (
-                    datetime.now(timezone.utc) - timedelta(days=rng.randint(1, 30))
+                    _naive_utcnow() - timedelta(days=rng.randint(1, 30))
                     if i < progressed
                     else None
                 ),
