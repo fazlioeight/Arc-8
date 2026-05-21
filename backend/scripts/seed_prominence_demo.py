@@ -58,6 +58,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.config import settings  # noqa: E402
 from app.models import load_all_models  # noqa: E402
+from app.models.coding import CodingProvider, CodingProviderLocation  # noqa: E402
 from app.models.member360 import (  # noqa: E402
     Member360Accumulator,
     Member360CareJourney,
@@ -131,15 +132,81 @@ _PLAN_NAMES = (
     "Prominence Health Plus",
     "Prominence Medicaid Select",
 )
-_PCPS = (
-    "Dr. Patel, Anjali",
-    "Dr. Nguyen, Tran",
-    "Dr. Robinson, Marcus",
-    "Dr. Khan, Sarah",
-    "Dr. Suarez, Mateo",
-    "Dr. Lin, Wei",
-    "Dr. Anderson, Heather",
+# ── Provider catalogue ──────────────────────────────────────────────────────
+# The set of providers that get seeded into ``coding_providers`` (the table
+# the Provider app reads). Each member's ``primary_care_provider`` string
+# field gets aligned to one of the ``is_pcp=True`` entries below so the
+# Provider app shows providers that are actually attributed to members.
+#
+# NPIs are synthetic 10-digit strings beginning with a digit that isn't a
+# valid NPI prefix (1-3), so they can't accidentally collide with a real
+# provider's NPI in the wild. Each provider gets one Nevada location to
+# match the member-base geography.
+_PROVIDER_SEED: tuple[dict, ...] = (
+    {"name": "Anjali Patel, MD",   "npi": "9700000001", "specialty": "Family Medicine",
+     "phone": "(775) 555-1101", "email": "apatel@prominencehealth.com",
+     "address_line1": "1500 Vista Blvd",   "city": "Sparks",      "state": "NV", "postal_code": "89431",
+     "is_pcp": True},
+    {"name": "Tran Nguyen, MD",    "npi": "9700000002", "specialty": "Family Medicine",
+     "phone": "(775) 555-1102", "email": "tnguyen@prominencehealth.com",
+     "address_line1": "200 N Sierra St",   "city": "Reno",        "state": "NV", "postal_code": "89501",
+     "is_pcp": True},
+    {"name": "Marcus Robinson, MD","npi": "9700000003", "specialty": "Internal Medicine",
+     "phone": "(775) 555-1103", "email": "mrobinson@prominencehealth.com",
+     "address_line1": "1155 Mill St",      "city": "Reno",        "state": "NV", "postal_code": "89502",
+     "is_pcp": True},
+    {"name": "Sarah Khan, MD",     "npi": "9700000004", "specialty": "Family Medicine",
+     "phone": "(775) 555-1104", "email": "skhan@prominencehealth.com",
+     "address_line1": "850 W 5th St",      "city": "Carson City", "state": "NV", "postal_code": "89703",
+     "is_pcp": True},
+    {"name": "Mateo Suarez, MD",   "npi": "9700000005", "specialty": "Internal Medicine",
+     "phone": "(702) 555-1105", "email": "msuarez@prominencehealth.com",
+     "address_line1": "3006 S Maryland Pkwy", "city": "Las Vegas", "state": "NV", "postal_code": "89109",
+     "is_pcp": True},
+    {"name": "Wei Lin, MD",        "npi": "9700000006", "specialty": "Family Medicine",
+     "phone": "(702) 555-1106", "email": "wlin@prominencehealth.com",
+     "address_line1": "1701 N Green Valley Pkwy", "city": "Henderson", "state": "NV", "postal_code": "89074",
+     "is_pcp": True},
+    {"name": "Heather Anderson, DO","npi": "9700000007", "specialty": "Family Medicine",
+     "phone": "(775) 555-1107", "email": "handerson@prominencehealth.com",
+     "address_line1": "555 Vista Knoll Pkwy", "city": "Reno",     "state": "NV", "postal_code": "89511",
+     "is_pcp": True},
+    # Specialists below — referenced for chases / risk insights, not assigned as PCPs.
+    {"name": "Priya Iyer, MD",     "npi": "9700000008", "specialty": "Endocrinology",
+     "phone": "(775) 555-1108", "email": "piyer@prominencehealth.com",
+     "address_line1": "75 Pringle Way",    "city": "Reno",        "state": "NV", "postal_code": "89502",
+     "is_pcp": False},
+    {"name": "James Whitaker, MD", "npi": "9700000009", "specialty": "Cardiology",
+     "phone": "(775) 555-1109", "email": "jwhitaker@prominencehealth.com",
+     "address_line1": "343 Elm St",        "city": "Reno",        "state": "NV", "postal_code": "89503",
+     "is_pcp": False},
+    {"name": "Daniela Cardoza, MD","npi": "9700000010", "specialty": "Nephrology",
+     "phone": "(775) 555-1110", "email": "dcardoza@prominencehealth.com",
+     "address_line1": "1155 Mill St",      "city": "Reno",        "state": "NV", "postal_code": "89502",
+     "is_pcp": False},
+    {"name": "Felix Brooks, MD",   "npi": "9700000011", "specialty": "Pulmonology",
+     "phone": "(702) 555-1111", "email": "fbrooks@prominencehealth.com",
+     "address_line1": "10001 S Eastern Ave","city": "Henderson",  "state": "NV", "postal_code": "89052",
+     "is_pcp": False},
+    {"name": "Zoe Williams, MD",   "npi": "9700000012", "specialty": "Psychiatry",
+     "phone": "(775) 555-1112", "email": "zwilliams@prominencehealth.com",
+     "address_line1": "480 Galletti Way",  "city": "Sparks",      "state": "NV", "postal_code": "89431",
+     "is_pcp": False},
 )
+
+
+def _pcp_names() -> tuple[str, ...]:
+    """Names of PCP-eligible providers — used to assign PCPs to members."""
+    return tuple(p["name"] for p in _PROVIDER_SEED if p["is_pcp"])
+
+
+def _all_provider_names() -> tuple[str, ...]:
+    return tuple(p["name"] for p in _PROVIDER_SEED)
+
+
+# Legacy alias for any in-script references; resolves to the PCP-eligible
+# subset of the seeded provider catalogue.
+_PCPS = _pcp_names()
 _RISK_TIERS = ("low", "low", "low", "rising", "rising", "high", "high", "complex")
 
 
@@ -638,6 +705,71 @@ def _per_member_rng(member_id: int, offset: int) -> random.Random:
     return random.Random(RANDOM_SEED + member_id * 31 + offset)
 
 
+async def _ensure_providers(session: AsyncSession) -> dict:
+    """Insert the seeded provider catalogue if ``coding_providers`` is empty.
+
+    Idempotent at the table level: any existing provider rows mean we
+    leave the catalogue alone (operators may have curated the list and we
+    shouldn't clobber that). Each new provider also gets one matching
+    ``coding_provider_locations`` row.
+    """
+    existing = int(
+        (await session.scalar(select(func.count()).select_from(CodingProvider))) or 0
+    )
+    if existing > 0:
+        return {"providers_existing": existing, "providers_inserted": 0}
+
+    inserted = 0
+    for p in _PROVIDER_SEED:
+        provider = CodingProvider(
+            npi=p["npi"],
+            name=p["name"],
+            phone=p["phone"],
+            email=p["email"],
+        )
+        session.add(provider)
+        await session.flush()  # populate id for the location FK
+        session.add(
+            CodingProviderLocation(
+                provider_id=provider.id,
+                address_line1=p["address_line1"],
+                city=p["city"],
+                state=p["state"],
+                postal_code=p["postal_code"],
+            )
+        )
+        inserted += 1
+    return {"providers_existing": 0, "providers_inserted": inserted}
+
+
+async def _align_member_pcps(
+    session: AsyncSession,
+) -> int:
+    """For each m360_member, if ``primary_care_provider`` is not one of the
+    PCP-eligible seeded provider names, rewrite it to a deterministic pick.
+
+    "Deterministic" = the assignment is keyed on member.id, so the same
+    member always ends up with the same PCP across reruns (good for demo
+    stability — a screenshot taken yesterday matches what's on screen
+    today).
+
+    Returns the number of members whose PCP string was changed.
+    """
+    pcp_names = list(_pcp_names())
+    if not pcp_names:
+        return 0
+    members = list((await session.execute(select(Member360Member))).scalars())
+    pcp_set = set(pcp_names)
+    changes = 0
+    for m in members:
+        if (m.primary_care_provider or "") in pcp_set:
+            continue
+        # Stable round-robin: same member.id always picks the same PCP.
+        m.primary_care_provider = pcp_names[(m.id - 1) % len(pcp_names)]
+        changes += 1
+    return changes
+
+
 async def _ensure_members(
     session: AsyncSession, base_rng: random.Random, target: int
 ) -> dict:
@@ -760,8 +892,20 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
 
     try:
         async with Session() as session:
+            # 0) Seed the provider catalogue first. New members generated in
+            #    step 1 will draw their PCP from the seeded provider names,
+            #    and existing members get re-aligned in step 1.5.
+            summary.update(await _ensure_providers(session))
+            await session.flush()
+
             # 1) Ensure 50 members exist.
             summary.update(await _ensure_members(session, base_rng, target))
+            await session.flush()
+
+            # 1.5) Rewrite stale primary_care_provider strings on members
+            #      whose value isn't a seeded PCP (legacy rows from earlier
+            #      seed versions). Same member.id always picks the same PCP.
+            summary["pcp_realigned"] = await _align_member_pcps(session)
             await session.flush()
 
             # 2) Iterate every member and top up the child tables.
