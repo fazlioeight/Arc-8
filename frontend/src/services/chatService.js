@@ -144,3 +144,72 @@ export const getDatasetLoad = async ({ token, tenant, loadId }) => {
   });
   return handleResponse(res);
 };
+
+// ── Conversation export ─────────────────────────────────────────────────────
+// Sends the message array (plus optional captured chart PNGs) to the backend,
+// which renders a .docx or .pdf and streams it back as a binary attachment.
+// We do NOT use handleResponse() here because the body is a Blob, not JSON.
+//
+// The caller is responsible for triggering the browser download — see
+// downloadBlob() below for the canonical pattern.
+
+export const exportConversation = async ({
+  token,
+  tenant,
+  format,
+  title,
+  messages,
+  charts,
+  includeUserMessages,
+}) => {
+  const res = await fetch(`${API_BASE}/api/chat/export`, {
+    method: 'POST',
+    headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      format,
+      title: title || null,
+      messages,
+      charts: charts || {},
+      include_user_messages: includeUserMessages !== false,
+    }),
+  });
+  if (!res.ok) {
+    // Error responses are JSON; success responses are binary. Branch on
+    // Content-Type so we don't try to JSON-parse a docx.
+    let detail = res.statusText || 'Export failed';
+    const ct = res.headers.get('Content-Type') || '';
+    if (ct.includes('application/json')) {
+      try {
+        const body = await res.json();
+        detail = body?.detail || detail;
+      } catch (e) {
+        // fall through to statusText
+      }
+    }
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  // Honor the server-provided filename if it set one.
+  const cd = res.headers.get('Content-Disposition') || '';
+  const match = cd.match(/filename="?([^";]+)"?/i);
+  const filename = match ? match[1] : `nexora-chat-transcript.${format}`;
+  return { blob, filename };
+};
+
+/**
+ * Trigger a browser download for a Blob using an in-memory <a download> link.
+ * Cleanup is intentional — failing to revokeObjectURL leaks memory until the
+ * tab closes.
+ */
+export const downloadBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Small delay before revoke — some browsers cancel the download if the
+  // URL is revoked synchronously after click().
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};

@@ -8,6 +8,8 @@ import { AuthContext } from '../../../context/AuthContext';
 import {
   chatWithFile,
   deleteWorkbook,
+  downloadBlob,
+  exportConversation,
   listChatModels,
   listDatasetTables,
   listWorkbooks,
@@ -94,7 +96,11 @@ const extractSegments = (markdown) => {
 
 const renderMarkdown = (text) => DOMPurify.sanitize(marked.parse(text || ''));
 
-const ChartBlock = ({ spec }) => {
+// Stable id format the backend uses to look up captured chart images.
+// Keep in sync with backend chat/export.py.
+const chartIdFor = (messageIdx, chartIdx) => `chart-${messageIdx}-${chartIdx}`;
+
+const ChartBlock = ({ spec, chartId }) => {
   const ref = useRef(null);
   useEffect(() => {
     if (!ref.current || !spec || !spec.type) return undefined;
@@ -136,27 +142,70 @@ const ChartBlock = ({ spec }) => {
   return (
     <div className="my-3 rounded-[3px] border border-[#1e1e1e] bg-[#0f0f0f] p-3">
       {spec.title && <div className="mb-2 text-xs font-bold text-[#d4d4d4]">{spec.title}</div>}
-      <div className="relative h-[280px]"><canvas ref={ref} /></div>
+      <div className="relative h-[280px]">
+        <canvas
+          ref={ref}
+          data-chart-id={chartId || undefined}
+          data-chart-title={(spec && spec.title) || ''}
+        />
+      </div>
     </div>
   );
 };
 
-const MessageBody = ({ content, isTyping }) => {
+const MessageBody = ({ content, isTyping, messageIdx }) => {
   const segments = useMemo(() => extractSegments(content), [content]);
   if (isTyping) return <div className="nx-typing text-[13px] leading-relaxed text-[#d97706]" />;
+  // Charts get a stable id keyed off message index + chart-block ordinal so
+  // the export endpoint can match captured images to the right placeholder.
+  let chartOrdinal = 0;
   return (
     <>
-      {segments.map((seg, i) => (
-        seg.type === 'chart'
-          ? <ChartBlock key={i} spec={seg.spec} />
-          : <div
-              key={i}
-              className="nx-md text-[13px] leading-relaxed text-[#9a9a9a]"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(seg.text) }}
-            />
-      ))}
+      {segments.map((seg, i) => {
+        if (seg.type === 'chart') {
+          const chartId = chartIdFor(messageIdx ?? 0, chartOrdinal);
+          chartOrdinal += 1;
+          return <ChartBlock key={i} spec={seg.spec} chartId={chartId} />;
+        }
+        return (
+          <div
+            key={i}
+            className="nx-md text-[13px] leading-relaxed text-[#9a9a9a]"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(seg.text) }}
+          />
+        );
+      })}
     </>
   );
+};
+
+/**
+ * Walk the thread DOM and pull each rendered chart canvas into a base64 PNG.
+ * Keys are the same `chart-{msg}-{ord}` ids ChartBlock tagged the canvases
+ * with. Failures are swallowed per-canvas so one broken capture doesn't kill
+ * the whole export — the backend falls back to a textual placeholder.
+ */
+const captureRenderedCharts = (root) => {
+  if (!root) return {};
+  const charts = {};
+  const canvases = root.querySelectorAll('canvas[data-chart-id]');
+  canvases.forEach((canvas) => {
+    const id = canvas.getAttribute('data-chart-id');
+    if (!id) return;
+    try {
+      // Use the raw canvas API rather than chart.toBase64Image(). We don't
+      // hold Chart instance refs at this level, and Chart.js stores its
+      // rendered bitmap on the canvas anyway.
+      charts[id] = canvas.toDataURL('image/png');
+    } catch (e) {
+      // Most likely a tainted canvas; the chart will fall back to a text
+      // placeholder in the export and the rest of the conversation still
+      // renders.
+      // eslint-disable-next-line no-console
+      console.warn('chart capture failed', id, e);
+    }
+  });
+  return charts;
 };
 
 const SidebarSection = ({ label, children }) => (
@@ -191,6 +240,7 @@ const ChatPage = () => {
   const [datasetMode, setDatasetMode] = useState(false);
   const [workbookModalOpen, setWorkbookModalOpen] = useState(false);
   const [datasetModalOpen, setDatasetModalOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [bg, setBg] = useState(() => {
     try { return localStorage.getItem('nexoraChatBackground') || '#0a0a0a'; } catch (e) { return '#0a0a0a'; }
   });
@@ -219,6 +269,48 @@ const ChatPage = () => {
   useEffect(() => {
     if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
   }, [messages]);
+
+  // Export the current conversation as a .docx or .pdf. We capture the
+  // currently-rendered Chart.js canvases here (rather than re-rendering
+  // server-side) so the doc matches exactly what the user saw on screen.
+  // Charts that haven't finished rendering or that can't be read (tainted
+  // canvas) fall back to a textual placeholder backend-side — the export
+  // never fails because of a chart capture problem.
+  const handleExport = useCallback(async (format) => {
+    if (!token) return;
+    if (!messages.length || exporting) return;
+    setError(null);
+    setExporting(true);
+    try {
+      const charts = captureRenderedCharts(threadRef.current);
+      // Strip transient frontend-only fields before sending; the backend
+      // only needs role, content, and optional model/file/timestamp.
+      const payload = messages
+        .filter((m) => !m.isTyping)
+        .map((m) => ({
+          role: m.role,
+          content: m.content || '',
+          model: m.model || null,
+          file: m.file || null,
+          timestamp: m.timestamp || null,
+        }));
+      const title = `Nexora Chat — ${new Date().toLocaleDateString()}`;
+      const { blob, filename } = await exportConversation({
+        token,
+        tenant: tenantKey,
+        format,
+        title,
+        messages: payload,
+        charts,
+        includeUserMessages: true,
+      });
+      downloadBlob(blob, filename);
+    } catch (e) {
+      setError((e && e.message) || `Failed to export ${format}`);
+    } finally {
+      setExporting(false);
+    }
+  }, [token, tenantKey, messages, exporting]);
 
   useEffect(() => {
     if (!token) return;
@@ -507,6 +599,27 @@ const ChatPage = () => {
               <span className="text-[11px] text-[#666]">Claude-powered AI assistant</span>
             </div>
             <div className="flex items-center gap-2" role="status" aria-live="polite">
+              {/* Export controls — disabled until there's something to export.
+                  Two buttons rather than a dropdown so both formats are one
+                  click away. */}
+              <button
+                type="button"
+                className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#3a3a3a] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => handleExport('docx')}
+                disabled={!messages.length || exporting}
+                title="Export the conversation as a Word document"
+              >
+                {exporting ? '...' : 'export .docx'}
+              </button>
+              <button
+                type="button"
+                className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#3a3a3a] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => handleExport('pdf')}
+                disabled={!messages.length || exporting}
+                title="Export the conversation as a PDF"
+              >
+                {exporting ? '...' : 'export .pdf'}
+              </button>
               <div className="flex items-center gap-1.5 rounded-[3px] border border-[#2a2a2a] px-2 py-0.5 text-[11px] text-[#4ade80]" aria-label="Service active">
                 <span className="h-[5px] w-[5px] rounded-full bg-[#4ade80]" aria-hidden="true" />
                 active
@@ -573,7 +686,7 @@ const ChatPage = () => {
                       {m.role === 'user' ? (
                         <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#d4d4d4]">{m.content}</div>
                       ) : (
-                        <MessageBody content={m.content} isTyping={m.isTyping} />
+                        <MessageBody content={m.content} isTyping={m.isTyping} messageIdx={i} />
                       )}
                     </div>
                   </article>

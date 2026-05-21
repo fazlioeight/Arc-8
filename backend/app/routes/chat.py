@@ -17,7 +17,7 @@ import uuid
 from typing import Any, AsyncIterator, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +38,15 @@ from ..services.chat.file_handlers import (
     upload_to_anthropic,
 )
 from ..services.chat.prompts import DEFAULT_SYSTEM_PROMPT
+from ..services.chat.export import (
+    ExportError,
+    ExportMessage,
+    export_to_docx,
+    export_to_pdf,
+)
+from ..schemas.chat_export import ChatExportRequest
+from ..utils.audit_logger import record_audit_event
+from ..db.session import control_session
 from ..utils.security import AuthenticatedUser, get_current_user
 
 
@@ -97,6 +106,173 @@ async def list_chat_models(_: AuthenticatedUser = Depends(get_current_user)):
         "default": settings.CLAUDE_MODEL,
         "models": [{"id": k, "label": v["label"]} for k, v in ALLOWED_MODELS.items()],
     }
+
+
+# ── Export ──────────────────────────────────────────────────────────────────
+# POST /api/chat/export — render the current conversation as a Word doc (.docx)
+# or PDF and stream it back as a binary attachment. The endpoint is stateless:
+# the client owns the conversation, sends the messages, gets a file. This
+# preserves the chat module's "no PHI persisted on the backend" property —
+# we only hold the conversation in memory long enough to render.
+#
+# Rate-limited per-user (separate budget from chat itself: rendering a 50-msg
+# conversation with embedded charts costs more than a single chat call).
+
+_EXPORT_BUCKETS: dict[str, list[float]] = {}
+_EXPORT_LIMIT_PER_MINUTE = 6  # generous for normal use, kills runaway scripts.
+
+
+def _check_export_rate_limit(user_email: str) -> None:
+    import time
+
+    now = time.monotonic()
+    cutoff = now - 60.0
+    bucket = _EXPORT_BUCKETS.setdefault(user_email, [])
+    bucket[:] = [t for t in bucket if t > cutoff]
+    if len(bucket) >= _EXPORT_LIMIT_PER_MINUTE:
+        retry_after = int(60 - (now - bucket[0])) + 1
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Export rate limit exceeded",
+            headers={"Retry-After": str(max(1, retry_after))},
+        )
+    bucket.append(now)
+
+
+_EXPORT_CONTENT_TYPES = {
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pdf": "application/pdf",
+}
+_EXPORT_EXTENSIONS = {"docx": "docx", "pdf": "pdf"}
+
+
+def _safe_filename_part(value: str) -> str:
+    """Sanitize a user-supplied title into a filename-safe slug.
+
+    Defense against: header injection (CRLF in Content-Disposition), path
+    traversal (/, \\), and OS-illegal characters. Also caps length so the
+    final filename stays well under common 255-byte filesystem limits.
+    """
+    if not value:
+        return "nexora-chat-transcript"
+    cleaned = "".join(c if c.isalnum() or c in {"-", "_"} else "-" for c in value.strip())
+    cleaned = "-".join(filter(None, cleaned.split("-")))  # collapse repeats
+    return (cleaned or "nexora-chat-transcript")[:64]
+
+
+@router.post("/export")
+async def export_conversation(
+    request: Request,
+    body: ChatExportRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_tenant_context),
+) -> Response:
+    """Render a chat conversation as a Word doc or PDF and return the file.
+
+    Audit: every successful export is recorded as ``chat.export.success`` with
+    the format, message count, and (truncated) title. Failures land as
+    ``chat.export.failed`` — both writes go into ``tenant_audit_events`` so a
+    compliance reviewer can reconstruct who took what data out of the system.
+    """
+    _check_export_rate_limit(current_user.email)
+    rid = _request_id(request)
+
+    if body.include_user_messages:
+        msgs_in = list(body.messages)
+    else:
+        msgs_in = [m for m in body.messages if m.role != "user"]
+    if not msgs_in:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Conversation contains nothing exportable.",
+        )
+
+    messages = [
+        ExportMessage(
+            role=m.role,
+            content=m.content or "",
+            timestamp=m.timestamp,
+            model=m.model,
+            file=m.file,
+        )
+        for m in msgs_in
+    ]
+
+    logger.info(
+        "chat_export_request",
+        extra={
+            "request_id": rid,
+            "user": current_user.email,
+            "tenant": tenant.key,
+            "format": body.format,
+            "message_count": len(messages),
+            "chart_count": len(body.charts or {}),
+        },
+    )
+
+    try:
+        if body.format == "docx":
+            blob = export_to_docx(messages=messages, charts=body.charts, title=body.title)
+        else:
+            blob = export_to_pdf(messages=messages, charts=body.charts, title=body.title)
+    except ExportError as exc:
+        logger.exception("chat_export_failed", extra={"request_id": rid, "error": str(exc)})
+        # Best-effort audit on failure path.
+        try:
+            async with control_session() as audit_session:
+                await record_audit_event(
+                    audit_session,
+                    tenant_id=tenant.id,
+                    actor=current_user.email,
+                    event_type="chat.export.failed",
+                    payload={
+                        "format": body.format,
+                        "message_count": len(messages),
+                        "error": str(exc)[:500],
+                        "request_id": rid,
+                    },
+                )
+                await audit_session.commit()
+        except Exception:  # noqa: BLE001
+            logger.exception("chat_export_audit_failed", extra={"request_id": rid})
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to render export",
+        )
+
+    # Audit success. Use a fresh control session because the route doesn't
+    # otherwise touch the DB — keeps this path cheap when audit is disabled.
+    try:
+        async with control_session() as audit_session:
+            await record_audit_event(
+                audit_session,
+                tenant_id=tenant.id,
+                actor=current_user.email,
+                event_type="chat.export.success",
+                payload={
+                    "format": body.format,
+                    "message_count": len(messages),
+                    "chart_count": len(body.charts or {}),
+                    "title": (body.title or "")[:200],
+                    "byte_size": len(blob),
+                    "request_id": rid,
+                },
+            )
+            await audit_session.commit()
+    except Exception:  # noqa: BLE001
+        # Audit failures don't take down the export, but log loudly.
+        logger.exception("chat_export_audit_failed", extra={"request_id": rid})
+
+    filename = f"{_safe_filename_part(body.title or 'nexora-chat-transcript')}.{_EXPORT_EXTENSIONS[body.format]}"
+    return Response(
+        content=blob,
+        media_type=_EXPORT_CONTENT_TYPES[body.format],
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Request-ID": rid,
+        },
+    )
 
 
 # ── Chat ───────────────────────────────────────────────────────────────────-

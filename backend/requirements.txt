@@ -47,3 +47,10 @@ openpyxl
 python-pptx
 pillow
 duckdb
+
+# Chat export (docx + pdf rendering). All pure-Python so the slim container
+# image doesn't need extra apt packages. `python-docx` is already declared
+# above for reading uploaded Word docs; here it doubles as the writer.
+markdown>=3.6
+beautifulsoup4>=4.12
+reportlab>=4.2
