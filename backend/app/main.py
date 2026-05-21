@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,6 +83,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Convert uncaught exceptions into a JSONResponse so the response flows back
+# through user middleware (CORS) instead of bubbling to Starlette's
+# ServerErrorMiddleware, which sits outside CORS and emits a 500 with no
+# Access-Control-Allow-Origin header — surfacing in browsers as a misleading
+# CORS error rather than the real exception message.
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    import logging
+    logging.getLogger("nexora.unhandled").exception(
+        "unhandled_exception", extra={"path": request.url.path}
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {exc}"},
+    )
+
 
 @app.on_event("startup")
 async def probe_member360_storage() -> None:
