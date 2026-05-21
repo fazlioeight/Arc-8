@@ -1,22 +1,29 @@
-"""Seed the Prominence tenant with 50 demo members + 5–8 claims each.
+"""Seed the Prominence tenant with a full Member360 demo dataset.
 
-This is a one-shot, idempotent demo loader. It is NOT part of the deploy
-pipeline — the user invokes it on demand (typically as a Container App job
-the first time the tenant is provisioned, or when reset demo data is
-desired).
+For each of 50 demo members the script generates:
+  * 5-8 claims                (m360_claims)
+  * 2-4 problems              (m360_problems, ICD-10 + HCC, correlated to risk tier)
+  * 2-5 active medications    (m360_medications, with NDC + prescriber)
+  * 3-6 lab observations      (m360_labs, LOINC-coded)
+  * 1-3 risk insights         (m360_risk_insights)
+  * 1-3 open tasks            (m360_tasks)
+  * 1 accumulator row         (m360_accumulators)
+  * 1 care journey            (m360_care_journeys + stages, for high/complex tier)
 
-Design constraints
-------------------
-* No literal seed payloads in source. The script generates rows from small
-  vocabulary tuples + a seeded Random — the same seed produces the same
-  data across runs, so reruns are deterministic without committing a
-  50-row Python list. The vocabularies (first names, plan names, claim
-  categories) are *generation inputs*, not the data itself.
-* Idempotent: counts existing m360_members; if at least ``TARGET_MEMBER_COUNT``
-  are already there, the script logs and exits 0. Otherwise it inserts
-  exactly the shortfall.
-* PHI shape: names + addresses are obviously-synthetic-but-plausible. No
-  real identifiers (SSN, MBI) are generated.
+It is idempotent at the **per-table** level: each generator checks whether
+the member already has rows in its target table and only inserts if the
+member is empty. That means:
+
+  * Running it once on a fresh tenant fills every table.
+  * Running it again is a near no-op (a few SELECTs, no inserts).
+  * If we later add a new generator to the script, the next run will fill
+    that new table for the existing 50 members without touching the
+    already-populated tables.
+
+Data is produced from small vocabulary tuples + a seeded Random, so reruns
+produce the same identities. No literal seed payloads (per the project's
+seed-data convention — data belongs in the DB or in external files, never
+inlined as a 50-row Python list).
 
 Run locally:
     DEFAULT_TENANT_DATABASE_URL=postgresql+asyncpg://... \\
@@ -30,7 +37,7 @@ Run as a Container App job (azure-prod path):
       --secrets tenant-db-url=<kv-uri> \\
       --env-vars ENVIRONMENT=production PYTHONPATH=/app \\
                  DEFAULT_TENANT_DATABASE_URL=secretref:tenant-db-url \\
-      --trigger-type Manual --replica-timeout 300
+      --trigger-type Manual --replica-timeout 600
     az containerapp job start  -g <rg> -n nexora-platform-seed-demo
 """
 from __future__ import annotations
@@ -39,20 +46,30 @@ import asyncio
 import os
 import random
 import sys
-import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
 
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.config import settings  # noqa: E402
 from app.models import load_all_models  # noqa: E402
-from app.models.member360 import Member360Claim, Member360Member  # noqa: E402
+from app.models.member360 import (  # noqa: E402
+    Member360Accumulator,
+    Member360CareJourney,
+    Member360CareJourneyStage,
+    Member360Claim,
+    Member360Lab,
+    Member360Medication,
+    Member360Member,
+    Member360Problem,
+    Member360RiskInsight,
+    Member360Task,
+)
 
 
 # ── Configuration knobs ─────────────────────────────────────────────────────
@@ -61,9 +78,8 @@ TARGET_MEMBER_COUNT = 50
 MIN_CLAIMS_PER_MEMBER = 5
 MAX_CLAIMS_PER_MEMBER = 8
 
-# Fixed seed so reruns produce the same synthetic identities. Change this if
-# you want a different deterministic dataset; keep it stable if you want
-# reproducible demos.
+# Fixed seed so reruns produce the same synthetic dataset. Change to vary the
+# generated identities; keep stable if you want reproducible demos.
 RANDOM_SEED = 4242
 
 
@@ -126,7 +142,9 @@ _PCPS = (
 )
 _RISK_TIERS = ("low", "low", "low", "rising", "rising", "high", "high", "complex")
 
-# (category, status_pool, billed_low, billed_high)
+# Claim categories with status weighting and billed-amount ranges. Lower-
+# acuity categories get higher weight so the dataset doesn't end up dominated
+# by inpatient stays.
 _CLAIM_CATEGORIES: tuple[tuple[str, tuple[str, ...], int, int], ...] = (
     ("pharmacy",          ("paid", "paid", "paid", "denied"),          15,    600),
     ("primary_care",      ("paid", "paid", "paid"),                    120,   480),
@@ -146,7 +164,159 @@ _PROVIDERS = (
 )
 
 
-# ── Generators ──────────────────────────────────────────────────────────────
+# Conditions per risk tier. The first tuple element is the ICD-10 code, the
+# second is the human-readable label. The script picks 2-4 entries per
+# member from the appropriate tier's pool so the diagnosis list reads
+# plausibly (a "complex" member doesn't just have one cold).
+_CONDITIONS_BY_TIER: dict[str, tuple[tuple[str, str, str], ...]] = {
+    # (icd10, description, severity)
+    "low": (
+        ("I10",    "Essential hypertension", "mild"),
+        ("E78.5",  "Hyperlipidemia, unspecified", "mild"),
+        ("Z00.00", "General adult medical examination", "mild"),
+        ("M54.5",  "Low back pain", "mild"),
+    ),
+    "rising": (
+        ("I10",     "Essential hypertension", "moderate"),
+        ("E78.5",   "Hyperlipidemia, unspecified", "moderate"),
+        ("E66.9",   "Obesity, unspecified", "moderate"),
+        ("F32.9",   "Major depressive disorder, single episode, unspecified", "moderate"),
+        ("J45.909", "Unspecified asthma, uncomplicated", "moderate"),
+    ),
+    "high": (
+        ("E11.9",   "Type 2 diabetes mellitus without complications", "moderate"),
+        ("I10",     "Essential hypertension", "moderate"),
+        ("I25.10",  "Atherosclerotic heart disease, native coronary artery", "moderate"),
+        ("J44.9",   "Chronic obstructive pulmonary disease, unspecified", "moderate"),
+        ("N18.3",   "Chronic kidney disease, stage 3", "moderate"),
+        ("E78.5",   "Hyperlipidemia, unspecified", "moderate"),
+    ),
+    "complex": (
+        ("E11.65",  "Type 2 diabetes mellitus with hyperglycemia", "severe"),
+        ("I50.32",  "Chronic diastolic (congestive) heart failure", "severe"),
+        ("N18.4",   "Chronic kidney disease, stage 4", "severe"),
+        ("J44.1",   "COPD with (acute) exacerbation", "severe"),
+        ("I25.10",  "Atherosclerotic heart disease", "severe"),
+        ("F33.2",   "Major depressive disorder, recurrent, severe", "moderate"),
+    ),
+}
+
+# (drug name, generic, dose, dose_unit, route, frequency, indication_icd10)
+# ``indication_icd10`` lets us prefer meds whose indication matches one of
+# the member's problems so the clinical story is internally consistent.
+_MEDS: tuple[tuple[str, str, str, str, str, str, str], ...] = (
+    ("Lisinopril 20mg", "lisinopril", "20", "mg", "PO", "once daily", "I10"),
+    ("Amlodipine 10mg", "amlodipine", "10", "mg", "PO", "once daily", "I10"),
+    ("Metformin 1000mg", "metformin",  "1000", "mg", "PO", "twice daily", "E11.9"),
+    ("Atorvastatin 40mg", "atorvastatin", "40", "mg", "PO", "once daily at bedtime", "E78.5"),
+    ("Aspirin 81mg", "aspirin", "81", "mg", "PO", "once daily", "I25.10"),
+    ("Furosemide 40mg", "furosemide", "40", "mg", "PO", "once daily", "I50.32"),
+    ("Albuterol HFA", "albuterol", "90", "mcg", "INH", "every 4-6 hours as needed", "J44.9"),
+    ("Sertraline 50mg", "sertraline", "50", "mg", "PO", "once daily", "F32.9"),
+    ("Insulin glargine 100u/ml", "insulin glargine", "10", "units", "SC", "once daily at bedtime", "E11.65"),
+    ("Levothyroxine 75mcg", "levothyroxine", "75", "mcg", "PO", "once daily on empty stomach", ""),
+    ("Omeprazole 20mg", "omeprazole", "20", "mg", "PO", "once daily before breakfast", ""),
+)
+_PHARMACIES = ("Walgreens", "CVS Pharmacy", "Smith's Pharmacy", "Costco Pharmacy", "Mail Order")
+
+
+# (loinc, test name, unit, low ref, high ref, abnormal-bias-by-tier)
+# The abnormal-bias map says: how likely is this lab to come back abnormal
+# for each risk tier. Used to weight result generation so a diabetic's
+# HbA1c is statistically higher than a low-risk member's.
+_LAB_DEFS: tuple[dict, ...] = (
+    {
+        "loinc": "4548-4", "name": "Hemoglobin A1c", "unit": "%",
+        "low": 4.0, "high": 5.6,
+        "tier_target": {"low": (4.8, 5.4), "rising": (5.5, 6.2), "high": (6.5, 8.5), "complex": (8.0, 11.0)},
+    },
+    {
+        "loinc": "2093-3", "name": "Total cholesterol", "unit": "mg/dL",
+        "low": 100, "high": 199,
+        "tier_target": {"low": (140, 195), "rising": (170, 220), "high": (190, 260), "complex": (200, 290)},
+    },
+    {
+        "loinc": "2089-1", "name": "LDL cholesterol", "unit": "mg/dL",
+        "low": 0, "high": 99,
+        "tier_target": {"low": (70, 100), "rising": (95, 130), "high": (110, 165), "complex": (130, 200)},
+    },
+    {
+        "loinc": "2160-0", "name": "Creatinine", "unit": "mg/dL",
+        "low": 0.7, "high": 1.3,
+        "tier_target": {"low": (0.8, 1.1), "rising": (0.9, 1.3), "high": (1.2, 2.1), "complex": (1.6, 3.2)},
+    },
+    {
+        "loinc": "33914-3", "name": "Estimated GFR", "unit": "mL/min/1.73m2",
+        "low": 60, "high": 120,
+        "tier_target": {"low": (75, 105), "rising": (60, 90), "high": (35, 60), "complex": (18, 40)},
+    },
+    {
+        "loinc": "2345-7", "name": "Glucose", "unit": "mg/dL",
+        "low": 70, "high": 99,
+        "tier_target": {"low": (78, 96), "rising": (90, 115), "high": (105, 180), "complex": (140, 260)},
+    },
+    {
+        "loinc": "718-7", "name": "Hemoglobin", "unit": "g/dL",
+        "low": 12.0, "high": 17.5,
+        "tier_target": {"low": (13.5, 15.5), "rising": (12.8, 15.0), "high": (11.5, 14.0), "complex": (9.5, 12.5)},
+    },
+)
+
+
+# Risk-insight templates. (domain, driver, recommendation)
+_RISK_INSIGHTS_TEMPLATES = (
+    ("clinical",    "Uncontrolled HbA1c with last result above goal",      "Schedule diabetes follow-up within 2 weeks."),
+    ("clinical",    "Recent ED visit indicating acute care risk",          "Care manager outreach within 48 hours."),
+    ("clinical",    "Hypertensive readings trending up over last quarter", "Schedule BP recheck and medication review."),
+    ("clinical",    "Multiple chronic conditions requiring coordination",  "Enroll in chronic condition management program."),
+    ("utilization", "PCP visit gap exceeds 12 months",                     "Outreach to schedule annual wellness visit."),
+    ("utilization", "Frequent specialist visits without PCP coordination", "Care navigation referral."),
+    ("cost",        "Pharmacy spend trending up year-over-year",           "Medication review for therapeutic alternatives."),
+    ("engagement",  "Low portal engagement and missed digital reminders",  "Switch outreach channel to phone."),
+)
+
+
+# Task templates. (title, priority, sbar_situation, recommended_next_action)
+_TASK_TEMPLATES = (
+    ("Annual wellness visit overdue",        "medium", "Member has not completed AWV in the past 12 months.",
+     "Schedule AWV with PCP."),
+    ("HbA1c follow-up due",                  "high",   "Last HbA1c above goal; quarterly recheck due.",
+     "Order HbA1c and book MD review."),
+    ("Medication reconciliation needed",     "medium", "Multiple new prescriptions across providers.",
+     "Schedule pharmacist consult."),
+    ("Care plan review",                     "low",    "Annual care plan refresh approaching.",
+     "Care manager to schedule review call."),
+    ("Post-discharge follow-up",             "high",   "Discharged from inpatient stay 5 days ago.",
+     "Confirm meds, schedule 7-day follow-up visit."),
+    ("Close care gap: colorectal screening", "medium", "Screening overdue per USPSTF schedule.",
+     "Order or schedule appropriate screening."),
+)
+_TASK_QUEUES = ("care_management", "coding", "outreach", "pharmacy")
+_TASK_ASSIGNEES = (None, "care.team@prominencehealth.com", "outreach@prominencehealth.com")
+
+
+# Care journeys by risk tier. (name, description, stages...)
+_CARE_JOURNEYS_BY_TIER: dict[str, tuple[tuple[str, str, tuple[str, ...]], ...]] = {
+    "high": (
+        ("Diabetes self-management",
+         "Quarterly cadence: A1c, foot exam, retinopathy screen, medication review.",
+         ("Initial assessment", "A1c + labs ordered", "Medication review", "Education session", "Outcomes review")),
+        ("Hypertension control",
+         "Bi-monthly cadence focused on BP control and adherence.",
+         ("Baseline BP check", "Medication titration", "Lifestyle counselling", "Outcomes review")),
+    ),
+    "complex": (
+        ("Heart-failure 30-day discharge",
+         "Post-acute care journey for newly-discharged CHF members.",
+         ("Discharge intake", "Medication reconciliation", "Cardiology follow-up", "30-day outcomes")),
+        ("CKD stage 3-4 coordination",
+         "Multidisciplinary support: nephrology, nutrition, medication safety.",
+         ("Nephrology consult", "Nutrition assessment", "Medication safety review", "Quarterly labs")),
+    ),
+}
+
+
+# ── Member generator ───────────────────────────────────────────────────────
 
 
 def _gen_member(rng: random.Random, seq: int) -> dict:
@@ -168,8 +338,8 @@ def _gen_member(rng: random.Random, seq: int) -> dict:
     plan = rng.choice(_PLAN_NAMES)
     lob = rng.choice(_LOB)
     risk_tier = rng.choice(_RISK_TIERS)
-    # Risk score correlates loosely with the tier — keeps the dataset
-    # internally consistent for demo dashboards.
+    # Risk score correlates loosely with the tier so demo dashboards have
+    # internally consistent data.
     base_score = {"low": 0.4, "rising": 0.9, "high": 1.6, "complex": 2.4}[risk_tier]
     composite = round(base_score + rng.uniform(-0.15, 0.35), 2)
 
@@ -208,19 +378,20 @@ def _gen_member(rng: random.Random, seq: int) -> dict:
     }
 
 
-def _gen_claims_for_member(rng: random.Random, member_id: int, member_seq: int) -> Iterable[dict]:
-    """Yield 5–8 claim dicts for a given member.
+# ── Per-member generators (rng deterministic per member id) ────────────────
+#
+# Each generator below takes a member-scoped rng so reruns produce the same
+# clinical story for a given member regardless of which other members already
+# have data. We derive the per-member rng inside ``seed()`` as
+# ``random.Random(RANDOM_SEED + member.id * 31 + table_offset)``.
 
-    Service dates span the last 12 months; categories are weighted toward
-    primary_care / pharmacy / specialist so the distribution looks
-    realistic without an outsized share of high-cost claims.
-    """
+
+def _gen_claims_for_member(rng: random.Random, member_id: int, member_seq: int) -> Iterable[dict]:
     n = rng.randint(MIN_CLAIMS_PER_MEMBER, MAX_CLAIMS_PER_MEMBER)
     for i in range(1, n + 1):
         category, status_pool, billed_lo, billed_hi = rng.choice(_CLAIM_CATEGORIES)
         status = rng.choice(status_pool)
         billed = Decimal(str(round(rng.uniform(billed_lo, billed_hi), 2)))
-        # Paid amount is 0 on denied claims; otherwise 60–95% of billed.
         if status == "denied":
             paid = Decimal("0.00")
             mem_resp = Decimal(str(round(float(billed) * rng.uniform(0.0, 0.25), 2)))
@@ -242,13 +413,316 @@ def _gen_claims_for_member(rng: random.Random, member_id: int, member_seq: int) 
         }
 
 
-# ── Orchestration ──────────────────────────────────────────────────────────
+def _gen_problems_for_member(rng: random.Random, member: Member360Member) -> Iterable[dict]:
+    tier = member.risk_tier or "low"
+    pool = list(_CONDITIONS_BY_TIER.get(tier, _CONDITIONS_BY_TIER["low"]))
+    rng.shuffle(pool)
+    n = rng.randint(2, min(4, len(pool)))
+    for idx, (code, desc, severity) in enumerate(pool[:n]):
+        onset_days = rng.randint(60, 1500)
+        yield {
+            "member_id": member.id,
+            "code": code,
+            "code_system": "ICD-10",
+            "description": desc,
+            "status": "active",
+            "severity": severity,
+            "is_primary": idx == 0,
+            "onset_date": date.today() - timedelta(days=onset_days),
+            "recorded_by": member.primary_care_provider,
+        }
+
+
+def _gen_medications_for_member(
+    rng: random.Random,
+    member: Member360Member,
+    problem_codes: list[str],
+) -> Iterable[dict]:
+    # Prefer medications whose indication matches one of the member's
+    # problems so the clinical story is internally consistent. Top up with
+    # random meds if the indication-matched pool is small.
+    relevant = [m for m in _MEDS if m[6] and m[6] in problem_codes]
+    other = [m for m in _MEDS if m not in relevant]
+    rng.shuffle(other)
+    rng.shuffle(relevant)
+    pool = relevant + other
+    n = rng.randint(2, 5)
+    for i, (drug, generic, dose, unit, route, freq, _ind) in enumerate(pool[:n], start=1):
+        start = date.today() - timedelta(days=rng.randint(30, 900))
+        last_fill = date.today() - timedelta(days=rng.randint(0, 60))
+        yield {
+            "member_id": member.id,
+            "rx_number": f"RX-{member.id:05d}-{i:02d}",
+            "ndc_code": f"{rng.randint(10000, 99999)}-{rng.randint(1000, 9999)}-{rng.randint(10, 99)}",
+            "drug_name": drug,
+            "generic_name": generic,
+            "dose": dose,
+            "dose_unit": unit,
+            "route": route,
+            "frequency": freq,
+            "days_supply": rng.choice((30, 30, 30, 60, 90)),
+            "refills_remaining": rng.randint(0, 5),
+            "prescriber": member.primary_care_provider,
+            "pharmacy": rng.choice(_PHARMACIES),
+            "start_date": start,
+            "last_fill_date": last_fill,
+            "status": "active",
+        }
+
+
+def _gen_labs_for_member(rng: random.Random, member: Member360Member) -> Iterable[dict]:
+    tier = member.risk_tier or "low"
+    pool = list(_LAB_DEFS)
+    rng.shuffle(pool)
+    n = rng.randint(3, 6)
+    for lab in pool[:n]:
+        target = lab["tier_target"].get(tier, lab["tier_target"]["low"])
+        value = round(rng.uniform(*target), 1)
+        abnormal = None
+        if value < lab["low"]:
+            abnormal = "L"
+        elif value > lab["high"]:
+            abnormal = "H"
+        result_date = date.today() - timedelta(days=rng.randint(7, 270))
+        yield {
+            "member_id": member.id,
+            "loinc_code": lab["loinc"],
+            "test_name": lab["name"],
+            "result_value": str(value),
+            "result_unit": lab["unit"],
+            "reference_range_low": lab["low"],
+            "reference_range_high": lab["high"],
+            "abnormal_flag": abnormal,
+            "result_date": result_date,
+            "ordering_provider": member.primary_care_provider,
+            "performing_lab": rng.choice(("Quest Diagnostics", "LabCorp", "Renown Lab")),
+            "status": "final",
+        }
+
+
+def _gen_risk_insights_for_member(rng: random.Random, member: Member360Member) -> Iterable[dict]:
+    pool = list(_RISK_INSIGHTS_TEMPLATES)
+    rng.shuffle(pool)
+    n = rng.randint(1, 3)
+    for domain, driver, recommendation in pool[:n]:
+        # Score the insight using the member's risk for that domain, where
+        # available. Falls back to composite for the catch-all domain.
+        domain_score = {
+            "clinical":   member.clinical_risk_score,
+            "utilization": member.utilization_risk_score,
+            "cost":        member.cost_risk_score,
+            "engagement":  member.engagement_risk_score,
+        }.get(domain) or member.risk_score_composite or 0
+        score = float(domain_score) + rng.uniform(-0.1, 0.1)
+        yield {
+            "member_id": member.id,
+            "domain": domain,
+            "score": round(score, 2),
+            "driver": driver,
+            "recommendation": recommendation,
+            "confidence": round(rng.uniform(0.55, 0.95), 2),
+        }
+
+
+def _gen_tasks_for_member(rng: random.Random, member: Member360Member) -> Iterable[dict]:
+    pool = list(_TASK_TEMPLATES)
+    rng.shuffle(pool)
+    n = rng.randint(1, 3)
+    for title, priority, sbar_s, next_action in pool[:n]:
+        due = date.today() + timedelta(days=rng.randint(-7, 30))
+        status = rng.choice(("open", "open", "in_progress", "done"))
+        yield {
+            "member_id": member.id,
+            "title": title,
+            "description": next_action,
+            "assigned_user": rng.choice(_TASK_ASSIGNEES),
+            "assigned_queue": rng.choice(_TASK_QUEUES),
+            "priority": priority,
+            "status": status,
+            "due_date": due,
+            "sbar_situation": sbar_s,
+            "sbar_background": f"Member is in the {member.risk_tier or 'unknown'} tier.",
+            "sbar_assessment": "Action recommended based on guideline gap.",
+            "sbar_recommendation": next_action,
+            "recommended_next_action": next_action,
+        }
+
+
+def _gen_accumulator_for_member(rng: random.Random, member: Member360Member) -> dict:
+    plan_year_start = date(date.today().year, 1, 1)
+    deductible_total = Decimal(str(rng.choice((500, 1000, 1500, 2000, 3500))))
+    deductible_met = (deductible_total * Decimal(str(round(rng.uniform(0.0, 1.0), 2)))).quantize(Decimal("0.01"))
+    oop_max = deductible_total * Decimal("3")
+    oop_met = (oop_max * Decimal(str(round(rng.uniform(0.0, 0.9), 2)))).quantize(Decimal("0.01"))
+    return {
+        "member_id": member.id,
+        "deductible": deductible_total,
+        "deductible_met": deductible_met,
+        "out_of_pocket_max": oop_max,
+        "out_of_pocket_met": oop_met,
+        "plan_year_start": plan_year_start,
+    }
+
+
+def _gen_care_journey_for_member(
+    rng: random.Random, member: Member360Member
+) -> tuple[dict, list[dict]] | None:
+    """Return (journey_row, stage_rows) or None if this tier shouldn't have one.
+
+    Care journeys are reserved for high/complex risk tiers in the seed —
+    they're a heavyweight workflow concept and dashboards expect a small
+    population of active journeys, not 50.
+    """
+    tier = member.risk_tier or "low"
+    if tier not in _CARE_JOURNEYS_BY_TIER:
+        return None
+    name, description, stage_names = rng.choice(_CARE_JOURNEYS_BY_TIER[tier])
+    start = date.today() - timedelta(days=rng.randint(7, 90))
+    journey = {
+        "member_id": member.id,
+        "name": name,
+        "description": description,
+        "status": "active",
+        "created_by": "seed_prominence_demo",
+        "assigned_to": "care.team@prominencehealth.com",
+        "start_date": start,
+        "target_completion_date": start + timedelta(days=120),
+        "source": "demo_seed",
+        "template_name": name,
+    }
+    # Mark the earliest stages as completed and the remainder pending so the
+    # journey looks "in progress" rather than freshly created.
+    progressed = rng.randint(0, max(0, len(stage_names) - 1))
+    stages = []
+    for i, sname in enumerate(stage_names):
+        stages.append(
+            {
+                "sequence": i,
+                "name": sname,
+                "description": None,
+                "status": "completed" if i < progressed else "pending",
+                "completed_at": (
+                    datetime.now(timezone.utc) - timedelta(days=rng.randint(1, 30))
+                    if i < progressed
+                    else None
+                ),
+            }
+        )
+    return journey, stages
+
+
+# ── Orchestration helpers ──────────────────────────────────────────────────
+
+
+def _per_member_rng(member_id: int, offset: int) -> random.Random:
+    """Stable per-(member, table) RNG. ``offset`` is a small int chosen per
+    generator so rerunning one generator doesn't shift the random stream of
+    another."""
+    return random.Random(RANDOM_SEED + member_id * 31 + offset)
+
+
+async def _ensure_members(
+    session: AsyncSession, base_rng: random.Random, target: int
+) -> dict:
+    """Insert members until we hit ``target``. Returns counts."""
+    existing = int(
+        (await session.scalar(select(func.count()).select_from(Member360Member))) or 0
+    )
+    if existing >= target:
+        return {"existing_members": existing, "inserted_members": 0}
+    to_insert = target - existing
+    print(
+        f"[seed_prominence_demo] {existing} existing members; inserting "
+        f"{to_insert} to reach target {target}."
+    )
+    for offset in range(1, to_insert + 1):
+        row = _gen_member(base_rng, existing + offset)
+        session.add(Member360Member(**row))
+    await session.flush()
+    return {"existing_members": existing, "inserted_members": to_insert}
+
+
+async def _topup_table(
+    session: AsyncSession,
+    member: Member360Member,
+    model_cls,
+    *,
+    fk_column: str,
+    rows: Iterable[dict],
+) -> int:
+    """Generic top-up: if the member has zero rows in ``model_cls``, insert
+    ``rows``. Returns count inserted (0 if the table already had data).
+    """
+    existing = int(
+        (
+            await session.scalar(
+                select(func.count())
+                .select_from(model_cls)
+                .where(getattr(model_cls, fk_column) == member.id)
+            )
+        )
+        or 0
+    )
+    if existing > 0:
+        return 0
+    count = 0
+    for row in rows:
+        session.add(model_cls(**row))
+        count += 1
+    return count
+
+
+async def _topup_accumulator(session: AsyncSession, member: Member360Member) -> int:
+    """Accumulator has a unique FK on member_id, so we can't add a second
+    row — early-out if any row exists."""
+    existing = int(
+        (
+            await session.scalar(
+                select(func.count())
+                .select_from(Member360Accumulator)
+                .where(Member360Accumulator.member_id == member.id)
+            )
+        )
+        or 0
+    )
+    if existing > 0:
+        return 0
+    row = _gen_accumulator_for_member(_per_member_rng(member.id, 6), member)
+    session.add(Member360Accumulator(**row))
+    return 1
+
+
+async def _topup_care_journey(session: AsyncSession, member: Member360Member) -> int:
+    """Insert a journey + its stages atomically. Skips if any journey row
+    already exists for the member."""
+    existing = int(
+        (
+            await session.scalar(
+                select(func.count())
+                .select_from(Member360CareJourney)
+                .where(Member360CareJourney.member_id == member.id)
+            )
+        )
+        or 0
+    )
+    if existing > 0:
+        return 0
+    result = _gen_care_journey_for_member(_per_member_rng(member.id, 7), member)
+    if result is None:
+        return 0
+    journey_row, stage_rows = result
+    journey = Member360CareJourney(**journey_row)
+    session.add(journey)
+    await session.flush()
+    for stage_row in stage_rows:
+        session.add(Member360CareJourneyStage(journey_id=journey.id, **stage_row))
+    return 1 + len(stage_rows)
+
+
+# ── Public entry ──────────────────────────────────────────────────────────
 
 
 def _tenant_database_url() -> str:
-    """Resolve which tenant DB to write to. Mirrors the env wiring the
-    existing Container App jobs use (``DEFAULT_TENANT_DATABASE_URL`` via
-    Key Vault secretRef)."""
     uri = os.getenv("DEFAULT_TENANT_DATABASE_URL") or settings.DEFAULT_TENANT_DATABASE_URL
     if not uri:
         raise RuntimeError(
@@ -259,70 +733,95 @@ def _tenant_database_url() -> str:
 
 
 async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
-    """Insert ``target - existing`` new members + their claims. Idempotent.
-
-    Returns a small dict summarising what changed so the job log makes the
-    end state obvious (existing count, inserted count, total claims).
-    """
+    """Fill the Prominence tenant. Returns a summary dict."""
     load_all_models()
-    rng = random.Random(RANDOM_SEED)
+    base_rng = random.Random(RANDOM_SEED)
 
     engine = create_async_engine(_tenant_database_url(), future=True, echo=False)
     Session = async_sessionmaker(engine, expire_on_commit=False)
+    summary: dict = {}
 
     try:
         async with Session() as session:
-            existing = await session.scalar(select(func.count()).select_from(Member360Member))
-            existing = int(existing or 0)
-            if existing >= target:
-                print(
-                    f"[seed_prominence_demo] {existing} members already present "
-                    f"(>= target {target}); nothing to do."
-                )
-                return {"existing": existing, "inserted_members": 0, "inserted_claims": 0}
+            # 1) Ensure 50 members exist.
+            summary.update(await _ensure_members(session, base_rng, target))
+            await session.flush()
 
-            to_insert = target - existing
-            print(
-                f"[seed_prominence_demo] {existing} existing members; inserting "
-                f"{to_insert} to reach target {target}."
+            # 2) Iterate every member and top up the child tables.
+            all_members = list(
+                (await session.execute(select(Member360Member))).scalars()
             )
 
-            # Insert members first so we have FK-able ids for the claims.
-            new_members: list[Member360Member] = []
-            for offset in range(1, to_insert + 1):
-                row = _gen_member(rng, existing + offset)
-                m = Member360Member(**row)
-                session.add(m)
-                new_members.append(m)
-            await session.flush()  # populate primary keys
+            counts = {
+                "claims": 0,
+                "problems": 0,
+                "medications": 0,
+                "labs": 0,
+                "risk_insights": 0,
+                "tasks": 0,
+                "accumulators": 0,
+                "care_journey_rows": 0,
+            }
 
-            inserted_claims = 0
-            for m in new_members:
-                seq = int(m.member_key.split("-")[-1])
-                for claim_row in _gen_claims_for_member(rng, m.id, seq):
-                    session.add(Member360Claim(**claim_row))
-                    inserted_claims += 1
+            for m in all_members:
+                seq = int((m.member_key or "PROM-0000").rsplit("-", 1)[-1] or 0)
+
+                # Problems first — meds use the problem codes for indication
+                # matching, so we generate problems before medications.
+                counts["problems"] += await _topup_table(
+                    session, m, Member360Problem,
+                    fk_column="member_id",
+                    rows=_gen_problems_for_member(_per_member_rng(m.id, 1), m),
+                )
+
+                # Re-read the member's current problems (just-inserted ones
+                # are in the session but not flushed yet — we use the rng's
+                # determinism instead to keep med generation in sync).
+                problem_codes = [
+                    c for c, _d, _s in _CONDITIONS_BY_TIER.get(m.risk_tier or "low", ())
+                ]
+
+                counts["claims"] += await _topup_table(
+                    session, m, Member360Claim,
+                    fk_column="member_id",
+                    rows=_gen_claims_for_member(_per_member_rng(m.id, 2), m.id, seq),
+                )
+                counts["medications"] += await _topup_table(
+                    session, m, Member360Medication,
+                    fk_column="member_id",
+                    rows=_gen_medications_for_member(
+                        _per_member_rng(m.id, 3), m, problem_codes
+                    ),
+                )
+                counts["labs"] += await _topup_table(
+                    session, m, Member360Lab,
+                    fk_column="member_id",
+                    rows=_gen_labs_for_member(_per_member_rng(m.id, 4), m),
+                )
+                counts["risk_insights"] += await _topup_table(
+                    session, m, Member360RiskInsight,
+                    fk_column="member_id",
+                    rows=_gen_risk_insights_for_member(_per_member_rng(m.id, 5), m),
+                )
+                counts["tasks"] += await _topup_table(
+                    session, m, Member360Task,
+                    fk_column="member_id",
+                    rows=_gen_tasks_for_member(_per_member_rng(m.id, 8), m),
+                )
+                counts["accumulators"] += await _topup_accumulator(session, m)
+                counts["care_journey_rows"] += await _topup_care_journey(session, m)
 
             await session.commit()
+            summary["topups"] = counts
 
-        print(
-            f"[seed_prominence_demo] Done. Inserted {to_insert} members and "
-            f"{inserted_claims} claims."
-        )
-        return {
-            "existing": existing,
-            "inserted_members": to_insert,
-            "inserted_claims": inserted_claims,
-        }
+        print(f"[seed_prominence_demo] Done. Summary: {summary}")
+        return summary
     finally:
         await engine.dispose()
 
 
 def main() -> None:
     result = asyncio.run(seed())
-    # Exit non-zero only on hard failure (caught by asyncio.run -> exception).
-    # An idempotent no-op still returns 0 — that's the expected behaviour
-    # for a job that runs on every deploy without re-doing work.
     print(result)
 
 
