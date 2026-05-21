@@ -741,11 +741,11 @@ async def delete_user_workbook(
     return {"deleted": workbook_id}
 
 
-# ── Dataset ────────────────────────────────────────────────────────────────-
-
-def _require_dataset_admin(user: AuthenticatedUser) -> None:
-    if not dataset_svc.is_dataset_admin(user.email, user.role):
-        raise HTTPException(status_code=403, detail="Access denied.")
+# ── Dataset (read-only) ────────────────────────────────────────────────────-
+# The dataset surface is read-only: the chat tool can SELECT from the tenant's
+# operational tables, but there is no upload / load / truncate path. The set
+# of queryable tables lives in app/services/chat/dataset_registry.py and is
+# tenant-data that's already there (Member360 + Coding).
 
 
 @router.get("/dataset/tables")
@@ -757,143 +757,6 @@ async def list_dataset_tables(
         return {"tables": await dataset_svc.list_tables(session)}
     except dataset_svc.DatasetError as exc:
         raise HTTPException(status_code=503, detail=f"Dataset unavailable: {exc}")
-
-
-@router.post("/dataset/{table_name}/load", status_code=202)
-async def load_dataset_table(
-    request: Request,
-    table_name: str,
-    mode: str = Form(default=dataset_svc.MODE_REPLACE),
-    file: Optional[UploadFile] = File(default=None),
-    current_user: AuthenticatedUser = Depends(get_current_user),
-    tenant: TenantContext = Depends(get_tenant_context),
-    session: AsyncSession = Depends(get_tenant_session),
-):
-    _require_dataset_admin(current_user)
-    rid = _request_id(request)
-    user_email = current_user.email
-
-    if table_name not in dataset_svc.DATASET_TABLES:
-        raise HTTPException(status_code=404, detail=f"Unknown table: {table_name}")
-    if mode not in dataset_svc.VALID_MODES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid mode. Allowed: {sorted(dataset_svc.VALID_MODES)}",
-        )
-
-    content_type = (request.headers.get("content-type") or "").lower()
-    factory = _tenant_session_factory(tenant)
-
-    if content_type.startswith("application/json"):
-        try:
-            body_json = await request.json()
-        except Exception:
-            raise HTTPException(status_code=400, detail="Body is not valid JSON.")
-        json_mode = body_json.get("mode", mode)
-        rows = body_json.get("rows")
-        if not isinstance(rows, list):
-            raise HTTPException(status_code=400, detail="JSON body must include 'rows' (array).")
-        if json_mode not in dataset_svc.VALID_MODES:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid mode. Allowed: {sorted(dataset_svc.VALID_MODES)}",
-            )
-        load_id = await dataset_svc.register_load(session, table_name, json_mode, "json", user_email)
-        try:
-            keys: list[str] = []
-            seen: set[str] = set()
-            for row in rows:
-                if not isinstance(row, dict):
-                    raise dataset_svc.SchemaMismatch("Each row must be a JSON object.")
-                for k in row.keys():
-                    if k not in seen:
-                        seen.add(k)
-                        keys.append(k)
-            if keys:
-                await dataset_svc._validate_columns(session, table_name, keys)
-        except dataset_svc.SchemaMismatch as exc:
-            await dataset_svc.mark_load_failed(session, load_id, str(exc))
-            raise HTTPException(status_code=400, detail=str(exc))
-
-        asyncio.create_task(
-            dataset_svc.run_ingestion(
-                factory, load_id, table_name, json_mode, "json",
-                dataset_svc.ingest_json, rows,
-            )
-        )
-        return {"load_id": load_id, "status": dataset_svc.STATUS_PENDING}
-
-    if file is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Provide either an uploaded CSV/XLSX file or a JSON body with 'rows'.",
-        )
-    raw_name = file.filename or "upload"
-    safe_name = os.path.basename(raw_name.strip())[:128]
-    ext = get_ext(safe_name)
-    if ext not in (".csv", ".xlsx"):
-        raise HTTPException(status_code=400, detail="Only .csv and .xlsx are accepted.")
-
-    file_bytes = await file.read()
-    if len(file_bytes) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File exceeds {MAX_UPLOAD_BYTES // MB} MB limit.",
-        )
-
-    load_id = await dataset_svc.register_load(session, table_name, mode, ext.lstrip("."), user_email)
-    if ext == ".csv":
-        asyncio.create_task(
-            dataset_svc.run_ingestion(
-                factory, load_id, table_name, mode, "csv",
-                dataset_svc.ingest_csv, file_bytes,
-            )
-        )
-    else:
-        asyncio.create_task(
-            dataset_svc.run_ingestion(
-                factory, load_id, table_name, mode, "xlsx",
-                dataset_svc.ingest_xlsx, file_bytes, None,
-            )
-        )
-    return {"load_id": load_id, "status": dataset_svc.STATUS_PENDING}
-
-
-@router.delete("/dataset/{table_name}/rows")
-async def truncate_dataset_table(
-    table_name: str,
-    current_user: AuthenticatedUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_tenant_session),
-):
-    _require_dataset_admin(current_user)
-    if table_name not in dataset_svc.DATASET_TABLES:
-        raise HTTPException(status_code=404, detail=f"Unknown table: {table_name}")
-    try:
-        await dataset_svc.truncate_table(session, table_name)
-    except dataset_svc.DatasetError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    return {"truncated": table_name}
-
-
-@router.get("/dataset/loads/{load_id}")
-async def get_dataset_load(
-    load_id: str,
-    _: AuthenticatedUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_tenant_session),
-):
-    record = await dataset_svc.get_load(session, load_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Load not found.")
-    return record
-
-
-@router.get("/dataset/loads")
-async def list_dataset_loads(
-    table: Optional[str] = None,
-    _: AuthenticatedUser = Depends(get_current_user),
-    session: AsyncSession = Depends(get_tenant_session),
-):
-    return {"loads": await dataset_svc.recent_loads(session, table_name=table, limit=25)}
 
 
 # ── Conversation history ────────────────────────────────────────────────────

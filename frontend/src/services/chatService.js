@@ -119,27 +119,12 @@ export const deleteWorkbook = async ({ token, tenant, workbookId }) => {
   return handleResponse(res);
 };
 
+// The dataset surface is read-only: the modal lists the tenant's operational
+// tables (Member360 + Coding) so users know what they can ask about, but
+// there is no upload path. The chat dataset SQL tool runs on the backend
+// when ``dataset`` is true on a chat request.
 export const listDatasetTables = async ({ token, tenant }) => {
   const res = await fetch(`${API_BASE}/api/chat/dataset/tables`, {
-    headers: buildHeaders(token, tenant),
-  });
-  return handleResponse(res);
-};
-
-export const loadDatasetTable = async ({ token, tenant, tableName, file, mode = 'replace' }) => {
-  const form = new FormData();
-  form.append('file', file);
-  form.append('mode', mode);
-  const res = await fetch(`${API_BASE}/api/chat/dataset/${tableName}/load`, {
-    method: 'POST',
-    headers: buildHeaders(token, tenant),
-    body: form,
-  });
-  return handleResponse(res);
-};
-
-export const getDatasetLoad = async ({ token, tenant, loadId }) => {
-  const res = await fetch(`${API_BASE}/api/chat/dataset/loads/${loadId}`, {
     headers: buildHeaders(token, tenant),
   });
   return handleResponse(res);

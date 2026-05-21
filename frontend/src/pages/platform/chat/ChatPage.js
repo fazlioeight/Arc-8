@@ -17,7 +17,6 @@ import {
   listConversations,
   listDatasetTables,
   listWorkbooks,
-  loadDatasetTable,
   renameConversation,
   sendChat,
   streamChat,
@@ -582,14 +581,6 @@ const ChatPage = () => {
     });
   };
 
-  const handleDatasetUpload = async (tableName, file, mode) => {
-    if (!file) return;
-    try {
-      await loadDatasetTable({ token, tenant: tenantKey, tableName, file, mode });
-      await refreshDatasetTables();
-    } catch (err) { setError(err.message); }
-  };
-
   // Tailwind class tokens reused across the chat shell.
   const fileBtn =
     "rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] " +
@@ -1024,25 +1015,26 @@ const ChatPage = () => {
           aria-modal="true"
           onClick={(e) => { if (e.target === e.currentTarget) setDatasetModalOpen(false); }}
         >
-          <div className="nx-chat-root max-h-[80vh] w-[min(560px,92vw)] overflow-y-auto rounded-[3px] border border-[#2a2a2a] bg-[#0f0f0f] p-4 text-[12px] text-[#d4d4d4]">
-            <h2 className="mb-2 text-[13px] text-[#d4d4d4]">Analytics dataset</h2>
+          <div className="nx-chat-root max-h-[80vh] w-[min(640px,92vw)] overflow-y-auto rounded-[3px] border border-[#2a2a2a] bg-[#0f0f0f] p-4 text-[12px] text-[#d4d4d4]">
+            <h2 className="mb-1 text-[13px] text-[#d4d4d4]">Tenant data</h2>
+            <p className="mb-2 text-[11px] text-[#666]">
+              The chat can answer questions by running read-only SQL against
+              your tenant&apos;s operational tables. Listed below are the tables
+              Claude is allowed to query.
+            </p>
             <div className="mb-2 flex items-center gap-1.5 border-b border-[#2a2a2a] pb-3">
               <button className={modalBtn} type="button" onClick={handleToggleDatasetMode}>
-                {datasetMode ? 'detach dataset' : 'use dataset for chat'}
+                {datasetMode ? 'detach data tools' : 'enable data tools for chat'}
               </button>
               <span className="text-[11px] text-[#666]">
-                {datasetMode ? 'chat is now routed to the dataset' : 'ask natural-language questions over the shared tables below'}
+                {datasetMode ? 'chat is now using the tables below' : 'ask natural-language questions over the tables below'}
               </span>
             </div>
             <div>
               {datasetTables.length === 0 ? (
-                <div className="py-3 text-center text-[#666]">no dataset tables defined</div>
+                <div className="py-3 text-center text-[#666]">no tables available for this tenant</div>
               ) : datasetTables.map((t) => (
-                <DatasetRow
-                  key={t.table_name}
-                  table={t}
-                  onUpload={(file, mode) => handleDatasetUpload(t.table_name, file, mode)}
-                />
+                <DatasetRow key={t.table_name} table={t} />
               ))}
             </div>
             <div className="mt-3 text-right">
@@ -1055,49 +1047,31 @@ const ChatPage = () => {
   );
 };
 
-const DatasetRow = ({ table, onUpload }) => {
-  const fileRef = useRef(null);
-  const [mode, setMode] = useState('replace');
-  const [uploading, setUploading] = useState(false);
-  const last = table.last_loaded_at;
-  const handleChange = async (e) => {
-    const f = e.target.files?.[0];
-    if (fileRef.current) fileRef.current.value = '';
-    if (!f) return;
-    setUploading(true);
-    try { await onUpload(f, mode); }
-    finally { setUploading(false); }
-  };
+// Read-only summary card for one dataset table. The dataset surface no
+// longer supports uploads — the backend is the source of truth for these
+// tables, populated by the rest of the application (Member360, Coding).
+const DatasetRow = ({ table }) => {
+  const missing = table.row_count == null;
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-dashed border-[#1e1e1e] py-2 last:border-b-0">
-      <div>
-        <div>{table.friendly_name} ({table.table_name})</div>
-        <div className="text-[11px] text-[#666]">
-          {table.row_count == null
-            ? 'table missing — apply the migration'
+    <div className="border-b border-dashed border-[#1e1e1e] py-2 last:border-b-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-[#d4d4d4]" title={table.table_name}>
+            {table.friendly_name}
+          </div>
+          <div className="font-mono text-[10px] text-[#666]">{table.table_name}</div>
+        </div>
+        <div className="flex-shrink-0 text-[11px] text-[#9a9a9a]">
+          {missing
+            ? <span className="text-[#f87171]">not provisioned</span>
             : `${table.row_count.toLocaleString()} rows`}
-          {last && ` — last load ${formatTs(last)}`}
         </div>
       </div>
-      <div className="flex flex-shrink-0 items-center gap-1.5">
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value)}
-          className="rounded-[3px] border border-[#2a2a2a] bg-[#141414] px-1.5 py-0.5 text-[11px] text-[#9a9a9a]"
-        >
-          <option value="replace">replace</option>
-          <option value="append">append</option>
-        </select>
-        <input ref={fileRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={handleChange} />
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-          className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#d97706] hover:text-[#d4d4d4] disabled:opacity-40"
-        >
-          {uploading ? 'uploading...' : 'upload csv/xlsx'}
-        </button>
-      </div>
+      {table.description && (
+        <div className="mt-1 text-[11px] leading-snug text-[#666]">
+          {table.description}
+        </div>
+      )}
     </div>
   );
 };
