@@ -407,25 +407,14 @@ const ChatPage = () => {
     }
   }, [token, tenantKey, busy]);
 
-  const handleNewChat = async () => {
+  const handleNewChat = () => {
     if (busy) return;
     setError(null);
     setAttachedFile(null);
     setDraft('');
-    // Create a persisted conversation if we have a token. The first send
-    // will fill in the title from the user's first message. If the create
-    // call fails (e.g. API down), fall back to ephemeral mode.
-    if (token) {
-      try {
-        const convo = await createConversation({ token, tenant: tenantKey });
-        setActiveConversationId(convo.id);
-        setMessages([]);
-        setConversations((prev) => [convo, ...prev]);
-        return;
-      } catch (e) {
-        // Silent fallback to ephemeral.
-      }
-    }
+    // Reset to an unsent state. The server-side row is created on first
+    // send (handleSend) — pre-creating it produced orphan empty rows that
+    // would land in the sidebar and look broken when clicked.
     setActiveConversationId(null);
     setMessages([]);
   };
@@ -491,24 +480,55 @@ const ChatPage = () => {
           messages: nextMessages, workbookId: activeWorkbookId, dataset: datasetMode,
         });
         setMessages([...nextMessages, { role: 'assistant', content: res.reply }]);
-      } else if (activeConversationId) {
-        // Persisted streaming path. Server writes the user message + the
-        // final assistant message; client just renders deltas.
-        let buffer = '';
-        await streamConversationMessage({
-          token, tenant: tenantKey, model,
-          conversationId: activeConversationId,
-          content: userMsg.content,
-          onDelta: (delta) => {
-            buffer += delta;
-            setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
-          },
-          onError: (err) => setError(err),
-        });
-        if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
-        // Refresh the sidebar so this conversation jumps to the top and
-        // any auto-generated title appears.
-        refreshConversations();
+      } else if (token) {
+        // Persisted streaming path. Create the conversation lazily on the
+        // first send so we never produce empty orphans in the sidebar. If
+        // create fails (e.g. API down), fall back to the ephemeral stream.
+        let conversationId = activeConversationId;
+        if (!conversationId) {
+          try {
+            const convo = await createConversation({ token, tenant: tenantKey });
+            conversationId = convo.id;
+            setActiveConversationId(conversationId);
+            // Bump message_count locally so the sidebar's empty-row filter
+            // doesn't hide this conversation between create and the
+            // refreshConversations call below. The server's authoritative
+            // count comes back on refresh.
+            setConversations((prev) => [{ ...convo, message_count: 1 }, ...prev]);
+          } catch (e) {
+            // Fall through to ephemeral path below.
+          }
+        }
+        if (conversationId) {
+          let buffer = '';
+          await streamConversationMessage({
+            token, tenant: tenantKey, model,
+            conversationId,
+            content: userMsg.content,
+            onDelta: (delta) => {
+              buffer += delta;
+              setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
+            },
+            onError: (err) => setError(err),
+          });
+          if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
+          // Refresh the sidebar so this conversation jumps to the top and
+          // any auto-generated title appears.
+          refreshConversations();
+        } else {
+          // Ephemeral fallback when conversation create failed.
+          let buffer = '';
+          await streamChat({
+            token, tenant: tenantKey, model,
+            messages: nextMessages,
+            onDelta: (delta) => {
+              buffer += delta;
+              setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
+            },
+            onError: (err) => setError(err),
+          });
+          if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
+        }
       } else {
         // Ephemeral mode — existing stateless stream.
         let buffer = '';
@@ -623,10 +643,10 @@ const ChatPage = () => {
             <span aria-hidden="true">+</span> new chat
           </button>
 
-          {conversations.length > 0 && (
+          {conversations.some((c) => (c.message_count || 0) > 0) && (
             <SidebarSection label="History">
               <ul className="flex flex-col gap-0.5" aria-label="Past conversations">
-                {conversations.map((c) => (
+                {conversations.filter((c) => (c.message_count || 0) > 0).map((c) => (
                   <li key={c.id} className="group flex items-center gap-1">
                     <button
                       type="button"
