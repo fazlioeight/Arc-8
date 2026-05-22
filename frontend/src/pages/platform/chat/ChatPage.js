@@ -23,20 +23,10 @@ import {
   streamConversationMessage,
   uploadWorkbook,
 } from '../../../services/chatService';
+import '../../../styles/memberWorkspace.css';
 import './ChatPage.css';
 
 marked.use({ gfm: true, breaks: true });
-
-const BG_SWATCHES = [
-  { name: 'Terminal Black', color: '#0a0a0a' },
-  { name: 'VS Code',        color: '#1e1e1e' },
-  { name: 'GitHub Dark',    color: '#0d1117' },
-  { name: 'Slate',          color: '#111827' },
-  { name: 'Dark Teal',      color: '#0d1f1f' },
-  { name: 'Dark Indigo',    color: '#0f0f1a' },
-  { name: 'Dark Purple',    color: '#160020' },
-  { name: 'Warm Dark',      color: '#141210' },
-];
 
 const SUPPORTED_FILES = ['PDF', 'DOCX', 'XLSX', 'PPTX', 'CSV', 'JSON', 'TXT', 'PNG', 'JPG'];
 const OUTPUT_FORMATS = ['Markdown', 'Tables', 'Charts', 'Export'];
@@ -73,9 +63,12 @@ const hexToRgba = (hex, alpha) => {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 };
 
-const formatTs = (iso) => {
-  if (!iso) return 'never';
-  try { return new Date(iso).toLocaleString(); } catch (e) { return String(iso); }
+// Resolve a CSS custom property from :root. Returns a fallback if the
+// browser isn't available (e.g. tests) or the var hasn't been defined.
+const cssVar = (name, fallback) => {
+  if (typeof window === 'undefined') return fallback;
+  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return val || fallback;
 };
 
 const extractSegments = (markdown) => {
@@ -109,11 +102,16 @@ const ChartBlock = ({ spec, chartId }) => {
   const ref = useRef(null);
   useEffect(() => {
     if (!ref.current || !spec || !spec.type) return undefined;
-    const accent = '#d97706';
+    // Resolve once per chart mount so charts pick up the portal theme.
+    const accent = cssVar('--brand-primary', '#0a66c2');
+    const tickColor = cssVar('--text-muted', '#516f90');
+    const gridColor = cssVar('--border', '#dfe3eb');
+    const bgCard = cssVar('--bg-card', '#ffffff');
+    const titleColor = cssVar('--text', '#33475b');
     const datasets = (spec.datasets || []).map((d, i) => ({
       label: d.label || `Series ${i + 1}`,
       data: d.data || [],
-      backgroundColor: hexToRgba(accent, 0.55),
+      backgroundColor: hexToRgba(accent.startsWith('#') ? accent : '#0a66c2', 0.45),
       borderColor: accent,
       borderWidth: 2,
     }));
@@ -124,12 +122,18 @@ const ChartBlock = ({ spec, chartId }) => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { labels: { color: '#9a9a9a', font: { family: 'Cascadia Code, monospace', size: 11 } } },
-          tooltip: { backgroundColor: '#0f0f0f', borderColor: '#2a2a2a', borderWidth: 1 },
+          legend: { labels: { color: tickColor, font: { family: 'Inter, system-ui, sans-serif', size: 11 } } },
+          tooltip: {
+            backgroundColor: bgCard,
+            titleColor,
+            bodyColor: titleColor,
+            borderColor: gridColor,
+            borderWidth: 1,
+          },
         },
         scales: ['bar', 'line'].includes(spec.type) ? {
-          x: { ticks: { color: '#9a9a9a', font: { size: 10 } }, grid: { color: '#1e1e1e' } },
-          y: { ticks: { color: '#9a9a9a', font: { size: 10 } }, grid: { color: '#1e1e1e' } },
+          x: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } },
+          y: { ticks: { color: tickColor, font: { size: 10 } }, grid: { color: gridColor } },
         } : undefined,
       },
     };
@@ -139,14 +143,14 @@ const ChartBlock = ({ spec, chartId }) => {
 
   if (!spec || !spec.type) {
     return (
-      <div className="my-3 rounded-[3px] border border-[#1e1e1e] bg-[#0f0f0f] p-3 text-[11px] text-[#666]">
+      <div className="my-3 rounded-lg border coding-border bg-[var(--bg-card)] p-3 text-xs coding-text-muted">
         Invalid chart JSON.
       </div>
     );
   }
   return (
-    <div className="my-3 rounded-[3px] border border-[#1e1e1e] bg-[#0f0f0f] p-3">
-      {spec.title && <div className="mb-2 text-xs font-bold text-[#d4d4d4]">{spec.title}</div>}
+    <div className="my-3 rounded-lg border coding-border bg-[var(--bg-card)] p-3 shadow-sm">
+      {spec.title && <div className="mb-2 text-sm font-semibold coding-text-strong">{spec.title}</div>}
       <div className="relative h-[280px]">
         <canvas
           ref={ref}
@@ -160,9 +164,7 @@ const ChartBlock = ({ spec, chartId }) => {
 
 const MessageBody = ({ content, isTyping, messageIdx }) => {
   const segments = useMemo(() => extractSegments(content), [content]);
-  if (isTyping) return <div className="nx-typing text-[13px] leading-relaxed text-[#d97706]" />;
-  // Charts get a stable id keyed off message index + chart-block ordinal so
-  // the export endpoint can match captured images to the right placeholder.
+  if (isTyping) return <div className="nx-typing text-sm leading-relaxed" />;
   let chartOrdinal = 0;
   return (
     <>
@@ -175,7 +177,7 @@ const MessageBody = ({ content, isTyping, messageIdx }) => {
         return (
           <div
             key={i}
-            className="nx-md text-[13px] leading-relaxed text-[#9a9a9a]"
+            className="nx-md"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(seg.text) }}
           />
         );
@@ -198,14 +200,8 @@ const captureRenderedCharts = (root) => {
     const id = canvas.getAttribute('data-chart-id');
     if (!id) return;
     try {
-      // Use the raw canvas API rather than chart.toBase64Image(). We don't
-      // hold Chart instance refs at this level, and Chart.js stores its
-      // rendered bitmap on the canvas anyway.
       charts[id] = canvas.toDataURL('image/png');
     } catch (e) {
-      // Most likely a tainted canvas; the chart will fall back to a text
-      // placeholder in the export and the rest of the conversation still
-      // renders.
       // eslint-disable-next-line no-console
       console.warn('chart capture failed', id, e);
     }
@@ -215,15 +211,9 @@ const captureRenderedCharts = (root) => {
 
 const SidebarSection = ({ label, children }) => (
   <div className="flex flex-col gap-1.5">
-    <div className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#666]">{label}</div>
+    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] coding-text-muted">{label}</div>
     {children}
   </div>
-);
-
-const Pill = ({ children }) => (
-  <span className="rounded-[3px] border border-[#2a2a2a] px-1.5 py-0.5 text-[11px] text-[#9a9a9a]">
-    {children}
-  </span>
 );
 
 const ChatPage = () => {
@@ -251,18 +241,11 @@ const ChatPage = () => {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [loadingConversation, setLoadingConversation] = useState(false);
-  const [bg, setBg] = useState(() => {
-    try { return localStorage.getItem('nexoraChatBackground') || '#0a0a0a'; } catch (e) { return '#0a0a0a'; }
-  });
 
   const fileInputRef = useRef(null);
   const workbookFileRef = useRef(null);
   const threadRef = useRef(null);
   const textareaRef = useRef(null);
-
-  useEffect(() => {
-    try { localStorage.setItem('nexoraChatBackground', bg); } catch (e) { /* ignore */ }
-  }, [bg]);
 
   const activeWorkbook = useMemo(
     () => workbooks.find((w) => w.id === activeWorkbookId) || null,
@@ -374,7 +357,6 @@ const ChatPage = () => {
       const data = await listConversations({ token, tenant: tenantKey });
       setConversations(data?.conversations || []);
     } catch (e) {
-      // Silent: an empty sidebar is the right fallback.
       setConversations([]);
     }
   }, [token, tenantKey]);
@@ -490,10 +472,6 @@ const ChatPage = () => {
             const convo = await createConversation({ token, tenant: tenantKey });
             conversationId = convo.id;
             setActiveConversationId(conversationId);
-            // Bump message_count locally so the sidebar's empty-row filter
-            // doesn't hide this conversation between create and the
-            // refreshConversations call below. The server's authoritative
-            // count comes back on refresh.
             setConversations((prev) => [{ ...convo, message_count: 1 }, ...prev]);
           } catch (e) {
             // Fall through to ephemeral path below.
@@ -512,11 +490,8 @@ const ChatPage = () => {
             onError: (err) => setError(err),
           });
           if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
-          // Refresh the sidebar so this conversation jumps to the top and
-          // any auto-generated title appears.
           refreshConversations();
         } else {
-          // Ephemeral fallback when conversation create failed.
           let buffer = '';
           await streamChat({
             token, tenant: tenantKey, model,
@@ -530,7 +505,6 @@ const ChatPage = () => {
           if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
         }
       } else {
-        // Ephemeral mode — existing stateless stream.
         let buffer = '';
         await streamChat({
           token, tenant: tenantKey, model,
@@ -601,33 +575,38 @@ const ChatPage = () => {
     });
   };
 
-  // Tailwind class tokens reused across the chat shell.
-  const fileBtn =
-    "rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] " +
-    "transition hover:border-[#d97706] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40";
-  const modalBtn =
-    "rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] " +
-    "transition hover:border-[#d97706] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40";
+  // Reusable button styles for the chat shell — anchored on the shared
+  // coding-ghost-button utility for portal-theme consistency.
+  const ghostBtn =
+    'coding-ghost-button inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium ' +
+    'disabled:cursor-not-allowed disabled:opacity-50';
+  const ghostBtnSm =
+    'coding-ghost-button inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium ' +
+    'disabled:cursor-not-allowed disabled:opacity-50';
 
   return (
     <div className="coding-member-workspace portal-theme flex h-screen min-h-screen flex-col">
       <PortalUtilityBar />
-      <div
-        className="nx-chat-root grid min-h-0 flex-1 grid-cols-[200px_1fr] grid-rows-1 overflow-hidden bg-[#0a0a0a] text-[13px] text-[#d4d4d4]"
-      >
+      <div className="nx-chat-root grid min-h-0 flex-1 grid-cols-[260px_1fr] grid-rows-1 overflow-hidden bg-[var(--bg)]">
         {/* ─ Sidebar ────────────────────────────────────────────────── */}
         <aside
-          className="nx-scroll flex h-full flex-col gap-3.5 overflow-y-auto border-r border-[#1e1e1e] bg-[#0f0f0f] p-3"
+          className="nx-scroll coding-sidebar flex h-full flex-col gap-4 overflow-y-auto p-4"
           aria-label="Nexora AI navigation"
         >
-          <div className="border-b border-[#1e1e1e] pb-3">
+          <div className="border-b coding-border-subtle pb-3">
             <div className="flex items-center gap-2">
-              <div className="grid h-[18px] w-[18px] place-items-center text-[13px] text-[#d97706]" aria-hidden="true">◆</div>
+              <div
+                className="grid h-8 w-8 place-items-center rounded-md text-base font-semibold text-white"
+                style={{ background: 'var(--brand-primary)' }}
+                aria-hidden="true"
+              >
+                N
+              </div>
               <div>
-                <div className="text-[13px] font-bold tracking-wide">
-                  Nexora <span className="text-[#d97706]">AI</span>
+                <div className="text-sm font-semibold coding-text-strong">
+                  Nexora <span style={{ color: 'var(--brand-primary)' }}>AI</span>
                 </div>
-                <div className="mt-0.5 text-[11px] leading-tight text-[#666]">
+                <div className="text-[11px] leading-tight coding-text-muted">
                   Claude-powered assistant
                 </div>
               </div>
@@ -637,59 +616,64 @@ const ChatPage = () => {
           <button
             type="button"
             onClick={handleNewChat}
-            className="flex w-full items-center gap-1.5 rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-1 text-left text-[12px] text-[#9a9a9a] transition hover:border-[#d97706] hover:text-[#d4d4d4]"
+            className="flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
+            style={{ background: 'var(--brand-primary)' }}
             aria-label="Start a new chat"
           >
-            <span aria-hidden="true">+</span> new chat
+            <span aria-hidden="true">+</span> New chat
           </button>
 
           {conversations.some((c) => (c.message_count || 0) > 0) && (
             <SidebarSection label="History">
               <ul className="flex flex-col gap-0.5" aria-label="Past conversations">
-                {conversations.filter((c) => (c.message_count || 0) > 0).map((c) => (
-                  <li key={c.id} className="group flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectConversation(c.id)}
-                      disabled={busy || loadingConversation}
-                      className={`flex-1 truncate rounded-[3px] px-1.5 py-1 text-left text-[11px] transition hover:bg-[#1e1e1e] disabled:cursor-not-allowed ${
-                        activeConversationId === c.id
-                          ? 'bg-[#1e1e1e] text-[#d4d4d4]'
-                          : 'text-[#9a9a9a]'
-                      }`}
-                      title={c.title || 'Untitled conversation'}
-                    >
-                      {c.title || 'Untitled conversation'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = window.prompt('Rename conversation', c.title || '');
-                        if (next && next.trim() && next !== c.title) {
-                          handleRenameConversation(c.id, next);
-                        }
-                      }}
-                      className="opacity-0 transition group-hover:opacity-100 rounded-[3px] border border-transparent px-1 text-[10px] text-[#666] hover:border-[#2a2a2a] hover:text-[#d4d4d4]"
-                      title="Rename"
-                      aria-label={`Rename conversation ${c.title || 'untitled'}`}
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm(`Delete "${c.title || 'this conversation'}"?`)) {
-                          handleDeleteConversation(c.id);
-                        }
-                      }}
-                      className="opacity-0 transition group-hover:opacity-100 rounded-[3px] border border-transparent px-1 text-[10px] text-[#666] hover:border-[#2a2a2a] hover:text-[#f87171]"
-                      title="Delete"
-                      aria-label={`Delete conversation ${c.title || 'untitled'}`}
-                    >
-                      ×
-                    </button>
-                  </li>
-                ))}
+                {conversations.filter((c) => (c.message_count || 0) > 0).map((c) => {
+                  const isActive = activeConversationId === c.id;
+                  return (
+                    <li key={c.id} className="group flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectConversation(c.id)}
+                        disabled={busy || loadingConversation}
+                        className={[
+                          'flex-1 truncate rounded-md px-2 py-1.5 text-left text-xs transition',
+                          'coding-nav-link',
+                          isActive ? 'coding-nav-link--active' : '',
+                          'disabled:cursor-not-allowed',
+                        ].filter(Boolean).join(' ')}
+                        title={c.title || 'Untitled conversation'}
+                      >
+                        {c.title || 'Untitled conversation'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = window.prompt('Rename conversation', c.title || '');
+                          if (next && next.trim() && next !== c.title) {
+                            handleRenameConversation(c.id, next);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 rounded px-1 text-[10px] coding-text-muted transition hover:text-[var(--text)]"
+                        title="Rename"
+                        aria-label={`Rename conversation ${c.title || 'untitled'}`}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Delete "${c.title || 'this conversation'}"?`)) {
+                            handleDeleteConversation(c.id);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 rounded px-1 text-[10px] coding-text-muted transition hover:text-[var(--state-critical)]"
+                        title="Delete"
+                        aria-label={`Delete conversation ${c.title || 'untitled'}`}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </SidebarSection>
           )}
@@ -698,8 +682,7 @@ const ChatPage = () => {
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="w-full rounded-[3px] border border-[#2a2a2a] bg-[#141414] py-1 pl-1.5 pr-5 text-[11px] text-[#9a9a9a] transition hover:border-[#d97706] hover:text-[#d4d4d4] focus:outline-none focus:ring-1 focus:ring-[#d97706]"
-              style={{ appearance: 'none', WebkitAppearance: 'none' }}
+              className="coding-input w-full rounded-md py-1.5 pl-2 pr-7 text-xs"
               aria-label="Select Claude model"
             >
               {models.length === 0 && <option value="">loading…</option>}
@@ -708,109 +691,84 @@ const ChatPage = () => {
           </SidebarSection>
 
           <SidebarSection label="About">
-            <div className="text-[11px] leading-snug text-[#9a9a9a]">
+            <div className="text-[11px] leading-snug coding-text-soft">
               Ask a question or upload a document for analysis.
             </div>
           </SidebarSection>
 
-          <SidebarSection label="Supported Files">
+          <SidebarSection label="Supported files">
             <div className="flex flex-wrap gap-1">
-              {SUPPORTED_FILES.map((p) => <Pill key={p}>{p}</Pill>)}
+              {SUPPORTED_FILES.map((p) => <span key={p} className="coding-tag">{p}</span>)}
             </div>
           </SidebarSection>
 
           <SidebarSection label="Output">
             <div className="flex flex-wrap gap-1">
-              {OUTPUT_FORMATS.map((p) => <Pill key={p}>{p}</Pill>)}
-            </div>
-          </SidebarSection>
-
-          <SidebarSection label="Background">
-            <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Chat background colour">
-              {BG_SWATCHES.map((sw) => (
-                <button
-                  key={sw.color}
-                  type="button"
-                  onClick={() => setBg(sw.color)}
-                  className={`h-[22px] w-full rounded-[3px] border transition ${
-                    bg === sw.color
-                      ? 'border-[#d97706] outline outline-1 outline-[#d97706] outline-offset-1'
-                      : 'border-[#2a2a2a] hover:border-[#d97706]'
-                  }`}
-                  style={{ background: sw.color }}
-                  aria-label={sw.name}
-                />
-              ))}
-            </div>
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <input
-                type="color"
-                value={bg}
-                onChange={(e) => setBg(e.target.value)}
-                className="h-[22px] w-[30px] cursor-pointer rounded-[3px] border border-[#2a2a2a] bg-transparent p-0"
-                aria-label="Custom background colour"
-              />
-              <span className="text-[11px] text-[#666]" aria-hidden="true">Custom</span>
+              {OUTPUT_FORMATS.map((p) => <span key={p} className="coding-tag">{p}</span>)}
             </div>
           </SidebarSection>
 
           <SidebarSection label="Guardrails">
-            <div className="text-[11px] leading-snug text-[#9a9a9a]" role="note">
+            <div className="text-[11px] leading-snug coding-text-soft" role="note">
               Do not upload PHI, member identifiers, medical records, claims files, or confidential production data.
             </div>
           </SidebarSection>
 
-          <div className="mt-auto border-t border-[#1e1e1e] pt-2.5 text-[10px] leading-snug text-[#666]">
+          <div className="mt-auto border-t coding-border-subtle pt-3 text-[10px] leading-snug coding-text-muted">
             Nexora AI · Azure-hosted<br />
             Claude-powered
           </div>
         </aside>
 
         {/* ─ Main ───────────────────────────────────────────────────── */}
-        <main className="flex h-full min-h-0 min-w-0 flex-col" style={{ background: bg }}>
-          {/* Inner topbar (light) — gives Status + signed-in user without
-              duplicating the portal nav above. */}
-          <header className="flex h-[44px] flex-none items-center justify-between border-b border-[#1e1e1e] bg-[#0f0f0f] px-4">
-            <div className="flex items-baseline gap-2.5">
-              <strong className="text-[13px] font-bold">nexora</strong>
-              <span className="text-[11px] text-[#666]">Claude-powered AI assistant</span>
+        <main className="flex h-full min-h-0 min-w-0 flex-col bg-[var(--bg)]">
+          {/* Inner topbar — Status + signed-in user + export controls. */}
+          <header className="coding-member-toolbar flex h-12 flex-none items-center justify-between px-5">
+            <div className="flex items-baseline gap-3">
+              <strong className="text-sm font-semibold coding-text-strong">Nexora Chat</strong>
+              <span className="text-xs coding-text-muted">Claude-powered AI assistant</span>
             </div>
             <div className="flex items-center gap-2" role="status" aria-live="polite">
-              {/* Export controls — disabled until there's something to export.
-                  Two buttons rather than a dropdown so both formats are one
-                  click away. */}
               <button
                 type="button"
-                className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#3a3a3a] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40"
+                className={ghostBtn}
                 onClick={() => handleExport('docx')}
                 disabled={!messages.length || exporting}
                 title="Export the conversation as a Word document"
               >
-                {exporting ? '...' : 'export .docx'}
+                {exporting ? '...' : 'Export .docx'}
               </button>
               <button
                 type="button"
-                className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#3a3a3a] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40"
+                className={ghostBtn}
                 onClick={() => handleExport('pdf')}
                 disabled={!messages.length || exporting}
                 title="Export the conversation as a PDF"
               >
-                {exporting ? '...' : 'export .pdf'}
+                {exporting ? '...' : 'Export .pdf'}
               </button>
               <button
                 type="button"
-                className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#3a3a3a] hover:text-[#d4d4d4] disabled:cursor-not-allowed disabled:opacity-40"
+                className={ghostBtn}
                 onClick={() => handleExport('pptx')}
                 disabled={!messages.length || exporting}
-                title="Export the conversation as a PowerPoint deck (one slide per chart and table)"
+                title="Export as a PowerPoint deck (one slide per chart and table)"
               >
-                {exporting ? '...' : 'export .pptx'}
+                {exporting ? '...' : 'Export .pptx'}
               </button>
-              <div className="flex items-center gap-1.5 rounded-[3px] border border-[#2a2a2a] px-2 py-0.5 text-[11px] text-[#4ade80]" aria-label="Service active">
-                <span className="h-[5px] w-[5px] rounded-full bg-[#4ade80]" aria-hidden="true" />
+              <div
+                className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                style={{
+                  background: 'color-mix(in srgb, var(--state-positive) 12%, transparent)',
+                  borderColor: 'color-mix(in srgb, var(--state-positive) 40%, var(--border))',
+                  color: 'var(--state-positive)',
+                }}
+                aria-label="Service active"
+              >
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--state-positive)' }} aria-hidden="true" />
                 active
               </div>
-              <div className="max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-[#666]" title={userEmail}>
+              <div className="max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap text-xs coding-text-muted" title={userEmail}>
                 {userEmail}
               </div>
             </div>
@@ -818,8 +776,13 @@ const ChatPage = () => {
 
           {error && (
             <div
-              className="mx-auto mt-2.5 w-[calc(100%-32px)] max-w-[760px] rounded-[3px] border border-[rgba(248,113,113,0.3)] px-3 py-1.5 text-[12px] text-[#f87171]"
+              className="mx-auto mt-3 w-[calc(100%-32px)] max-w-[820px] rounded-md border px-3 py-2 text-xs"
               role="alert"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--state-critical) 35%, var(--border))',
+                background: 'color-mix(in srgb, var(--state-critical) 8%, var(--bg-card))',
+                color: 'var(--state-critical)',
+              }}
             >
               {error}
             </div>
@@ -827,67 +790,83 @@ const ChatPage = () => {
 
           <section
             ref={threadRef}
-            className="nx-scroll flex-1 overflow-y-auto px-5 pb-44 pt-0"
+            className="nx-scroll flex-1 overflow-y-auto px-6 pb-44 pt-2"
             aria-label="Conversation"
           >
-            <div className="mx-auto flex max-w-[760px] flex-col">
+            <div className="mx-auto flex max-w-[820px] flex-col">
               {messages.length === 0 ? (
-                <div className="border-b border-[#1e1e1e] py-6">
-                  <h1 className="nx-welcome-h mb-1.5 text-[14px] font-bold leading-tight text-[#d4d4d4]">Nexora AI</h1>
-                  <p className="mb-3.5 max-w-[560px] text-[12px] leading-relaxed text-[#9a9a9a]">
+                <div className="py-8">
+                  <h1 className="mb-2 text-2xl font-semibold leading-tight coding-text-strong">Nexora AI</h1>
+                  <p className="mb-5 max-w-[620px] text-sm leading-relaxed coding-text-muted">
                     Ask a question or attach a file (PDF, DOCX, XLSX, PPTX, CSV, JSON, TXT, PNG, JPG) for analysis.
                     Responses can include tables, charts, and markdown formatting.
                   </p>
-                  <div className="flex flex-col" role="list" aria-label="Suggested prompts">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] coding-text-muted mb-2">
+                    Suggested prompts
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2" role="list" aria-label="Suggested prompts">
                     {SUGGESTED_PROMPTS.map((p) => (
                       <button
                         key={p.title}
                         type="button"
-                        className="nx-prompt-card flex items-baseline gap-2 border-none bg-transparent py-1 text-left text-[12px] leading-relaxed text-[#9a9a9a] transition hover:text-[#d4d4d4]"
+                        className="coding-surface flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition hover:bg-[var(--coding-hover)]"
                         onClick={() => handlePickPrompt(p.prompt)}
                         role="listitem"
                       >
-                        <strong className="min-w-[148px] flex-none text-[12px] font-semibold text-[#60a5fa]">
+                        <span className="text-sm font-semibold" style={{ color: 'var(--brand-primary)' }}>
                           {p.title}
-                        </strong>
-                        <span>{p.summary}</span>
+                        </span>
+                        <span className="text-xs leading-relaxed coding-text-soft">{p.summary}</span>
                       </button>
                     ))}
                   </div>
                 </div>
               ) : (
-                messages.map((m, i) => (
-                  <article
-                    key={i}
-                    className="grid grid-cols-[16px_1fr] items-start gap-2.5 border-t border-[#1e1e1e] py-3"
-                  >
-                    <div className={`pt-px text-[12px] leading-[1.7] ${m.role === 'user' ? 'text-[#60a5fa]' : 'text-[#d97706]'}`} aria-hidden="true">
-                      {m.role === 'user' ? '›' : '◆'}
-                    </div>
-                    <div className="min-w-0 overflow-x-auto">
-                      <div className={`mb-1 text-[11px] font-bold tracking-wide ${m.role === 'user' ? 'text-[#60a5fa]' : 'text-[#d97706]'}`}>
-                        {m.role === 'user' ? 'USER' : 'ASSISTANT'}
+                messages.map((m, i) => {
+                  const isUser = m.role === 'user';
+                  const accent = isUser ? 'var(--brand-primary)' : 'var(--text)';
+                  return (
+                    <article
+                      key={i}
+                      className="grid grid-cols-[20px_1fr] items-start gap-3 border-t coding-border-subtle py-4 first:border-t-0"
+                    >
+                      <div
+                        className="grid h-5 w-5 place-items-center rounded-full text-[11px] font-semibold"
+                        style={{
+                          background: isUser
+                            ? 'color-mix(in srgb, var(--brand-primary) 14%, transparent)'
+                            : 'color-mix(in srgb, var(--text) 8%, transparent)',
+                          color: accent,
+                        }}
+                        aria-hidden="true"
+                      >
+                        {isUser ? '›' : '◆'}
                       </div>
-                      {m.file && <div className="text-[11px] text-[#666]">📎 {m.file}</div>}
-                      {m.role === 'user' ? (
-                        <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-[#d4d4d4]">{m.content}</div>
-                      ) : (
-                        <MessageBody content={m.content} isTyping={m.isTyping} messageIdx={i} />
-                      )}
-                    </div>
-                  </article>
-                ))
+                      <div className="min-w-0 overflow-x-auto">
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: accent }}>
+                          {isUser ? 'You' : 'Assistant'}
+                        </div>
+                        {m.file && <div className="text-xs coding-text-muted">📎 {m.file}</div>}
+                        {isUser ? (
+                          <div className="whitespace-pre-wrap text-sm leading-relaxed coding-text-strong">{m.content}</div>
+                        ) : (
+                          <MessageBody content={m.content} isTyping={m.isTyping} messageIdx={i} />
+                        )}
+                      </div>
+                    </article>
+                  );
+                })
               )}
             </div>
           </section>
 
           {/* ─ Composer ─────────────────────────────────────────────── */}
           <div
-            className="sticky bottom-0 px-5 pb-4 pt-3"
-            style={{ background: `linear-gradient(to top, ${bg} 70%, transparent)` }}
+            className="sticky bottom-0 px-6 pb-5 pt-3"
+            style={{ background: 'linear-gradient(to top, var(--bg) 70%, transparent)' }}
           >
-            <div className="mx-auto max-w-[760px] rounded-[3px] border border-[#2a2a2a] bg-[#0f0f0f] px-2.5 py-2">
-              <div className="mb-1.5 flex flex-wrap items-center gap-1.5 border-b border-dashed border-[#1e1e1e] pb-1.5">
+            <div className="coding-surface mx-auto max-w-[820px] rounded-xl px-3 py-2.5 shadow-sm">
+              <div className="mb-2 flex flex-wrap items-center gap-1.5 border-b coding-border-subtle pb-2">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -895,60 +874,89 @@ const ChatPage = () => {
                   className="hidden"
                   onChange={handlePickFile}
                 />
-                <button className={fileBtn} type="button" onClick={() => fileInputRef.current?.click()} disabled={busy}>attach</button>
-                <button className={fileBtn} type="button" onClick={() => setAttachedFile(null)} disabled={!attachedFile}>clear</button>
-                <button className={fileBtn} type="button" onClick={() => setWorkbookModalOpen(true)}>
-                  workbooks
+                <button className={ghostBtnSm} type="button" onClick={() => fileInputRef.current?.click()} disabled={busy}>Attach</button>
+                <button className={ghostBtnSm} type="button" onClick={() => setAttachedFile(null)} disabled={!attachedFile}>Clear</button>
+                <button className={ghostBtnSm} type="button" onClick={() => setWorkbookModalOpen(true)}>
+                  Workbooks
                   {workbooks.some((w) => w.status === 'pending' || w.status === 'ingesting') && (
-                    <span className="ml-1 rounded-[6px] bg-[#d97706] px-1 text-[9px] font-bold text-black">
+                    <span
+                      className="ml-1 rounded-full px-1.5 text-[9px] font-bold text-white"
+                      style={{ background: 'var(--brand-primary)' }}
+                    >
                       {workbooks.filter((w) => w.status === 'pending' || w.status === 'ingesting').length}
                     </span>
                   )}
                 </button>
                 <button
-                  className={fileBtn}
+                  className={ghostBtnSm}
                   type="button"
                   onClick={() => setDatasetModalOpen(true)}
                   disabled={datasetTables.length === 0}
                   title={datasetTables.length === 0 ? 'Dataset not yet loaded for this tenant' : ''}
                 >
-                  dataset
+                  Dataset
                 </button>
-                <span className="text-[11px] text-[#666]">
-                  {attachedFile ? `📎 ${attachedFile.name}` : 'no file selected'}
+                <span className="text-[11px] coding-text-muted">
+                  {attachedFile ? `📎 ${attachedFile.name}` : 'No file selected'}
                 </span>
                 {activeWorkbook && (
-                  <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-[#d97706] px-2 py-0.5 text-[11px] text-[#d4d4d4]">
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]"
+                    style={{
+                      background: 'color-mix(in srgb, var(--brand-primary) 10%, transparent)',
+                      borderColor: 'color-mix(in srgb, var(--brand-primary) 35%, var(--border))',
+                      color: 'var(--brand-primary)',
+                    }}
+                  >
                     workbook: {activeWorkbook.filename}
-                    <button className="border-none bg-transparent px-0.5 text-[12px] text-[#666] hover:text-[#d97706]" onClick={() => setActiveWorkbookId(null)} aria-label="Detach workbook">×</button>
+                    <button
+                      className="border-none bg-transparent px-0.5 text-xs coding-text-muted hover:text-[var(--brand-primary)]"
+                      onClick={() => setActiveWorkbookId(null)}
+                      aria-label="Detach workbook"
+                    >
+                      ×
+                    </button>
                   </span>
                 )}
                 {datasetMode && (
-                  <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-[#d97706] px-2 py-0.5 text-[11px] text-[#d4d4d4]">
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]"
+                    style={{
+                      background: 'color-mix(in srgb, var(--brand-primary) 10%, transparent)',
+                      borderColor: 'color-mix(in srgb, var(--brand-primary) 35%, var(--border))',
+                      color: 'var(--brand-primary)',
+                    }}
+                  >
                     dataset
-                    <button className="border-none bg-transparent px-0.5 text-[12px] text-[#666] hover:text-[#d97706]" onClick={() => setDatasetMode(false)} aria-label="Detach dataset">×</button>
+                    <button
+                      className="border-none bg-transparent px-0.5 text-xs coding-text-muted hover:text-[var(--brand-primary)]"
+                      onClick={() => setDatasetMode(false)}
+                      aria-label="Detach dataset"
+                    >
+                      ×
+                    </button>
                   </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-[auto_1fr_auto] items-end gap-1.5">
-                <span className="select-none pb-2 text-[14px] leading-none text-[#d97706] opacity-85" aria-hidden="true">›</span>
+              <div className="grid grid-cols-[1fr_auto] items-end gap-2">
                 <textarea
                   ref={textareaRef}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={handleKey}
-                  placeholder="message nexora..."
+                  placeholder="Message Nexora…"
                   rows={1}
                   disabled={busy}
-                  className="w-full min-h-[36px] max-h-[140px] resize-none border-none bg-transparent px-1 py-2 text-[13px] leading-relaxed text-[#d4d4d4] outline-none placeholder:text-[#666]"
+                  className="w-full min-h-[36px] max-h-[140px] resize-none border-none bg-transparent px-1 py-2 text-sm leading-relaxed coding-text-strong outline-none placeholder:text-[var(--text-muted)]"
                   aria-label="Type your message"
                 />
                 <button
                   type="button"
                   onClick={handleSend}
                   disabled={busy || (!draft.trim() && !attachedFile)}
-                  className="mb-0.5 grid h-8 w-8 place-items-center rounded-[3px] border border-[#2a2a2a] bg-transparent text-[14px] text-[#9a9a9a] transition hover:border-[#d97706] hover:text-[#d97706] disabled:cursor-not-allowed disabled:opacity-30"
+                  className="mb-0.5 grid h-9 w-9 place-items-center rounded-md text-base text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: 'var(--brand-primary)' }}
                   aria-label="Send message"
                   title="Send (Enter)"
                 >
@@ -956,7 +964,7 @@ const ChatPage = () => {
                 </button>
               </div>
 
-              <div className="mx-1 mt-1.5 text-center text-[10px] leading-tight text-[#666]" role="note">
+              <div className="mx-1 mt-2 text-center text-[10px] leading-tight coding-text-muted" role="note">
                 Do not enter or upload PHI, member identifiers, claims files, medical records, or confidential production data.
               </div>
             </div>
@@ -967,61 +975,93 @@ const ChatPage = () => {
       {/* ─ Workbook modal ─────────────────────────────────────────────── */}
       {workbookModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           onClick={(e) => { if (e.target === e.currentTarget) setWorkbookModalOpen(false); }}
         >
-          <div className="nx-chat-root max-h-[80vh] w-[min(560px,92vw)] overflow-y-auto rounded-[3px] border border-[#2a2a2a] bg-[#0f0f0f] p-4 text-[12px] text-[#d4d4d4]">
-            <h2 className="mb-2 text-[13px] text-[#d4d4d4]">Workbooks</h2>
-            <div className="mb-2 flex items-center gap-1.5 border-b border-[#2a2a2a] pb-3">
-              <input
-                ref={workbookFileRef}
-                type="file"
-                accept=".xlsx"
-                className="hidden"
-                onChange={handleUploadWorkbook}
-              />
-              <button className={modalBtn} type="button" onClick={() => workbookFileRef.current?.click()}>upload .xlsx</button>
-              <span className="text-[11px] text-[#666]">drop in an Excel workbook to query it with SQL</span>
-            </div>
-            <div>
-              {workbooks.length === 0 ? (
-                <div className="py-3 text-center text-[#666]">no workbooks yet</div>
-              ) : workbooks.map((wb) => (
-                <div key={wb.id} className="flex items-center justify-between gap-2 border-b border-dashed border-[#1e1e1e] py-2 last:border-b-0">
-                  <div>
-                    <div>
-                      {wb.filename}
-                      {(wb.status === 'pending' || wb.status === 'ingesting') && (
-                        <span className="ml-1.5 inline-block rounded-[8px] border border-[#d97706] px-1.5 py-px text-[10px] text-[#d97706]">ingesting...</span>
-                      )}
-                      {wb.status === 'failed' && (
-                        <span className="ml-1.5 inline-block rounded-[8px] border border-[rgba(248,113,113,0.4)] px-1.5 py-px text-[10px] text-[#f87171]">failed</span>
-                      )}
+          <div className="coding-member-workspace portal-theme">
+            <div className="coding-surface max-h-[80vh] w-[min(560px,92vw)] overflow-y-auto rounded-xl p-5 shadow-lg">
+              <h2 className="mb-3 text-base font-semibold coding-text-strong">Workbooks</h2>
+              <div className="mb-3 flex items-center gap-2 border-b coding-border-subtle pb-3">
+                <input
+                  ref={workbookFileRef}
+                  type="file"
+                  accept=".xlsx"
+                  className="hidden"
+                  onChange={handleUploadWorkbook}
+                />
+                <button className={ghostBtn} type="button" onClick={() => workbookFileRef.current?.click()}>Upload .xlsx</button>
+                <span className="text-xs coding-text-muted">Drop in an Excel workbook to query it with SQL.</span>
+              </div>
+              <div>
+                {workbooks.length === 0 ? (
+                  <div className="py-6 text-center text-sm coding-text-muted">No workbooks yet.</div>
+                ) : workbooks.map((wb) => (
+                  <div key={wb.id} className="flex items-center justify-between gap-2 border-b coding-border-subtle py-2.5 last:border-b-0">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm coding-text-strong">
+                        {wb.filename}
+                        {(wb.status === 'pending' || wb.status === 'ingesting') && (
+                          <span
+                            className="ml-1.5 inline-block rounded-full border px-1.5 py-px text-[10px]"
+                            style={{
+                              borderColor: 'color-mix(in srgb, var(--brand-primary) 35%, var(--border))',
+                              color: 'var(--brand-primary)',
+                              background: 'color-mix(in srgb, var(--brand-primary) 10%, transparent)',
+                            }}
+                          >
+                            ingesting...
+                          </span>
+                        )}
+                        {wb.status === 'failed' && (
+                          <span
+                            className="ml-1.5 inline-block rounded-full border px-1.5 py-px text-[10px]"
+                            style={{
+                              borderColor: 'color-mix(in srgb, var(--state-critical) 35%, var(--border))',
+                              color: 'var(--state-critical)',
+                              background: 'color-mix(in srgb, var(--state-critical) 10%, transparent)',
+                            }}
+                          >
+                            failed
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs coding-text-muted">
+                        {STATUS_LABEL[wb.status] || wb.status} · {(wb.size_bytes / 1024).toFixed(0)} KB
+                        {wb.error_message && ` — ${wb.error_message}`}
+                      </div>
                     </div>
-                    <div className="text-[11px] text-[#666]">
-                      {STATUS_LABEL[wb.status] || wb.status} · {(wb.size_bytes / 1024).toFixed(0)} KB
-                      {wb.error_message && ` — ${wb.error_message}`}
+                    <div className="flex flex-shrink-0 items-center gap-1.5">
+                      <button type="button" onClick={() => handleAttachWorkbook(wb)} disabled={wb.status !== 'ready'} className={ghostBtn}>
+                        {activeWorkbookId === wb.id ? 'Attached' : 'Attach'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteWorkbook(wb.id)}
+                        className="inline-flex items-center rounded-md border bg-transparent px-2.5 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{
+                          borderColor: 'var(--coding-border)',
+                          color: 'var(--text-muted)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--state-critical) 50%, var(--border))';
+                          e.currentTarget.style.color = 'var(--state-critical)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--coding-border)';
+                          e.currentTarget.style.color = 'var(--text-muted)';
+                        }}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
-                  <div className="flex flex-shrink-0 items-center gap-1.5">
-                    <button type="button" onClick={() => handleAttachWorkbook(wb)} disabled={wb.status !== 'ready'} className={modalBtn}>
-                      {activeWorkbookId === wb.id ? 'attached' : 'attach'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteWorkbook(wb.id)}
-                      className="rounded-[3px] border border-[#2a2a2a] bg-transparent px-2 py-0.5 text-[11px] text-[#9a9a9a] transition hover:border-[#f87171] hover:text-[#f87171]"
-                    >
-                      delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 text-right">
-              <button className={modalBtn} type="button" onClick={() => setWorkbookModalOpen(false)}>close</button>
+                ))}
+              </div>
+              <div className="mt-4 text-right">
+                <button className={ghostBtn} type="button" onClick={() => setWorkbookModalOpen(false)}>Close</button>
+              </div>
             </div>
           </div>
         </div>
@@ -1030,35 +1070,37 @@ const ChatPage = () => {
       {/* ─ Dataset modal ──────────────────────────────────────────────── */}
       {datasetModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           onClick={(e) => { if (e.target === e.currentTarget) setDatasetModalOpen(false); }}
         >
-          <div className="nx-chat-root max-h-[80vh] w-[min(640px,92vw)] overflow-y-auto rounded-[3px] border border-[#2a2a2a] bg-[#0f0f0f] p-4 text-[12px] text-[#d4d4d4]">
-            <h2 className="mb-1 text-[13px] text-[#d4d4d4]">Tenant data</h2>
-            <p className="mb-2 text-[11px] text-[#666]">
-              The chat can answer questions by running read-only SQL against
-              your tenant&apos;s operational tables. Listed below are the tables
-              Claude is allowed to query.
-            </p>
-            <div className="mb-2 flex items-center gap-1.5 border-b border-[#2a2a2a] pb-3">
-              <button className={modalBtn} type="button" onClick={handleToggleDatasetMode}>
-                {datasetMode ? 'detach data tools' : 'enable data tools for chat'}
-              </button>
-              <span className="text-[11px] text-[#666]">
-                {datasetMode ? 'chat is now using the tables below' : 'ask natural-language questions over the tables below'}
-              </span>
-            </div>
-            <div>
-              {datasetTables.length === 0 ? (
-                <div className="py-3 text-center text-[#666]">no tables available for this tenant</div>
-              ) : datasetTables.map((t) => (
-                <DatasetRow key={t.table_name} table={t} />
-              ))}
-            </div>
-            <div className="mt-3 text-right">
-              <button className={modalBtn} type="button" onClick={() => setDatasetModalOpen(false)}>close</button>
+          <div className="coding-member-workspace portal-theme">
+            <div className="coding-surface max-h-[80vh] w-[min(640px,92vw)] overflow-y-auto rounded-xl p-5 shadow-lg">
+              <h2 className="mb-1 text-base font-semibold coding-text-strong">Tenant data</h2>
+              <p className="mb-3 text-xs coding-text-muted">
+                The chat can answer questions by running read-only SQL against
+                your tenant&apos;s operational tables. Listed below are the tables
+                Claude is allowed to query.
+              </p>
+              <div className="mb-3 flex items-center gap-2 border-b coding-border-subtle pb-3">
+                <button className={ghostBtn} type="button" onClick={handleToggleDatasetMode}>
+                  {datasetMode ? 'Detach data tools' : 'Enable data tools for chat'}
+                </button>
+                <span className="text-xs coding-text-muted">
+                  {datasetMode ? 'Chat is now using the tables below.' : 'Ask natural-language questions over the tables below.'}
+                </span>
+              </div>
+              <div>
+                {datasetTables.length === 0 ? (
+                  <div className="py-6 text-center text-sm coding-text-muted">No tables available for this tenant.</div>
+                ) : datasetTables.map((t) => (
+                  <DatasetRow key={t.table_name} table={t} />
+                ))}
+              </div>
+              <div className="mt-4 text-right">
+                <button className={ghostBtn} type="button" onClick={() => setDatasetModalOpen(false)}>Close</button>
+              </div>
             </div>
           </div>
         </div>
@@ -1073,22 +1115,24 @@ const ChatPage = () => {
 const DatasetRow = ({ table }) => {
   const missing = table.row_count == null;
   return (
-    <div className="border-b border-dashed border-[#1e1e1e] py-2 last:border-b-0">
+    <div className="border-b coding-border-subtle py-2.5 last:border-b-0">
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate font-semibold text-[#d4d4d4]" title={table.table_name}>
+          <div className="truncate text-sm font-semibold coding-text-strong" title={table.table_name}>
             {table.friendly_name}
           </div>
-          <div className="font-mono text-[10px] text-[#666]">{table.table_name}</div>
+          <div className="text-[10px] coding-text-muted" style={{ fontFamily: "'SF Mono', Menlo, Consolas, monospace" }}>
+            {table.table_name}
+          </div>
         </div>
-        <div className="flex-shrink-0 text-[11px] text-[#9a9a9a]">
+        <div className="flex-shrink-0 text-xs coding-text-soft">
           {missing
-            ? <span className="text-[#f87171]">not provisioned</span>
+            ? <span style={{ color: 'var(--state-critical)' }}>not provisioned</span>
             : `${table.row_count.toLocaleString()} rows`}
         </div>
       </div>
       {table.description && (
-        <div className="mt-1 text-[11px] leading-snug text-[#666]">
+        <div className="mt-1 text-xs leading-snug coding-text-muted">
           {table.description}
         </div>
       )}
