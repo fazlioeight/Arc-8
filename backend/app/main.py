@@ -14,7 +14,6 @@ from .core.logging_config import setup_logging
 from .dependencies.tenant import get_tenant_context
 from .db.session import get_control_session
 from .db.tenant_manager import TenantContext, tenant_connection_manager
-from .middleware.rate_limit import RateLimitMiddleware
 from .middleware.request_logging import RequestLoggingMiddleware
 from .middleware.security_headers import SecurityHeadersMiddleware
 from .middleware.tenant import TenantMiddleware
@@ -62,7 +61,6 @@ setup_logging()
 app = FastAPI(title="Nexora Lab API", version="2.0.0")
 
 app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     TenantMiddleware,
     default_tenant=None if settings.is_production else "prominencehealth",
