@@ -13,9 +13,6 @@ ALLOWED_MODELS: dict[str, dict] = {
     "claude-opus-4-7":           {"label": "Opus 4.7   — most capable", "max_tokens": 128_000},
 }
 
-# Non-streaming requests above ~16K risk SDK HTTP timeouts; streaming has no such limit.
-_MAX_TOKENS_SYNC = 16_000
-
 
 def resolve_model(requested: Optional[str]) -> str:
     if requested and requested in ALLOWED_MODELS:
@@ -23,9 +20,8 @@ def resolve_model(requested: Optional[str]) -> str:
     return settings.CLAUDE_MODEL
 
 
-def max_tokens(model_id: str, streaming: bool = False) -> int:
-    full = ALLOWED_MODELS.get(model_id, {}).get("max_tokens", 64_000)
-    return full if streaming else min(full, _MAX_TOKENS_SYNC)
+def max_tokens(model_id: str) -> int:
+    return ALLOWED_MODELS.get(model_id, {}).get("max_tokens", 64_000)
 
 
 _client: Optional[AsyncAnthropic] = None

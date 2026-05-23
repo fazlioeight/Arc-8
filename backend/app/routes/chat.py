@@ -327,7 +327,7 @@ async def chat(
     try:
         response = await client.messages.create(
             model=model,
-            max_tokens=max_tokens(model, streaming=False),
+            max_tokens=max_tokens(model),
             system=DEFAULT_SYSTEM_PROMPT,
             messages=[{"role": m.role, "content": m.content} for m in body.messages],
         )
@@ -362,7 +362,7 @@ async def chat_stream(
         try:
             async with client.messages.stream(
                 model=model,
-                max_tokens=max_tokens(model, streaming=True),
+                max_tokens=max_tokens(model),
                 system=DEFAULT_SYSTEM_PROMPT,
                 messages=messages,
             ) as stream:
@@ -412,7 +412,7 @@ async def _chat_with_workbook(
         try:
             response = await client.messages.create(
                 model=model,
-                max_tokens=max_tokens(model, streaming=False),
+                max_tokens=max_tokens(model),
                 system=system,
                 tools=[workbooks_svc.RUN_SQL_TOOL],
                 messages=messages,
@@ -491,7 +491,7 @@ async def _chat_with_dataset(
         try:
             response = await client.messages.create(
                 model=model,
-                max_tokens=max_tokens(model, streaming=False),
+                max_tokens=max_tokens(model),
                 system=system,
                 tools=[dataset_svc.RUN_DATASET_SQL_TOOL],
                 messages=messages,
@@ -597,7 +597,7 @@ async def chat_with_file(
         ]
         response = await client.messages.create(
             model=resolved_model,
-            max_tokens=max_tokens(resolved_model, streaming=False),
+            max_tokens=max_tokens(resolved_model),
             system=DEFAULT_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": content}],
             extra_headers={"anthropic-beta": "files-api-2025-04-14"},
@@ -933,7 +933,7 @@ async def send_message_to_conversation(
     try:
         response = await client.messages.create(
             model=model,
-            max_tokens=max_tokens(model, streaming=False),
+            max_tokens=max_tokens(model),
             system=DEFAULT_SYSTEM_PROMPT,
             messages=messages_for_llm,
         )
@@ -1040,7 +1040,7 @@ async def stream_message_to_conversation(
             usage_block: dict = {}
             async with client.messages.stream(
                 model=model,
-                max_tokens=max_tokens(model, streaming=True),
+                max_tokens=max_tokens(model),
                 system=DEFAULT_SYSTEM_PROMPT,
                 messages=messages_for_llm,
             ) as stream:
