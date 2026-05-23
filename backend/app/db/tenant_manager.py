@@ -1,15 +1,80 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import OrderedDict
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from ..core.config import settings
+
+logger = logging.getLogger(__name__)
+
+_TENANT_FUNCTIONS_PATH = Path(__file__).parent / "tenant_functions.sql"
+
+
+def _split_sql(sql: str) -> list[str]:
+    """Split tenant_functions.sql on ``$$``-quoted bodies + trailing ``;``."""
+    pieces: list[str] = []
+    buf: list[str] = []
+    in_dollar = False
+    for line in sql.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("--"):
+            continue
+        buf.append(line)
+        if "$$" in line and line.count("$$") % 2 == 1:
+            in_dollar = not in_dollar
+        if not in_dollar and stripped.endswith(";"):
+            stmt = "\n".join(buf).strip()
+            if stmt and stmt != ";":
+                pieces.append(stmt.rstrip(";"))
+            buf = []
+    return pieces
+
+
+async def _bootstrap_tenant_schema(engine: AsyncEngine, tenant: "TenantContext") -> None:
+    # Runs once per process per tenant, inside the per-tenant lock in
+    # _ensure_sessionmaker. Each step uses its own transaction so a failure
+    # in one does not roll back the other. Failures are logged and swallowed:
+    # operators can re-run ``scripts/ensure_tenant_schema.py`` if needed.
+    from ..models.tables import TenantDataBase  # local import: avoid circular
+
+    schema_stmt = None
+    if tenant.db_schema:
+        safe_schema = tenant.db_schema.replace('"', '""')
+        schema_stmt = text(f'SET search_path TO "{safe_schema}"')
+
+    try:
+        async with engine.begin() as conn:
+            if schema_stmt is not None:
+                await conn.execute(schema_stmt)
+            await conn.run_sync(TenantDataBase.metadata.create_all)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "tenant_schema_create_all_failed", extra={"tenant_key": tenant.key}
+        )
+
+    if not engine.dialect.name.startswith("postgres"):
+        return
+    if not _TENANT_FUNCTIONS_PATH.exists():
+        return
+    try:
+        sql = _TENANT_FUNCTIONS_PATH.read_text(encoding="utf-8")
+        async with engine.begin() as conn:
+            if schema_stmt is not None:
+                await conn.execute(schema_stmt)
+            for stmt in _split_sql(sql):
+                await conn.execute(text(stmt))
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "tenant_functions_failed", extra={"tenant_key": tenant.key}
+        )
 
 
 @dataclass(slots=True)
@@ -94,6 +159,7 @@ class TenantConnectionManager:
             if not tenant.db_connection_uri.startswith("sqlite"):
                 engine_kwargs.update(pool_size=5, max_overflow=10, pool_recycle=3600)
             engine = create_async_engine(tenant.db_connection_uri, **engine_kwargs)
+            await _bootstrap_tenant_schema(engine, tenant)
             factory = async_sessionmaker(
                 engine,
                 expire_on_commit=False,

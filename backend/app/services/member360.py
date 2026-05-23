@@ -1,12 +1,13 @@
 """Service layer for Nexora Lab Member360.
 
 Responsibilities:
-- Idempotent tenant schema setup (tables + PostgreSQL helper functions).
 - Query helpers used by route handlers.
 - Computation of dashboard rollups and risk insight summaries.
 
-No demo or synthetic data is created automatically. All pages read from
-whatever the tenant database contains; seeding is the operator's job via
+Tenant schema and helper-function setup happens once per process per
+tenant in ``app.db.tenant_manager._bootstrap_tenant_schema`` (invoked when
+the tenant's sessionmaker is first created). No demo or synthetic data is
+created automatically — seeding is the operator's job via
 ``scripts/seed_prominence.py`` or a real data import.
 """
 from __future__ import annotations
@@ -47,84 +48,6 @@ def _compute_age(dob: Optional[date]) -> Optional[int]:
         return None
     today = date.today()
     return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-
-
-async def ensure_ready(session: AsyncSession) -> None:
-    """Ensure tenant tables and PostgreSQL helper functions exist.
-
-    Replaces the previous demo-data seeding behaviour: this function only
-    sets up *schema*, never data. Safe to call on every request — both
-    operations are idempotent.
-    """
-    await _ensure_tenant_schema(session)
-
-
-async def _ensure_tenant_schema(session: AsyncSession) -> None:
-    """Idempotently create any missing tenant tables (Member360 admin tables)
-    and the PostgreSQL helper functions used for rollups + worklists.
-    """
-    from ..models.tables import TenantDataBase
-
-    try:
-        async_conn = await session.connection()
-        await async_conn.run_sync(TenantDataBase.metadata.create_all)
-    except Exception:  # noqa: BLE001
-        # Schema creation should never block reads; the table likely exists.
-        pass
-    await _ensure_tenant_functions(session)
-
-
-_TENANT_FUNCTIONS_PATH = (
-    __file__.rsplit("services", 1)[0] + "db/tenant_functions.sql"
-)
-
-
-async def _ensure_tenant_functions(session: AsyncSession) -> None:
-    """Apply tenant-side stored functions. PostgreSQL only — silently skips
-    on SQLite (used in tests) and any other dialect."""
-    bind = session.get_bind()
-    dialect = getattr(bind, "dialect", None)
-    name = getattr(dialect, "name", "") if dialect else ""
-    if not name.startswith("postgres"):
-        return
-    try:
-        from pathlib import Path
-        from sqlalchemy import text
-
-        path = Path(_TENANT_FUNCTIONS_PATH)
-        if not path.exists():
-            return
-        sql = path.read_text(encoding="utf-8")
-        async_conn = await session.connection()
-        for stmt in _split_sql(sql):
-            await async_conn.execute(text(stmt))
-    except Exception:  # noqa: BLE001
-        # Function creation failures are non-fatal — the python query
-        # fallbacks still work.
-        pass
-
-
-def _split_sql(sql: str) -> list[str]:
-    """Naive split on ``$$`` dollar-quoted function bodies + trailing ``;``."""
-    pieces: list[str] = []
-    buf: list[str] = []
-    in_dollar = False
-    for line in sql.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("--"):
-            continue
-        buf.append(line)
-        if "$$" in line:
-            # Count occurrences on this line — an odd count toggles state.
-            if line.count("$$") % 2 == 1:
-                in_dollar = not in_dollar
-        if not in_dollar and stripped.endswith(";"):
-            stmt = "\n".join(buf).strip()
-            if stmt and stmt != ";":
-                pieces.append(stmt.rstrip(";"))
-            buf = []
-    return pieces
-
 
 
 # ---------------------- Query helpers --------------------------------------

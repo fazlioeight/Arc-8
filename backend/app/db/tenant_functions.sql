@@ -1,6 +1,6 @@
 -- Tenant-side PostgreSQL functions for Member360.
--- Applied idempotently on tenant provisioning and on first request via
--- _ensure_tenant_functions() in app.services.member360.
+-- Applied idempotently on tenant provisioning and once per process per
+-- tenant via _bootstrap_tenant_schema() in app.db.tenant_manager.
 --
 -- All functions are tenant-scoped: they read tables in the tenant DB and
 -- never reference the control plane. They short-circuit cleanly on SQLite

@@ -1,7 +1,10 @@
 """FastAPI routes for Nexora Lab Member360.
 
 Mounted at ``/api/member360``. All routes require an authenticated user
-within the active tenant. Tables are auto-seeded on first use.
+within the active tenant. Tenant tables and helper PG functions are
+bootstrapped once per process per tenant in
+``app.db.tenant_manager._bootstrap_tenant_schema`` — handlers here can
+assume the schema is ready.
 
 Audit writes target the control plane (``tenant_audit_events`` is a
 ``ControlBase`` table that only exists in the control DB). Routes accept
@@ -78,10 +81,6 @@ router = APIRouter(
 )
 
 
-async def _ensure(session: AsyncSession) -> None:
-    await member360_service.ensure_ready(session)
-
-
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard(
     tenant: TenantContext = Depends(get_tenant_context),
@@ -89,7 +88,6 @@ async def get_dashboard(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     payload = await member360_service.build_dashboard(session)
     await record_audit_event(
         control_session,
@@ -116,7 +114,6 @@ async def list_members(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     items, total = await member360_service.list_members(
         session,
         search=search,
@@ -146,7 +143,6 @@ async def get_member(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     detail = await member360_service.get_member_detail(session, member_id)
     if not detail:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
@@ -171,7 +167,6 @@ async def update_member(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     data = payload.model_dump(exclude_none=True)
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes provided")
@@ -198,7 +193,6 @@ async def create_task(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     try:
         task = await member360_service.create_task(session, payload.model_dump())
     except ValueError as exc:
@@ -224,7 +218,6 @@ async def update_task(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     data = payload.model_dump(exclude_none=True)
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes provided")
@@ -252,7 +245,6 @@ async def create_note(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     note = await member360_service.create_note(
         session,
         member_id=member_id,
@@ -283,7 +275,6 @@ async def create_message(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     message = await member360_service.create_message(
         session, member_id=member_id, sender=current_user.email, payload=payload.model_dump()
     )
@@ -309,7 +300,6 @@ async def create_care_option(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     result = await member360_service.create_care_option(session, payload.model_dump())
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
@@ -333,7 +323,6 @@ async def create_care_journey(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     try:
         journey = await member360_service.create_care_journey(
             session,
@@ -366,7 +355,6 @@ async def list_templates(
     session: AsyncSession = Depends(get_tenant_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     return await member360_service.list_care_journey_templates(session)
 
 
@@ -379,7 +367,6 @@ async def get_member_gap_analysis(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     result = await member360_service.build_gap_analysis(session, member_id, submission_year)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
@@ -407,7 +394,6 @@ async def export_submission(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     result = await member360_service.generate_submission_export(
         session,
         submission_year=payload.submission_year,
@@ -450,7 +436,6 @@ async def list_tasks(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     items, total = await member360_service.list_tasks(
         session,
         limit=limit,
@@ -483,7 +468,6 @@ async def list_messages(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     items, total = await member360_service.list_messages(
         session,
         limit=limit,
@@ -515,7 +499,6 @@ async def list_care_options(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     items, total = await member360_service.list_care_options_all(
         session,
         limit=limit,
@@ -546,7 +529,6 @@ async def list_documents(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     items, total = await member360_service.list_documents_all(
         session,
         limit=limit,
@@ -577,7 +559,6 @@ async def list_care_journeys(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     items, total = await member360_service.list_care_journeys_all(
         session,
         limit=limit,
@@ -608,7 +589,6 @@ async def list_risk_insights(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     items, total = await member360_service.list_risk_insights_all(
         session,
         limit=limit,
@@ -640,7 +620,6 @@ async def patch_care_journey(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     data = payload.model_dump(exclude_none=True)
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes provided")
@@ -675,7 +654,6 @@ async def add_care_journey_stage(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     try:
         journey = await member360_service.add_care_journey_stage(
             session, journey_id, payload.model_dump()
@@ -706,7 +684,6 @@ async def patch_care_journey_stage(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     data = payload.model_dump(exclude_none=True)
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes provided")
@@ -744,7 +721,6 @@ async def import_members(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     summary = await member360_service.import_members(
         session, [item.model_dump() for item in payload.members]
     )
@@ -773,7 +749,6 @@ async def import_claims(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     summary = await member360_service.import_claims(
         session, [item.model_dump() for item in payload.claims]
     )
@@ -815,7 +790,6 @@ async def upload_document(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     settings = get_settings()
     max_bytes = max(1, settings.MEMBER360_STORAGE_MAX_UPLOAD_MB) * 1024 * 1024
     body = await file.read()
@@ -884,7 +858,6 @@ async def list_member_audit(
     by every member-scoped audit call (task/note/message/care-option/journey
     create + update, document upload/download, gap analysis view, etc.).
     """
-    await _ensure(session)
     rows, total = await member360_admin_service.list_audit_events_for_member(
         control_session,
         tenant_id=tenant.id,
@@ -907,7 +880,6 @@ async def download_document(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     result = await member360_service.read_document(
         session, tenant_key=tenant.key, document_id=document_id
     )
@@ -940,7 +912,6 @@ async def import_risk_insights(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     summary = await member360_service.import_risk_insights(
         session, [item.model_dump() for item in payload.insights]
     )
@@ -969,7 +940,6 @@ async def import_problems(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     summary = await member360_service.import_problems(
         session, [item.model_dump() for item in payload.problems]
     )
@@ -998,7 +968,6 @@ async def import_medications(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     summary = await member360_service.import_medications(
         session, [item.model_dump() for item in payload.medications]
     )
@@ -1027,7 +996,6 @@ async def import_labs(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    await _ensure(session)
     summary = await member360_service.import_labs(
         session, [item.model_dump() for item in payload.labs]
     )
