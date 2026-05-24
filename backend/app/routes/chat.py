@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..core.config import settings
 from ..db.tenant_manager import TenantContext, tenant_connection_manager
 from ..dependencies.tenant import get_tenant_context, get_tenant_session
+from ..services.chat import artifacts as artifacts_svc
 from ..services.chat import dataset as dataset_svc
 from ..services.chat import workbooks as workbooks_svc
 from ..services.chat.client import ALLOWED_MODELS, get_client, max_tokens, resolve_model
@@ -290,6 +291,58 @@ async def export_conversation(
     )
 
 
+# ── Artifact download ───────────────────────────────────────────────────────
+# GET /api/chat/artifacts/{artifact_id}?token=…
+#
+# Returns the bytes the assistant produced via the ``build_artifact`` tool.
+# Authorization is via a short-lived JWT token in the query string (not the
+# normal Authorization header) so the user can click a plain anchor link
+# without the frontend having to attach credentials. The token is bound to a
+# single artifact id + tenant + owner so leakage of one URL can't read
+# anything else.
+
+
+@router.get("/artifacts/{artifact_id}")
+async def download_chat_artifact(
+    artifact_id: str,
+    token: str,
+    request: Request,
+) -> Response:
+    rid = _request_id(request)
+    try:
+        tenant_key, owner_email = artifacts_svc.verify_download_token(
+            token, expected_artifact_id=artifact_id,
+        )
+    except artifacts_svc.ArtifactTokenInvalid as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    try:
+        blob, meta = artifacts_svc.load_artifact(
+            tenant_key=tenant_key, owner_email=owner_email, artifact_id=artifact_id,
+        )
+    except artifacts_svc.ArtifactNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    logger.info(
+        "chat_artifact_download",
+        extra={
+            "request_id": rid, "user": owner_email, "tenant": tenant_key,
+            "artifact_id": artifact_id, "format": meta.get("format"),
+            "size_bytes": meta.get("size_bytes"),
+        },
+    )
+
+    return Response(
+        content=blob,
+        media_type=meta.get("mime", "application/octet-stream"),
+        headers={
+            "Content-Disposition": f'attachment; filename="{meta.get("filename", artifact_id)}"',
+            "Cache-Control": "no-store",
+            "X-Request-ID": rid,
+        },
+    )
+
+
 # ── Chat ───────────────────────────────────────────────────────────────────-
 
 @router.post("", response_model=ChatResponse)
@@ -322,7 +375,7 @@ async def chat(
         return await _chat_with_workbook(client, session, tenant, rid, current_user.email, model, body)
 
     if body.dataset:
-        return await _chat_with_dataset(client, session, rid, current_user.email, model, body)
+        return await _chat_with_dataset(client, session, tenant, rid, current_user.email, model, body)
 
     try:
         response = await client.messages.create(
@@ -404,7 +457,10 @@ async def _chat_with_workbook(
         raise HTTPException(status_code=409, detail=detail)
 
     schema_block = workbooks_svc.schema_summary_for_prompt(workbook["schema"])
-    system = f"{DEFAULT_SYSTEM_PROMPT}\n\n---\n{schema_block}"
+    system = (
+        f"{DEFAULT_SYSTEM_PROMPT}\n\n---\n{schema_block}"
+        f"{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
+    )
     messages: list[dict] = [{"role": m.role, "content": m.content} for m in body.messages]
 
     last_text = ""
@@ -414,7 +470,7 @@ async def _chat_with_workbook(
                 model=model,
                 max_tokens=max_tokens(model),
                 system=system,
-                tools=[workbooks_svc.RUN_SQL_TOOL],
+                tools=[workbooks_svc.RUN_SQL_TOOL, artifacts_svc.BUILD_ARTIFACT_TOOL],
                 messages=messages,
             )
         except Exception as exc:
@@ -435,15 +491,18 @@ async def _chat_with_workbook(
         for block in response.content:
             if getattr(block, "type", None) != "tool_use":
                 continue
-            if block.name != "run_sql":
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": f"Unknown tool: {block.name}",
-                    "is_error": True,
-                })
+            if block.name == "run_sql":
+                tool_results.append(await _run_sql_tool(session, tenant.key, block, body.workbook_id, user_email, rid))
                 continue
-            tool_results.append(await _run_sql_tool(session, tenant.key, block, body.workbook_id, user_email, rid))
+            if block.name == "build_artifact":
+                tool_results.append(_run_build_artifact_tool(block, tenant.key, user_email, rid))
+                continue
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": f"Unknown tool: {block.name}",
+                "is_error": True,
+            })
         messages.append({"role": "user", "content": tool_results})
 
     return ChatResponse(
@@ -473,6 +532,7 @@ async def _run_sql_tool(
 async def _chat_with_dataset(
     client,
     session: AsyncSession,
+    tenant: TenantContext,
     rid: str,
     user_email: str,
     model: str,
@@ -483,7 +543,10 @@ async def _chat_with_dataset(
     except dataset_svc.DatasetError as exc:
         raise HTTPException(status_code=503, detail=f"Dataset unavailable: {exc}")
 
-    system = f"{DEFAULT_SYSTEM_PROMPT}\n\n---\n{schema_block}"
+    system = (
+        f"{DEFAULT_SYSTEM_PROMPT}\n\n---\n{schema_block}"
+        f"{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
+    )
     messages: list[dict] = [{"role": m.role, "content": m.content} for m in body.messages]
 
     last_text = ""
@@ -493,7 +556,7 @@ async def _chat_with_dataset(
                 model=model,
                 max_tokens=max_tokens(model),
                 system=system,
-                tools=[dataset_svc.RUN_DATASET_SQL_TOOL],
+                tools=[dataset_svc.RUN_DATASET_SQL_TOOL, artifacts_svc.BUILD_ARTIFACT_TOOL],
                 messages=messages,
             )
         except Exception as exc:
@@ -514,19 +577,94 @@ async def _chat_with_dataset(
         for block in response.content:
             if getattr(block, "type", None) != "tool_use":
                 continue
-            if block.name != "run_dataset_sql":
-                tool_results.append({
-                    "type": "tool_result", "tool_use_id": block.id,
-                    "content": f"Unknown tool: {block.name}", "is_error": True,
-                })
+            if block.name == "run_dataset_sql":
+                tool_results.append(await _run_dataset_sql_tool(session, block, user_email, rid))
                 continue
-            tool_results.append(await _run_dataset_sql_tool(session, block, user_email, rid))
+            if block.name == "build_artifact":
+                tool_results.append(_run_build_artifact_tool(block, tenant.key, user_email, rid))
+                continue
+            tool_results.append({
+                "type": "tool_result", "tool_use_id": block.id,
+                "content": f"Unknown tool: {block.name}", "is_error": True,
+            })
         messages.append({"role": "user", "content": tool_results})
 
     return ChatResponse(
         reply=last_text or "Sorry, I couldn't answer that within the query limit. Try a more specific question.",
         model=model,
     )
+
+
+def _run_build_artifact_tool(block: Any, tenant_key: str, user_email: str, rid: str) -> dict:
+    """Render the model's requested PPTX/DOCX/PDF and persist it.
+
+    Returns a ``tool_result`` block whose JSON payload includes a signed
+    download URL the model can hand back to the user. Failures are surfaced
+    as ``is_error: True`` results so the model can retry with adjusted input
+    instead of crashing the whole chat turn.
+    """
+    args = block.input or {}
+    fmt = (args.get("format") or "").strip().lower()
+    title = args.get("title") or None
+    content_md = args.get("content_markdown") or ""
+
+    logger.info(
+        "chat_build_artifact_tool",
+        extra={
+            "request_id": rid, "user": user_email, "tenant": tenant_key,
+            "format": fmt, "content_len": len(content_md), "has_title": bool(title),
+        },
+    )
+
+    if fmt not in artifacts_svc.ARTIFACT_FORMATS:
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": f"Unsupported format: {fmt!r}. Use one of: pptx, docx, pdf.",
+            "is_error": True,
+        }
+    if not content_md.strip():
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": "content_markdown is required and cannot be empty.",
+            "is_error": True,
+        }
+
+    export_msg = ExportMessage(role="assistant", content=content_md)
+    try:
+        if fmt == "pptx":
+            blob = export_to_pptx(messages=[export_msg], title=title)
+        elif fmt == "docx":
+            blob = export_to_docx(messages=[export_msg], title=title)
+        else:
+            blob = export_to_pdf(messages=[export_msg], title=title)
+    except ExportError as exc:
+        logger.exception("chat_build_artifact_render_failed", extra={"request_id": rid})
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": f"Failed to render {fmt}: {exc}", "is_error": True,
+        }
+
+    try:
+        result = artifacts_svc.persist_artifact(
+            tenant_key=tenant_key, owner_email=user_email,
+            fmt=fmt, blob=blob, title=title,
+        )
+    except artifacts_svc.ArtifactQuotaExceeded as exc:
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": str(exc), "is_error": True,
+        }
+    except artifacts_svc.ArtifactError as exc:
+        logger.exception("chat_build_artifact_persist_failed", extra={"request_id": rid})
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": f"Failed to save artifact: {exc}", "is_error": True,
+        }
+
+    return {
+        "type": "tool_result", "tool_use_id": block.id,
+        "content": json.dumps(result),
+    }
 
 
 async def _run_dataset_sql_tool(

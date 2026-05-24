@@ -88,6 +88,16 @@ class Settings(BaseSettings):
     CHAT_FILE_RATE_LIMIT_PER_MINUTE: int = 10
     CHAT_WORKBOOK_RATE_LIMIT_PER_MINUTE: int = 5
 
+    # Chat artifacts (PPTX/DOCX/PDF produced by the `build_artifact` tool).
+    # Lives next to the workbook data so the deployment only mounts one
+    # writable volume for the chat module. Tokens piggyback on JWT_ALGORITHM
+    # and SECRET_KEY — no separate signing key to rotate.
+    CHAT_ARTIFACT_DIR: str = "data/chat_artifacts"
+    CHAT_ARTIFACT_MAX_BYTES: int = 50 * 1024 * 1024
+    CHAT_ARTIFACT_MAX_PER_USER: int = 50
+    CHAT_ARTIFACT_TTL_SECONDS: int = 24 * 60 * 60
+    CHAT_ARTIFACT_DOWNLOAD_TTL_SECONDS: int = 60 * 60
+
     WORKBOOK_DATA_DIR: str = "data/workbooks"
     WORKBOOK_MAX_BYTES: int = 1024 * 1024 * 1024
     WORKBOOK_MAX_PER_USER: int = 10
