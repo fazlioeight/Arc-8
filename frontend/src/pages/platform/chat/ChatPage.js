@@ -26,7 +26,37 @@ import {
 import '../../../styles/memberWorkspace.css';
 import './ChatPage.css';
 
-marked.use({ gfm: true, breaks: true });
+// API base must match chatService.js — artifact URLs returned by the backend
+// are relative paths (``/api/chat/artifacts/...``), so we prepend the API
+// origin before navigating. Without this, ``<a href="/api/...">`` resolves
+// against the *frontend* origin and the SPA catches it as a 404.
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+
+const absoluteApiUrl = (relative) => {
+  if (!relative) return relative;
+  if (/^https?:\/\//i.test(relative)) return relative;
+  return `${API_BASE}${relative.startsWith('/') ? '' : '/'}${relative}`;
+};
+
+// Rewrite any anchor whose href points at the artifacts API so a plain
+// markdown link the model wrote (rather than a line-isolated link that became
+// an ArtifactCard) still downloads correctly when clicked. marked's renderer
+// API lets us override just the link emitter.
+const _markedRenderer = new marked.Renderer();
+const _baseLinkRenderer = _markedRenderer.link.bind(_markedRenderer);
+_markedRenderer.link = function patchedLink(href, title, text) {
+  const html = _baseLinkRenderer(href, title, text);
+  if (typeof href === 'string' && href.startsWith('/api/chat/artifacts/')) {
+    const abs = absoluteApiUrl(href).replace(/"/g, '&quot;');
+    // Replace the relative href with the absolute one and add target=_blank
+    // so the SPA route doesn't capture the click as a navigation.
+    return html
+      .replace(/href="[^"]*"/, `href="${abs}"`)
+      .replace(/^<a /, '<a target="_blank" rel="noopener noreferrer" ');
+  }
+  return html;
+};
+marked.use({ gfm: true, breaks: true, renderer: _markedRenderer });
 
 const SUPPORTED_FILES = ['PDF', 'DOCX', 'XLSX', 'PPTX', 'CSV', 'JSON', 'TXT', 'PNG', 'JPG'];
 const OUTPUT_FORMATS = ['Markdown', 'Tables', 'Charts', 'Export'];
@@ -221,8 +251,11 @@ const FORMAT_BADGES = {
 const ArtifactCard = ({ label, downloadUrl, artifactId, token }) => {
   const [meta, setMeta] = useState(null);
   const [imgError, setImgError] = useState(false);
-  const metaUrl = `/api/chat/artifacts/${artifactId}/meta?token=${token}`;
-  const thumbUrl = `/api/chat/artifacts/${artifactId}/thumbnail.png?token=${token}`;
+  // Backend returns relative URLs — prepend the API origin so the browser
+  // hits the backend domain instead of the SPA's catch-all 404 route.
+  const absDownloadUrl = absoluteApiUrl(downloadUrl);
+  const metaUrl = absoluteApiUrl(`/api/chat/artifacts/${artifactId}/meta?token=${token}`);
+  const thumbUrl = absoluteApiUrl(`/api/chat/artifacts/${artifactId}/thumbnail.png?token=${token}`);
 
   useEffect(() => {
     let cancelled = false;
@@ -242,14 +275,18 @@ const ArtifactCard = ({ label, downloadUrl, artifactId, token }) => {
   const handleDownload = useCallback(() => {
     // The token is in the URL so a plain anchor click works without JWT
     // headers. We trigger via JS so the filename hint from the backend's
-    // Content-Disposition wins over the URL's path basename.
+    // Content-Disposition wins over the URL's path basename. target=_blank
+    // means the download starts in a new tab that closes itself once the
+    // browser sees the attachment header — the user's chat session stays
+    // intact even if the response is slow.
     const a = document.createElement('a');
-    a.href = downloadUrl;
+    a.href = absDownloadUrl;
+    a.target = '_blank';
     a.rel = 'noopener noreferrer';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-  }, [downloadUrl]);
+  }, [absDownloadUrl]);
 
   return (
     <div className="my-3 flex gap-3 rounded-xl border coding-border bg-[var(--bg-card)] p-3 shadow-sm">
