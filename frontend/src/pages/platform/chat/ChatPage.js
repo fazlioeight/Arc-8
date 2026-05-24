@@ -71,24 +71,67 @@ const cssVar = (name, fallback) => {
   return val || fallback;
 };
 
+// Recognise download links to /api/chat/artifacts/{id}?token=... emitted by
+// the assistant's build_artifact tool calls. We intercept them here so the
+// link renders as a rich download card (thumbnail + metadata) instead of a
+// plain anchor. The regex tolerates extra query params and arbitrary label
+// text, so the model can write `[Download Q1.pptx](/api/chat/artifacts/...)`
+// in any natural-language phrasing.
+const ARTIFACT_LINK_RE = /\[([^\]]+)\]\((\/api\/chat\/artifacts\/([a-f0-9]+)\?token=([^)\s]+))\)/g;
+
 const extractSegments = (markdown) => {
   if (!markdown) return [];
-  const re = /```chart\s*([\s\S]*?)```/g;
   const segments = [];
+  // First pass: split on chart blocks.
+  const chartRe = /```chart\s*([\s\S]*?)```/g;
   let lastIndex = 0;
   let m;
-  while ((m = re.exec(markdown)) !== null) {
-    if (m.index > lastIndex) {
-      segments.push({ type: 'md', text: markdown.slice(lastIndex, m.index) });
-    }
+  const pre = [];
+  while ((m = chartRe.exec(markdown)) !== null) {
+    if (m.index > lastIndex) pre.push({ type: 'md', text: markdown.slice(lastIndex, m.index) });
     let spec = null;
     try { spec = JSON.parse(m[1].trim()); } catch (e) { /* keep null */ }
-    segments.push({ type: 'chart', spec });
+    pre.push({ type: 'chart', spec });
     lastIndex = m.index + m[0].length;
   }
-  if (lastIndex < markdown.length) {
-    segments.push({ type: 'md', text: markdown.slice(lastIndex) });
-  }
+  if (lastIndex < markdown.length) pre.push({ type: 'md', text: markdown.slice(lastIndex) });
+  // Second pass: inside each md segment, split out artifact-link rows so we
+  // can render them as cards. We only treat a link as an "artifact card" if
+  // it's the only content on its line — inline mentions stay plain links.
+  pre.forEach((seg) => {
+    if (seg.type !== 'md') {
+      segments.push(seg);
+      return;
+    }
+    const lines = seg.text.split(/\r?\n/);
+    let buffer = [];
+    const flush = () => {
+      if (!buffer.length) return;
+      const text = buffer.join('\n');
+      if (text.trim()) segments.push({ type: 'md', text });
+      buffer = [];
+    };
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      // Reset regex state per line; only a line whose whole content is the
+      // link counts as an artifact card.
+      ARTIFACT_LINK_RE.lastIndex = 0;
+      const match = ARTIFACT_LINK_RE.exec(trimmed);
+      if (match && match[0] === trimmed) {
+        flush();
+        segments.push({
+          type: 'artifact',
+          label: match[1],
+          downloadUrl: match[2],
+          artifactId: match[3],
+          token: match[4],
+        });
+      } else {
+        buffer.push(line);
+      }
+    });
+    flush();
+  });
   return segments;
 };
 
@@ -162,6 +205,120 @@ const ChartBlock = ({ spec, chartId }) => {
   );
 };
 
+const formatBytes = (n) => {
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const FORMAT_BADGES = {
+  pptx: { label: 'PPTX', color: '#D97706' },
+  docx: { label: 'DOCX', color: '#2563EB' },
+  pdf: { label: 'PDF', color: '#DC2626' },
+};
+
+const ArtifactCard = ({ label, downloadUrl, artifactId, token }) => {
+  const [meta, setMeta] = useState(null);
+  const [imgError, setImgError] = useState(false);
+  const metaUrl = `/api/chat/artifacts/${artifactId}/meta?token=${token}`;
+  const thumbUrl = `/api/chat/artifacts/${artifactId}/thumbnail.png?token=${token}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(metaUrl)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!cancelled && data) setMeta(data); })
+      .catch(() => { /* leave meta as null; card still renders downloadable */ });
+    return () => { cancelled = true; };
+  }, [metaUrl]);
+
+  const stats = meta?.stats || {};
+  const fmtKey = (meta?.format || '').toLowerCase();
+  const badge = FORMAT_BADGES[fmtKey] || { label: fmtKey.toUpperCase() || 'FILE', color: '#6B7280' };
+  const filename = meta?.filename || label;
+  const title = meta?.title || label.replace(/^Download\s+/i, '');
+
+  const handleDownload = useCallback(() => {
+    // The token is in the URL so a plain anchor click works without JWT
+    // headers. We trigger via JS so the filename hint from the backend's
+    // Content-Disposition wins over the URL's path basename.
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, [downloadUrl]);
+
+  return (
+    <div className="my-3 flex gap-3 rounded-xl border coding-border bg-[var(--bg-card)] p-3 shadow-sm">
+      <div className="relative h-[88px] w-[156px] flex-shrink-0 overflow-hidden rounded-lg border coding-border bg-[var(--bg-canvas)]">
+        {meta?.has_thumbnail && !imgError ? (
+          <img
+            src={thumbUrl}
+            alt={title}
+            className="h-full w-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div
+            className="flex h-full w-full items-center justify-center text-xl font-bold tracking-wide"
+            style={{ color: badge.color, backgroundColor: 'var(--bg-canvas)' }}
+          >
+            {badge.label}
+          </div>
+        )}
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span
+            className="rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white"
+            style={{ backgroundColor: badge.color }}
+          >
+            {badge.label}
+          </span>
+          <div className="truncate text-sm font-semibold coding-text-strong">{title}</div>
+        </div>
+        <div className="truncate text-xs coding-text-muted">{filename}</div>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] coding-text-muted">
+          {typeof stats.slide_count === 'number' && fmtKey === 'pptx' && (
+            <span>{stats.slide_count} slide{stats.slide_count === 1 ? '' : 's'}</span>
+          )}
+          {typeof stats.chart_count === 'number' && stats.chart_count > 0 && (
+            <span>{stats.chart_count} chart{stats.chart_count === 1 ? '' : 's'}</span>
+          )}
+          {typeof stats.table_count === 'number' && stats.table_count > 0 && (
+            <span>{stats.table_count} table{stats.table_count === 1 ? '' : 's'}</span>
+          )}
+          {typeof meta?.size_bytes === 'number' && <span>{formatBytes(meta.size_bytes)}</span>}
+          {typeof stats.render_ms === 'number' && <span>{stats.render_ms} ms</span>}
+          {stats.template && stats.template !== 'default' && (
+            <span className="rounded bg-[var(--bg-canvas)] px-1.5 py-0.5">{stats.template.replace(/_/g, ' ')}</span>
+          )}
+          {typeof stats.revisions === 'number' && stats.revisions > 0 && (
+            <span>rev {stats.revisions}</span>
+          )}
+        </div>
+        <div className="mt-1">
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-white shadow-sm hover:opacity-90"
+            style={{ backgroundColor: badge.color }}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M8 1.5a.75.75 0 01.75.75v6.69l2.22-2.22a.75.75 0 111.06 1.06l-3.5 3.5a.75.75 0 01-1.06 0l-3.5-3.5a.75.75 0 011.06-1.06l2.22 2.22V2.25A.75.75 0 018 1.5z" />
+              <path d="M2.75 12a.75.75 0 01.75.75v.75h9v-.75a.75.75 0 011.5 0v1.5a.75.75 0 01-.75.75h-10.5a.75.75 0 01-.75-.75v-1.5a.75.75 0 01.75-.75z" />
+            </svg>
+            Download
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const MessageBody = ({ content, isTyping, messageIdx }) => {
   const segments = useMemo(() => extractSegments(content), [content]);
   if (isTyping) return <div className="nx-typing text-sm leading-relaxed" />;
@@ -173,6 +330,17 @@ const MessageBody = ({ content, isTyping, messageIdx }) => {
           const chartId = chartIdFor(messageIdx ?? 0, chartOrdinal);
           chartOrdinal += 1;
           return <ChartBlock key={i} spec={seg.spec} chartId={chartId} />;
+        }
+        if (seg.type === 'artifact') {
+          return (
+            <ArtifactCard
+              key={i}
+              label={seg.label}
+              downloadUrl={seg.downloadUrl}
+              artifactId={seg.artifactId}
+              token={seg.token}
+            />
+          );
         }
         return (
           <div

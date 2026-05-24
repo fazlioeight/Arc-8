@@ -45,7 +45,10 @@ from ..services.chat.export import (
     export_to_docx,
     export_to_pdf,
     export_to_pptx,
+    theme_from_branding,
 )
+from ..models.tables import Tenant
+from sqlalchemy import select as sa_select
 from ..schemas.chat_export import ChatExportRequest
 from ..schemas.chat_history import (
     ConversationDetail,
@@ -302,6 +305,73 @@ async def export_conversation(
 # anything else.
 
 
+@router.get("/artifacts/{artifact_id}/meta")
+async def get_chat_artifact_meta(
+    artifact_id: str,
+    token: str,
+    request: Request,
+) -> dict:
+    """Return artifact metadata (title, slide count, render stats, format)
+    without serving the binary. The frontend artifact card calls this to
+    populate the download tile without forcing a full file fetch first."""
+    rid = _request_id(request)
+    try:
+        tenant_key, owner_email = artifacts_svc.verify_download_token(
+            token, expected_artifact_id=artifact_id,
+        )
+    except artifacts_svc.ArtifactTokenInvalid as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    try:
+        meta = artifacts_svc.load_meta(
+            tenant_key=tenant_key, owner_email=owner_email, artifact_id=artifact_id,
+        )
+    except artifacts_svc.ArtifactNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    # Strip server-internal fields before returning to the browser.
+    return {
+        "artifact_id": meta.get("artifact_id"),
+        "filename": meta.get("filename"),
+        "title": meta.get("title"),
+        "format": meta.get("format"),
+        "size_bytes": meta.get("size_bytes"),
+        "created_at": meta.get("created_at"),
+        "updated_at": meta.get("updated_at"),
+        "has_thumbnail": bool(meta.get("has_thumbnail")),
+        "stats": meta.get("stats") or {},
+        "request_id": rid,
+    }
+
+
+@router.get("/artifacts/{artifact_id}/thumbnail.png")
+async def get_chat_artifact_thumbnail(
+    artifact_id: str,
+    token: str,
+    request: Request,
+) -> Response:
+    """Serve the synthetic preview tile generated at persist time."""
+    rid = _request_id(request)
+    try:
+        tenant_key, owner_email = artifacts_svc.verify_download_token(
+            token, expected_artifact_id=artifact_id,
+        )
+    except artifacts_svc.ArtifactTokenInvalid as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    try:
+        png = artifacts_svc.load_thumbnail(
+            tenant_key=tenant_key, owner_email=owner_email, artifact_id=artifact_id,
+        )
+    except artifacts_svc.ArtifactNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "private, max-age=300",
+            "X-Request-ID": rid,
+        },
+    )
+
+
 @router.get("/artifacts/{artifact_id}")
 async def download_chat_artifact(
     artifact_id: str,
@@ -470,7 +540,11 @@ async def _chat_with_workbook(
                 model=model,
                 max_tokens=max_tokens(model),
                 system=system,
-                tools=[workbooks_svc.RUN_SQL_TOOL, artifacts_svc.BUILD_ARTIFACT_TOOL],
+                tools=[
+                    workbooks_svc.RUN_SQL_TOOL,
+                    artifacts_svc.BUILD_ARTIFACT_TOOL,
+                    artifacts_svc.REVISE_ARTIFACT_TOOL,
+                ],
                 messages=messages,
             )
         except Exception as exc:
@@ -495,7 +569,10 @@ async def _chat_with_workbook(
                 tool_results.append(await _run_sql_tool(session, tenant.key, block, body.workbook_id, user_email, rid))
                 continue
             if block.name == "build_artifact":
-                tool_results.append(_run_build_artifact_tool(block, tenant.key, user_email, rid))
+                tool_results.append(await _run_build_artifact_tool(block, tenant, user_email, rid))
+                continue
+            if block.name == "revise_artifact":
+                tool_results.append(await _run_revise_artifact_tool(block, tenant, user_email, rid))
                 continue
             tool_results.append({
                 "type": "tool_result",
@@ -556,7 +633,11 @@ async def _chat_with_dataset(
                 model=model,
                 max_tokens=max_tokens(model),
                 system=system,
-                tools=[dataset_svc.RUN_DATASET_SQL_TOOL, artifacts_svc.BUILD_ARTIFACT_TOOL],
+                tools=[
+                    dataset_svc.RUN_DATASET_SQL_TOOL,
+                    artifacts_svc.BUILD_ARTIFACT_TOOL,
+                    artifacts_svc.REVISE_ARTIFACT_TOOL,
+                ],
                 messages=messages,
             )
         except Exception as exc:
@@ -581,7 +662,10 @@ async def _chat_with_dataset(
                 tool_results.append(await _run_dataset_sql_tool(session, block, user_email, rid))
                 continue
             if block.name == "build_artifact":
-                tool_results.append(_run_build_artifact_tool(block, tenant.key, user_email, rid))
+                tool_results.append(await _run_build_artifact_tool(block, tenant, user_email, rid))
+                continue
+            if block.name == "revise_artifact":
+                tool_results.append(await _run_revise_artifact_tool(block, tenant, user_email, rid))
                 continue
             tool_results.append({
                 "type": "tool_result", "tool_use_id": block.id,
@@ -595,24 +679,105 @@ async def _chat_with_dataset(
     )
 
 
-def _run_build_artifact_tool(block: Any, tenant_key: str, user_email: str, rid: str) -> dict:
+# ── Build / revise artifact tool handlers ──────────────────────────────────-
+
+# Tenant branding is small (a JSON dict per tenant). Cache lookups in-process
+# for the duration of the chat turn so a deck-revision conversation doesn't
+# re-fetch it once per tool call. The cache key is ``tenant.id`` and entries
+# expire on a 30s TTL — short enough that a branding update via the admin
+# console becomes visible within seconds without the model hitting the DB
+# on every turn.
+_BRANDING_CACHE: dict[int, tuple[float, dict]] = {}
+_BRANDING_CACHE_TTL = 30.0
+
+
+async def _load_tenant_branding(tenant: TenantContext) -> dict:
+    """Return the tenant's branding JSON (or empty dict if unconfigured)."""
+    import time as _time
+    entry = _BRANDING_CACHE.get(tenant.id)
+    if entry and _time.monotonic() - entry[0] < _BRANDING_CACHE_TTL:
+        return entry[1]
+    try:
+        async with control_session() as session:
+            stmt = sa_select(Tenant.branding).where(Tenant.id == tenant.id)
+            result = await session.execute(stmt)
+            row = result.scalar_one_or_none()
+            branding = dict(row) if isinstance(row, dict) else {}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("tenant_branding_load_failed", extra={"tenant": tenant.key, "error": str(exc)})
+        branding = {}
+    _BRANDING_CACHE[tenant.id] = (_time.monotonic(), branding)
+    return branding
+
+
+def _render_artifact_blob(
+    *, fmt: str, content_markdown: str, title: Optional[str], theme,
+) -> tuple[bytes, dict]:
+    """Render the requested file and return (bytes, stats).
+
+    ``stats`` shape:
+        { "slide_count": int, "chart_count": int, "render_ms": int,
+          "template": str, "format": str }
+
+    Counts are computed by parsing the markdown so they don't depend on
+    the format's internal slide grammar. ``slide_count`` is the count of
+    H1/H2 headings (which become slide titles in pptx) plus the cover.
+    """
+    import re
+    import time as _time
+
+    chart_count = len(re.findall(r"```chart", content_markdown or ""))
+    section_count = len(re.findall(r"^#{1,2}\s+", content_markdown or "", flags=re.MULTILINE))
+    table_count = len(re.findall(r"^\s*\|.+\|\s*$", content_markdown or "", flags=re.MULTILINE))
+    # Tables are detected by counting GFM pipe rows; subtract the header/divider
+    # rows by dividing by 3 as a rough heuristic (header, divider, ≥1 body row).
+    estimated_tables = max(0, table_count // 3) if table_count else 0
+    # pptx emits: 1 cover + 1 per assistant section + 1 per chart + 1 per table.
+    slide_count = 1 + max(section_count, 1) + chart_count + estimated_tables
+
+    export_msg = ExportMessage(role="assistant", content=content_markdown)
+    start = _time.monotonic()
+    if fmt == "pptx":
+        blob = export_to_pptx(messages=[export_msg], title=title, theme=theme)
+    elif fmt == "docx":
+        blob = export_to_docx(messages=[export_msg], title=title, theme=theme)
+    else:
+        blob = export_to_pdf(messages=[export_msg], title=title, theme=theme)
+    render_ms = int((_time.monotonic() - start) * 1000)
+
+    stats = {
+        "format": fmt,
+        "template": theme.template,
+        "slide_count": slide_count if fmt == "pptx" else 1,
+        "chart_count": chart_count,
+        "table_count": estimated_tables,
+        "render_ms": render_ms,
+    }
+    return blob, stats
+
+
+async def _run_build_artifact_tool(block: Any, tenant: TenantContext, user_email: str, rid: str) -> dict:
     """Render the model's requested PPTX/DOCX/PDF and persist it.
 
-    Returns a ``tool_result`` block whose JSON payload includes a signed
-    download URL the model can hand back to the user. Failures are surfaced
-    as ``is_error: True`` results so the model can retry with adjusted input
-    instead of crashing the whole chat turn.
+    Loads tenant branding from the control DB, applies the chosen template,
+    renders charts server-side, persists the bytes + a synthetic thumbnail,
+    and returns a JSON tool result containing download/thumbnail URLs plus
+    build stats (slide_count, chart_count, render_ms). The model relays
+    the download_url to the user as a Markdown link; the frontend turns
+    that into a download card using the metadata endpoint.
     """
     args = block.input or {}
     fmt = (args.get("format") or "").strip().lower()
     title = args.get("title") or None
     content_md = args.get("content_markdown") or ""
+    template = (args.get("template") or "default").strip().lower()
 
     logger.info(
         "chat_build_artifact_tool",
         extra={
-            "request_id": rid, "user": user_email, "tenant": tenant_key,
-            "format": fmt, "content_len": len(content_md), "has_title": bool(title),
+            "request_id": rid, "user": user_email, "tenant": tenant.key,
+            "format": fmt, "content_len": len(content_md),
+            "template": template, "has_title": bool(title),
         },
     )
 
@@ -629,14 +794,13 @@ def _run_build_artifact_tool(block: Any, tenant_key: str, user_email: str, rid: 
             "is_error": True,
         }
 
-    export_msg = ExportMessage(role="assistant", content=content_md)
+    branding = await _load_tenant_branding(tenant)
+    theme = theme_from_branding(branding, template=template)
+
     try:
-        if fmt == "pptx":
-            blob = export_to_pptx(messages=[export_msg], title=title)
-        elif fmt == "docx":
-            blob = export_to_docx(messages=[export_msg], title=title)
-        else:
-            blob = export_to_pdf(messages=[export_msg], title=title)
+        blob, stats = _render_artifact_blob(
+            fmt=fmt, content_markdown=content_md, title=title, theme=theme,
+        )
     except ExportError as exc:
         logger.exception("chat_build_artifact_render_failed", extra={"request_id": rid})
         return {
@@ -644,10 +808,20 @@ def _run_build_artifact_tool(block: Any, tenant_key: str, user_email: str, rid: 
             "content": f"Failed to render {fmt}: {exc}", "is_error": True,
         }
 
+    thumbnail = artifacts_svc.render_thumbnail_png(
+        title=title or "Untitled",
+        fmt=fmt,
+        slide_count=stats.get("slide_count", 1),
+        chart_count=stats.get("chart_count", 0),
+        primary_color=theme.primary_color,
+        eyebrow=theme.eyebrow,
+    )
+
     try:
         result = artifacts_svc.persist_artifact(
-            tenant_key=tenant_key, owner_email=user_email,
+            tenant_key=tenant.key, owner_email=user_email,
             fmt=fmt, blob=blob, title=title,
+            stats=stats, thumbnail_png=thumbnail,
         )
     except artifacts_svc.ArtifactQuotaExceeded as exc:
         return {
@@ -656,6 +830,114 @@ def _run_build_artifact_tool(block: Any, tenant_key: str, user_email: str, rid: 
         }
     except artifacts_svc.ArtifactError as exc:
         logger.exception("chat_build_artifact_persist_failed", extra={"request_id": rid})
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": f"Failed to save artifact: {exc}", "is_error": True,
+        }
+
+    logger.info("chat_build_artifact_completed", extra={
+        "request_id": rid, "user": user_email, "tenant": tenant.key,
+        "artifact_id": result["artifact_id"], "render_ms": stats.get("render_ms"),
+        "slide_count": stats.get("slide_count"), "chart_count": stats.get("chart_count"),
+    })
+
+    return {
+        "type": "tool_result", "tool_use_id": block.id,
+        "content": json.dumps(result),
+    }
+
+
+async def _run_revise_artifact_tool(block: Any, tenant: TenantContext, user_email: str, rid: str) -> dict:
+    """Re-render an existing artifact in place from new markdown.
+
+    The download URL the user already has continues to work (its token is
+    bound to the artifact_id, not to a specific blob revision), so the
+    next click serves the updated file. This avoids spawning duplicate
+    deck links every time the user iterates.
+    """
+    args = block.input or {}
+    artifact_id = (args.get("artifact_id") or "").strip()
+    content_md = args.get("content_markdown") or ""
+    title_override = args.get("title")
+    template_override = args.get("template")
+
+    if not artifact_id:
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": "artifact_id is required.", "is_error": True,
+        }
+    if not content_md.strip():
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": "content_markdown cannot be empty.", "is_error": True,
+        }
+
+    try:
+        existing = artifacts_svc.load_meta(
+            tenant_key=tenant.key, owner_email=user_email, artifact_id=artifact_id,
+        )
+    except artifacts_svc.ArtifactNotFound as exc:
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": str(exc), "is_error": True,
+        }
+
+    fmt = existing.get("format")
+    if fmt not in artifacts_svc.ARTIFACT_FORMATS:
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": f"Artifact has unrecognised format: {fmt!r}.", "is_error": True,
+        }
+
+    title = title_override or existing.get("title")
+    template = (template_override or (existing.get("stats") or {}).get("template") or "default").strip().lower()
+
+    logger.info("chat_revise_artifact_tool", extra={
+        "request_id": rid, "user": user_email, "tenant": tenant.key,
+        "artifact_id": artifact_id, "format": fmt, "template": template,
+        "content_len": len(content_md),
+    })
+
+    branding = await _load_tenant_branding(tenant)
+    theme = theme_from_branding(branding, template=template)
+
+    try:
+        new_blob, stats = _render_artifact_blob(
+            fmt=fmt, content_markdown=content_md, title=title, theme=theme,
+        )
+    except ExportError as exc:
+        logger.exception("chat_revise_artifact_render_failed", extra={"request_id": rid})
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": f"Failed to render {fmt}: {exc}", "is_error": True,
+        }
+
+    thumbnail = artifacts_svc.render_thumbnail_png(
+        title=title or "Untitled",
+        fmt=fmt,
+        slide_count=stats.get("slide_count", 1),
+        chart_count=stats.get("chart_count", 0),
+        primary_color=theme.primary_color,
+        eyebrow=theme.eyebrow,
+    )
+
+    try:
+        result = artifacts_svc.overwrite_artifact_blob(
+            tenant_key=tenant.key, owner_email=user_email, artifact_id=artifact_id,
+            new_blob=new_blob, stats_patch=stats, thumbnail_png=thumbnail,
+        )
+    except artifacts_svc.ArtifactNotFound as exc:
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": str(exc), "is_error": True,
+        }
+    except artifacts_svc.ArtifactQuotaExceeded as exc:
+        return {
+            "type": "tool_result", "tool_use_id": block.id,
+            "content": str(exc), "is_error": True,
+        }
+    except artifacts_svc.ArtifactError as exc:
+        logger.exception("chat_revise_artifact_persist_failed", extra={"request_id": rid})
         return {
             "type": "tool_result", "tool_use_id": block.id,
             "content": f"Failed to save artifact: {exc}", "is_error": True,

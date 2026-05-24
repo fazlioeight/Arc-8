@@ -31,12 +31,169 @@ import base64
 import io
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Sequence
+
+from . import chart_renderer
 
 
 log = logging.getLogger("nexora.chat.export")
+
+
+# ── Theming ─────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class ExportTheme:
+    """Visual theme applied to a render pass.
+
+    Carries per-tenant branding (palette + accent colour + optional caption)
+    and the structural template selector. Defaults reproduce the original
+    Nexora orange look so call sites that don't pass a theme keep working
+    unchanged.
+
+    ``template`` controls *structural* variations (cover slide layout, slide
+    grammar, default body density), while ``palette`` controls *colour*. The
+    two are deliberately orthogonal — a tenant with their own colours can use
+    any template, and a template renders consistently across palettes.
+    """
+
+    palette: tuple[str, ...] = chart_renderer.DEFAULT_PALETTE
+    primary_color: tuple[int, int, int] = (0xD9, 0x77, 0x06)
+    primary_color_dark: tuple[int, int, int] = (0xB4, 0x53, 0x09)
+    caption: str = "Nexora Lab  ·  Confidential  ·  Internal use"
+    eyebrow: str = "NEXORA"
+    template: str = "default"
+    logo_png: Optional[bytes] = None  # raw PNG bytes for the cover slide
+
+
+DEFAULT_THEME = ExportTheme()
+
+
+def _hex_to_rgb(value: str) -> Optional[tuple[int, int, int]]:
+    """Parse ``#RRGGBB`` (case-insensitive, optional leading ``#``). Returns
+    ``None`` for malformed input so callers can fall back to defaults."""
+    if not value:
+        return None
+    s = value.strip().lstrip("#")
+    if len(s) != 6:
+        return None
+    try:
+        return int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
+    except ValueError:
+        return None
+
+
+def theme_from_branding(branding: Optional[dict], *, template: str = "default") -> ExportTheme:
+    """Build an :class:`ExportTheme` from a tenant's ``branding`` JSON.
+
+    ``branding`` is the JSON payload stored on the Tenant row — keys:
+    ``primary_color`` (hex), ``secondary_color`` (hex), ``palette`` (list of
+    hex), ``caption`` (str), ``eyebrow`` (str). Missing or malformed keys
+    fall through to the Nexora defaults so a partial config can't crash the
+    export.
+    """
+    if not isinstance(branding, dict):
+        return ExportTheme(template=template)
+
+    primary = _hex_to_rgb(str(branding.get("primary_color") or ""))
+    dark = _hex_to_rgb(str(branding.get("secondary_color") or ""))
+
+    raw_palette = branding.get("palette")
+    palette: tuple[str, ...]
+    if isinstance(raw_palette, list) and raw_palette:
+        cleaned = [str(c).strip() for c in raw_palette if isinstance(c, str) and c.strip()]
+        palette = tuple(cleaned) or chart_renderer.DEFAULT_PALETTE
+    elif primary:
+        # If the tenant supplied a single primary colour, lead the palette
+        # with it and keep the rest of the default rotation for variety.
+        palette = (f"#{primary[0]:02X}{primary[1]:02X}{primary[2]:02X}",) + chart_renderer.DEFAULT_PALETTE[1:]
+    else:
+        palette = chart_renderer.DEFAULT_PALETTE
+
+    caption = str(branding.get("caption") or ExportTheme.caption)
+    eyebrow = str(branding.get("eyebrow") or ExportTheme.eyebrow)
+
+    logo_b64 = branding.get("logo_png_base64")
+    logo_bytes: Optional[bytes] = None
+    if isinstance(logo_b64, str) and logo_b64.strip():
+        try:
+            logo_bytes = base64.b64decode(logo_b64.strip(), validate=False)
+            if len(logo_bytes) > 2 * 1024 * 1024:
+                logo_bytes = None  # cap so a huge logo can't bloat decks
+        except Exception:  # noqa: BLE001
+            logo_bytes = None
+
+    return ExportTheme(
+        palette=palette,
+        primary_color=primary or ExportTheme.primary_color,
+        primary_color_dark=dark or ExportTheme.primary_color_dark,
+        caption=caption,
+        eyebrow=eyebrow,
+        template=template or "default",
+        logo_png=logo_bytes,
+    )
+
+
+# ── Chart image resolution ──────────────────────────────────────────────────
+
+
+def _resolve_chart_image_bytes(
+    *,
+    chart_id: str,
+    chart_idx: int,
+    chart_specs: list[dict],
+    charts: dict,
+    theme: ExportTheme,
+) -> Optional[bytes]:
+    """Return PNG bytes for a chart, preferring client-captured pixels.
+
+    Order of preference:
+      1. Client-captured image (passed in via ``charts``) — pixel-identical
+         to what the user saw on screen, so the deck matches the chat.
+      2. Server-rendered matplotlib image from the spec — used by the
+         ``build_artifact`` tool path where no canvas exists.
+      3. ``None`` — caller renders a textual placeholder.
+    """
+    captured = charts.get(chart_id, "")
+    decoded = _decode_chart_image(captured) if captured else None
+    if decoded is not None:
+        return decoded
+
+    spec = chart_specs[chart_idx] if 0 <= chart_idx < len(chart_specs) else None
+    if isinstance(spec, dict):
+        try:
+            return chart_renderer.render_chart_png(spec, palette=theme.palette)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("server_chart_render_failed",
+                        extra={"chart_id": chart_id, "error": str(exc)})
+    return None
+
+
+# ── Speaker notes ───────────────────────────────────────────────────────────
+
+# Speaker notes are emitted by the model as HTML comments of the form
+# ``<!-- notes: ... -->`` attached underneath the heading or paragraph they
+# describe. They never appear on-slide; they flow into the pptx notes pane.
+_NOTES_BLOCK_RE = re.compile(r"<!--\s*notes:\s*([\s\S]*?)-->", re.IGNORECASE)
+
+
+def _extract_notes_for_section(markdown_src: str, heading_text: str) -> Optional[str]:
+    """Find the first ``<!-- notes: ... -->`` block that follows ``heading_text``
+    in ``markdown_src``. Returns the note body (stripped) or None if no
+    notes block appears within the section.
+    """
+    if not markdown_src or not heading_text:
+        return None
+    heading_pos = markdown_src.find(heading_text)
+    if heading_pos < 0:
+        return None
+    tail = markdown_src[heading_pos:]
+    match = _NOTES_BLOCK_RE.search(tail)
+    if not match:
+        return None
+    return match.group(1).strip() or None
 
 
 class ExportError(RuntimeError):
@@ -65,8 +222,10 @@ def export_to_docx(
     messages: list[ExportMessage],
     charts: dict[str, str] | None = None,
     title: Optional[str] = None,
+    theme: Optional[ExportTheme] = None,
 ) -> bytes:
     """Render ``messages`` as a .docx file. Returns the raw bytes."""
+    theme = theme or DEFAULT_THEME
     try:
         from docx import Document
         from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -92,7 +251,7 @@ def export_to_docx(
     meta_run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
     for msg_idx, msg in enumerate(messages):
-        _docx_render_message(doc, msg, msg_idx, charts or {}, Pt, RGBColor)
+        _docx_render_message(doc, msg, msg_idx, charts or {}, Pt, RGBColor, theme)
 
     buf = io.BytesIO()
     try:
@@ -107,6 +266,7 @@ def export_to_pptx(
     messages: list[ExportMessage],
     charts: dict[str, str] | None = None,
     title: Optional[str] = None,
+    theme: Optional[ExportTheme] = None,
 ) -> bytes:
     """Render ``messages`` as a .pptx presentation. Returns the raw bytes.
 
@@ -134,13 +294,15 @@ def export_to_pptx(
             "python-pptx is required for pptx export. Add it to requirements.txt."
         ) from exc
 
+    theme = theme or DEFAULT_THEME
+
     prs = Presentation()
     # 16:9 widescreen is the modern default. Default python-pptx blank
     # presentations are 10x7.5 (4:3), which looks dated.
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
 
-    _pptx_add_title_slide(prs, title, len(messages), Inches, Pt, RGBColor)
+    _pptx_add_title_slide(prs, title, len(messages), Inches, Pt, RGBColor, theme)
 
     response_idx = 0
     for msg_idx, msg in enumerate(messages):
@@ -150,7 +312,7 @@ def export_to_pptx(
         preceding_user = _find_preceding_user(messages, msg_idx)
         _pptx_add_assistant_slides(
             prs, msg, msg_idx, response_idx, charts or {}, preceding_user,
-            Inches, Pt, RGBColor,
+            Inches, Pt, RGBColor, theme,
         )
 
     # Stamp page numbers on every slide except the cover. We do this in a
@@ -161,7 +323,7 @@ def export_to_pptx(
     for idx, slide in enumerate(prs.slides, start=1):
         if idx == 1:
             continue  # cover gets the orange band, not a page number
-        _pptx_add_page_number_footer(slide, idx, total, Inches, Pt, RGBColor)
+        _pptx_add_page_number_footer(slide, idx, total, Inches, Pt, RGBColor, theme)
 
     buf = io.BytesIO()
     try:
@@ -176,8 +338,10 @@ def export_to_pdf(
     messages: list[ExportMessage],
     charts: dict[str, str] | None = None,
     title: Optional[str] = None,
+    theme: Optional[ExportTheme] = None,
 ) -> bytes:
     """Render ``messages`` as a PDF. Returns the raw bytes."""
+    theme = theme or DEFAULT_THEME
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import LETTER
@@ -238,6 +402,7 @@ def export_to_pdf(
             TableStyle,
             RLImage,
             HRFlowable,
+            theme,
         )
 
     try:
@@ -342,7 +507,7 @@ def _apply_default_docx_styles(doc, Pt, RGBColor) -> None:
     normal.font.size = Pt(11)
 
 
-def _docx_render_message(doc, msg: ExportMessage, msg_idx: int, charts: dict, Pt, RGBColor) -> None:
+def _docx_render_message(doc, msg: ExportMessage, msg_idx: int, charts: dict, Pt, RGBColor, theme: ExportTheme) -> None:
     """Append one message's content to the document."""
     role_label = "User" if msg.role == "user" else ("Assistant" if msg.role == "assistant" else msg.role.title())
     role_color = RGBColor(0x60, 0xA5, 0xFA) if msg.role == "user" else RGBColor(0xD9, 0x77, 0x06)
@@ -378,10 +543,10 @@ def _docx_render_message(doc, msg: ExportMessage, msg_idx: int, charts: dict, Pt
 
     rewritten, chart_specs = _extract_chart_blocks(msg.content or "")
     tree = _markdown_to_html(rewritten)
-    _docx_walk(doc, tree, msg_idx, chart_specs, charts, Pt, RGBColor)
+    _docx_walk(doc, tree, msg_idx, chart_specs, charts, Pt, RGBColor, theme)
 
 
-def _docx_walk(doc, node, msg_idx: int, chart_specs: list[dict], charts: dict, Pt, RGBColor) -> None:
+def _docx_walk(doc, node, msg_idx: int, chart_specs: list[dict], charts: dict, Pt, RGBColor, theme: ExportTheme) -> None:
     """Walk the HTML tree, emitting docx elements for each block-level node.
 
     Block-level elements (p, h1-h6, ul/ol, table, pre, blockquote) generate
@@ -409,7 +574,7 @@ def _docx_walk(doc, node, msg_idx: int, chart_specs: list[dict], charts: dict, P
             # A paragraph might contain a sentinel that points to a chart.
             sentinel_match = _find_chart_sentinel(child)
             if sentinel_match is not None:
-                _docx_insert_chart(doc, msg_idx, sentinel_match, chart_specs, charts, Inches, Pt, RGBColor)
+                _docx_insert_chart(doc, msg_idx, sentinel_match, chart_specs, charts, Inches, Pt, RGBColor, theme)
                 continue
             p = doc.add_paragraph()
             _docx_inline(p, child, Pt, RGBColor)
@@ -545,10 +710,14 @@ def _docx_insert_chart(
     Inches,
     Pt,
     RGBColor,
+    theme: ExportTheme,
 ) -> None:
-    """Insert the captured chart image, or a placeholder paragraph."""
+    """Insert the captured (or server-rendered) chart image, or a placeholder."""
     chart_id = f"chart-{msg_idx}-{chart_idx}"
-    image_bytes = _decode_chart_image(charts.get(chart_id, ""))
+    image_bytes = _resolve_chart_image_bytes(
+        chart_id=chart_id, chart_idx=chart_idx,
+        chart_specs=chart_specs, charts=charts, theme=theme,
+    )
     spec = chart_specs[chart_idx] if 0 <= chart_idx < len(chart_specs) else {}
     title = (spec.get("title") or "").strip() if isinstance(spec, dict) else ""
 
@@ -642,6 +811,7 @@ def _pdf_render_message(
     TableStyle,
     RLImage,
     HRFlowable,
+    theme: ExportTheme,
 ) -> None:
     speaker_style = styles["speaker_user"] if msg.role == "user" else styles["speaker_assistant"]
     label = (msg.role or "speaker").upper()
@@ -667,6 +837,7 @@ def _pdf_render_message(
     _pdf_walk(
         story, styles, tree, msg_idx, chart_specs, charts,
         inch, colors, Paragraph, Spacer, Table, TableStyle, RLImage, HRFlowable,
+        theme,
     )
 
 
@@ -721,6 +892,7 @@ def _pdf_walk(
     TableStyle,
     RLImage,
     HRFlowable,
+    theme: ExportTheme,
 ) -> None:
     for child in node.children:
         name = getattr(child, "name", None)
@@ -741,7 +913,7 @@ def _pdf_walk(
             if chart_idx is not None:
                 _pdf_insert_chart(
                     story, styles, msg_idx, chart_idx, chart_specs, charts,
-                    inch, Paragraph, Spacer, RLImage,
+                    inch, Paragraph, Spacer, RLImage, theme,
                 )
                 continue
             story.append(Paragraph(_inline_to_rl_markup(child) or "&nbsp;", styles["body"]))
@@ -932,11 +1104,20 @@ def _pptx_set_text(
             pass
 
 
-def _pptx_add_brand_header(slide, title_text: str, Inches, Pt, RGBColor) -> None:
-    """Title bar at the top of every content slide: title text + thin orange
-    underline. Replaces the stock Title placeholder used by layout 5 so we
-    have full control over typography and spacing."""
-    # Title text (slightly indented from the left edge).
+def _pptx_add_brand_header(slide, title_text: str, Inches, Pt, RGBColor, theme: ExportTheme) -> None:
+    """Title bar at the top of every content slide: title text + thin
+    themed underline. Replaces the stock Title placeholder used by layout
+    5 so we have full control over typography and spacing."""
+    # Title sizing varies per template — executive decks want a larger,
+    # more confident header; analysis decks stay compact so more body
+    # content fits on the same slide.
+    title_size = {
+        "executive_summary": 28,
+        "dashboard": 22,
+        "roadmap": 26,
+        "analysis": 22,
+    }.get(theme.template, 24)
+
     title_box = slide.shapes.add_textbox(
         Inches(_PPTX_MARGIN_X), Inches(0.35),
         Inches(13.333 - 2 * _PPTX_MARGIN_X), Inches(0.7),
@@ -944,12 +1125,10 @@ def _pptx_add_brand_header(slide, title_text: str, Inches, Pt, RGBColor) -> None
     _pptx_set_text(
         title_box.text_frame, title_text,
         Pt=Pt, RGBColor=RGBColor,
-        font=_PPTX_FONT_DISPLAY, size=24, bold=True,
+        font=_PPTX_FONT_DISPLAY, size=title_size, bold=True,
         color=_PPTX_TEXT_PRIMARY,
     )
 
-    # Thin orange underline accent — same width as the visual title block
-    # would be, not the full page (keeps the look modern).
     try:
         from pptx.enum.shapes import MSO_SHAPE
     except ImportError:  # pragma: no cover
@@ -958,14 +1137,12 @@ def _pptx_add_brand_header(slide, title_text: str, Inches, Pt, RGBColor) -> None
         slide, MSO_SHAPE, RGBColor,
         left=Inches(_PPTX_MARGIN_X), top=Inches(1.05),
         width=Inches(2.0), height=Inches(_PPTX_ACCENT_BAR_HEIGHT),
-        fill_rgb=_PPTX_BRAND_PRIMARY,
+        fill_rgb=theme.primary_color,
     )
 
 
-def _pptx_add_page_number_footer(slide, page_idx: int, total: int, Inches, Pt, RGBColor) -> None:
-    """Thin hairline + 'NEXORA  ·  N / M' at the bottom-right of content
-    slides. Page numbers are 1-indexed and INCLUDE the title slide so users
-    can reference 'slide 4 of 12' verbally."""
+def _pptx_add_page_number_footer(slide, page_idx: int, total: int, Inches, Pt, RGBColor, theme: ExportTheme) -> None:
+    """Thin hairline + brand mark + 'N / M' at the bottom of content slides."""
     try:
         from pptx.enum.shapes import MSO_SHAPE
     except ImportError:  # pragma: no cover
@@ -979,16 +1156,16 @@ def _pptx_add_page_number_footer(slide, page_idx: int, total: int, Inches, Pt, R
         fill_rgb=_PPTX_BORDER,
     )
 
-    # Left-aligned brand mark.
+    # Left-aligned brand mark — uses tenant eyebrow + primary colour.
     brand = slide.shapes.add_textbox(
         Inches(_PPTX_MARGIN_X), Inches(_PPTX_CONTENT_BOTTOM + 0.15),
         Inches(4.0), Inches(_PPTX_FOOTER_HEIGHT),
     )
     _pptx_set_text(
-        brand.text_frame, "NEXORA",
+        brand.text_frame, theme.eyebrow,
         Pt=Pt, RGBColor=RGBColor,
         font=_PPTX_FONT_DISPLAY, size=9, bold=True,
-        color=_PPTX_BRAND_PRIMARY, letter_spacing=200,
+        color=theme.primary_color, letter_spacing=200,
     )
 
     # Right-aligned page number.
@@ -1004,12 +1181,13 @@ def _pptx_add_page_number_footer(slide, page_idx: int, total: int, Inches, Pt, R
     )
 
 
-def _pptx_add_title_slide(prs, title: Optional[str], message_count: int, Inches, Pt, RGBColor) -> None:
-    """Cover slide: brand-styled title with accent bars, no placeholder slop.
+def _pptx_add_title_slide(prs, title: Optional[str], message_count: int, Inches, Pt, RGBColor, theme: ExportTheme) -> None:
+    """Cover slide: brand-styled title with accent bars and optional logo.
 
-    Uses the Blank layout + manual shapes so the look is identical across
-    Office versions (default layout 0 inherits Microsoft template defaults
-    we don't control).
+    The cover layout varies subtly per template — executive_summary uses a
+    larger main title; dashboard adds a faint colour-block under the title
+    to suggest a tile layout; roadmap shifts the accent rule wider. The
+    differences are visual, not structural (one cover slide regardless).
     """
     try:
         from pptx.enum.shapes import MSO_SHAPE
@@ -1022,46 +1200,75 @@ def _pptx_add_title_slide(prs, title: Optional[str], message_count: int, Inches,
     slide_w_in = prs.slide_width / 914400  # EMUs per inch
     slide_h_in = prs.slide_height / 914400
 
-    # Top thin orange accent bar (full width, 4pt).
+    # Top accent bar (full width). Templates can opt for a thicker bar
+    # to make the cover feel more deliberate.
+    top_bar_h = 0.12 if theme.template == "executive_summary" else 0.08
     _pptx_add_rect_fill(
         slide, MSO_SHAPE, RGBColor,
         left=Inches(0), top=Inches(0),
-        width=Inches(slide_w_in), height=Inches(0.08),
-        fill_rgb=_PPTX_BRAND_PRIMARY,
+        width=Inches(slide_w_in), height=Inches(top_bar_h),
+        fill_rgb=theme.primary_color,
     )
 
-    # Eyebrow label ("NEXORA").
+    # Optional logo, top-right. Sized to fit the eyebrow band so it reads
+    # as a brand mark rather than competing with the title.
+    if theme.logo_png:
+        try:
+            slide.shapes.add_picture(
+                io.BytesIO(theme.logo_png),
+                Inches(slide_w_in - 1.7), Inches(0.4),
+                height=Inches(0.7),
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("pptx_logo_embed_failed", extra={"error": str(exc)})
+
     eyebrow = slide.shapes.add_textbox(
         Inches(_PPTX_MARGIN_X), Inches(1.2),
         Inches(slide_w_in - 2 * _PPTX_MARGIN_X), Inches(0.45),
     )
     _pptx_set_text(
-        eyebrow.text_frame, "NEXORA",
+        eyebrow.text_frame, theme.eyebrow,
         Pt=Pt, RGBColor=RGBColor,
         font=_PPTX_FONT_DISPLAY, size=16, bold=True,
-        color=_PPTX_BRAND_PRIMARY, letter_spacing=200,
+        color=theme.primary_color, letter_spacing=200,
     )
 
-    # Main title.
+    title_size = {
+        "executive_summary": 52,
+        "dashboard": 40,
+        "roadmap": 46,
+        "analysis": 40,
+    }.get(theme.template, 44)
+
     title_box = slide.shapes.add_textbox(
         Inches(_PPTX_MARGIN_X), Inches(1.9),
-        Inches(slide_w_in - 2 * _PPTX_MARGIN_X), Inches(1.4),
+        Inches(slide_w_in - 2 * _PPTX_MARGIN_X), Inches(1.6),
     )
     _pptx_set_text(
         title_box.text_frame,
         title or "Chat Transcript",
         Pt=Pt, RGBColor=RGBColor,
-        font=_PPTX_FONT_DISPLAY, size=44, bold=True,
+        font=_PPTX_FONT_DISPLAY, size=title_size, bold=True,
         color=_PPTX_TEXT_PRIMARY,
     )
 
-    # Short accent underline below the title (~3" wide).
+    accent_width = 4.0 if theme.template == "roadmap" else 2.5
     _pptx_add_rect_fill(
         slide, MSO_SHAPE, RGBColor,
         left=Inches(_PPTX_MARGIN_X), top=Inches(3.5),
-        width=Inches(2.5), height=Inches(0.06),
-        fill_rgb=_PPTX_BRAND_PRIMARY,
+        width=Inches(accent_width), height=Inches(0.06),
+        fill_rgb=theme.primary_color,
     )
+
+    # Dashboard template adds a faint horizontal block under the title to
+    # hint at a tile-grid layout. Subtle visual differentiation only.
+    if theme.template == "dashboard":
+        _pptx_add_rect_fill(
+            slide, MSO_SHAPE, RGBColor,
+            left=Inches(_PPTX_MARGIN_X), top=Inches(5.3),
+            width=Inches(slide_w_in - 2 * _PPTX_MARGIN_X), height=Inches(0.6),
+            fill_rgb=_PPTX_ROW_ALT,
+        )
 
     # Metadata block.
     meta_box = slide.shapes.add_textbox(
@@ -1083,20 +1290,19 @@ def _pptx_add_title_slide(prs, title: Optional[str], message_count: int, Inches,
     run.font.size = Pt(12)
     run.font.color.rgb = RGBColor(*_PPTX_TEXT_MUTED)
 
-    # Bottom orange band as the cover's signature element.
+    # Bottom themed band as the cover's signature element.
     _pptx_add_rect_fill(
         slide, MSO_SHAPE, RGBColor,
         left=Inches(0), top=Inches(slide_h_in - 0.45),
         width=Inches(slide_w_in), height=Inches(0.45),
-        fill_rgb=_PPTX_BRAND_PRIMARY,
+        fill_rgb=theme.primary_color,
     )
-    # Bottom-band caption (sits on top of the orange).
     caption = slide.shapes.add_textbox(
         Inches(_PPTX_MARGIN_X), Inches(slide_h_in - 0.42),
         Inches(slide_w_in - 2 * _PPTX_MARGIN_X), Inches(0.42),
     )
     _pptx_set_text(
-        caption.text_frame, "Nexora Lab  ·  Confidential  ·  Internal use",
+        caption.text_frame, theme.caption,
         Pt=Pt, RGBColor=RGBColor,
         font=_PPTX_FONT_BODY, size=10, color=_PPTX_WHITE, letter_spacing=80,
     )
@@ -1151,51 +1357,71 @@ def _pptx_add_assistant_slides(
     Inches,
     Pt,
     RGBColor,
+    theme: ExportTheme,
 ) -> None:
     """Emit the slides for one assistant message: text slide, chart
     slide(s), table slide(s)."""
     tree, chart_specs = _pptx_extract_artifacts(msg.content)
     slide_title = _pptx_resolve_slide_title(msg, tree, response_idx, preceding_user)
 
-    # 1) Text slide — all prose content; we strip tables and chart sentinels
-    #    first so they don't double-render on follow-up slides.
-    _pptx_add_text_slide(
-        prs, tree, slide_title, msg, Inches, Pt, RGBColor,
-    )
+    # Speaker notes flow into the pptx notes pane for any slide derived
+    # from this message. The model emits them as ``<!-- notes: ... -->``
+    # at the top of the message body; we look up by slide title.
+    text_slide_notes = _extract_notes_for_section(msg.content or "", slide_title)
 
-    # 2) Chart slides — one per chart in the message, in order.
+    text_slide = _pptx_add_text_slide(
+        prs, tree, slide_title, msg, Inches, Pt, RGBColor, theme,
+    )
+    if text_slide is not None and text_slide_notes:
+        _pptx_set_speaker_notes(text_slide, text_slide_notes)
+
     for chart_idx, spec in enumerate(chart_specs):
         chart_id = f"chart-{msg_idx}-{chart_idx}"
-        image_bytes = _decode_chart_image(charts.get(chart_id, ""))
+        image_bytes = _resolve_chart_image_bytes(
+            chart_id=chart_id, chart_idx=chart_idx,
+            chart_specs=chart_specs, charts=charts, theme=theme,
+        )
         chart_title = ""
         if isinstance(spec, dict):
             chart_title = (spec.get("title") or "").strip()
-        _pptx_add_chart_slide(
+        chart_slide = _pptx_add_chart_slide(
             prs,
             chart_title or f"Chart {chart_idx + 1}",
             image_bytes,
-            Inches, Pt, RGBColor,
+            Inches, Pt, RGBColor, theme,
         )
+        chart_notes = _extract_notes_for_section(msg.content or "", chart_title or "")
+        if chart_slide is not None and chart_notes:
+            _pptx_set_speaker_notes(chart_slide, chart_notes)
 
-    # 3) Table slides — one per <table> found, in order.
     table_idx = 0
     for table_node in tree.find_all("table"):
         table_idx += 1
         _pptx_add_table_slide(
-            prs, f"Data table {table_idx}", table_node, Inches, Pt, RGBColor,
+            prs, f"Data table {table_idx}", table_node, Inches, Pt, RGBColor, theme,
         )
 
 
-def _pptx_add_text_slide(prs, tree, slide_title: str, msg: ExportMessage, Inches, Pt, RGBColor) -> None:
+def _pptx_set_speaker_notes(slide, text: str) -> None:
+    """Attach ``text`` to the slide's notes pane. python-pptx creates the
+    notes_slide lazily on first access so we don't need to opt in earlier
+    in the build."""
+    try:
+        notes_tf = slide.notes_slide.notes_text_frame
+        notes_tf.text = text
+    except Exception as exc:  # noqa: BLE001
+        log.warning("pptx_notes_set_failed", extra={"error": str(exc)})
+
+
+def _pptx_add_text_slide(prs, tree, slide_title: str, msg: ExportMessage, Inches, Pt, RGBColor, theme: ExportTheme):
     """Branded content slide: header bar + content textbox + (optional) message
     metadata strip + footer (added in post-processing).
 
-    Uses the Blank layout (not Title Only) because we draw the title bar
-    manually for full control. The content textbox auto-shrinks long bodies
-    to fit the page.
+    Returns the created slide so callers can attach speaker notes after the
+    fact (notes flow into the pptx notes pane, never the visible slide).
     """
     slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank
-    _pptx_add_brand_header(slide, slide_title, Inches, Pt, RGBColor)
+    _pptx_add_brand_header(slide, slide_title, Inches, Pt, RGBColor, theme)
 
     # Optional metadata strip directly under the accent line.
     body_top = _PPTX_CONTENT_TOP
@@ -1242,6 +1468,7 @@ def _pptx_add_text_slide(prs, tree, slide_title: str, msg: ExportMessage, Inches
         return tf.add_paragraph()
 
     _pptx_walk_text(tree, _new_paragraph, Pt, RGBColor)
+    return slide
 
 
 def _pptx_walk_text(node, new_para_fn, Pt, RGBColor) -> None:
@@ -1403,15 +1630,13 @@ def _pptx_add_footer(slide, msg: ExportMessage, Inches, Pt, RGBColor) -> None:
             run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
 
-def _pptx_add_chart_slide(prs, title_text: str, image_bytes: Optional[bytes], Inches, Pt, RGBColor) -> None:
+def _pptx_add_chart_slide(prs, title_text: str, image_bytes: Optional[bytes], Inches, Pt, RGBColor, theme: ExportTheme):
     """Per-chart slide: branded header + centred image with hairline frame.
 
-    The framed look (thin border around the chart) reads more polished than
-    a bare image floating on white — clinicians shared early feedback that
-    untrimmed Chart.js exports looked "raw" in decks.
+    Returns the slide so callers can attach speaker notes.
     """
     slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank
-    _pptx_add_brand_header(slide, title_text, Inches, Pt, RGBColor)
+    _pptx_add_brand_header(slide, title_text, Inches, Pt, RGBColor, theme)
 
     if image_bytes is None:
         tb = slide.shapes.add_textbox(
@@ -1424,7 +1649,7 @@ def _pptx_add_chart_slide(prs, title_text: str, image_bytes: Optional[bytes], In
             font=_PPTX_FONT_BODY, size=14, italic=True, color=_PPTX_TEXT_MUTED,
             align="center",
         )
-        return
+        return slide
 
     # Hairline frame behind the image — same width as the image (10"), gives
     # the chart a subtle "card" look.
@@ -1464,9 +1689,10 @@ def _pptx_add_chart_slide(prs, title_text: str, image_bytes: Optional[bytes], In
             font=_PPTX_FONT_BODY, size=14, italic=True, color=_PPTX_TEXT_MUTED,
             align="center",
         )
+    return slide
 
 
-def _pptx_add_table_slide(prs, title_text: str, table_node, Inches, Pt, RGBColor) -> None:
+def _pptx_add_table_slide(prs, title_text: str, table_node, Inches, Pt, RGBColor, theme: ExportTheme):
     """Per-table slide: branded header + polished table.
 
     Polishing:
@@ -1480,14 +1706,14 @@ def _pptx_add_table_slide(prs, title_text: str, table_node, Inches, Pt, RGBColor
     widest row's column count so the pptx grid has no holes.
     """
     slide = prs.slides.add_slide(prs.slide_layouts[6])  # Blank
-    _pptx_add_brand_header(slide, title_text, Inches, Pt, RGBColor)
+    _pptx_add_brand_header(slide, title_text, Inches, Pt, RGBColor, theme)
 
     rows = table_node.find_all("tr")
     if not rows:
-        return
+        return slide
     col_count = max(len(r.find_all(["td", "th"])) for r in rows)
     if col_count == 0:
-        return
+        return slide
 
     # Layout the table to fill the content area.
     available_width = Inches(13.333 - 2 * _PPTX_MARGIN_X)
@@ -1564,6 +1790,7 @@ def _pptx_add_table_slide(prs, title_text: str, table_node, Inches, Pt, RGBColor
                     else:
                         run.font.size = Pt(10.5)
                         run.font.color.rgb = RGBColor(*_PPTX_TEXT_PRIMARY)
+    return slide
 
 
 def _pdf_insert_chart(
@@ -1577,9 +1804,13 @@ def _pdf_insert_chart(
     Paragraph,
     Spacer,
     RLImage,
+    theme: ExportTheme,
 ) -> None:
     chart_id = f"chart-{msg_idx}-{chart_idx}"
-    image_bytes = _decode_chart_image(charts.get(chart_id, ""))
+    image_bytes = _resolve_chart_image_bytes(
+        chart_id=chart_id, chart_idx=chart_idx,
+        chart_specs=chart_specs, charts=charts, theme=theme,
+    )
     spec = chart_specs[chart_idx] if 0 <= chart_idx < len(chart_specs) else {}
     title = (spec.get("title") or "").strip() if isinstance(spec, dict) else ""
 
