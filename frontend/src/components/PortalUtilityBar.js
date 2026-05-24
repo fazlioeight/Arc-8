@@ -108,12 +108,17 @@ const PortalUtilityBar = () => {
   }, []);
 
   const applicationTiles = useMemo(() => [
-    { key: 'portal',       label: 'Nexora Lab',   desc: 'Metrics & insights',  icon: 'NL', color: '#0176d3', path: ROUTES.PORTAL.LANDING },
-    { key: 'member360',    label: 'Member 360',   desc: 'Chart launchpad',     icon: 'M3', color: '#0891b2', path: ROUTES.MEMBER_360.LANDING },
-    { key: 'providers',    label: 'Providers',    desc: 'Directory search',    icon: 'PR', color: '#0f172a', path: ROUTES.PROVIDERS.LANDING },
-    { key: 'docs',         label: 'Docs Library', desc: 'Knowledge base',      icon: 'DL', color: '#6366f1', path: ROUTES.DOCS },
-    { key: 'job_center',   label: 'Job Center',   desc: 'Logs & retry',        icon: 'JC', color: '#0f766e', path: ROUTES.JOBS.STATUS_CENTER },
-    { key: 'admin_console',label: 'Master Admin', desc: 'Roles & access',      icon: 'MA', color: '#dc2626', path: ROUTES.ADMIN.MASTER, requiredLevel: 'admin' },
+    { key: 'portal',       label: 'Nexora Lab',          desc: 'Metrics & insights',     icon: 'NL', color: '#0176d3', path: ROUTES.PORTAL.LANDING },
+    { key: 'member360',    label: 'Member 360',          desc: 'Chart launchpad',        icon: 'M3', color: '#0891b2', path: ROUTES.MEMBER360_LAB.DASHBOARD },
+    { key: 'coding',       label: 'Coding Worklists',    desc: 'Member reviews',         icon: 'CD', color: '#0f172a', path: ROUTES.CODING.WORKLIST },
+    { key: 'providers',    label: 'Providers',           desc: 'Directory search',       icon: 'PR', color: '#1f2937', path: ROUTES.PROVIDERS.LANDING },
+    { key: 'ride_booking', label: 'Ride Booking',        desc: 'Transportation',         icon: 'RB', color: '#2563eb', path: '/ride-booking' },
+    { key: 'dashboard',    label: 'Dashboard',           desc: 'Analytics view',         icon: 'DB', color: '#4f46e5', path: '/dashboard' },
+    { key: 'chat',         label: 'Nexora Chat',         desc: 'Claude assistant',       icon: 'AI', color: '#7c3aed', path: ROUTES.CHAT },
+    { key: 'docs',         label: 'Docs Library',        desc: 'Knowledge base',         icon: 'DL', color: '#6366f1', path: ROUTES.DOCS },
+    { key: 'job_center',   label: 'Job Center',          desc: 'Logs & retry',           icon: 'JC', color: '#0f766e', path: ROUTES.JOBS.STATUS_CENTER },
+    { key: 'settings',     label: 'Settings',            desc: 'Preferences',            icon: 'ST', color: '#64748b', path: ROUTES.SETTINGS },
+    { key: 'admin_console',label: 'Master Admin',        desc: 'Roles & access',         icon: 'MA', color: '#dc2626', path: ROUTES.ADMIN.MASTER, requiredLevel: 'admin' },
   ], []);
 
   const accessibleApps = useMemo(() => {

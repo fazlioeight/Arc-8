@@ -34,6 +34,88 @@ async def test_portal_overview_returns_real_application_registry(fastapi_app):
     assert payload["profile"]["email"] == "user@example.com"
 
 
+async def test_portal_overview_aggregates_todos_from_purchased_apps(fastapi_app):
+    """Tasks surfaced on the portal must include items from each purchased app."""
+    from sqlalchemy import select as _select
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.core.config import settings as app_settings
+    from app.db.session import control_session
+    from app.models.coding import CodingMember, CodingMemberChase
+    from app.models.member360 import Member360Member, Member360Task
+    from app.models.ride_booking import RideReconciliationItem
+    from app.models.tables import DataImportJob, Tenant as _Tenant
+
+    tenant_uri = app_settings.DEFAULT_TENANT_DATABASE_URL.format(tenant_key=TENANT_KEY)
+    engine = create_async_engine(tenant_uri, future=True, echo=False)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as session:
+        coder_member = CodingMember(member_key="COD-ASSIGNED", first_name="Assignee", last_name="One", status="active")
+        session.add(coder_member)
+        await session.flush()
+        session.add(
+            CodingMemberChase(
+                member_id=coder_member.id,
+                chase_code="CHASE-USER",
+                status="open",
+                priority="high",
+                assigned_coder_email="user@example.com",
+            )
+        )
+
+        m360_member = Member360Member(member_key="M360-ASSIGNED", first_name="Care", last_name="Target")
+        session.add(m360_member)
+        await session.flush()
+        session.add(
+            Member360Task(
+                member_id=m360_member.id,
+                title="Outreach call",
+                status="open",
+                priority="high",
+                assigned_user="user@example.com",
+            )
+        )
+
+        session.add(
+            RideReconciliationItem(
+                title="Match invoice #42",
+                detail="Vendor charge missing rider",
+                status="open",
+                priority="high",
+            )
+        )
+        await session.commit()
+    await engine.dispose()
+
+    async with control_session() as ctrl:
+        tenant_row = (await ctrl.scalars(_select(_Tenant).where(_Tenant.key == TENANT_KEY))).first()
+        ctrl.add(
+            DataImportJob(
+                tenant_id=tenant_row.id,
+                name="Eligibility import",
+                source_type="upload",
+                status="failed",
+                progress=42,
+                error="Row 17 malformed",
+                initiated_by="user@example.com",
+            )
+        )
+        await ctrl.commit()
+
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        resp = await client.get(
+            "/api/portal/overview",
+            headers={"Authorization": f"Bearer {token}", **TENANT_HEADER},
+        )
+
+    assert resp.status_code == 200, resp.text
+    payload = resp.json()
+    app_keys_in_todos = {todo["app_key"] for todo in payload["todos"]}
+    assert {"coding", "member360", "ride_booking", "job_center"} <= app_keys_in_todos
+
+
 async def test_ride_booking_partner_and_ride_flow(fastapi_app):
     transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
