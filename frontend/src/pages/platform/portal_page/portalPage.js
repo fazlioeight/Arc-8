@@ -1,7 +1,6 @@
 ﻿import React, { useContext, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
-import PortalCard from "../../../components/PortalCard";
 import KpiTile from "../../../components/ui/KpiTile";
 import SearchInput from "../../../components/ui/SearchInput";
 import { AuthContext } from "../../../context/AuthContext";
@@ -369,104 +368,14 @@ const PortalPage = () => {
         />
       )}
 
-      <PortalCard
-        title="Profile"
-        subtitle="Your account at a glance"
-        tone="info"
-        compact
-      >
-        <div className="portal-list">
-          <div className="portal-list-item portal-list-item--info">
-            <span className="portal-list-item__icon">
-              {user?.email?.slice(0, 1).toUpperCase() || "N"}
-            </span>
-            <div className="portal-list-item__body">
-              <div className="portal-list-item__title">
-                {overview.profile?.email || user?.email}
-              </div>
-              <p className="portal-list-item__meta">
-                Tenant {overview.profile?.tenant || user?.tenant || "Nexora Lab"} |{" "}
-                {formatRoleLabel(overview.profile?.role)} |{" "}
-                {overview.profile?.lastLogin
-                  ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
-                  : "Last login just now"}{" "}
-                | {allowedApps.length || renderableApps.length} applications
-              </p>
-              <div className="portal-list-item__actions">
-                <span className="portal-pill portal-pill--ghost">
-                  Tenant {overview.profile?.tenant || tenant || "Nexora Lab"}
-                </span>
-                <span className="portal-pill portal-pill--ghost">
-                  {formatRoleLabel(overview.profile?.role)}
-                </span>
-                <span className="portal-pill portal-pill--ghost">
-                  {allowedApps.length || renderableApps.length} apps
-                </span>
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section className="coding-surface rounded-2xl shadow-sm p-5">
+          <header className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-sm font-semibold coding-text-strong">Last saved</h2>
+              <p className="text-xs coding-text-soft">Recent items you have pinned or updated.</p>
             </div>
-            <button
-              className="portal-ghost-button"
-              onClick={() => navigate("/settings")}
-              type="button"
-            >
-              Manage
-            </button>
-          </div>
-        </div>
-      </PortalCard>
-
-      <div className="portal-section-grid">
-        <PortalCard
-          title="Applications"
-          subtitle="Launch into the areas you use most."
-          tone="info"
-        >
-          <div className="portal-list">
-            {renderableApps.map((app) => {
-              const isLocked = !app.allowed;
-              const itemTone = isLocked ? "warning" : "info";
-              return (
-                <div
-                  key={app.key}
-                  className={["portal-list-item", `portal-list-item--${itemTone}`].join(
-                    " "
-                  )}
-                  aria-disabled={isLocked}
-                >
-                  <span
-                    className="portal-list-item__icon"
-                    style={{ background: app.color }}
-                    aria-hidden
-                  >
-                    {app.icon}
-                  </span>
-                  <div className="portal-list-item__body">
-                    <div className="portal-list-item__title">{app.label}</div>
-                    <p className="portal-list-item__meta">{app.desc}</p>
-                    {isLocked && (
-                      <p className="portal-list-item__meta">
-                        Request access from your admin.
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    className="portal-ghost-button"
-                    onClick={() => !isLocked && navigate(app.path)}
-                    disabled={isLocked}
-                    type="button"
-                  >
-                    {isLocked ? "Locked" : "Open"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </PortalCard>
-
-        <PortalCard
-          title="Last saved"
-          subtitle="Recent items you have pinned or updated."
-        >
+          </header>
           <div className="portal-list">
             {lastSavedItems.map((item) => (
               <div key={item.id} className="portal-list-item portal-list-item--info">
@@ -502,13 +411,15 @@ const PortalPage = () => {
               />
             )}
           </div>
-        </PortalCard>
+        </section>
 
-        <PortalCard
-          title="To-do"
-          subtitle="Assignments from your managers across applications."
-          tone="warning"
-        >
+        <section className="coding-surface rounded-2xl shadow-sm p-5">
+          <header className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-sm font-semibold coding-text-strong">To-do</h2>
+              <p className="text-xs coding-text-soft">Assignments from your managers across applications.</p>
+            </div>
+          </header>
           <div className="portal-list">
             {todoItems.map((todo) => {
               const tone = PRIORITY_TONE[todo.priority] || PRIORITY_TONE.low;
@@ -562,7 +473,7 @@ const PortalPage = () => {
               />
             )}
           </div>
-        </PortalCard>
+        </section>
       </div>
     </PortalPageLayout>
   );
