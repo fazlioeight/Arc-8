@@ -392,7 +392,7 @@ const PortalPage = () => {
                       </span>
                     )}
                     <button
-                      className="portal-ghost-button"
+                      className="portal-task-link"
                       type="button"
                       onClick={() => navigate(item.path || ROUTES.PORTAL.LANDING)}
                     >
@@ -454,7 +454,7 @@ const PortalPage = () => {
                       )}
                     </div>
                     <button
-                      className="portal-ghost-button"
+                      className="portal-task-link"
                       type="button"
                       onClick={() => navigate(todo.path || ROUTES.PORTAL.LANDING)}
                     >

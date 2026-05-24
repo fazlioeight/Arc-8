@@ -146,6 +146,30 @@
   box-shadow: none;
 }
 
+/* ─── Task link (hyperlink-style action inside list items) ────────────── */
+.portal-task-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--brand-primary) 80%, #000 20%);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color var(--transition-quick);
+}
+.portal-task-link:hover {
+  color: color-mix(in srgb, var(--brand-primary) 60%, #000 40%);
+}
+.portal-task-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
 /* ─── Section grid ────────────────────────────────────────────────────── */
 .portal-section-grid {
   display: grid;
