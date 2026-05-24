@@ -1,4 +1,8 @@
 import { createMemberDetail, createMemberSummary } from '../viewModels/common';
+import {
+  fetchMember360Members,
+  fetchMember360MemberDetail,
+} from './member360LabService';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 
@@ -136,5 +140,62 @@ export class MemberSearchService {
       raw: response,
       isSample: false,
     };
+  }
+}
+
+// Member360-backed search. The /api/member360/members endpoint uses
+// limit/offset instead of page/page_size, so we translate here.
+const fetchMember360MembersAdapter = (token, tenant, { search, page = 1, pageSize = 25 } = {}) =>
+  fetchMember360Members(token, tenant, {
+    search,
+    limit: pageSize,
+    offset: Math.max(0, (page - 1) * pageSize),
+  });
+
+export class Member360MemberSearchService extends MemberSearchService {
+  constructor({ token, tenant } = {}) {
+    super({
+      token,
+      tenant,
+      fetchMembers: fetchMember360MembersAdapter,
+      fetchMemberDetail: fetchMember360MemberDetail,
+    });
+  }
+}
+
+// Searches member360 first; if it errors out (e.g. tenant doesn't have the
+// app), falls back to the coding members directory. Used by the portal page
+// so the quick search can find members regardless of which app the user
+// primarily works in.
+export class PortalMemberSearchService {
+  constructor({ token, tenant } = {}) {
+    this.token = token;
+    this.tenant = tenant;
+    this.primary = new Member360MemberSearchService({ token, tenant });
+    this.fallback = new MemberSearchService({ token, tenant });
+  }
+
+  async search(params) {
+    try {
+      return await this.primary.search(params);
+    } catch (error) {
+      const message = (error && error.message) || "";
+      if (message === "Unauthorized" || /not enabled|access/i.test(message)) {
+        return this.fallback.search(params);
+      }
+      throw error;
+    }
+  }
+
+  async getMember(memberId) {
+    try {
+      return await this.primary.getMember(memberId);
+    } catch (error) {
+      const message = (error && error.message) || "";
+      if (message === "Unauthorized" || /not enabled|access/i.test(message)) {
+        return this.fallback.getMember(memberId);
+      }
+      throw error;
+    }
   }
 }

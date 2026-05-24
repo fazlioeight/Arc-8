@@ -16,6 +16,11 @@ import { useMemberSearch } from "../../../hooks/useMemberSearch";
 import { usePortalOverview } from "../../../hooks/usePortalOverview";
 import { PORTAL_NAV_ITEMS } from "./portalNavItems";
 import { ROUTES } from "../../../constants/routes";
+import {
+  Member360MemberSearchService,
+  MemberSearchService,
+  PortalMemberSearchService,
+} from "../../../services/codingService";
 
 const formatRelativeTime = (value) => {
   try {
@@ -86,6 +91,21 @@ const PortalPage = () => {
     }),
     []
   );
+  const hasMember360 = Boolean(accessMap?.member360);
+  const hasCoding = Boolean(accessMap?.coding);
+  const memberSearchService = useMemo(() => {
+    if (hasMember360 && hasCoding) {
+      return new PortalMemberSearchService({ token, tenant });
+    }
+    if (hasMember360) {
+      return new Member360MemberSearchService({ token, tenant });
+    }
+    if (hasCoding) {
+      return new MemberSearchService({ token, tenant });
+    }
+    return new Member360MemberSearchService({ token, tenant });
+  }, [hasCoding, hasMember360, tenant, token]);
+
   const {
     memberQuery,
     memberOptions,
@@ -97,7 +117,9 @@ const PortalPage = () => {
   } = useMemberSearch({
     token,
     tenant,
-    onNavigate: (memberId) => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${memberId}`),
+    service: memberSearchService,
+    onNavigate: (memberId) =>
+      navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${memberId}`),
   });
 
   const appCatalog = useMemo(

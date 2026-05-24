@@ -103,12 +103,16 @@ export const useMemberSearch = ({
   lookupPageSize = 5,
   minChars = 2,
   messages: customMessages = DEFAULT_MEMBER_SEARCH_MESSAGES,
+  service: providedService,
 } = {}) => {
   const messages = useMemo(
     () => mergeMessages(customMessages || {}),
     [customMessages]
   );
-  const memberService = useMemo(() => new MemberSearchService({ token, tenant }), [tenant, token]);
+  const memberService = useMemo(
+    () => providedService || new MemberSearchService({ token, tenant }),
+    [providedService, tenant, token]
+  );
 
   const [memberQuery, setMemberQuery] = useState("");
   const [memberSuggestions, setMemberSuggestions] = useState([]);
