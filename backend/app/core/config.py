@@ -26,10 +26,6 @@ class Settings(BaseSettings):
     TENANT_CONNECTION_CACHE_SIZE: int = 32
 
     REDIS_URL: Optional[str] = None
-    RATE_LIMIT_MAX_PER_MINUTE: int = 600
-    RATE_LIMIT_BURST: int = 120
-    RATE_LIMIT_WINDOW_SECONDS: int = 60
-    RATE_LIMIT_STORAGE_KEY_PREFIX: str = "nexora:tenant:rate:"
 
     USAGE_DAILY_LIMIT: int = 10000
 

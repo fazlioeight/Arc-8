@@ -39,9 +39,8 @@ router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 
 
 # ── Lightweight per-user rate limit ─────────────────────────────────────────
-# We deliberately do NOT reuse the global RateLimitMiddleware budget — that's
-# coarse-grained per-tenant. AI Assistant calls hit a third-party LLM with
-# PHI on every request, so they get their own per-user quota.
+# AI Assistant calls hit a third-party LLM with PHI on every request, so they
+# get a per-user quota.
 #
 # In-memory token-bucket. For multi-replica deploys this is per-replica which
 # is fine for the MVP (effective limit = limit × replica count). When we

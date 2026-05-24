@@ -135,7 +135,6 @@ nexora-platform/
 - Schema helpers in `backend/scripts/tenant` ensure DDL consistency when onboarding new tenants.
 
 **Cross-cutting controls**
-- `RateLimitMiddleware` uses Redis (or a pluggable store) for per-tenant token buckets; headers expose remaining quota.
 - `RequestLoggingMiddleware` and `utils.audit_logger` capture structured logs, persist audit events to both file (`logs/audit.log`) and the control database, and surface actor/tenant metadata.
 - HIPAA mode (`HIPAA_MODE=True`) enforces known-tenant restrictions and suppresses dummy logins by default.
 
@@ -160,8 +159,7 @@ nexora-platform/
    - `CONTROL_DATABASE_URL` (defaults to Postgres via `postgresql+asyncpg://`; override with `sqlite+aiosqlite:///...` for a zero-dependency quickstart)
    - `DEFAULT_TENANT_DATABASE_URL` or `TENANT_DATABASE_URL_TEMPLATE` (template accepts `{tenant_key}` for per-tenant databases)
    - `TENANT_CONNECTION_CACHE_SIZE` to tune the async engine LRU cache (default `32`)
-   - `REDIS_URL` (`redis://localhost:6379/0`) to activate distributed rate limiting
-   - `RATE_LIMIT_MAX_PER_MINUTE`, `RATE_LIMIT_BURST`, `RATE_LIMIT_WINDOW_SECONDS` to shape tenant throttling
+   - `REDIS_URL` (`redis://localhost:6379/0`) for shared Redis-backed state (audit throttle, etc.)
    - `ALLOW_DUMMY_LOGIN` toggles the `admin@admin.com` shortcut for demos
    - Optional: `TENANT_DATABASE_SCHEMA_TEMPLATE`, `ALLOWED_TENANT_HOSTS`, `AUDIT_LOG_PATH`, `USAGE_DAILY_LIMIT`, `S3_BUCKET_PREFIX`, `BACKGROUND_QUEUE_URL`, `PORTAL_APPLICATIONS`
 
