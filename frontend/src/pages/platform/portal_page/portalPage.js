@@ -11,6 +11,7 @@ import {
 } from "../../../components/ehr/Primitives";
 import "../../../index.css";
 import "../../../styles/memberWorkspace.css";
+import "../../../styles/portalPattern.css";
 import { useMemberSearch } from "../../../hooks/useMemberSearch";
 import { usePortalOverview } from "../../../hooks/usePortalOverview";
 import { PORTAL_NAV_ITEMS } from "./portalNavItems";
