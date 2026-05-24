@@ -87,6 +87,17 @@ const ForcePasswordRotation = () => {
   return <Navigate to={ROUTES.AUTH.CHANGE_PASSWORD} replace />;
 };
 
+// When the inactivity timer locks the session, bounce users off whatever
+// route they were on so LoginOnlySessionLockOverlay can show the re-auth
+// modal on /login. Token stays valid, so drafts are preserved.
+const RedirectWhenLocked = () => {
+  const { sessionLocked } = useContext(AuthContext);
+  const location = useLocation();
+  if (!sessionLocked) return null;
+  if (location.pathname === '/login') return null;
+  return <Navigate to="/login" replace />;
+};
+
 const Shell = ({ themePreference, setThemePreference }) => {
   const location = useLocation();
   const hideNavbarOn = [
@@ -281,6 +292,7 @@ function App() {
           <GuidedTourProvider>
             <NotificationsProvider>
               <Router>
+                <RedirectWhenLocked />
                 <ForcePasswordRotation />
                 <Shell themePreference={themePreference} setThemePreference={setThemePreference} />
                 <CommandPalette onThemeToggle={handleThemeToggle} />
