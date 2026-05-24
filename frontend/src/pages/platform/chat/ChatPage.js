@@ -38,25 +38,22 @@ const absoluteApiUrl = (relative) => {
   return `${API_BASE}${relative.startsWith('/') ? '' : '/'}${relative}`;
 };
 
-// Rewrite any anchor whose href points at the artifacts API so a plain
-// markdown link the model wrote (rather than a line-isolated link that became
-// an ArtifactCard) still downloads correctly when clicked. marked's renderer
-// API lets us override just the link emitter.
-const _markedRenderer = new marked.Renderer();
-const _baseLinkRenderer = _markedRenderer.link.bind(_markedRenderer);
-_markedRenderer.link = function patchedLink(href, title, text) {
-  const html = _baseLinkRenderer(href, title, text);
-  if (typeof href === 'string' && href.startsWith('/api/chat/artifacts/')) {
+marked.use({ gfm: true, breaks: true });
+
+// Post-process rendered HTML to rewrite any anchor whose href points at the
+// artifacts API. We do this on the HTML string (not via marked's renderer
+// API) because marked v9+ renderer methods receive token objects and need
+// access to the parser instance to call ``parseInline`` — overriding them
+// from outside is brittle across marked versions.
+const _ARTIFACT_HREF_RE = /<a\b([^>]*?)\shref="(\/api\/chat\/artifacts\/[^"]+)"([^>]*?)>/gi;
+
+const rewriteArtifactAnchors = (html) =>
+  html.replace(_ARTIFACT_HREF_RE, (match, pre, href, post) => {
     const abs = absoluteApiUrl(href).replace(/"/g, '&quot;');
-    // Replace the relative href with the absolute one and add target=_blank
-    // so the SPA route doesn't capture the click as a navigation.
-    return html
-      .replace(/href="[^"]*"/, `href="${abs}"`)
-      .replace(/^<a /, '<a target="_blank" rel="noopener noreferrer" ');
-  }
-  return html;
-};
-marked.use({ gfm: true, breaks: true, renderer: _markedRenderer });
+    // Strip any existing target/rel so we don't double up.
+    const attrs = `${pre} ${post}`.replace(/\s*\b(target|rel)="[^"]*"/gi, '').trim();
+    return `<a ${attrs} target="_blank" rel="noopener noreferrer" href="${abs}">`;
+  });
 
 const SUPPORTED_FILES = ['PDF', 'DOCX', 'XLSX', 'PPTX', 'CSV', 'JSON', 'TXT', 'PNG', 'JPG'];
 const OUTPUT_FORMATS = ['Markdown', 'Tables', 'Charts', 'Export'];
@@ -165,7 +162,13 @@ const extractSegments = (markdown) => {
   return segments;
 };
 
-const renderMarkdown = (text) => DOMPurify.sanitize(marked.parse(text || ''));
+const renderMarkdown = (text) => {
+  const rendered = rewriteArtifactAnchors(marked.parse(text || ''));
+  // ADD_ATTR keeps target/rel on the anchors we just rewrote — DOMPurify
+  // permits them by default but being explicit avoids a future config
+  // change silently breaking the download links.
+  return DOMPurify.sanitize(rendered, { ADD_ATTR: ['target', 'rel'] });
+};
 
 // Stable id format the backend uses to look up captured chart images.
 // Keep in sync with backend chat/export.py.
