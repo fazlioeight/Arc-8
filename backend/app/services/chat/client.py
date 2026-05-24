@@ -13,6 +13,12 @@ ALLOWED_MODELS: dict[str, dict] = {
     "claude-opus-4-7":           {"label": "Opus 4.7   — most capable", "max_tokens": 128_000},
 }
 
+# Non-streaming requests must finish within the SDK's 10-minute timeout, or
+# the client refuses to send them ("Streaming is required for operations that
+# may take longer than 10 minutes."). Chat replies almost never exceed a few
+# thousand tokens, so cap non-streaming calls well below the guardrail.
+NON_STREAMING_MAX_TOKENS = 8_192
+
 
 def resolve_model(requested: Optional[str]) -> str:
     if requested and requested in ALLOWED_MODELS:
@@ -20,7 +26,9 @@ def resolve_model(requested: Optional[str]) -> str:
     return settings.CLAUDE_MODEL
 
 
-def max_tokens(model_id: str) -> int:
+def max_tokens(model_id: str, *, streaming: bool = False) -> int:
+    if not streaming:
+        return NON_STREAMING_MAX_TOKENS
     return ALLOWED_MODELS.get(model_id, {}).get("max_tokens", 64_000)
 
 

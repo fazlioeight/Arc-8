@@ -362,7 +362,7 @@ async def chat_stream(
         try:
             async with client.messages.stream(
                 model=model,
-                max_tokens=max_tokens(model),
+                max_tokens=max_tokens(model, streaming=True),
                 system=DEFAULT_SYSTEM_PROMPT,
                 messages=messages,
             ) as stream:
@@ -1040,7 +1040,7 @@ async def stream_message_to_conversation(
             usage_block: dict = {}
             async with client.messages.stream(
                 model=model,
-                max_tokens=max_tokens(model),
+                max_tokens=max_tokens(model, streaming=True),
                 system=DEFAULT_SYSTEM_PROMPT,
                 messages=messages_for_llm,
             ) as stream:
