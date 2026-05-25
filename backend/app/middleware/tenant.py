@@ -27,7 +27,14 @@ class TenantMiddleware(BaseHTTPMiddleware):
         self.require_known_tenant = require_known_tenant
 
     async def dispatch(self, request: Request, call_next):
-        if request.url.path.startswith("/health/"):
+        path = request.url.path
+        # Health checks and signed-URL artifact downloads bypass tenant
+        # resolution. Artifact endpoints carry a JWT token in the query
+        # string that already binds the request to (tenant, user, artifact);
+        # they're invoked directly by the browser via <img> / anchor click,
+        # so no X-Tenant-Key header is attached and the middleware would
+        # otherwise 404 every download.
+        if path.startswith("/health/") or path.startswith("/api/chat/artifacts/"):
             request.state.tenant = None
             request.state.tenant_key = None
             return await call_next(request)
