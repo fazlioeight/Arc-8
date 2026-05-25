@@ -14,7 +14,7 @@ import json
 import logging
 import os
 import uuid
-from typing import Any, AsyncIterator, List, Literal, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response, StreamingResponse
@@ -447,14 +447,19 @@ async def chat(
     if body.dataset:
         return await _chat_with_dataset(client, session, tenant, rid, current_user.email, model, body)
 
+    # Plain chat now also exposes the artifact tools so the user can ask for
+    # a deck/doc/PDF without first attaching a workbook or switching into
+    # dataset mode. The system prompt gets the same hint the tool-aware paths
+    # use so the model knows when to call build_artifact / revise_artifact.
     try:
-        response = await client.messages.create(
-            model=model,
-            max_tokens=max_tokens(model),
-            system=DEFAULT_SYSTEM_PROMPT,
-            messages=[{"role": m.role, "content": m.content} for m in body.messages],
+        system = f"{DEFAULT_SYSTEM_PROMPT}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
+        messages = [{"role": m.role, "content": m.content} for m in body.messages]
+        dispatch = _artifact_tool_dispatchers(tenant, current_user.email, rid)
+        tools = [artifacts_svc.BUILD_ARTIFACT_TOOL, artifacts_svc.REVISE_ARTIFACT_TOOL]
+        reply, _usage = await _run_chat_loop_with_tools(
+            client=client, model=model, system=system,
+            messages=messages, tools=tools, dispatch=dispatch,
         )
-        reply = extract_text_blocks(response)
         return ChatResponse(reply=reply, model=model)
     except HTTPException:
         raise
@@ -470,12 +475,16 @@ async def chat_stream(
     request: Request,
     body: ChatRequest,
     current_user: AuthenticatedUser = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_tenant_context),
 ):
     _check_client()
     rid = _request_id(request)
     client = get_client()
     model = resolve_model(body.model)
     messages = [{"role": m.role, "content": m.content} for m in body.messages]
+    system = f"{DEFAULT_SYSTEM_PROMPT}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
+    dispatch = _artifact_tool_dispatchers(tenant, current_user.email, rid)
+    tools = [artifacts_svc.BUILD_ARTIFACT_TOOL, artifacts_svc.REVISE_ARTIFACT_TOOL]
 
     logger.info("chat_stream_request", extra={
         "request_id": rid, "user": current_user.email, "model": model,
@@ -483,14 +492,17 @@ async def chat_stream(
 
     async def _generate() -> AsyncIterator[str]:
         try:
-            async with client.messages.stream(
-                model=model,
-                max_tokens=max_tokens(model, streaming=True),
-                system=DEFAULT_SYSTEM_PROMPT,
-                messages=messages,
-            ) as stream:
-                async for text in stream.text_stream:
-                    yield f"data: {json.dumps({'delta': text})}\n\n"
+            async for event in _stream_chat_with_tools(
+                client=client, model=model, system=system,
+                messages=messages, tools=tools, dispatch=dispatch,
+            ):
+                if "error" in event:
+                    yield f"data: {json.dumps({'error': event['error']})}\n\n"
+                    return
+                if event.get("event") == "final":
+                    # Terminal informational event — don't forward to wire.
+                    break
+                yield f"data: {json.dumps(event)}\n\n"
             yield "data: [DONE]\n\n"
         except Exception:
             logger.exception("chat_stream_failed", extra={"request_id": rid, "user": current_user.email})
@@ -501,6 +513,203 @@ async def chat_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ── Shared chat-with-tools plumbing ────────────────────────────────────────-
+#
+# These two helpers let plain chat (and the conversation endpoints) call the
+# same tool-use loop the workbook/dataset paths already use. The workbook and
+# dataset functions stay on their own implementations because they have
+# additional concerns (DuckDB connection lifecycle, dataset session rollback)
+# — extracting them would be more code than it removes.
+
+# A "dispatcher" is a per-tool async callable bound with whatever context the
+# handler needs (tenant key, user email, request id, etc.). Returning a dict
+# matches the shape the Anthropic API expects for tool_result blocks, so the
+# caller can append it directly to the messages array.
+ToolDispatcher = Callable[[Any], Awaitable[Dict[str, Any]]]
+
+
+def _artifact_tool_dispatchers(
+    tenant: TenantContext, user_email: str, rid: str
+) -> Dict[str, ToolDispatcher]:
+    """Bind tenant/user/request context to the artifact tool handlers.
+
+    Returned dict maps tool name → async handler. Plain chat and the
+    conversation endpoints use this directly; workbook/dataset paths add
+    their own SQL handler to the result before passing to the streaming
+    or non-streaming helpers.
+    """
+    return {
+        "build_artifact": lambda block: _run_build_artifact_tool(block, tenant, user_email, rid),
+        "revise_artifact": lambda block: _run_revise_artifact_tool(block, tenant, user_email, rid),
+    }
+
+
+async def _run_chat_loop_with_tools(
+    *,
+    client,
+    model: str,
+    system: str,
+    messages: list[dict],
+    tools: list[dict],
+    dispatch: Dict[str, ToolDispatcher],
+    max_iterations: int = 8,
+) -> tuple[str, dict]:
+    """Non-streaming tool-use loop. Drives ``messages.create`` until the
+    model stops with ``end_turn`` (or the iteration cap is hit). Returns
+    ``(reply_text, usage)`` where usage has ``tokens_in`` and ``tokens_out``
+    summed across all iterations.
+
+    Used by ``/api/chat`` and the non-streaming conversation endpoint so
+    plain chat finally gets access to the artifact tools.
+    """
+    last_text = ""
+    tokens_in = 0
+    tokens_out = 0
+    for iteration in range(max_iterations):
+        response = await client.messages.create(
+            model=model,
+            max_tokens=max_tokens(model),
+            system=system,
+            tools=tools,
+            messages=messages,
+        )
+        usage = getattr(response, "usage", None)
+        if usage:
+            tokens_in += getattr(usage, "input_tokens", 0) or 0
+            tokens_out += getattr(usage, "output_tokens", 0) or 0
+
+        turn_text = extract_text_blocks(response)
+        if turn_text and turn_text != "No text content in response.":
+            last_text = turn_text
+
+        if response.stop_reason != "tool_use":
+            return last_text or turn_text, {"tokens_in": tokens_in, "tokens_out": tokens_out}
+
+        messages.append({"role": "assistant", "content": response.content})
+        tool_results: list[dict] = []
+        for block in response.content:
+            if getattr(block, "type", None) != "tool_use":
+                continue
+            handler = dispatch.get(block.name)
+            if handler is None:
+                tool_results.append({
+                    "type": "tool_result", "tool_use_id": block.id,
+                    "content": f"Unknown tool: {block.name}", "is_error": True,
+                })
+                continue
+            tool_results.append(await handler(block))
+        messages.append({"role": "user", "content": tool_results})
+
+    return (
+        last_text or "Sorry, I couldn't finish that within the tool-use limit. Try a more specific request.",
+        {"tokens_in": tokens_in, "tokens_out": tokens_out},
+    )
+
+
+async def _stream_chat_with_tools(
+    *,
+    client,
+    model: str,
+    system: str,
+    messages: list[dict],
+    tools: list[dict],
+    dispatch: Dict[str, ToolDispatcher],
+    max_iterations: int = 8,
+) -> AsyncIterator[dict]:
+    """Streaming tool-use loop. Yields *event dicts* (not SSE-framed strings)
+    so callers can compose them with their own framing (raw SSE for plain
+    streaming; SSE + DB persistence for the conversation endpoint).
+
+    Yield shapes:
+      {'delta':    str}                            — text token
+      {'event':    'tool_start', 'name': str, 'tool_use_id': str}
+      {'event':    'tool_done',  'name': str, 'tool_use_id': str, 'is_error': bool}
+      {'event':    'final',      'text': str, 'usage': {'tokens_in': int, 'tokens_out': int}}
+      {'error':    str}                            — terminal on failure
+
+    The terminal 'final' yield is informational — it lets the caller persist
+    the accumulated assistant text and token counts without re-stitching
+    the deltas. Callers should not forward the 'final' event to the wire;
+    forward only 'delta', 'tool_start', 'tool_done', then emit ``[DONE]``.
+
+    The model can iterate up to ``max_iterations`` rounds of tool-use; beyond
+    that the loop returns whatever text it accumulated so a runaway model
+    can't burn through tokens or wedge the stream forever.
+    """
+    accumulated: list[str] = []
+    tokens_in = 0
+    tokens_out = 0
+    for iteration in range(max_iterations):
+        try:
+            async with client.messages.stream(
+                model=model,
+                max_tokens=max_tokens(model, streaming=True),
+                system=system,
+                tools=tools,
+                messages=messages,
+            ) as stream:
+                async for text in stream.text_stream:
+                    accumulated.append(text)
+                    yield {"delta": text}
+                final_message = await stream.get_final_message()
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("chat_stream_with_tools_failed", extra={"iteration": iteration})
+            yield {"error": f"Stream interrupted: {exc}"}
+            return
+
+        usage = getattr(final_message, "usage", None)
+        if usage:
+            tokens_in += getattr(usage, "input_tokens", 0) or 0
+            tokens_out += getattr(usage, "output_tokens", 0) or 0
+
+        if final_message.stop_reason != "tool_use":
+            yield {
+                "event": "final",
+                "text": "".join(accumulated),
+                "usage": {"tokens_in": tokens_in, "tokens_out": tokens_out},
+            }
+            return
+
+        # Run the tools. We surface each tool call to the wire so the frontend
+        # can show a "Building deck…" indicator — long-running tools would
+        # otherwise look like a paused stream.
+        messages.append({"role": "assistant", "content": final_message.content})
+        tool_results: list[dict] = []
+        for block in final_message.content:
+            if getattr(block, "type", None) != "tool_use":
+                continue
+            yield {"event": "tool_start", "name": block.name, "tool_use_id": block.id}
+            handler = dispatch.get(block.name)
+            if handler is None:
+                result = {
+                    "type": "tool_result", "tool_use_id": block.id,
+                    "content": f"Unknown tool: {block.name}", "is_error": True,
+                }
+            else:
+                try:
+                    result = await handler(block)
+                except Exception as exc:  # noqa: BLE001
+                    logger.exception("chat_stream_tool_handler_failed",
+                                     extra={"tool": block.name})
+                    result = {
+                        "type": "tool_result", "tool_use_id": block.id,
+                        "content": f"Tool '{block.name}' failed: {exc}", "is_error": True,
+                    }
+            tool_results.append(result)
+            yield {
+                "event": "tool_done", "name": block.name, "tool_use_id": block.id,
+                "is_error": bool(result.get("is_error")),
+            }
+        messages.append({"role": "user", "content": tool_results})
+
+    # Iteration cap reached without an end_turn. Surface whatever we have.
+    yield {
+        "event": "final",
+        "text": "".join(accumulated),
+        "usage": {"tokens_in": tokens_in, "tokens_out": tokens_out},
+    }
 
 
 # ── Workbook + dataset tool-use loops ──────────────────────────────────────-
@@ -1298,6 +1507,7 @@ async def send_message_to_conversation(
     body: SendMessageRequest,
     request: Request,
     current_user: AuthenticatedUser = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
 ) -> SendMessageResponse:
     """Combined endpoint: persist user message, call Claude with full
@@ -1349,15 +1559,16 @@ async def send_message_to_conversation(
         },
     )
 
-    # 3) Call Claude.
+    # 3) Call Claude with the artifact tools available so plain conversation
+    #    turns can also export decks/docs without a workbook attached.
     try:
-        response = await client.messages.create(
-            model=model,
-            max_tokens=max_tokens(model),
-            system=DEFAULT_SYSTEM_PROMPT,
-            messages=messages_for_llm,
+        system = f"{DEFAULT_SYSTEM_PROMPT}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
+        dispatch = _artifact_tool_dispatchers(tenant, current_user.email, rid)
+        tools = [artifacts_svc.BUILD_ARTIFACT_TOOL, artifacts_svc.REVISE_ARTIFACT_TOOL]
+        reply, usage_totals = await _run_chat_loop_with_tools(
+            client=client, model=model, system=system,
+            messages=messages_for_llm, tools=tools, dispatch=dispatch,
         )
-        reply = extract_text_blocks(response)
     except HTTPException:
         raise
     except Exception as exc:
@@ -1373,9 +1584,8 @@ async def send_message_to_conversation(
         raise HTTPException(status_code=500, detail=detail)
 
     # 4) Persist the assistant reply with model + token counts when available.
-    usage = getattr(response, "usage", None)
-    tokens_in = getattr(usage, "input_tokens", None) if usage else None
-    tokens_out = getattr(usage, "output_tokens", None) if usage else None
+    tokens_in = usage_totals.get("tokens_in") or None
+    tokens_out = usage_totals.get("tokens_out") or None
     assistant_msg = await history_svc.append_message(
         session,
         conversation_id=conversation_id,
@@ -1431,9 +1641,13 @@ async def stream_message_to_conversation(
     rid = _request_id(request)
     client = get_client()
     model = resolve_model(body.model)
+    system = f"{DEFAULT_SYSTEM_PROMPT}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
+    dispatch = _artifact_tool_dispatchers(tenant, current_user.email, rid)
+    tools = [artifacts_svc.BUILD_ARTIFACT_TOOL, artifacts_svc.REVISE_ARTIFACT_TOOL]
 
     async def _generate() -> AsyncIterator[str]:
-        accumulated: list[str] = []
+        full_text = ""
+        usage_block: dict = {}
         try:
             # Step 1+2: persist user message and prepare the LLM payload.
             async with tenant_connection_manager.get_session(tenant) as session:
@@ -1456,30 +1670,27 @@ async def stream_message_to_conversation(
                 )
                 await session.commit()
 
-            # Step 3: stream from Claude.
-            usage_block: dict = {}
-            async with client.messages.stream(
-                model=model,
-                max_tokens=max_tokens(model, streaming=True),
-                system=DEFAULT_SYSTEM_PROMPT,
-                messages=messages_for_llm,
-            ) as stream:
-                async for text in stream.text_stream:
-                    accumulated.append(text)
-                    yield f"data: {json.dumps({'delta': text})}\n\n"
-                # Capture usage when the stream has fully completed.
-                try:
-                    final_message = await stream.get_final_message()
-                    if final_message and getattr(final_message, "usage", None):
-                        usage_block = {
-                            "tokens_in": final_message.usage.input_tokens,
-                            "tokens_out": final_message.usage.output_tokens,
-                        }
-                except Exception:
-                    pass
+            # Step 3: stream from Claude with artifact tools available. The
+            # shared helper yields delta + tool_start + tool_done + final
+            # events; we forward the first three to the wire and use the
+            # final event to capture accumulated text + token totals for
+            # the assistant-message persistence in step 4.
+            async for event in _stream_chat_with_tools(
+                client=client, model=model, system=system,
+                messages=messages_for_llm, tools=tools, dispatch=dispatch,
+            ):
+                if "error" in event:
+                    yield f"data: {json.dumps({'error': event['error']})}\n\n"
+                    return
+                if event.get("event") == "final":
+                    full_text = event.get("text", "")
+                    usage_block = event.get("usage", {}) or {}
+                    break
+                yield f"data: {json.dumps(event)}\n\n"
 
-            # Step 4: persist the assistant message.
-            full_text = "".join(accumulated)
+            # Step 4: persist the assistant message — accumulated text from
+            # the final event includes both the streamed deltas AND any
+            # additional text the model produced across tool-use rounds.
             if full_text.strip():
                 async with tenant_connection_manager.get_session(tenant) as session:
                     await history_svc.append_message(

@@ -433,6 +433,11 @@ const ChatPage = () => {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  // While the model is running a server-side tool (e.g. build_artifact)
+  // the SSE stream pauses delivering text deltas. Without an indicator the
+  // chat looks frozen — this state surfaces "Building deck…" or similar
+  // until the tool_done event fires.
+  const [toolStatus, setToolStatus] = useState(null);
   const [error, setError] = useState(null);
   const [models, setModels] = useState([]);
   const [model, setModel] = useState('');
@@ -685,6 +690,18 @@ const ChatPage = () => {
             // Fall through to ephemeral path below.
           }
         }
+        const toolHandlers = {
+          onToolStart: ({ name }) => {
+            const labels = {
+              build_artifact: 'Building artifact…',
+              revise_artifact: 'Revising artifact…',
+              run_sql: 'Running query…',
+              run_dataset_sql: 'Running query…',
+            };
+            setToolStatus(labels[name] || `Running ${name}…`);
+          },
+          onToolDone: () => setToolStatus(null),
+        };
         if (conversationId) {
           let buffer = '';
           await streamConversationMessage({
@@ -696,6 +713,7 @@ const ChatPage = () => {
               setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
             },
             onError: (err) => setError(err),
+            ...toolHandlers,
           });
           if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
           refreshConversations();
@@ -709,6 +727,7 @@ const ChatPage = () => {
               setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
             },
             onError: (err) => setError(err),
+            ...toolHandlers,
           });
           if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
         }
@@ -722,6 +741,12 @@ const ChatPage = () => {
             setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
           },
           onError: (err) => setError(err),
+          onToolStart: ({ name }) => setToolStatus(
+            name === 'build_artifact' ? 'Building artifact…'
+              : name === 'revise_artifact' ? 'Revising artifact…'
+              : `Running ${name}…`,
+          ),
+          onToolDone: () => setToolStatus(null),
         });
         if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
       }
@@ -730,6 +755,7 @@ const ChatPage = () => {
       setMessages([...nextMessages, { role: 'assistant', content: `Error: ${e.message}`, error: true }]);
     } finally {
       setBusy(false);
+      setToolStatus(null);
     }
   }, [busy, draft, attachedFile, messages, token, tenantKey, model, activeWorkbookId, datasetMode, activeConversationId, refreshConversations]);
 
@@ -1066,6 +1092,19 @@ const ChatPage = () => {
                 })
               )}
             </div>
+            {toolStatus && (
+              <div
+                className="mx-auto mt-2 inline-flex items-center gap-2 self-start rounded-full border coding-border bg-[var(--bg-card)] px-3 py-1 text-xs shadow-sm"
+                role="status"
+                aria-live="polite"
+              >
+                <span
+                  className="inline-block h-2 w-2 animate-pulse rounded-full"
+                  style={{ background: 'var(--brand-primary)' }}
+                />
+                <span className="coding-text-strong">{toolStatus}</span>
+              </div>
+            )}
           </section>
 
           {/* ─ Composer ─────────────────────────────────────────────── */}

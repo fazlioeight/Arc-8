@@ -37,17 +37,10 @@ export const sendChat = async ({ token, tenant, messages, model, workbookId, dat
   return handleResponse(res);
 };
 
-export const streamChat = async ({ token, tenant, messages, model, onDelta, onError, signal }) => {
-  const res = await fetch(`${API_BASE}/api/chat/stream`, {
-    method: 'POST',
-    headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ messages, model }),
-    signal,
-  });
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(detail || 'Stream failed');
-  }
+// Helper: consume an SSE stream, dispatching delta / tool_start / tool_done /
+// error events to the supplied callbacks. Extracted so both streamChat and
+// streamConversationMessage can share the same wire-format handling.
+const _consumeChatSseStream = async (res, { onDelta, onError, onToolStart, onToolDone }) => {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -64,13 +57,37 @@ export const streamChat = async ({ token, tenant, messages, model, onDelta, onEr
       if (payload === '[DONE]') return;
       try {
         const parsed = JSON.parse(payload);
-        if (parsed.error && onError) onError(parsed.error);
-        else if (parsed.delta && onDelta) onDelta(parsed.delta);
+        if (parsed.error && onError) {
+          onError(parsed.error);
+        } else if (parsed.delta && onDelta) {
+          onDelta(parsed.delta);
+        } else if (parsed.event === 'tool_start' && onToolStart) {
+          onToolStart({ name: parsed.name, toolUseId: parsed.tool_use_id });
+        } else if (parsed.event === 'tool_done' && onToolDone) {
+          onToolDone({ name: parsed.name, toolUseId: parsed.tool_use_id, isError: !!parsed.is_error });
+        }
       } catch (e) {
         // ignore malformed line
       }
     }
   }
+};
+
+export const streamChat = async ({
+  token, tenant, messages, model,
+  onDelta, onError, onToolStart, onToolDone, signal,
+}) => {
+  const res = await fetch(`${API_BASE}/api/chat/stream`, {
+    method: 'POST',
+    headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ messages, model }),
+    signal,
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(detail || 'Stream failed');
+  }
+  await _consumeChatSseStream(res, { onDelta, onError, onToolStart, onToolDone });
 };
 
 export const chatWithFile = async ({ token, tenant, prompt, file, model }) => {
@@ -261,7 +278,7 @@ export const sendConversationMessage = async ({
  */
 export const streamConversationMessage = async ({
   token, tenant, conversationId, content, model, workbookId, dataset,
-  onDelta, onError, signal,
+  onDelta, onError, onToolStart, onToolDone, signal,
 }) => {
   const res = await fetch(
     `${API_BASE}/api/chat/conversations/${conversationId}/messages/stream`,
@@ -281,29 +298,7 @@ export const streamConversationMessage = async ({
     const detail = await res.text();
     throw new Error(detail || 'Stream failed');
   }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split('\n\n');
-    buffer = events.pop() || '';
-    for (const evt of events) {
-      const line = evt.trim();
-      if (!line.startsWith('data:')) continue;
-      const payload = line.slice(5).trim();
-      if (payload === '[DONE]') return;
-      try {
-        const parsed = JSON.parse(payload);
-        if (parsed.error && onError) onError(parsed.error);
-        else if (parsed.delta && onDelta) onDelta(parsed.delta);
-      } catch (e) {
-        // ignore malformed line
-      }
-    }
-  }
+  await _consumeChatSseStream(res, { onDelta, onError, onToolStart, onToolDone });
 };
 
 
