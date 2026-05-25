@@ -493,6 +493,10 @@ const ChatPage = () => {
   const [attachTarget, setAttachTarget] = useState(null);
   const [attachSelectedProjectId, setAttachSelectedProjectId] = useState(null);
   const [attachBusy, setAttachBusy] = useState(false);
+  // Right-click context menu for a project row. ``{ projectId, x, y }`` —
+  // coordinates are clientX/clientY so the menu renders under the cursor
+  // regardless of sidebar scroll position. Null = closed.
+  const [projectContextMenu, setProjectContextMenu] = useState(null);
 
   const fileInputRef = useRef(null);
   const workbookFileRef = useRef(null);
@@ -776,6 +780,27 @@ const ChatPage = () => {
       setError(e.message || 'Failed to delete project');
     }
   }, [token, tenantKey, activeProjectId]);
+
+  // Right-click on a project row → floating menu near the cursor. We
+  // suppress the browser's native context menu so the sidebar action set
+  // (share, rename, delete) is what users see instead.
+  const handleProjectContextMenu = useCallback((event, projectId) => {
+    event.preventDefault();
+    setProjectContextMenu({ projectId, x: event.clientX, y: event.clientY });
+  }, []);
+
+  const closeProjectContextMenu = useCallback(() => {
+    setProjectContextMenu(null);
+  }, []);
+
+  // Escape closes the context menu. Mounted only while the menu is open
+  // so we're not paying for an unused listener on every keypress.
+  useEffect(() => {
+    if (!projectContextMenu) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') closeProjectContextMenu(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [projectContextMenu, closeProjectContextMenu]);
 
   // Open the "add chat to project" picker. The actual attach POST happens
   // in confirmAttachConversation when the user clicks Add — splitting the
@@ -1209,7 +1234,10 @@ const ChatPage = () => {
                   const canEdit = project.my_role === 'owner' || project.my_role === 'editor';
                   return (
                     <li key={project.id} className="group flex flex-col">
-                      <div className="group flex items-center gap-1">
+                      <div
+                        className="group flex items-center gap-1"
+                        onContextMenu={(e) => handleProjectContextMenu(e, project.id)}
+                      >
                         <button
                           type="button"
                           onClick={() => handleToggleProject(project.id)}
@@ -1849,6 +1877,84 @@ const ChatPage = () => {
           </div>
         </div>
       )}
+
+      {/* ─ Project context menu (right-click on a project row) ─────── */}
+      {projectContextMenu && (() => {
+        const project = projects.find((p) => p.id === projectContextMenu.projectId);
+        if (!project) return null;
+        const isOwner = project.my_role === 'owner';
+        // Clamp to viewport so the menu doesn't render off-screen when
+        // right-clicking near the right/bottom edge. 200x150 is an
+        // approximate cap on the menu's intrinsic size.
+        const left = Math.min(projectContextMenu.x, window.innerWidth - 200);
+        const top = Math.min(projectContextMenu.y, window.innerHeight - 150);
+        const item =
+          'w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-canvas)] ' +
+          'disabled:cursor-not-allowed disabled:opacity-50';
+        return (
+          <div
+            className="fixed inset-0 z-50"
+            onClick={closeProjectContextMenu}
+            onContextMenu={(e) => { e.preventDefault(); closeProjectContextMenu(); }}
+            role="presentation"
+          >
+            <div
+              role="menu"
+              aria-label={`Actions for project ${project.title}`}
+              className="absolute min-w-[180px] rounded-md py-1 shadow-lg"
+              style={{
+                left, top,
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className={item}
+                onClick={() => { closeProjectContextMenu(); openShareModal(project.id); }}
+              >
+                Share…
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={item}
+                onClick={() => {
+                  closeProjectContextMenu();
+                  setActiveProjectId(project.id);
+                  if (!expandedProjectIds.has(project.id)) handleToggleProject(project.id);
+                  handleNewChat();
+                }}
+                disabled={!isOwner && project.my_role !== 'editor'}
+              >
+                New chat in project
+              </button>
+              <div className="my-1 border-t coding-border-subtle" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
+                className={item}
+                onClick={() => { closeProjectContextMenu(); handleRenameProject(project.id, project.title); }}
+                disabled={!isOwner}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={item}
+                style={isOwner ? { color: 'var(--state-critical)' } : undefined}
+                onClick={() => { closeProjectContextMenu(); handleDeleteProject(project.id, project.title); }}
+                disabled={!isOwner}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ─ Add chat to project picker ──────────────────────────────── */}
       {attachTarget && (
