@@ -712,6 +712,63 @@ async def _stream_chat_with_tools(
     }
 
 
+async def _build_conversation_tool_context(
+    *,
+    session: AsyncSession,
+    tenant: TenantContext,
+    user_email: str,
+    rid: str,
+    workbook_id: Optional[str],
+    use_dataset: bool,
+) -> tuple[str, list[dict], Dict[str, ToolDispatcher]]:
+    """Compose (system_prompt, tools, dispatch) for a conversation turn.
+
+    The artifact tools (build_artifact / revise_artifact) are always on.
+    Workbook and dataset tools are added when the request opted into them
+    — this is what lets persisted conversations include workbook-grounded
+    turns in the chat history table (which the previous ``/api/chat``
+    workbook path bypassed entirely).
+    """
+    system = f"{DEFAULT_SYSTEM_PROMPT}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
+    tools: list[dict] = [artifacts_svc.BUILD_ARTIFACT_TOOL, artifacts_svc.REVISE_ARTIFACT_TOOL]
+    dispatch: Dict[str, ToolDispatcher] = _artifact_tool_dispatchers(tenant, user_email, rid)
+
+    if workbook_id:
+        try:
+            workbook = await workbooks_svc.get_workbook(session, workbook_id, owner_email=user_email)
+        except workbooks_svc.WorkbookNotFound:
+            raise HTTPException(status_code=404, detail="Workbook not found.")
+        if workbook["status"] != workbooks_svc.STATUS_READY:
+            if workbook["status"] == workbooks_svc.STATUS_FAILED:
+                detail = f"Workbook failed to ingest: {workbook.get('error_message') or 'unknown error'}"
+            else:
+                detail = "Workbook is still being ingested. Try again in a moment."
+            raise HTTPException(status_code=409, detail=detail)
+        schema_block = workbooks_svc.schema_summary_for_prompt(workbook["schema"])
+        system = f"{DEFAULT_SYSTEM_PROMPT}\n\n---\n{schema_block}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
+        tools.append(workbooks_svc.RUN_SQL_TOOL)
+
+        async def _wb_dispatch(block: Any) -> dict:
+            # Bind the captured session so each tool call runs against the
+            # same tenant DB connection as the conversation turn.
+            return await _run_sql_tool(session, tenant.key, block, workbook_id, user_email, rid)
+        dispatch["run_sql"] = _wb_dispatch
+
+    elif use_dataset:
+        try:
+            schema_block = await dataset_svc.schema_summary_for_prompt(session)
+        except dataset_svc.DatasetError as exc:
+            raise HTTPException(status_code=503, detail=f"Dataset unavailable: {exc}")
+        system = f"{DEFAULT_SYSTEM_PROMPT}\n\n---\n{schema_block}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
+        tools.append(dataset_svc.RUN_DATASET_SQL_TOOL)
+
+        async def _ds_dispatch(block: Any) -> dict:
+            return await _run_dataset_sql_tool(session, block, user_email, rid)
+        dispatch["run_dataset_sql"] = _ds_dispatch
+
+    return system, tools, dispatch
+
+
 # ── Workbook + dataset tool-use loops ──────────────────────────────────────-
 
 async def _chat_with_workbook(
@@ -1559,12 +1616,15 @@ async def send_message_to_conversation(
         },
     )
 
-    # 3) Call Claude with the artifact tools available so plain conversation
-    #    turns can also export decks/docs without a workbook attached.
+    # 3) Call Claude with the artifact tools available, plus the workbook
+    #    SQL tool when workbook_id is attached or the dataset tool when
+    #    dataset=true. Routing through this endpoint (instead of /api/chat)
+    #    is what gets workbook/dataset turns into the chat history.
     try:
-        system = f"{DEFAULT_SYSTEM_PROMPT}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
-        dispatch = _artifact_tool_dispatchers(tenant, current_user.email, rid)
-        tools = [artifacts_svc.BUILD_ARTIFACT_TOOL, artifacts_svc.REVISE_ARTIFACT_TOOL]
+        system, tools, dispatch = await _build_conversation_tool_context(
+            session=session, tenant=tenant, user_email=current_user.email, rid=rid,
+            workbook_id=body.workbook_id, use_dataset=body.dataset,
+        )
         reply, usage_totals = await _run_chat_loop_with_tools(
             client=client, model=model, system=system,
             messages=messages_for_llm, tools=tools, dispatch=dispatch,
@@ -1641,16 +1701,20 @@ async def stream_message_to_conversation(
     rid = _request_id(request)
     client = get_client()
     model = resolve_model(body.model)
-    system = f"{DEFAULT_SYSTEM_PROMPT}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
-    dispatch = _artifact_tool_dispatchers(tenant, current_user.email, rid)
-    tools = [artifacts_svc.BUILD_ARTIFACT_TOOL, artifacts_svc.REVISE_ARTIFACT_TOOL]
 
     async def _generate() -> AsyncIterator[str]:
         full_text = ""
         usage_block: dict = {}
         try:
-            # Step 1+2: persist user message and prepare the LLM payload.
+            # We hold a single tenant DB session for the whole turn so the
+            # workbook/dataset SQL dispatchers can run their queries on the
+            # same connection that persists the user/assistant messages.
+            # The earlier implementation closed the session before streaming
+            # and reopened it for assistant persistence — fine for text-only
+            # plain chat, but workbook/dataset tools have nowhere to query
+            # from without a live session.
             async with tenant_connection_manager.get_session(tenant) as session:
+                # Step 1: persist user message.
                 try:
                     await history_svc.append_message(
                         session,
@@ -1663,36 +1727,48 @@ async def stream_message_to_conversation(
                 except history_svc.ConversationNotFound:
                     yield f"data: {json.dumps({'error': 'Conversation not found.'})}\n\n"
                     return
+
+                # Step 2: build tool context (may raise 404/409 for missing/
+                # not-ready workbook).
+                try:
+                    system, tools, dispatch = await _build_conversation_tool_context(
+                        session=session, tenant=tenant, user_email=current_user.email, rid=rid,
+                        workbook_id=body.workbook_id, use_dataset=body.dataset,
+                    )
+                except HTTPException as exc:
+                    yield f"data: {json.dumps({'error': exc.detail})}\n\n"
+                    return
+
                 messages_for_llm = await history_svc.list_messages_for_llm(
                     session,
                     conversation_id=conversation_id,
                     user_id=current_user.id,
                 )
+                # Commit the user-message insert before we start streaming so
+                # the row is visible to other reads even if the stream is
+                # cancelled mid-way.
                 await session.commit()
 
-            # Step 3: stream from Claude with artifact tools available. The
-            # shared helper yields delta + tool_start + tool_done + final
-            # events; we forward the first three to the wire and use the
-            # final event to capture accumulated text + token totals for
-            # the assistant-message persistence in step 4.
-            async for event in _stream_chat_with_tools(
-                client=client, model=model, system=system,
-                messages=messages_for_llm, tools=tools, dispatch=dispatch,
-            ):
-                if "error" in event:
-                    yield f"data: {json.dumps({'error': event['error']})}\n\n"
-                    return
-                if event.get("event") == "final":
-                    full_text = event.get("text", "")
-                    usage_block = event.get("usage", {}) or {}
-                    break
-                yield f"data: {json.dumps(event)}\n\n"
+                # Step 3: stream from Claude. delta + tool_start + tool_done
+                # are forwarded to the wire; the terminal 'final' event
+                # carries the accumulated text + token totals.
+                async for event in _stream_chat_with_tools(
+                    client=client, model=model, system=system,
+                    messages=messages_for_llm, tools=tools, dispatch=dispatch,
+                ):
+                    if "error" in event:
+                        yield f"data: {json.dumps({'error': event['error']})}\n\n"
+                        return
+                    if event.get("event") == "final":
+                        full_text = event.get("text", "")
+                        usage_block = event.get("usage", {}) or {}
+                        break
+                    yield f"data: {json.dumps(event)}\n\n"
 
-            # Step 4: persist the assistant message — accumulated text from
-            # the final event includes both the streamed deltas AND any
-            # additional text the model produced across tool-use rounds.
-            if full_text.strip():
-                async with tenant_connection_manager.get_session(tenant) as session:
+                # Step 4: persist the assistant message. Reuse the same
+                # session so this is one transactional unit with the prior
+                # commits — anything left uncommitted at the end is lost.
+                if full_text.strip():
                     await history_svc.append_message(
                         session,
                         conversation_id=conversation_id,

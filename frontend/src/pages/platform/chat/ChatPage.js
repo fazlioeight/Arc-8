@@ -669,16 +669,12 @@ const ChatPage = () => {
       if (fileToSend) {
         const res = await chatWithFile({ token, tenant: tenantKey, prompt: userMsg.content, file: fileToSend, model });
         setMessages([...nextMessages, { role: 'assistant', content: res.reply }]);
-      } else if (usingTool) {
-        const res = await sendChat({
-          token, tenant: tenantKey, model,
-          messages: nextMessages, workbookId: activeWorkbookId, dataset: datasetMode,
-        });
-        setMessages([...nextMessages, { role: 'assistant', content: res.reply }]);
       } else if (token) {
-        // Persisted streaming path. Create the conversation lazily on the
-        // first send so we never produce empty orphans in the sidebar. If
-        // create fails (e.g. API down), fall back to the ephemeral stream.
+        // Persisted streaming path — for every chat, including workbook /
+        // dataset turns. Previously workbook chats went through the
+        // non-persisting /api/chat endpoint, so they never landed in the
+        // sidebar history; now the conversation endpoint dispatches to
+        // the right SQL tool internally based on workbookId / dataset.
         let conversationId = activeConversationId;
         if (!conversationId) {
           try {
@@ -708,6 +704,8 @@ const ChatPage = () => {
             token, tenant: tenantKey, model,
             conversationId,
             content: userMsg.content,
+            workbookId: activeWorkbookId,
+            dataset: datasetMode,
             onDelta: (delta) => {
               buffer += delta;
               setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
@@ -718,18 +716,30 @@ const ChatPage = () => {
           if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
           refreshConversations();
         } else {
-          let buffer = '';
-          await streamChat({
-            token, tenant: tenantKey, model,
-            messages: nextMessages,
-            onDelta: (delta) => {
-              buffer += delta;
-              setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
-            },
-            onError: (err) => setError(err),
-            ...toolHandlers,
-          });
-          if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
+          // No conversation created — fall back to the ephemeral non-persisting
+          // path. The /api/chat endpoint dispatches workbook/dataset chats
+          // internally; we use sendChat for that case since /api/chat/stream
+          // doesn't yet route workbook/dataset itself.
+          if (usingTool) {
+            const res = await sendChat({
+              token, tenant: tenantKey, model,
+              messages: nextMessages, workbookId: activeWorkbookId, dataset: datasetMode,
+            });
+            setMessages([...nextMessages, { role: 'assistant', content: res.reply }]);
+          } else {
+            let buffer = '';
+            await streamChat({
+              token, tenant: tenantKey, model,
+              messages: nextMessages,
+              onDelta: (delta) => {
+                buffer += delta;
+                setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
+              },
+              onError: (err) => setError(err),
+              ...toolHandlers,
+            });
+            if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
+          }
         }
       } else {
         let buffer = '';
