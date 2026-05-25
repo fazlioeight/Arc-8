@@ -112,6 +112,10 @@ async def get_conversation(
 
     ``include_messages=True`` (default) eager-loads the messages relationship
     in a single round-trip via ``selectinload``.
+
+    This is the owner-strict path. For project-aware access (where another
+    tenant user can read or write the chat through a shared project) use
+    :func:`get_readable_conversation` or :func:`get_writable_conversation`.
     """
     stmt = select(ChatConversation).where(
         ChatConversation.id == conversation_id,
@@ -124,6 +128,78 @@ async def get_conversation(
     if row is None:
         raise ConversationNotFound(conversation_id)
     return row
+
+
+async def get_readable_conversation(
+    session: AsyncSession,
+    *,
+    conversation_id: str,
+    user_id: int,
+    include_messages: bool = True,
+) -> ChatConversation:
+    """Load a conversation that ``user_id`` can read.
+
+    Read access = owner OR any project member (owner / editor / viewer)
+    of an active project the conversation is attached to. Existence
+    leakage is handled exactly like :func:`get_conversation`: missing,
+    inaccessible, and soft-deleted all collapse to ``ConversationNotFound``.
+    """
+    # Import inside the function to avoid a circular import — projects.py
+    # already imports this module.
+    from . import projects as projects_svc
+
+    stmt = select(ChatConversation).where(
+        ChatConversation.id == conversation_id,
+        ChatConversation.archived_at.is_(None),
+    )
+    if include_messages:
+        stmt = stmt.options(selectinload(ChatConversation.messages))
+    row = await session.scalar(stmt)
+    if row is None:
+        raise ConversationNotFound(conversation_id)
+
+    if row.user_id == user_id:
+        return row
+    if await projects_svc.user_has_read_access(
+        session, conversation_id=conversation_id, user_id=user_id
+    ):
+        return row
+    raise ConversationNotFound(conversation_id)
+
+
+async def get_writable_conversation(
+    session: AsyncSession,
+    *,
+    conversation_id: str,
+    user_id: int,
+    include_messages: bool = False,
+) -> ChatConversation:
+    """Load a conversation that ``user_id`` can append messages to.
+
+    Write access = owner OR editor/owner role in an active project
+    containing the chat. A viewer-role member can read but not write —
+    they'll get ``ConversationNotFound`` here (and the route layer turns
+    that into a 404, not a 403, so we don't leak the chat's existence to
+    users who shouldn't be writing to it)."""
+    from . import projects as projects_svc
+
+    stmt = select(ChatConversation).where(
+        ChatConversation.id == conversation_id,
+        ChatConversation.archived_at.is_(None),
+    )
+    if include_messages:
+        stmt = stmt.options(selectinload(ChatConversation.messages))
+    row = await session.scalar(stmt)
+    if row is None:
+        raise ConversationNotFound(conversation_id)
+
+    if row.user_id == user_id:
+        return row
+    if await projects_svc.user_has_write_access(
+        session, conversation_id=conversation_id, user_id=user_id
+    ):
+        return row
+    raise ConversationNotFound(conversation_id)
 
 
 async def create_conversation(
@@ -202,8 +278,12 @@ async def append_message(
     The caller (route handler) commits — keeping commit at the route lets us
     write user message + LLM call + assistant message under the same Unit
     of Work, so a network blip mid-stream doesn't leave a half-saved row.
+
+    Permission: the conversation owner OR an editor/owner of a project
+    that contains the chat may append. Viewers (read-only project members)
+    are rejected with ``ConversationNotFound``.
     """
-    convo = await get_conversation(
+    convo = await get_writable_conversation(
         session, conversation_id=conversation_id, user_id=user_id, include_messages=False
     )
     msg = ChatHistoryMessage(
@@ -241,8 +321,12 @@ async def list_messages_for_llm(
 
     The sequence INCLUDES the most recently appended user message (the
     typical call order is: append user → list_messages_for_llm → call LLM).
+
+    Uses the writable view: this function is only called from the chat
+    routes when a user is sending a message, so the caller already has
+    write access. Readers (viewers) shouldn't be triggering LLM calls.
     """
-    convo = await get_conversation(
+    convo = await get_writable_conversation(
         session, conversation_id=conversation_id, user_id=user_id, include_messages=True
     )
     return [

@@ -302,6 +302,159 @@ export const streamConversationMessage = async ({
 };
 
 
+// ── Projects ────────────────────────────────────────────────────────────────
+// Group chats together and share them with other tenant users. Roles:
+// owner (creator) > editor (attach chats, send messages) > viewer (read-only).
+// A user is added to a project by ``user_id``; the share dialog feeds itself
+// from listTenantUsers() to pick from active users in the same tenant.
+
+export const listProjects = async ({ token, tenant }) => {
+  const res = await fetch(`${API_BASE}/api/chat/projects`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const createProject = async ({ token, tenant, title, description }) => {
+  const res = await fetch(`${API_BASE}/api/chat/projects`, {
+    method: 'POST',
+    headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ title, description: description || null }),
+  });
+  return handleResponse(res);
+};
+
+export const getProject = async ({ token, tenant, projectId }) => {
+  const res = await fetch(`${API_BASE}/api/chat/projects/${projectId}`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const updateProject = async ({ token, tenant, projectId, title, description }) => {
+  const res = await fetch(`${API_BASE}/api/chat/projects/${projectId}`, {
+    method: 'PATCH',
+    headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      ...(title !== undefined ? { title } : {}),
+      ...(description !== undefined ? { description } : {}),
+    }),
+  });
+  return handleResponse(res);
+};
+
+export const deleteProject = async ({ token, tenant, projectId }) => {
+  const res = await fetch(`${API_BASE}/api/chat/projects/${projectId}`, {
+    method: 'DELETE',
+    headers: buildHeaders(token, tenant),
+  });
+  if (!res.ok && res.status !== 204) {
+    const detail = await res.text();
+    throw new Error(detail || 'Delete failed');
+  }
+  return { deleted: projectId };
+};
+
+export const listProjectMembers = async ({ token, tenant, projectId }) => {
+  const res = await fetch(`${API_BASE}/api/chat/projects/${projectId}/members`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+export const addProjectMember = async ({ token, tenant, projectId, userId, role }) => {
+  const res = await fetch(`${API_BASE}/api/chat/projects/${projectId}/members`, {
+    method: 'POST',
+    headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ user_id: userId, role: role || 'viewer' }),
+  });
+  return handleResponse(res);
+};
+
+export const updateProjectMemberRole = async ({ token, tenant, projectId, userId, role }) => {
+  const res = await fetch(
+    `${API_BASE}/api/chat/projects/${projectId}/members/${userId}`,
+    {
+      method: 'PATCH',
+      headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ role }),
+    },
+  );
+  return handleResponse(res);
+};
+
+export const removeProjectMember = async ({ token, tenant, projectId, userId }) => {
+  const res = await fetch(
+    `${API_BASE}/api/chat/projects/${projectId}/members/${userId}`,
+    {
+      method: 'DELETE',
+      headers: buildHeaders(token, tenant),
+    },
+  );
+  if (!res.ok && res.status !== 204) {
+    const detail = await res.text();
+    throw new Error(detail || 'Remove failed');
+  }
+  return { removed: userId };
+};
+
+export const listProjectConversations = async ({ token, tenant, projectId }) => {
+  const res = await fetch(
+    `${API_BASE}/api/chat/projects/${projectId}/conversations`,
+    { headers: buildHeaders(token, tenant) },
+  );
+  return handleResponse(res);
+};
+
+/**
+ * Attach an existing conversation OR create a new one in the project. Pass
+ * exactly one of ``conversationId`` (attach) or ``title`` (create new).
+ */
+export const attachConversationToProject = async ({
+  token, tenant, projectId, conversationId, title,
+}) => {
+  const res = await fetch(
+    `${API_BASE}/api/chat/projects/${projectId}/conversations`,
+    {
+      method: 'POST',
+      headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        conversation_id: conversationId || null,
+        title: title || null,
+      }),
+    },
+  );
+  return handleResponse(res);
+};
+
+export const detachConversationFromProject = async ({
+  token, tenant, projectId, conversationId,
+}) => {
+  const res = await fetch(
+    `${API_BASE}/api/chat/projects/${projectId}/conversations/${conversationId}`,
+    {
+      method: 'DELETE',
+      headers: buildHeaders(token, tenant),
+    },
+  );
+  if (!res.ok && res.status !== 204) {
+    const detail = await res.text();
+    throw new Error(detail || 'Detach failed');
+  }
+  return { detached: conversationId };
+};
+
+// Active users in the caller's tenant (id + email only). Feeds the share
+// dialog's "add member" picker. Excludes the caller themselves so they
+// can't pick themselves out of the list.
+export const listTenantUsers = async ({ token, tenant }) => {
+  const res = await fetch(`${API_BASE}/api/chat/tenant-users`, {
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(res);
+};
+
+
 /**
  * Trigger a browser download for a Blob using an in-memory <a download> link.
  * Cleanup is intentional — failing to revokeObjectURL leaks memory until the

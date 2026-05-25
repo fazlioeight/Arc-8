@@ -60,9 +60,24 @@ from ..schemas.chat_history import (
     SendMessageRequest,
     SendMessageResponse,
 )
+from ..schemas.chat_projects import (
+    AddMemberRequest,
+    AttachConversationRequest,
+    CreateProjectRequest,
+    ProjectDetail,
+    ProjectListResponse,
+    ProjectMemberOut,
+    ProjectSummary,
+    TenantUserListResponse,
+    TenantUserOut,
+    UpdateMemberRoleRequest,
+    UpdateProjectRequest,
+)
 from ..services.chat import history as history_svc
+from ..services.chat import projects as projects_svc
+from ..models.tables import User
 from ..utils.audit_logger import record_audit_event
-from ..db.session import control_session
+from ..db.session import control_session, get_control_session
 from ..utils.security import AuthenticatedUser, get_current_user
 
 
@@ -1511,8 +1526,12 @@ async def get_conversation_detail(
     current_user: AuthenticatedUser = Depends(get_current_user),
     session: AsyncSession = Depends(get_tenant_session),
 ):
+    # Project-aware read: owner OR any project member can open the
+    # conversation. Rename/delete (below) remain owner-strict via
+    # ``get_conversation`` because the conversation itself is still
+    # singly-owned, sharing is just additive.
     try:
-        convo = await history_svc.get_conversation(
+        convo = await history_svc.get_readable_conversation(
             session, conversation_id=conversation_id, user_id=current_user.id
         )
     except history_svc.ConversationNotFound:
@@ -1658,8 +1677,10 @@ async def send_message_to_conversation(
     )
 
     # Reload the conversation summary so the response includes the bumped
-    # message_count + updated_at.
-    convo = await history_svc.get_conversation(
+    # message_count + updated_at. ``get_writable_conversation`` so an
+    # editor in a shared project can send messages without being the chat
+    # owner.
+    convo = await history_svc.get_writable_conversation(
         session,
         conversation_id=conversation_id,
         user_id=current_user.id,
@@ -1793,4 +1814,414 @@ async def stream_message_to_conversation(
         _generate(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ── Projects ────────────────────────────────────────────────────────────────
+# Group chats together and share them with other tenant users. A project is
+# created by one user (the "owner"), and additional tenant users can be
+# invited as editor (can attach chats + send messages in member chats) or
+# viewer (read-only). The chat conversation itself remains singly-owned —
+# project membership is additive read/write access on top of ownership. See
+# ``services/chat/projects.py`` for the full role matrix.
+
+
+def _project_to_summary(
+    project, my_role: str, conversation_count: int, member_count: int
+) -> ProjectSummary:
+    return ProjectSummary.model_validate(
+        {
+            "id": project.id,
+            "title": project.title,
+            "description": project.description,
+            "owner_id": project.owner_id,
+            "owner_email": project.owner_email,
+            "conversation_count": conversation_count,
+            "member_count": member_count,
+            "my_role": my_role,
+            "created_at": project.created_at,
+            "updated_at": project.updated_at,
+        }
+    )
+
+
+def _project_exc_to_http(exc: Exception) -> HTTPException:
+    """Map service exceptions to HTTP responses. Centralised so every
+    route returns consistent status codes + detail strings."""
+    if isinstance(exc, projects_svc.ProjectNotFound):
+        return HTTPException(status_code=404, detail="Project not found.")
+    if isinstance(exc, projects_svc.ProjectPermissionDenied):
+        return HTTPException(
+            status_code=403, detail="You don't have permission for this action."
+        )
+    if isinstance(exc, projects_svc.ProjectConflict):
+        return HTTPException(status_code=409, detail=str(exc))
+    if isinstance(exc, ValueError):
+        return HTTPException(status_code=400, detail=str(exc))
+    raise exc
+
+
+@router.get("/projects", response_model=ProjectListResponse)
+async def list_my_projects(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    rows = await projects_svc.list_projects_for_user(session, user_id=current_user.id)
+    return ProjectListResponse(
+        projects=[
+            _project_to_summary(project, membership.role, conv_count, member_count)
+            for (project, membership, conv_count, member_count) in rows
+        ]
+    )
+
+
+@router.post("/projects", response_model=ProjectSummary, status_code=201)
+async def create_project(
+    body: CreateProjectRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    project = await projects_svc.create_project(
+        session,
+        owner_id=current_user.id,
+        owner_email=current_user.email,
+        title=body.title,
+        description=body.description,
+    )
+    await session.commit()
+    return _project_to_summary(project, my_role="owner", conversation_count=0, member_count=1)
+
+
+@router.get("/projects/{project_id}", response_model=ProjectDetail)
+async def get_project_detail(
+    project_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        project, member = await projects_svc.get_project(
+            session, project_id=project_id, user_id=current_user.id
+        )
+        members = await projects_svc.list_members(
+            session, project_id=project_id, user_id=current_user.id
+        )
+        convos = await projects_svc.list_project_conversations(
+            session, project_id=project_id, user_id=current_user.id
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+
+    return ProjectDetail.model_validate(
+        {
+            "id": project.id,
+            "title": project.title,
+            "description": project.description,
+            "owner_id": project.owner_id,
+            "owner_email": project.owner_email,
+            "my_role": member.role,
+            "created_at": project.created_at,
+            "updated_at": project.updated_at,
+            "members": [ProjectMemberOut.model_validate(m) for m in members],
+            "conversations": [
+                ConversationSummary.model_validate(c) for c in convos
+            ],
+        }
+    )
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectSummary)
+async def update_project(
+    project_id: str,
+    body: UpdateProjectRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    if body.title is None and body.description is None:
+        raise HTTPException(status_code=400, detail="Nothing to update.")
+    try:
+        project = await projects_svc.update_project(
+            session,
+            project_id=project_id,
+            user_id=current_user.id,
+            title=body.title,
+            description=body.description,
+        )
+        _, member = await projects_svc.get_project(
+            session, project_id=project_id, user_id=current_user.id
+        )
+        conv_count = await projects_svc._count_conversations(session, project.id)
+        member_count = await projects_svc._count_members(session, project.id)
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+    await session.commit()
+    return _project_to_summary(project, member.role, conv_count, member_count)
+
+
+@router.delete("/projects/{project_id}", status_code=204)
+async def delete_project(
+    project_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        await projects_svc.delete_project(
+            session, project_id=project_id, user_id=current_user.id
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+    await session.commit()
+
+
+# ── Project members ────────────────────────────────────────────────────────
+
+
+@router.get("/projects/{project_id}/members", response_model=list[ProjectMemberOut])
+async def list_project_members(
+    project_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        members = await projects_svc.list_members(
+            session, project_id=project_id, user_id=current_user.id
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+    return [ProjectMemberOut.model_validate(m) for m in members]
+
+
+@router.post(
+    "/projects/{project_id}/members",
+    response_model=ProjectMemberOut,
+    status_code=201,
+)
+async def add_project_member(
+    project_id: str,
+    body: AddMemberRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control: AsyncSession = Depends(get_control_session),
+):
+    # Verify the caller is the project owner BEFORE doing the user lookup —
+    # otherwise a non-owner could probe for valid user_ids in the tenant by
+    # watching for 404 vs 403 responses.
+    try:
+        _, actor_membership = await projects_svc.get_project(
+            session, project_id=project_id, user_id=current_user.id
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+    if actor_membership.role != "owner":
+        raise HTTPException(
+            status_code=403, detail="You don't have permission for this action."
+        )
+
+    # Look up the new member in the control plane to:
+    #   1) confirm they exist + are in the same tenant (no cross-tenant invites),
+    #   2) capture their email so the project member row stays renderable
+    #      even if the User record is later deleted.
+    user = await control.scalar(
+        sa_select(User).where(
+            User.id == body.user_id,
+            User.tenant_id == tenant.id,
+            User.is_active.is_(True),
+        )
+    )
+    if user is None:
+        # Don't leak whether the id exists in another tenant.
+        raise HTTPException(status_code=404, detail="User not found in this tenant.")
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=400, detail="You're already a member of the project."
+        )
+
+    try:
+        member = await projects_svc.add_member(
+            session,
+            project_id=project_id,
+            actor_user_id=current_user.id,
+            new_user_id=user.id,
+            new_user_email=user.email,
+            role=body.role,
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+    await session.commit()
+    return ProjectMemberOut.model_validate(member)
+
+
+@router.patch(
+    "/projects/{project_id}/members/{user_id}",
+    response_model=ProjectMemberOut,
+)
+async def update_project_member_role(
+    project_id: str,
+    user_id: int,
+    body: UpdateMemberRoleRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        member = await projects_svc.update_member_role(
+            session,
+            project_id=project_id,
+            actor_user_id=current_user.id,
+            target_user_id=user_id,
+            role=body.role,
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+    await session.commit()
+    return ProjectMemberOut.model_validate(member)
+
+
+@router.delete(
+    "/projects/{project_id}/members/{user_id}",
+    status_code=204,
+)
+async def remove_project_member(
+    project_id: str,
+    user_id: int,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        await projects_svc.remove_member(
+            session,
+            project_id=project_id,
+            actor_user_id=current_user.id,
+            target_user_id=user_id,
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+    await session.commit()
+
+
+# ── Project conversations ──────────────────────────────────────────────────
+
+
+@router.get(
+    "/projects/{project_id}/conversations",
+    response_model=ConversationListResponse,
+)
+async def list_project_conversations(
+    project_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        convos = await projects_svc.list_project_conversations(
+            session, project_id=project_id, user_id=current_user.id
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+    return ConversationListResponse(
+        conversations=[ConversationSummary.model_validate(c) for c in convos]
+    )
+
+
+@router.post(
+    "/projects/{project_id}/conversations",
+    response_model=ConversationSummary,
+    status_code=201,
+)
+async def attach_or_create_project_conversation(
+    project_id: str,
+    body: AttachConversationRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    """Either attach an existing conversation (``conversation_id`` set) or
+    create a new one within the project (``title`` set or both unset).
+
+    Exactly one mode per request — passing both fields is rejected as 400."""
+    if body.conversation_id and body.title:
+        raise HTTPException(
+            status_code=400,
+            detail="Pass either conversation_id or title, not both.",
+        )
+    try:
+        if body.conversation_id:
+            link = await projects_svc.attach_conversation(
+                session,
+                project_id=project_id,
+                user_id=current_user.id,
+                user_email=current_user.email,
+                conversation_id=body.conversation_id,
+            )
+            convo = await history_svc.get_readable_conversation(
+                session,
+                conversation_id=link.conversation_id,
+                user_id=current_user.id,
+                include_messages=False,
+            )
+        else:
+            convo = await projects_svc.create_conversation_in_project(
+                session,
+                project_id=project_id,
+                user_id=current_user.id,
+                user_email=current_user.email,
+                title=body.title,
+            )
+    except history_svc.ConversationNotFound:
+        # Re-shaping a history miss inside the project flow: most often
+        # this means the caller doesn't own the conversation they tried
+        # to attach.
+        raise HTTPException(
+            status_code=404, detail="Conversation not found or not yours to share."
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+
+    await session.commit()
+    return ConversationSummary.model_validate(convo)
+
+
+@router.delete(
+    "/projects/{project_id}/conversations/{conversation_id}",
+    status_code=204,
+)
+async def detach_project_conversation(
+    project_id: str,
+    conversation_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_tenant_session),
+):
+    try:
+        await projects_svc.detach_conversation(
+            session,
+            project_id=project_id,
+            user_id=current_user.id,
+            conversation_id=conversation_id,
+        )
+    except Exception as exc:
+        raise _project_exc_to_http(exc)
+    await session.commit()
+
+
+# ── Tenant user picker (used by the project share dialog) ──────────────────
+# We deliberately do NOT reuse /api/admin/users — that endpoint is admin-only
+# and returns more PII than the share dialog needs. This minimal endpoint
+# returns just (id, email) for active users in the caller's tenant.
+
+
+@router.get("/tenant-users", response_model=TenantUserListResponse)
+async def list_tenant_users(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_tenant_context),
+    control: AsyncSession = Depends(get_control_session),
+):
+    stmt = (
+        sa_select(User.id, User.email)
+        .where(User.tenant_id == tenant.id, User.is_active.is_(True))
+        .order_by(User.email.asc())
+    )
+    rows = (await control.execute(stmt)).all()
+    return TenantUserListResponse(
+        users=[
+            TenantUserOut(id=row.id, email=row.email)
+            for row in rows
+            if row.id != current_user.id
+        ]
     )

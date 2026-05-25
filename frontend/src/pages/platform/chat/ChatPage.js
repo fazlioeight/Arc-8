@@ -6,21 +6,33 @@ import Chart from 'chart.js/auto';
 import PortalUtilityBar from '../../../components/PortalUtilityBar';
 import { AuthContext } from '../../../context/AuthContext';
 import {
+  addProjectMember,
+  attachConversationToProject,
   chatWithFile,
   createConversation,
+  createProject,
   deleteConversation,
+  deleteProject,
   deleteWorkbook,
+  detachConversationFromProject,
   downloadBlob,
   exportConversation,
   getConversation,
+  getProject,
   listChatModels,
   listConversations,
   listDatasetTables,
+  listProjectMembers,
+  listProjects,
+  listTenantUsers,
   listWorkbooks,
+  removeProjectMember,
   renameConversation,
   sendChat,
   streamChat,
   streamConversationMessage,
+  updateProject,
+  updateProjectMemberRole,
   uploadWorkbook,
 } from '../../../services/chatService';
 import '../../../styles/memberWorkspace.css';
@@ -454,6 +466,33 @@ const ChatPage = () => {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [loadingConversation, setLoadingConversation] = useState(false);
+  // Projects — list of {id, title, my_role, conversation_count, ...}.
+  // ``activeProjectId`` is the project the user has expanded in the sidebar;
+  // new chats created while a project is active are auto-attached to it.
+  // ``expandedProjectIds`` is a Set of project ids whose chat lists are
+  // visible in the sidebar (separate from active so a user can keep one
+  // project expanded while working in another).
+  const [projects, setProjects] = useState([]);
+  const [activeProjectId, setActiveProjectId] = useState(null);
+  const [expandedProjectIds, setExpandedProjectIds] = useState(() => new Set());
+  // Chats per project — { [projectId]: [conversation summary, ...] }.
+  // Loaded lazily on first expand so the initial render doesn't fan-out
+  // one request per project.
+  const [projectConversations, setProjectConversations] = useState({});
+  // Share / settings modal state for a single project. ``shareProjectId``
+  // null means the modal is closed.
+  const [shareProjectId, setShareProjectId] = useState(null);
+  const [shareMembers, setShareMembers] = useState([]);
+  const [tenantUserOptions, setTenantUserOptions] = useState([]);
+  const [shareInviteUserId, setShareInviteUserId] = useState('');
+  const [shareInviteRole, setShareInviteRole] = useState('viewer');
+  const [shareBusy, setShareBusy] = useState(false);
+  // "Add chat to project" picker. ``attachTarget`` holds the conversation
+  // the user is moving + its title (for the modal heading). Null = closed.
+  // ``attachSelectedProjectId`` tracks the radio selection inside the modal.
+  const [attachTarget, setAttachTarget] = useState(null);
+  const [attachSelectedProjectId, setAttachSelectedProjectId] = useState(null);
+  const [attachBusy, setAttachBusy] = useState(false);
 
   const fileInputRef = useRef(null);
   const workbookFileRef = useRef(null);
@@ -640,6 +679,242 @@ const ChatPage = () => {
     }
   }, [token, tenantKey]);
 
+  // ── Projects ─────────────────────────────────────────────────────────────
+  // Best-effort load on mount, mirroring refreshConversations. Empty
+  // ``projects`` is a valid state — the sidebar just hides the section.
+  const refreshProjects = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await listProjects({ token, tenant: tenantKey });
+      setProjects(data?.projects || []);
+    } catch (e) {
+      setProjects([]);
+    }
+  }, [token, tenantKey]);
+
+  useEffect(() => {
+    refreshProjects();
+  }, [refreshProjects]);
+
+  // Lazily fetch a project's conversation list the first time it's expanded.
+  const ensureProjectConversations = useCallback(async (projectId) => {
+    if (!token || !projectId) return;
+    if (projectConversations[projectId]) return;
+    try {
+      const data = await getProject({ token, tenant: tenantKey, projectId });
+      setProjectConversations((prev) => ({
+        ...prev,
+        [projectId]: data?.conversations || [],
+      }));
+    } catch (e) {
+      setProjectConversations((prev) => ({ ...prev, [projectId]: [] }));
+    }
+  }, [token, tenantKey, projectConversations]);
+
+  const handleToggleProject = useCallback((projectId) => {
+    setExpandedProjectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+        // Fetch on first expand; ensureProjectConversations no-ops if cached.
+        ensureProjectConversations(projectId);
+      }
+      return next;
+    });
+  }, [ensureProjectConversations]);
+
+  const handleCreateProject = useCallback(async () => {
+    const title = window.prompt('New project name');
+    if (!title || !title.trim()) return;
+    try {
+      const project = await createProject({
+        token, tenant: tenantKey, title: title.trim(),
+      });
+      setProjects((prev) => [project, ...prev]);
+      setProjectConversations((prev) => ({ ...prev, [project.id]: [] }));
+      setExpandedProjectIds((prev) => new Set(prev).add(project.id));
+      setActiveProjectId(project.id);
+    } catch (e) {
+      setError(e.message || 'Failed to create project');
+    }
+  }, [token, tenantKey]);
+
+  const handleRenameProject = useCallback(async (projectId, currentTitle) => {
+    const next = window.prompt('Rename project', currentTitle || '');
+    if (!next || !next.trim() || next === currentTitle) return;
+    try {
+      const updated = await updateProject({
+        token, tenant: tenantKey, projectId, title: next.trim(),
+      });
+      setProjects((prev) => prev.map((p) => (p.id === projectId ? { ...p, ...updated } : p)));
+    } catch (e) {
+      setError(e.message || 'Failed to rename project');
+    }
+  }, [token, tenantKey]);
+
+  const handleDeleteProject = useCallback(async (projectId, title) => {
+    if (!window.confirm(`Delete project "${title || 'untitled'}"? Chats inside the project are not deleted.`)) {
+      return;
+    }
+    try {
+      await deleteProject({ token, tenant: tenantKey, projectId });
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      setProjectConversations((prev) => {
+        const next = { ...prev };
+        delete next[projectId];
+        return next;
+      });
+      setExpandedProjectIds((prev) => {
+        const next = new Set(prev);
+        next.delete(projectId);
+        return next;
+      });
+      if (activeProjectId === projectId) setActiveProjectId(null);
+    } catch (e) {
+      setError(e.message || 'Failed to delete project');
+    }
+  }, [token, tenantKey, activeProjectId]);
+
+  // Open the "add chat to project" picker. The actual attach POST happens
+  // in confirmAttachConversation when the user clicks Add — splitting the
+  // two lets the modal preview the destination without committing.
+  const handleAttachConversationToProject = useCallback((conversationId, conversationTitle) => {
+    const choices = projects.filter((p) => p.my_role === 'owner' || p.my_role === 'editor');
+    if (choices.length === 0) {
+      setError('No projects available. Create a project first.');
+      return;
+    }
+    setAttachTarget({ conversationId, conversationTitle });
+    setAttachSelectedProjectId(choices[0].id);
+  }, [projects]);
+
+  const closeAttachModal = () => {
+    setAttachTarget(null);
+    setAttachSelectedProjectId(null);
+  };
+
+  const confirmAttachConversation = useCallback(async () => {
+    if (!attachTarget || !attachSelectedProjectId) return;
+    const projectId = attachSelectedProjectId;
+    const { conversationId } = attachTarget;
+    setAttachBusy(true);
+    try {
+      await attachConversationToProject({
+        token, tenant: tenantKey, projectId, conversationId,
+      });
+      // Invalidate the cached chat list for the project so a re-expand re-fetches.
+      setProjectConversations((prev) => {
+        const next = { ...prev };
+        delete next[projectId];
+        return next;
+      });
+      setProjects((prev) => prev.map((p) =>
+        p.id === projectId ? { ...p, conversation_count: (p.conversation_count || 0) + 1 } : p,
+      ));
+      setExpandedProjectIds((prev) => new Set(prev).add(projectId));
+      ensureProjectConversations(projectId);
+      closeAttachModal();
+    } catch (e) {
+      // Stay open on error so the user can see what went wrong and retry.
+      setError(e.message || 'Failed to add chat to project');
+    } finally {
+      setAttachBusy(false);
+    }
+  }, [token, tenantKey, attachTarget, attachSelectedProjectId, ensureProjectConversations]);
+
+  // ── Project share / settings modal ───────────────────────────────────────
+  // Opening the modal triggers two loads in parallel: the project's current
+  // members (so we render the existing access list) and the tenant's users
+  // (so the "Add member" select has options). Errors are surfaced inline.
+  const openShareModal = useCallback(async (projectId) => {
+    setShareProjectId(projectId);
+    setShareInviteUserId('');
+    setShareInviteRole('viewer');
+    try {
+      const [membersResp, usersResp] = await Promise.all([
+        listProjectMembers({ token, tenant: tenantKey, projectId }),
+        listTenantUsers({ token, tenant: tenantKey }),
+      ]);
+      setShareMembers(Array.isArray(membersResp) ? membersResp : []);
+      setTenantUserOptions(usersResp?.users || []);
+    } catch (e) {
+      setError(e.message || 'Failed to load project members');
+      setShareMembers([]);
+      setTenantUserOptions([]);
+    }
+  }, [token, tenantKey]);
+
+  const closeShareModal = () => {
+    setShareProjectId(null);
+    setShareMembers([]);
+    setTenantUserOptions([]);
+  };
+
+  const handleInviteMember = useCallback(async () => {
+    if (!shareProjectId || !shareInviteUserId) return;
+    setShareBusy(true);
+    try {
+      const member = await addProjectMember({
+        token, tenant: tenantKey, projectId: shareProjectId,
+        userId: Number(shareInviteUserId), role: shareInviteRole,
+      });
+      setShareMembers((prev) => [...prev, member]);
+      setProjects((prev) => prev.map((p) =>
+        p.id === shareProjectId ? { ...p, member_count: (p.member_count || 1) + 1 } : p,
+      ));
+      setShareInviteUserId('');
+    } catch (e) {
+      setError(e.message || 'Failed to add member');
+    } finally {
+      setShareBusy(false);
+    }
+  }, [token, tenantKey, shareProjectId, shareInviteUserId, shareInviteRole]);
+
+  const handleRemoveMember = useCallback(async (userId) => {
+    if (!shareProjectId) return;
+    setShareBusy(true);
+    try {
+      await removeProjectMember({
+        token, tenant: tenantKey, projectId: shareProjectId, userId,
+      });
+      setShareMembers((prev) => prev.filter((m) => m.user_id !== userId));
+      setProjects((prev) => prev.map((p) =>
+        p.id === shareProjectId
+          ? { ...p, member_count: Math.max(1, (p.member_count || 1) - 1) }
+          : p,
+      ));
+    } catch (e) {
+      setError(e.message || 'Failed to remove member');
+    } finally {
+      setShareBusy(false);
+    }
+  }, [token, tenantKey, shareProjectId]);
+
+  const handleChangeMemberRole = useCallback(async (userId, role) => {
+    if (!shareProjectId) return;
+    setShareBusy(true);
+    try {
+      const updated = await updateProjectMemberRole({
+        token, tenant: tenantKey, projectId: shareProjectId, userId, role,
+      });
+      setShareMembers((prev) => prev.map((m) => (m.user_id === userId ? updated : m)));
+    } catch (e) {
+      setError(e.message || 'Failed to update member role');
+    } finally {
+      setShareBusy(false);
+    }
+  }, [token, tenantKey, shareProjectId]);
+
+  // Tenant users not yet a member — feeds the invite picker. Memoised
+  // against the current member list so the dropdown stays consistent
+  // while the modal is open.
+  const inviteCandidates = useMemo(() => {
+    const memberIds = new Set(shareMembers.map((m) => m.user_id));
+    return tenantUserOptions.filter((u) => !memberIds.has(u.id));
+  }, [shareMembers, tenantUserOptions]);
+
   const handlePickPrompt = (prompt) => {
     setDraft(prompt);
     textareaRef.current?.focus();
@@ -678,10 +953,32 @@ const ChatPage = () => {
         let conversationId = activeConversationId;
         if (!conversationId) {
           try {
-            const convo = await createConversation({ token, tenant: tenantKey });
+            // If a project is active in the sidebar, route the create through
+            // the project endpoint so the new chat is auto-attached to it.
+            // Otherwise fall back to the plain conversation create.
+            const convo = activeProjectId
+              ? await attachConversationToProject({
+                  token, tenant: tenantKey, projectId: activeProjectId,
+                })
+              : await createConversation({ token, tenant: tenantKey });
             conversationId = convo.id;
             setActiveConversationId(conversationId);
             setConversations((prev) => [{ ...convo, message_count: 1 }, ...prev]);
+            if (activeProjectId) {
+              // Invalidate the cached chat list for the active project so
+              // the new chat shows up on next sidebar expand.
+              setProjectConversations((prev) => {
+                const next = { ...prev };
+                delete next[activeProjectId];
+                return next;
+              });
+              setProjects((prev) => prev.map((p) =>
+                p.id === activeProjectId
+                  ? { ...p, conversation_count: (p.conversation_count || 0) + 1 }
+                  : p,
+              ));
+              ensureProjectConversations(activeProjectId);
+            }
           } catch (e) {
             // Fall through to ephemeral path below.
           }
@@ -767,7 +1064,7 @@ const ChatPage = () => {
       setBusy(false);
       setToolStatus(null);
     }
-  }, [busy, draft, attachedFile, messages, token, tenantKey, model, activeWorkbookId, datasetMode, activeConversationId, refreshConversations]);
+  }, [busy, draft, attachedFile, messages, token, tenantKey, model, activeWorkbookId, datasetMode, activeConversationId, refreshConversations, activeProjectId, ensureProjectConversations]);
 
   const handleKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -859,13 +1156,192 @@ const ChatPage = () => {
 
           <button
             type="button"
-            onClick={handleNewChat}
+            onClick={() => { setActiveProjectId(null); handleNewChat(); }}
             className="flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
             style={{ background: 'var(--brand-primary)' }}
             aria-label="Start a new chat"
           >
             <span aria-hidden="true">+</span> New chat
           </button>
+
+          {/* Projects — owners/editors can create new chats inside; viewers
+              see chats but the "+" actions are hidden. The active project
+              pill at the top of this section is what handleSend reads to
+              auto-attach freshly-created chats. */}
+          <SidebarSection label="Projects">
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={handleCreateProject}
+                className="coding-ghost-button inline-flex items-center justify-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium"
+                aria-label="Create a new project"
+              >
+                + New project
+              </button>
+              {activeProjectId && (
+                <div className="flex items-center justify-between rounded-md px-2 py-1 text-[11px] coding-text-muted" style={{ background: 'var(--bg-canvas)' }}>
+                  <span className="truncate">
+                    New chats go to:{' '}
+                    <span className="font-medium coding-text-strong">
+                      {projects.find((p) => p.id === activeProjectId)?.title || 'project'}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveProjectId(null)}
+                    className="ml-2 rounded px-1 text-[10px] coding-text-muted hover:text-[var(--text)]"
+                    title="Stop creating chats inside this project"
+                    aria-label="Clear active project"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+              {projects.length === 0 && (
+                <div className="px-2 py-1 text-[11px] coding-text-soft">
+                  No projects yet.
+                </div>
+              )}
+              <ul className="flex flex-col gap-0.5" aria-label="Chat projects">
+                {projects.map((project) => {
+                  const expanded = expandedProjectIds.has(project.id);
+                  const projectChats = projectConversations[project.id] || [];
+                  const canEdit = project.my_role === 'owner' || project.my_role === 'editor';
+                  return (
+                    <li key={project.id} className="group flex flex-col">
+                      <div className="group flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleProject(project.id)}
+                          className={[
+                            'flex-1 truncate rounded-md px-2 py-1.5 text-left text-xs transition coding-nav-link',
+                            activeProjectId === project.id ? 'coding-nav-link--active' : '',
+                          ].filter(Boolean).join(' ')}
+                          title={project.title}
+                        >
+                          <span className="mr-1 inline-block w-3 text-center text-[10px] coding-text-muted">
+                            {expanded ? '▾' : '▸'}
+                          </span>
+                          {project.title}
+                          {project.my_role !== 'owner' && (
+                            <span className="ml-1 text-[10px] coding-text-muted">
+                              ({project.my_role})
+                            </span>
+                          )}
+                        </button>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveProjectId(project.id);
+                              if (!expanded) handleToggleProject(project.id);
+                              handleNewChat();
+                            }}
+                            className="opacity-0 group-hover:opacity-100 rounded px-1 text-[10px] coding-text-muted transition hover:text-[var(--text)]"
+                            title="New chat in this project"
+                            aria-label={`New chat in ${project.title}`}
+                          >
+                            +
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openShareModal(project.id)}
+                          className="opacity-0 group-hover:opacity-100 rounded px-1 text-[10px] coding-text-muted transition hover:text-[var(--text)]"
+                          title="Share"
+                          aria-label={`Share ${project.title}`}
+                        >
+                          ⇨
+                        </button>
+                        {project.my_role === 'owner' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleRenameProject(project.id, project.title)}
+                              className="opacity-0 group-hover:opacity-100 rounded px-1 text-[10px] coding-text-muted transition hover:text-[var(--text)]"
+                              title="Rename project"
+                              aria-label={`Rename project ${project.title}`}
+                            >
+                              ✎
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProject(project.id, project.title)}
+                              className="opacity-0 group-hover:opacity-100 rounded px-1 text-[10px] coding-text-muted transition hover:text-[var(--state-critical)]"
+                              title="Delete project"
+                              aria-label={`Delete project ${project.title}`}
+                            >
+                              ×
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      {expanded && (
+                        <ul className="ml-3 mt-0.5 flex flex-col gap-0.5 border-l coding-border-subtle pl-2">
+                          {projectChats.length === 0 && (
+                            <li className="px-1 py-0.5 text-[11px] coding-text-soft">
+                              No chats yet.
+                            </li>
+                          )}
+                          {projectChats.map((c) => {
+                            const isActive = activeConversationId === c.id;
+                            return (
+                              <li key={c.id} className="group flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveProjectId(project.id);
+                                    handleSelectConversation(c.id);
+                                  }}
+                                  disabled={busy || loadingConversation}
+                                  className={[
+                                    'flex-1 truncate rounded-md px-2 py-1 text-left text-[11px] transition coding-nav-link',
+                                    isActive ? 'coding-nav-link--active' : '',
+                                  ].filter(Boolean).join(' ')}
+                                  title={c.title || 'Untitled conversation'}
+                                >
+                                  {c.title || 'Untitled conversation'}
+                                </button>
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!window.confirm(`Remove "${c.title || 'this chat'}" from project?`)) return;
+                                      try {
+                                        await detachConversationFromProject({
+                                          token, tenant: tenantKey, projectId: project.id, conversationId: c.id,
+                                        });
+                                        setProjectConversations((prev) => ({
+                                          ...prev,
+                                          [project.id]: (prev[project.id] || []).filter((x) => x.id !== c.id),
+                                        }));
+                                        setProjects((prev) => prev.map((p) =>
+                                          p.id === project.id
+                                            ? { ...p, conversation_count: Math.max(0, (p.conversation_count || 1) - 1) }
+                                            : p,
+                                        ));
+                                      } catch (e) {
+                                        setError(e.message);
+                                      }
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 rounded px-1 text-[10px] coding-text-muted transition hover:text-[var(--state-critical)]"
+                                    title="Remove from project"
+                                    aria-label={`Remove ${c.title || 'chat'} from project`}
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </SidebarSection>
 
           {conversations.some((c) => (c.message_count || 0) > 0) && (
             <SidebarSection label="History">
@@ -888,6 +1364,17 @@ const ChatPage = () => {
                       >
                         {c.title || 'Untitled conversation'}
                       </button>
+                      {projects.some((p) => p.my_role === 'owner' || p.my_role === 'editor') && (
+                        <button
+                          type="button"
+                          onClick={() => handleAttachConversationToProject(c.id, c.title)}
+                          className="opacity-0 group-hover:opacity-100 rounded px-1 text-[10px] coding-text-muted transition hover:text-[var(--text)]"
+                          title="Add to project"
+                          aria-label={`Add ${c.title || 'conversation'} to a project`}
+                        >
+                          ⊞
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
@@ -1359,6 +1846,233 @@ const ChatPage = () => {
                 <button className={ghostBtn} type="button" onClick={() => setDatasetModalOpen(false)}>Close</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─ Add chat to project picker ──────────────────────────────── */}
+      {attachTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add chat to a project"
+          onClick={attachBusy ? undefined : closeAttachModal}
+        >
+          <div
+            className="w-full max-w-md rounded-lg p-5 shadow-xl"
+            style={{ background: 'var(--bg-card)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold coding-text-strong">
+                Add to project
+              </div>
+              <button
+                type="button"
+                className={ghostBtnSm}
+                onClick={closeAttachModal}
+                disabled={attachBusy}
+                aria-label="Close picker"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] coding-text-muted">
+              "{attachTarget.conversationTitle || 'Untitled conversation'}" will be
+              visible to every member of the project, including its full history.
+            </p>
+
+            <ul className="mt-3 flex max-h-80 flex-col gap-1 overflow-y-auto" role="radiogroup" aria-label="Pick a project">
+              {projects
+                .filter((p) => p.my_role === 'owner' || p.my_role === 'editor')
+                .map((p) => {
+                  const selected = attachSelectedProjectId === p.id;
+                  return (
+                    <li key={p.id}>
+                      <label
+                        className={[
+                          'flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-xs transition',
+                          selected ? 'coding-nav-link--active' : 'coding-nav-link',
+                        ].join(' ')}
+                        style={selected ? undefined : { background: 'var(--bg-canvas)' }}
+                      >
+                        <input
+                          type="radio"
+                          name="attach-project-pick"
+                          value={p.id}
+                          checked={selected}
+                          onChange={() => setAttachSelectedProjectId(p.id)}
+                          className="cursor-pointer"
+                          disabled={attachBusy}
+                        />
+                        <span className="min-w-0 flex-1 truncate font-medium coding-text-strong" title={p.title}>
+                          {p.title}
+                        </span>
+                        <span className="text-[10px] coding-text-muted">
+                          {(p.conversation_count || 0)} chat{p.conversation_count === 1 ? '' : 's'}
+                          {' · '}
+                          {(p.member_count || 1)} member{p.member_count === 1 ? '' : 's'}
+                          {p.my_role !== 'owner' && ` · ${p.my_role}`}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+            </ul>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className={ghostBtn}
+                onClick={closeAttachModal}
+                disabled={attachBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: 'var(--brand-primary)' }}
+                onClick={confirmAttachConversation}
+                disabled={attachBusy || !attachSelectedProjectId}
+              >
+                {attachBusy ? 'Adding…' : 'Add'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─ Project share modal ─────────────────────────────────────── */}
+      {shareProjectId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Share project"
+          onClick={closeShareModal}
+        >
+          <div
+            className="w-full max-w-md rounded-lg p-5 shadow-xl"
+            style={{ background: 'var(--bg-card)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold coding-text-strong">
+                Share project — {projects.find((p) => p.id === shareProjectId)?.title}
+              </div>
+              <button
+                type="button"
+                className={ghostBtnSm}
+                onClick={closeShareModal}
+                aria-label="Close share dialog"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-1 text-[11px] coding-text-muted">
+              Project members can see every chat attached to this project, including
+              its full history.
+            </p>
+
+            {(() => {
+              const project = projects.find((p) => p.id === shareProjectId);
+              const isOwner = project?.my_role === 'owner';
+              return (
+                <>
+                  {isOwner && (
+                    <div className="mt-3 flex flex-wrap items-end gap-2">
+                      <div className="flex-1 min-w-[160px]">
+                        <label className="block text-[10px] font-semibold uppercase tracking-wide coding-text-muted">
+                          Add member
+                        </label>
+                        <select
+                          value={shareInviteUserId}
+                          onChange={(e) => setShareInviteUserId(e.target.value)}
+                          className="coding-input mt-1 w-full rounded-md py-1.5 pl-2 pr-7 text-xs"
+                          aria-label="Pick a tenant user to add"
+                        >
+                          <option value="">Select user…</option>
+                          {inviteCandidates.map((u) => (
+                            <option key={u.id} value={u.id}>{u.email}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold uppercase tracking-wide coding-text-muted">
+                          Role
+                        </label>
+                        <select
+                          value={shareInviteRole}
+                          onChange={(e) => setShareInviteRole(e.target.value)}
+                          className="coding-input mt-1 rounded-md py-1.5 pl-2 pr-7 text-xs"
+                          aria-label="Role for the new member"
+                        >
+                          <option value="viewer">Viewer</option>
+                          <option value="editor">Editor</option>
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        className={ghostBtn}
+                        onClick={handleInviteMember}
+                        disabled={!shareInviteUserId || shareBusy}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="mt-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide coding-text-muted">
+                      Members ({shareMembers.length})
+                    </div>
+                    <ul className="mt-1 flex flex-col gap-1">
+                      {shareMembers.map((m) => (
+                        <li
+                          key={m.user_id}
+                          className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-xs"
+                          style={{ background: 'var(--bg-canvas)' }}
+                        >
+                          <span className="truncate" title={m.user_email}>{m.user_email}</span>
+                          <div className="flex items-center gap-2">
+                            {m.role === 'owner' ? (
+                              <span className="text-[10px] font-semibold coding-text-muted">OWNER</span>
+                            ) : isOwner ? (
+                              <>
+                                <select
+                                  value={m.role}
+                                  onChange={(e) => handleChangeMemberRole(m.user_id, e.target.value)}
+                                  className="coding-input rounded-md py-0.5 pl-1 pr-5 text-[11px]"
+                                  disabled={shareBusy}
+                                  aria-label={`Role for ${m.user_email}`}
+                                >
+                                  <option value="viewer">Viewer</option>
+                                  <option value="editor">Editor</option>
+                                </select>
+                                <button
+                                  type="button"
+                                  className="rounded px-1 text-[11px] coding-text-muted hover:text-[var(--state-critical)]"
+                                  onClick={() => handleRemoveMember(m.user_id)}
+                                  disabled={shareBusy}
+                                  title="Remove from project"
+                                  aria-label={`Remove ${m.user_email}`}
+                                >
+                                  ×
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[10px] coding-text-muted">{m.role}</span>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
