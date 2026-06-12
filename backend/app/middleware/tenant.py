@@ -34,7 +34,14 @@ class TenantMiddleware(BaseHTTPMiddleware):
         # they're invoked directly by the browser via <img> / anchor click,
         # so no X-Tenant-Key header is attached and the middleware would
         # otherwise 404 every download.
-        if path.startswith("/health/") or path.startswith("/api/chat/artifacts/"):
+        # /api/staff/* is the Nexora platform-staff surface — its identity
+        # tokens are not tenant-bound, and the impersonate route resolves the
+        # tenant itself via path param + tenant_registry.
+        if (
+            path.startswith("/health/")
+            or path.startswith("/api/chat/artifacts/")
+            or path.startswith("/api/staff/")
+        ):
             request.state.tenant = None
             request.state.tenant_key = None
             return await call_next(request)

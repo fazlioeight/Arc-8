@@ -19,7 +19,7 @@ from ..core.redis import get_redis_client
 from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
 from ..dependencies.tenant import get_tenant_context
-from ..models.tables import User
+from ..models.tables import StaffUser, User
 
 _revocation_logger = logging.getLogger(__name__)
 _REVOCATION_KEY_PREFIX = "nexora:jwt:revoked:"
@@ -161,6 +161,36 @@ async def get_current_user(
     if await is_jti_revoked(jti):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
 
+    # Nexora staff impersonation token: the actor is a row in `staff_users`,
+    # not in `users`. We don't materialize a shadow user inside the tenant DB
+    # — instead we synthesize an AuthenticatedUser with platform_admin role
+    # and full application access for the target tenant. All existing
+    # /api/admin/* routes operate on it exactly like a real platform_admin.
+    if payload.get("act_typ") == "staff":
+        staff_id = payload.get("act_sid")
+        if not staff_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid staff impersonation token")
+        staff = await session.scalar(
+            select(StaffUser)
+            .where(StaffUser.id == staff_id, StaffUser.is_active.is_(True))
+            .limit(1)
+        )
+        if not staff or staff.email != sub:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Staff identity mismatch")
+        available = sorted(tenant_application_keys(tenant))
+        app_permissions = {key: "admin" for key in available}
+        request.state.user_email = staff.email
+        request.state.staff_actor_id = staff.id
+        return AuthenticatedUser(
+            id=0,  # virtual: no row in tenant `users` table
+            email=staff.email,
+            tenant_id=tenant.id,
+            tenant_key=tenant.key,
+            role="platform_admin",
+            scopes=available,
+            app_permissions=app_permissions,
+        )
+
     if not user_id:
         stmt = select(User).where(User.email == sub, User.tenant_id == tenant.id)
     else:
@@ -185,6 +215,92 @@ async def get_current_user(
         role=role,
         scopes=scopes if isinstance(scopes, list) else [str(scopes)],
         app_permissions=app_permissions,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Nexora platform staff authentication
+# ---------------------------------------------------------------------------
+
+@dataclass(slots=True)
+class AuthenticatedStaff:
+    id: int
+    email: str
+    name: str | None
+    is_superuser: bool
+    mfa_enrolled: bool
+    must_change_password: bool
+
+
+staff_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/staff/login", auto_error=True)
+
+
+def create_staff_token(staff: StaffUser, expires_delta: Optional[timedelta] = None) -> str:
+    """Issue an identity-only staff JWT. Not bound to any tenant."""
+    return create_access_token(
+        {
+            "sub": staff.email,
+            "sid": staff.id,
+            "typ": "staff",
+        },
+        expires_delta=expires_delta or timedelta(minutes=settings.JWT_EXPIRES_MINUTES),
+    )
+
+
+def create_staff_impersonation_token(
+    staff: StaffUser,
+    tenant: TenantContext,
+    expires_delta: Optional[timedelta] = None,
+) -> str:
+    """Issue a tenant-scoped JWT that grants `staff` platform_admin access to `tenant`.
+
+    Carries `act_typ=staff` so `get_current_user` can route to the virtual-user
+    code path. The `sub` field is the staff email so audit log `actor` rows
+    show the real human, not a fabricated tenant user.
+    """
+    # Impersonation tokens are short-lived — staff can re-enter the tenant
+    # at will from the staff console.
+    ttl = expires_delta or timedelta(minutes=min(settings.JWT_EXPIRES_MINUTES, 60))
+    return create_access_token(
+        {
+            "sub": staff.email,
+            "tid": tenant.key,
+            "role": "platform_admin",
+            "act_typ": "staff",
+            "act_sid": staff.id,
+        },
+        expires_delta=ttl,
+    )
+
+
+async def get_current_staff(
+    request: Request,
+    token: str = Depends(staff_oauth2_scheme),
+    session: AsyncSession = Depends(get_control_session),
+) -> AuthenticatedStaff:
+    payload = decode_token(token)
+    if payload.get("typ") != "staff":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not a staff token")
+    staff_id = payload.get("sid")
+    sub = payload.get("sub")
+    jti = payload.get("jti")
+    if not staff_id or not sub:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    if await is_jti_revoked(jti):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
+    staff = await session.scalar(
+        select(StaffUser).where(StaffUser.id == staff_id, StaffUser.is_active.is_(True)).limit(1)
+    )
+    if not staff or staff.email != sub:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Staff not found or inactive")
+    request.state.staff_email = staff.email
+    return AuthenticatedStaff(
+        id=staff.id,
+        email=staff.email,
+        name=staff.name,
+        is_superuser=bool(staff.is_superuser),
+        mfa_enrolled=staff.mfa_enrolled_at is not None,
+        must_change_password=bool(staff.must_change_password),
     )
 
 async def require_admin(

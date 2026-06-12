@@ -37,4 +37,10 @@ export const ROUTES = {
   ADMIN: {
     MASTER: "/admin/master",
   },
+  STAFF: {
+    LOGIN: "/staff/login",
+    CONSOLE: "/staff",
+    USERS: "/staff/users",
+    BOOTSTRAP: "/staff/bootstrap",
+  },
 };

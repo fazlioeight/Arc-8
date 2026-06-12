@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useEffect, useMemo, useRef, useState
 export const AuthContext = createContext();
 
 const STORAGE_KEY = 'authState';
+const STAFF_STORAGE_KEY = 'staffSession';
 const DEFAULT_TIMEOUT = 15 * 60 * 1000;
 const PERSIST_DEBOUNCE_MS = 200;
 const TOUCH_THROTTLE_MS = 5000;
@@ -104,6 +105,7 @@ const normalizeState = (raw) => {
     mustChangePassword: Boolean(raw.must_change_password ?? raw.mustChangePassword),
     auditTrail: Array.isArray(raw.auditTrail) ? raw.auditTrail : [],
     impersonation,
+    staffActor: raw.staffActor || null,
     session,
   };
 };
@@ -133,6 +135,19 @@ const serializeAuthState = (state) => {
   };
 };
 
+const normalizeStaffSession = (raw) => {
+  if (!raw || !raw.token || !raw.email) return null;
+  return {
+    token: raw.token,
+    email: raw.email,
+    name: raw.name || null,
+    isSuperuser: Boolean(raw.isSuperuser ?? raw.is_superuser),
+    mfaEnrolled: Boolean(raw.mfaEnrolled ?? raw.mfa_enrolled),
+    mfaEnrollmentRequired: Boolean(raw.mfaEnrollmentRequired ?? raw.mfa_enrollment_required),
+    mustChangePassword: Boolean(raw.mustChangePassword ?? raw.must_change_password),
+  };
+};
+
 export const AuthProvider = ({ children }) => {
   const [authState, setAuthState] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -144,9 +159,33 @@ export const AuthProvider = ({ children }) => {
       return null;
     }
   });
+  const [staffSession, setStaffSession] = useState(() => {
+    const stored = localStorage.getItem(STAFF_STORAGE_KEY);
+    if (!stored) return null;
+    try {
+      return normalizeStaffSession(JSON.parse(stored));
+    } catch (error) {
+      console.warn('Failed to parse stored staff session', error);
+      return null;
+    }
+  });
   const persistTimerRef = useRef(null);
   const lastSerializedRef = useRef(null);
   const lastTouchRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    if (!staffSession) {
+      localStorage.removeItem(STAFF_STORAGE_KEY);
+      return undefined;
+    }
+    try {
+      localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(staffSession));
+    } catch (error) {
+      console.warn('Failed to persist staff session', error);
+    }
+    return undefined;
+  }, [staffSession]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -332,6 +371,76 @@ export const AuthProvider = ({ children }) => {
         reason: impersonation.reason,
       }));
     });
+  }, []);
+
+  const loginAsStaff = useCallback((response) => {
+    const normalized = normalizeStaffSession({
+      token: response?.token,
+      email: response?.email,
+      name: response?.name,
+      isSuperuser: response?.is_superuser,
+      mfaEnrolled: response?.mfa_enrolled,
+      mfaEnrollmentRequired: response?.mfa_enrollment_required,
+      mustChangePassword: response?.must_change_password,
+    });
+    if (!normalized) return;
+    setStaffSession(normalized);
+  }, []);
+
+  const updateStaffSession = useCallback((patch) => {
+    setStaffSession((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
+  const staffSignOut = useCallback(() => {
+    setStaffSession(null);
+    setAuthState(null);
+  }, []);
+
+  // Build a tenant session from the staff impersonation response. The
+  // returned token is a tenant-scoped JWT with role=platform_admin, so all
+  // existing /api/admin/* fetches that read `token` + `tenant` from this
+  // context work unchanged.
+  const enterTenantAsStaff = useCallback((impersonation) => {
+    if (!impersonation?.token || !impersonation?.tenant) return;
+    setStaffSession((prevStaff) => {
+      const tenantInfo = {
+        key: impersonation.tenant.key,
+        name: impersonation.tenant.name,
+        region: impersonation.tenant.region || null,
+      };
+      const baseApps = (impersonation.tenant.purchased_applications || []).reduce(
+        (acc, key) => ({ ...acc, [key]: 'admin' }),
+        {}
+      );
+      const tenantState = normalizeState({
+        token: impersonation.token,
+        email: prevStaff?.email,
+        role: 'platform_admin',
+        tenant: tenantInfo.key,
+        availableTenants: [tenantInfo],
+        applications: { ...baseApps, portal: 'admin', settings: 'admin', admin_console: 'admin' },
+        available_applications: impersonation.tenant.purchased_applications || [],
+        purchased_applications: impersonation.tenant.purchased_applications || [],
+      });
+      if (tenantState) {
+        const withActor = {
+          ...tenantState,
+          staffActor: {
+            email: prevStaff?.email,
+            name: prevStaff?.name,
+          },
+        };
+        setAuthState(appendAudit(withActor, buildAuditEvent('staff.impersonation.start', {
+          actor: prevStaff?.email,
+          tenant: tenantInfo.key,
+        })));
+      }
+      return prevStaff;
+    });
+  }, []);
+
+  const exitStaffImpersonation = useCallback(() => {
+    setAuthState(null);
   }, []);
 
   const endImpersonation = useCallback(() => {
@@ -520,6 +629,16 @@ export const AuthProvider = ({ children }) => {
     touchSession,
     unlockSession,
     clearMustChangePassword,
+    // Nexora platform-staff surface
+    staffSession,
+    isStaffAuthenticated: Boolean(staffSession?.token),
+    isStaffActor: Boolean(staffSession?.token && authState?.staffActor),
+    staffActor: authState?.staffActor || null,
+    loginAsStaff,
+    updateStaffSession,
+    staffSignOut,
+    enterTenantAsStaff,
+    exitStaffImpersonation,
   }), [
     authState,
     effectiveApplications,
@@ -539,6 +658,12 @@ export const AuthProvider = ({ children }) => {
     touchSession,
     unlockSession,
     clearMustChangePassword,
+    staffSession,
+    loginAsStaff,
+    updateStaffSession,
+    staffSignOut,
+    enterTenantAsStaff,
+    exitStaffImpersonation,
   ]);
 
   return (

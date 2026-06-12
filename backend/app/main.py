@@ -36,6 +36,7 @@ from .routes import member360_admin as member360_admin_router
 from .routes import portal as portal_router
 from .routes import ride_booking as ride_booking_router
 from .routes import settings as settings_router
+from .routes import staff as staff_router
 from .routes import workbench as workbench_router
 from .routes import utilization as utilization_router
 from .schemas.types import NormalizedEmail
@@ -492,4 +493,5 @@ app.include_router(docs_router.router)
 app.include_router(settings_router.router)
 app.include_router(chat_router.router)
 app.include_router(ai_router.router)
+app.include_router(staff_router.router)
 

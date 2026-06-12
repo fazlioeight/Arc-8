@@ -12,6 +12,7 @@ import AppBreadcrumbs from './components/AppBreadcrumbs';
 import ErrorBoundary from './components/ErrorBoundary';
 import CommandPalette from './components/CommandPalette';
 import SessionLockOverlay from './components/SessionLockOverlay';
+import StaffImpersonationBanner from './components/StaffImpersonationBanner';
 import GuidedTourOverlay from './components/GuidedTourOverlay';
 import { LoadingState } from './components/ehr/Primitives';
 import { ROUTES } from './constants/routes';
@@ -42,6 +43,10 @@ const Docs = lazy(() => import('./pages/docs/Docs'));
 const ProvidersPage = lazy(() => import('./pages/platform/providers/ProvidersPage'));
 const ProviderDetailPage = lazy(() => import('./pages/platform/providers/ProviderDetailPage'));
 const MasterAdminPage = lazy(() => import('./pages/platform/admin/MasterAdminPage'));
+const StaffLogin = lazy(() => import('./pages/platform/staff/StaffLogin'));
+const StaffBootstrap = lazy(() => import('./pages/platform/staff/StaffBootstrap'));
+const StaffConsole = lazy(() => import('./pages/platform/staff/StaffConsole'));
+const StaffUsers = lazy(() => import('./pages/platform/staff/StaffUsers'));
 const JobStatusCenter = lazy(() => import('./pages/platform/jobs/JobStatusCenter'));
 const ImportDataPage = lazy(() => import('./pages/platform/jobs/ImportDataPage'));
 const CodingWorklistPage = lazy(() => import('./pages/platform/coding/CodingWorklistPage'));
@@ -111,11 +116,13 @@ const Shell = ({ themePreference, setThemePreference }) => {
     "/jobs",
     ROUTES.CHAT,
     ROUTES.CODING.WORKLIST,
+    "/staff",
   ];
   const hideNavbar = hideNavbarOn.some((p) => location.pathname.startsWith(p));
 
   return (
     <div className="coding-member-workspace min-h-screen">
+      <StaffImpersonationBanner />
       {!hideNavbar && (
         <>
           <Navbar />
@@ -216,6 +223,10 @@ const Shell = ({ themePreference, setThemePreference }) => {
             </ErrorBoundary>
           )} />
           <Route path="/admin/master" element={<MasterAdminPage />} />
+          <Route path={ROUTES.STAFF.LOGIN} element={<StaffLogin />} />
+          <Route path={ROUTES.STAFF.BOOTSTRAP} element={<StaffBootstrap />} />
+          <Route path={ROUTES.STAFF.CONSOLE} element={<StaffConsole />} />
+          <Route path={ROUTES.STAFF.USERS} element={<StaffUsers />} />
           <Route path="/jobs/import-data" element={<ImportDataPage />} />
           <Route path="/jobs/status-center" element={<JobStatusCenter />} />
           <Route path={ROUTES.CODING.WORKLIST} element={(
