@@ -1,10 +1,11 @@
 param(
-    # Container App: the existing 'nexora-chat' app is reused in place.
-    [string]$AppName            = "nexora-chat",
+    # Container App: the existing 'nexora-chat-v2' app is reused in place.
+    # The -v2 suffix came from the env / app migration; matching live state.
+    [string]$AppName            = "nexora-chat-v2",
     [string]$ResourceGroup      = "nexora-chat-rg",
     [string]$AcrName            = "nexorachatacr65700",
     [string]$ImageName          = "nexora-platform",
-    [string]$ContainerEnvName   = "nexora-chat-env",
+    [string]$ContainerEnvName   = "nexora-chat-env-v2",
     [string]$KeyVaultName       = "nexora-chat-kv",
     [string]$LogWorkspaceName   = "nexora-chat-logs",
     [string]$AppInsightsName    = "nexora-chat-insights",
@@ -336,10 +337,12 @@ if (-not $SkipBackend) {
 if (-not $SkipMigrations) {
     Write-Phase "Phase 3: Migrations and tenant provisioning"
 
-    $MigrationJob = "nexora-platform-migrations"
-    $Path2DdlJob = "nexora-platform-path2-ddl"
-    $TenantDdlJob = "nexora-platform-tenant-ddl"
-    $TenantProvJob = "nexora-platform-tenant-provision"
+    # Job names match the -v2 resources currently deployed in nexora-chat-env-v2.
+    # tenant-provision intentionally has no "platform-" prefix (live state).
+    $MigrationJob  = "nexora-platform-migrations-v2"
+    $Path2DdlJob   = "nexora-platform-path2-ddl-v2"
+    $TenantDdlJob  = "nexora-platform-tenant-ddl-v2"
+    $TenantProvJob = "nexora-tenant-provision-v2"
 
     # Grant the Container App's managed identity Key Vault access for any future
     # use; KV-backed secrets here are just read once and passed to jobs by value.
@@ -375,20 +378,24 @@ if (-not $SkipMigrations) {
                 --command $JobCommand `
                 --args $JobArgs `
                 --output none
+            if ($LASTEXITCODE -ne 0) { throw "Failed to create job '$JobName'. See output above." }
         } else {
             Write-Host "Updating job '$JobName' image + env..."
             az containerapp job secret set `
                 -n $JobName -g $ResourceGroup `
                 --secrets $allSecrets `
                 --output none
+            if ($LASTEXITCODE -ne 0) { throw "Failed to set secrets on job '$JobName'. See output above." }
             az containerapp job update `
                 -n $JobName -g $ResourceGroup `
                 --image $FullImage `
                 --set-env-vars $EnvVars `
                 --output none
+            if ($LASTEXITCODE -ne 0) { throw "Failed to update job '$JobName'. See output above." }
         }
         Write-Host "Starting job '$JobName'..."
         az containerapp job start -n $JobName -g $ResourceGroup --output none
+        if ($LASTEXITCODE -ne 0) { throw "Failed to start job '$JobName'. See output above." }
     }
 
     # Use ControlBase.metadata.create_all rather than Alembic. The migration
