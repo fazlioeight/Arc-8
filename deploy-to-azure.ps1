@@ -153,7 +153,6 @@ function Read-KvSecretOrThrow {
 }
 
 Test-Cmd az
-Test-Cmd docker
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ProjectRoot
 Write-Host "Project root: $ProjectRoot"
