@@ -50,6 +50,10 @@ os.environ["CONTROL_DATABASE_URL"] = TEST_CONTROL_DB
 os.environ["DEFAULT_TENANT_DATABASE_URL"] = TEST_TENANT_DB_TEMPLATE
 os.environ["ALLOW_DUMMY_LOGIN"] = "false"
 os.environ["FIELD_ENCRYPTION_KEY"] = TEST_FIELD_KEY
+# Rate limiting is an infrastructure control, not the unit under test. Disable
+# it globally so the cumulative request volume of the suite doesn't trip the
+# per-user PHI limit; tests that exercise the limiter re-enable it explicitly.
+os.environ["RATE_LIMIT_ENABLED"] = "false"
 
 
 config_module.settings.CONTROL_DATABASE_URL = TEST_CONTROL_DB
@@ -57,6 +61,7 @@ config_module.settings.DEFAULT_TENANT_DATABASE_URL = TEST_TENANT_DB_TEMPLATE
 config_module.settings.SECRET_KEY = TEST_SECRET
 config_module.settings.ALLOW_DUMMY_LOGIN = False
 config_module.settings.FIELD_ENCRYPTION_KEY = TEST_FIELD_KEY
+config_module.settings.RATE_LIMIT_ENABLED = False
 
 def _tests_dir() -> Path:
     return Path(BACKEND_ROOT) / "tests"
@@ -73,12 +78,14 @@ async def _bootstrap_async():
     os.environ["DEFAULT_TENANT_DATABASE_URL"] = TEST_TENANT_DB_TEMPLATE
     os.environ["ALLOW_DUMMY_LOGIN"] = "false"
     os.environ["FIELD_ENCRYPTION_KEY"] = TEST_FIELD_KEY
+    os.environ["RATE_LIMIT_ENABLED"] = "false"
 
     config_module.settings.CONTROL_DATABASE_URL = TEST_CONTROL_DB
     config_module.settings.DEFAULT_TENANT_DATABASE_URL = TEST_TENANT_DB_TEMPLATE
     config_module.settings.SECRET_KEY = TEST_SECRET
     config_module.settings.ALLOW_DUMMY_LOGIN = False
     config_module.settings.FIELD_ENCRYPTION_KEY = TEST_FIELD_KEY
+    config_module.settings.RATE_LIMIT_ENABLED = False
 
     Path("tests").mkdir(parents=True, exist_ok=True)
     Path("tests/tenants").mkdir(parents=True, exist_ok=True)

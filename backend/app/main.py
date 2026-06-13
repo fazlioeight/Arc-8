@@ -5,15 +5,16 @@ from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .core.config import settings
+from .core.config import assert_required_settings, settings
 from .core.logging_config import setup_logging
 from .dependencies.tenant import get_tenant_context
 from .db.session import get_control_session
 from .db.tenant_manager import TenantContext, tenant_connection_manager
+from .middleware.rate_limit import RateLimitMiddleware, auth_rate_limit
 from .middleware.request_logging import RequestLoggingMiddleware
 from .middleware.security_headers import SecurityHeadersMiddleware
 from .middleware.tenant import TenantMiddleware
@@ -49,14 +50,20 @@ from .utils.security import (
     decode_token,
     filter_application_permissions,
     get_current_user,
+    issue_refresh_token,
     oauth2_scheme,
     revoke_jti,
+    revoke_user_refresh_tokens,
+    rotate_refresh_token,
     tenant_application_keys,
     verify_password,
 )
 
 setup_logging()
 
+# Fail fast on boot if required production configuration is missing, rather
+# than surfacing as obscure runtime errors on the first request.
+assert_required_settings(settings)
 
 
 app = FastAPI(title="Nexora Lab API", version="2.0.0")
@@ -75,6 +82,10 @@ for origin in settings.CORS_ORIGINS:
     cors_origins.append(f"{origin_str}/")
 
 app.add_middleware(SecurityHeadersMiddleware)
+# Global per-IP rate limit. Added before CORS so CORS remains the outermost
+# layer and a 429 still carries Access-Control-Allow-Origin (otherwise browsers
+# surface a misleading CORS error instead of the real 429).
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(set(cors_origins)),
@@ -167,6 +178,9 @@ def _build_login_response(user: User, tenant: TenantContext) -> dict:
             "uid": user.id,
             "role": user.role or "user",
             "scp": sorted(applications.keys()),
+            # Carries MFA state into the session so require_mfa can gate PHI
+            # routes without an extra DB round-trip per request.
+            "mfa": user.mfa_enrolled_at is not None,
         }
     )
     return {
@@ -203,6 +217,7 @@ async def login(
     request: Request,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_control_session),
+    _rl: None = Depends(auth_rate_limit),
 ):
     if credentials.tenant and credentials.tenant != tenant.key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant mismatch")
@@ -335,9 +350,12 @@ async def login(
             "mfa": "verified" if mfa_enrolled else ("enrollment_required" if mfa_required_for_role else "not_required"),
         },
     )
+    refresh_token = await issue_refresh_token(session, tenant_id=tenant.id, user_id=user.id, ip=ip)
     await session.commit()
 
     response = _build_login_response(user, tenant)
+    response["refresh_token"] = refresh_token
+    response["expires_in"] = settings.ACCESS_TOKEN_EXPIRES_MINUTES * 60
     response["mfa_enrollment_required"] = bool(mfa_required_for_role and not mfa_enrolled)
     return response
 
@@ -364,6 +382,11 @@ async def logout(
             await revoke_jti(jti, ttl)
     sub = payload.get("sub") or "unknown"
     if tenant and tenant.id:
+        # Revoke this user's refresh tokens so a logged-out session can't be
+        # resurrected via a still-valid refresh token.
+        uid = payload.get("uid")
+        if uid:
+            await revoke_user_refresh_tokens(session, tenant_id=tenant.id, user_id=uid)
         await record_audit_event(
             session,
             tenant_id=tenant.id,
@@ -448,9 +471,52 @@ async def azure_auth_exchange(
         event_type="login.azure.success",
         payload={"tenant": tenant.key, "azure_oid": claims.get("oid", ""), "ip": ip, "user_agent": user_agent},
     )
+    refresh_token = await issue_refresh_token(session, tenant_id=tenant.id, user_id=user.id, ip=ip)
     await session.commit()
 
-    return _build_login_response(user, tenant)
+    response = _build_login_response(user, tenant)
+    response["refresh_token"] = refresh_token
+    response["expires_in"] = settings.ACCESS_TOKEN_EXPIRES_MINUTES * 60
+    return response
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=20)
+
+
+@app.post("/api/auth/refresh")
+async def refresh_access_token(
+    payload: RefreshRequest,
+    request: Request,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_control_session),
+    _rl: None = Depends(auth_rate_limit),
+):
+    """Rotate a refresh token and mint a fresh 15-minute access token.
+
+    The old refresh token is consumed; a new one is returned. Replaying a
+    consumed token revokes the whole session chain (see rotate_refresh_token).
+    """
+    ip = client_ip(request)
+    user_id, new_refresh = await rotate_refresh_token(
+        session, raw_token=payload.refresh_token, tenant_id=tenant.id, ip=ip
+    )
+    user = await session.get(User, user_id)
+    if not user or user.tenant_id != tenant.id or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    await record_audit_event(
+        session,
+        tenant_id=tenant.id,
+        actor=user.email,
+        event_type="token.refreshed",
+        payload={"tenant": tenant.key, "ip": ip},
+    )
+    await session.commit()
+
+    response = _build_login_response(user, tenant)
+    response["refresh_token"] = new_refresh
+    response["expires_in"] = settings.ACCESS_TOKEN_EXPIRES_MINUTES * 60
+    return response
 
 
 @app.get("/api/tenant/self")

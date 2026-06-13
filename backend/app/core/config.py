@@ -15,7 +15,20 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     SECRET_KEY: Optional[str] = None
     JWT_ALGORITHM: str = "HS256"
+    # Legacy/default JWT lifetime, still used by identity-only staff tokens.
     JWT_EXPIRES_MINUTES: int = 60
+    # User-facing access tokens are short-lived (HIPAA-aligned 15 min) and
+    # paired with rotating refresh tokens (see app.utils.security). The refresh
+    # token has a sliding idle window (session dies after this many minutes of
+    # inactivity) bounded by an absolute max session lifetime.
+    ACCESS_TOKEN_EXPIRES_MINUTES: int = 15
+    REFRESH_TOKEN_IDLE_MINUTES: int = 30
+    REFRESH_TOKEN_MAX_LIFETIME_MINUTES: int = 12 * 60
+    # When True, every PHI route requires the caller to have completed MFA
+    # (require_mfa dependency hard-fails otherwise). Defaults False so existing
+    # non-enrolled users aren't locked out; flip to True once enrollment is
+    # complete. See SECURITY.md.
+    REQUIRE_PHI_MFA: bool = False
 
     CORS_ORIGINS: Annotated[List[AnyHttpUrl], NoDecode] = ["http://localhost:3000"]
 
@@ -32,6 +45,16 @@ class Settings(BaseSettings):
     LOGIN_LOCKOUT_MAX_ATTEMPTS: int = 5
     LOGIN_LOCKOUT_WINDOW_SECONDS: int = 15 * 60
 
+    # ── HTTP rate limiting ────────────────────────────────────────────────
+    # Enforced by app.middleware.rate_limit (global, per-IP) and the
+    # auth_rate_limit / phi_rate_limit dependencies. Redis-backed when
+    # REDIS_URL is set; otherwise a per-process in-memory fallback (sufficient
+    # for dev/test, fails open if the backing store errors).
+    RATE_LIMIT_ENABLED: bool = True
+    GLOBAL_RATE_LIMIT_PER_MINUTE: int = 100  # per client IP, all routes
+    AUTH_RATE_LIMIT_PER_MINUTE: int = 5      # per client IP, login/reset
+    PHI_RATE_LIMIT_PER_MINUTE: int = 30      # per authenticated user, PHI routes
+
     REQUIRE_ADMIN_MFA: bool = True
     MFA_ISSUER: str = "Nexora Lab"
 
@@ -41,6 +64,11 @@ class Settings(BaseSettings):
     CANONICAL_HOST_DOMAIN: Optional[str] = None
 
     AUDIT_LOG_PATH: str = "logs/audit.log"
+    # Append-only PHI access/mutation trail. Kept on a SEPARATE path from the
+    # general audit log and never written to an editable DB table — see
+    # app.utils.phi_audit. In production this path should sit on a WORM /
+    # immutable-blob mount and be shipped to Azure Monitor.
+    PHI_AUDIT_LOG_PATH: str = "logs/phi_audit.log"
     # HIPAA §164.316(b)(2): documentation must be retained 6 years from the
     # date of creation or last effective use. We treat audit events the same.
     AUDIT_LOG_RETENTION_DAYS: int = 365 * 6
@@ -336,6 +364,45 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
+
+
+# Variables that MUST be present (non-default, non-placeholder) before the app
+# is allowed to serve traffic in production. SECRET_KEY / FIELD_ENCRYPTION_KEY
+# are already enforced by field validators at construction time; this check
+# covers the rest and fails fast with one clear message instead of surfacing
+# as obscure runtime errors later.
+_REQUIRED_IN_PRODUCTION = ("CONTROL_DATABASE_URL",)
+# Strongly recommended in production; their absence degrades a security control
+# (rate limiting, account lockout, and token revocation all fall back to a
+# weaker per-process mode without Redis) so we log a loud warning.
+_RECOMMENDED_IN_PRODUCTION = ("REDIS_URL", "CORS_ORIGINS")
+
+
+def assert_required_settings(s: Optional[Settings] = None) -> None:
+    """Fail fast on boot if required configuration is missing in production.
+
+    Raises ``RuntimeError`` listing every missing required variable. No-op
+    outside production so local/test runs keep working with defaults.
+    """
+    import logging
+
+    s = s or get_settings()
+    if not s.is_production:
+        return
+
+    missing = [name for name in _REQUIRED_IN_PRODUCTION if not getattr(s, name, None)]
+    if missing:
+        raise RuntimeError(
+            "Missing required environment variables in production: " + ", ".join(sorted(missing))
+        )
+
+    log = logging.getLogger("nexora.config")
+    for name in _RECOMMENDED_IN_PRODUCTION:
+        if not getattr(s, name, None):
+            log.warning(
+                "Recommended setting %s is not configured; a security control is running in a degraded fallback mode",
+                name,
+            )
 
 
 settings = get_settings()

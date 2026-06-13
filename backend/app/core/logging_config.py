@@ -80,6 +80,13 @@ def setup_logging() -> None:
     _listener.start()
     atexit.register(_listener.stop)
 
+    # Wire the append-only PHI audit logger to its dedicated file handler. Kept
+    # separate from the queue/root fan-out above so PHI lines only land in the
+    # immutable sink, never on stdout.
+    from ..utils.phi_audit import configure_phi_audit_logger
+
+    configure_phi_audit_logger()
+
     _configure_azure_monitor()
 
 

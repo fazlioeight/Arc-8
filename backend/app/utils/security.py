@@ -1,17 +1,19 @@
 ﻿from __future__ import annotations
 
+import hashlib
 import logging
 import secrets as _secrets
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import asyncio
 import bcrypt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 import jwt
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
@@ -19,7 +21,7 @@ from ..core.redis import get_redis_client
 from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
 from ..dependencies.tenant import get_tenant_context
-from ..models.tables import StaffUser, User
+from ..models.tables import RefreshToken, StaffUser, User
 
 _revocation_logger = logging.getLogger(__name__)
 _REVOCATION_KEY_PREFIX = "nexora:jwt:revoked:"
@@ -57,6 +59,9 @@ class AuthenticatedUser:
     role: str
     scopes: list[str]
     app_permissions: Dict[str, str]
+    # True when the session was established with MFA (carried in the access
+    # token's ``mfa`` claim). Gated by require_mfa for PHI routes.
+    mfa_authenticated: bool = False
 
 
 _BASE_TENANT_APPS = {"portal", "admin_console", "settings", "chat"}
@@ -89,7 +94,11 @@ def filter_application_permissions(app_permissions: Dict[str, str] | None, tenan
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.JWT_EXPIRES_MINUTES))
+    # Default to the short (15 min) access-token lifetime. Callers that need a
+    # different lifetime (e.g. identity-only staff tokens) pass expires_delta.
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRES_MINUTES)
+    )
     to_encode.setdefault("jti", _secrets.token_urlsafe(16))
     to_encode["exp"] = expire
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
@@ -189,6 +198,9 @@ async def get_current_user(
             role="platform_admin",
             scopes=available,
             app_permissions=app_permissions,
+            # Staff complete MFA at staff login before they can mint an
+            # impersonation token, so the impersonated session is MFA-backed.
+            mfa_authenticated=True,
         )
 
     if not user_id:
@@ -215,6 +227,7 @@ async def get_current_user(
         role=role,
         scopes=scopes if isinstance(scopes, list) else [str(scopes)],
         app_permissions=app_permissions,
+        mfa_authenticated=bool(payload.get("mfa", False)),
     )
 
 
@@ -316,6 +329,135 @@ async def require_platform_admin(
 ) -> AuthenticatedUser:
     if current_user.role != "platform_admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Platform admin privileges required")
+    return current_user
+
+
+# ---------------------------------------------------------------------------
+# Refresh-token rotation
+# ---------------------------------------------------------------------------
+
+
+def _hash_refresh_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _aware(dt: datetime) -> datetime:
+    """SQLite drops tzinfo even on tz-aware columns; coerce to UTC-aware."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+async def issue_refresh_token(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    user_id: int,
+    ip: Optional[str] = None,
+    session_id: Optional[str] = None,
+    max_expires_at: Optional[datetime] = None,
+) -> str:
+    """Create and persist a new refresh token; return the opaque raw value.
+
+    The raw token is returned to the client exactly once and only its hash is
+    stored. ``session_id`` / ``max_expires_at`` are carried across a rotation
+    chain so the absolute session lifetime is enforced regardless of rotation.
+    """
+    now = datetime.now(timezone.utc)
+    raw = _secrets.token_urlsafe(48)
+    absolute = max_expires_at or (now + timedelta(minutes=settings.REFRESH_TOKEN_MAX_LIFETIME_MINUTES))
+    idle_expiry = now + timedelta(minutes=settings.REFRESH_TOKEN_IDLE_MINUTES)
+    # Never let the sliding window outlive the absolute session cap.
+    expires_at = min(idle_expiry, absolute)
+    record = RefreshToken(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        session_id=session_id or uuid.uuid4().hex,
+        token_hash=_hash_refresh_token(raw),
+        expires_at=expires_at,
+        max_expires_at=absolute,
+        created_ip=ip,
+    )
+    session.add(record)
+    await session.flush()
+    return raw
+
+
+async def rotate_refresh_token(
+    session: AsyncSession,
+    *,
+    raw_token: str,
+    tenant_id: int,
+    ip: Optional[str] = None,
+) -> Tuple[int, str]:
+    """Validate, consume, and rotate a refresh token.
+
+    Returns ``(user_id, new_raw_token)``. Raises 401 on any problem. If a token
+    that has already been consumed (or revoked) is presented, the entire
+    rotation chain is revoked — treating it as a stolen-token replay.
+    """
+    token_hash = _hash_refresh_token(raw_token or "")
+    record = await session.scalar(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.tenant_id == tenant_id,
+        ).limit(1)
+    )
+    invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    if record is None:
+        raise invalid
+
+    now = datetime.now(timezone.utc)
+
+    # Replay of a consumed/revoked token => likely theft. Burn the whole chain.
+    # Commit the revocation here (not just flush): we are about to raise, and
+    # the caller won't commit on the error path, so without an explicit commit
+    # the chain-kill would be rolled back and the live token would survive.
+    if record.revoked or record.used_at is not None:
+        await session.execute(
+            update(RefreshToken)
+            .where(RefreshToken.session_id == record.session_id)
+            .values(revoked=True)
+        )
+        await session.commit()
+        raise invalid
+
+    if _aware(record.expires_at) < now or _aware(record.max_expires_at) < now:
+        raise invalid
+
+    record.used_at = now
+    new_raw = await issue_refresh_token(
+        session,
+        tenant_id=record.tenant_id,
+        user_id=record.user_id,
+        ip=ip,
+        session_id=record.session_id,
+        max_expires_at=_aware(record.max_expires_at),
+    )
+    return record.user_id, new_raw
+
+
+async def revoke_user_refresh_tokens(session: AsyncSession, *, tenant_id: int, user_id: int) -> None:
+    """Revoke all of a user's refresh tokens (e.g. on logout / password change)."""
+    await session.execute(
+        update(RefreshToken)
+        .where(RefreshToken.tenant_id == tenant_id, RefreshToken.user_id == user_id, RefreshToken.revoked.is_(False))
+        .values(revoked=True)
+    )
+
+
+async def require_mfa(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> AuthenticatedUser:
+    """Gate a route on a completed-MFA session.
+
+    No-op unless ``REQUIRE_PHI_MFA`` is enabled, so existing non-enrolled users
+    are not locked out until the org has finished enrollment. When enabled, a
+    session whose access token lacks the verified-MFA claim is rejected with
+    403. See SECURITY.md.
+    """
+    if not settings.REQUIRE_PHI_MFA:
+        return current_user
+    if not current_user.mfa_authenticated:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="MFA verification required")
     return current_user
 
 

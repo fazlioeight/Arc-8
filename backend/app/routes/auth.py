@@ -19,6 +19,7 @@ from ..core.config import settings
 from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
 from ..dependencies.tenant import get_tenant_context
+from ..middleware.rate_limit import auth_rate_limit
 from ..models.tables import PasswordResetToken, User
 from ..schemas.types import NormalizedEmail
 from ..utils.audit_logger import record_audit_event
@@ -69,6 +70,7 @@ async def password_reset_request(
     request: Request,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_control_session),
+    _rl: None = Depends(auth_rate_limit),
 ) -> None:
     # Always respond 204 regardless of whether the user exists; this prevents
     # account enumeration via the reset endpoint.
@@ -127,6 +129,7 @@ async def password_reset_confirm(
     request: Request,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_control_session),
+    _rl: None = Depends(auth_rate_limit),
 ) -> None:
     token_hash = _hash_token(payload.token)
     record: Optional[PasswordResetToken] = await session.scalar(

@@ -126,6 +126,31 @@ class PasswordResetToken(ControlBase):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
+class RefreshToken(ControlBase):
+    """Rotating refresh tokens for the bearer-token auth flow.
+
+    Only the SHA-256 hash of the opaque token is stored. Each refresh consumes
+    one row (``used_at``) and issues a child sharing the same ``session_id`` so
+    a stolen-then-reused token can be detected (reuse of a consumed token
+    revokes the whole chain). ``expires_at`` is the sliding idle window;
+    ``max_expires_at`` is the absolute session cap.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    max_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
 class FhirConnector(ControlBase):
     __tablename__ = "fhir_connectors"
 

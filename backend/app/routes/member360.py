@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,18 +66,27 @@ from ..schemas.member360 import (
 from ..schemas.member360_admin import AuditEventListResponse
 from ..services import member360 as member360_service
 from ..services import member360_admin as member360_admin_service
+from ..middleware.rate_limit import phi_rate_limit
 from ..utils.audit_logger import record_audit_event
-from ..utils.security import AuthenticatedUser, get_current_user, require_application
+from ..utils.phi_audit import PhiAction, PhiEvent, record_phi_access
+from ..utils.security import AuthenticatedUser, get_current_user, require_application, require_mfa
 
-# All member360 routes require the tenant to have the `member360` app
-# purchased AND the calling user to have at least `user`-level access
-# on that app key. Matches the gating pattern used by routes/coding.py.
-# Without this gate, any authenticated user in any tenant could reach
-# /api/member360/* by knowing the URL.
+# All member360 routes require, in order:
+#   * the tenant to have the `member360` app purchased AND the caller to have
+#     at least `user`-level access on that app key (require_application);
+#   * a completed-MFA session when REQUIRE_PHI_MFA is enabled (require_mfa);
+#   * the PHI per-user rate limit (30/min) not to be exceeded (phi_rate_limit).
+# Without the first gate, any authenticated user in any tenant could reach
+# /api/member360/* by knowing the URL. These are PHI routes, so every member
+# read/write is additionally recorded to the append-only PHI audit trail.
 router = APIRouter(
     prefix="/api/member360",
     tags=["member360"],
-    dependencies=[Depends(require_application("member360"))],
+    dependencies=[
+        Depends(require_application("member360")),
+        Depends(require_mfa),
+        Depends(phi_rate_limit()),
+    ],
 )
 
 
@@ -138,6 +147,7 @@ async def list_members(
 @router.get("/members/{member_id}", response_model=MemberDetailResponse)
 async def get_member(
     member_id: int,
+    request: Request,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
     control_session: AsyncSession = Depends(get_control_session),
@@ -145,7 +155,27 @@ async def get_member(
 ):
     detail = await member360_service.get_member_detail(session, member_id)
     if not detail:
+        # Record the failed access attempt too — a denied/miss read is exactly
+        # what a compliance reviewer needs to see for anomaly detection.
+        record_phi_access(
+            request,
+            event=PhiEvent.ACCESS.value,
+            user_id=current_user.email,
+            patient_id=str(member_id),
+            record_type="member360.member",
+            action=PhiAction.READ.value,
+            success=False,
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    record_phi_access(
+        request,
+        event=PhiEvent.ACCESS.value,
+        user_id=current_user.email,
+        patient_id=str(member_id),
+        record_type="member360.member",
+        action=PhiAction.READ.value,
+        success=True,
+    )
     await record_audit_event(
         control_session,
         tenant_id=tenant.id,
@@ -162,6 +192,7 @@ async def get_member(
 async def update_member(
     member_id: int,
     payload: MemberUpdate,
+    request: Request,
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
     control_session: AsyncSession = Depends(get_control_session),
@@ -172,7 +203,25 @@ async def update_member(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes provided")
     detail = await member360_service.update_member(session, member_id, data)
     if not detail:
+        record_phi_access(
+            request,
+            event=PhiEvent.UPDATE.value,
+            user_id=current_user.email,
+            patient_id=str(member_id),
+            record_type="member360.member",
+            action=PhiAction.WRITE.value,
+            success=False,
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    record_phi_access(
+        request,
+        event=PhiEvent.UPDATE.value,
+        user_id=current_user.email,
+        patient_id=str(member_id),
+        record_type="member360.member",
+        action=PhiAction.WRITE.value,
+        success=True,
+    )
     await record_audit_event(
         control_session,
         tenant_id=tenant.id,
