@@ -491,18 +491,36 @@ async def chat_stream(
     body: ChatRequest,
     current_user: AuthenticatedUser = Depends(get_current_user),
     tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
 ):
     _check_client()
     rid = _request_id(request)
     client = get_client()
     model = resolve_model(body.model)
     messages = [{"role": m.role, "content": m.content} for m in body.messages]
-    system = f"{DEFAULT_SYSTEM_PROMPT}{artifacts_svc.BUILD_ARTIFACT_PROMPT_HINT}"
-    dispatch = _artifact_tool_dispatchers(tenant, current_user.email, rid)
-    tools = [artifacts_svc.BUILD_ARTIFACT_TOOL, artifacts_svc.REVISE_ARTIFACT_TOOL]
+
+    if body.workbook_id and body.dataset:
+        raise HTTPException(
+            status_code=400,
+            detail="workbook_id and dataset cannot be combined on the same request.",
+        )
+
+    # Compose tools/system the same way the persisted conversation stream does,
+    # so an ephemeral (no-conversation) stream can also ground on a workbook or
+    # the tenant dataset instead of falling back to non-streaming chat.
+    system, tools, dispatch = await _build_conversation_tool_context(
+        session=session,
+        tenant=tenant,
+        user_email=current_user.email,
+        rid=rid,
+        workbook_id=body.workbook_id,
+        use_dataset=body.dataset,
+    )
 
     logger.info("chat_stream_request", extra={
         "request_id": rid, "user": current_user.email, "model": model,
+        "workbook_id": body.workbook_id or "",
+        "dataset": body.dataset,
     })
 
     async def _generate() -> AsyncIterator[str]:

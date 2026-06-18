@@ -74,13 +74,18 @@ const _consumeChatSseStream = async (res, { onDelta, onError, onToolStart, onToo
 };
 
 export const streamChat = async ({
-  token, tenant, messages, model,
+  token, tenant, messages, model, workbookId, dataset,
   onDelta, onError, onToolStart, onToolDone, signal,
 }) => {
   const res = await fetch(`${API_BASE}/api/chat/stream`, {
     method: 'POST',
     headers: buildHeaders(token, tenant, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ messages, model }),
+    body: JSON.stringify({
+      messages,
+      model,
+      workbook_id: workbookId || null,
+      dataset: Boolean(dataset),
+    }),
     signal,
   });
   if (!res.ok) {

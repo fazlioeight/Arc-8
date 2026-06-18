@@ -42,7 +42,7 @@ export default function CodingChasePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { chaseId } = useParams();
-  const { token, tenant, isAuthenticated } = useContext(AuthContext) || {};
+  const { token, tenant, isAuthenticated, user } = useContext(AuthContext) || {};
   const [chase, setChase] = useState(location.state?.chase || null);
   const [loading, setLoading] = useState(!location.state?.chase);
   const [error, setError] = useState(null);
@@ -156,11 +156,19 @@ export default function CodingChasePage() {
     </>
   );
 
+  const assignedToMe = Boolean(user?.email && chase.assigned_coder_email === user.email);
   const actions = [
     { key: 'start', label: 'Start coding', primary: true, onClick: () => setTab('codes') },
-    { key: 'assign', label: 'Assign' },
+    {
+      key: 'assign',
+      label: assignedToMe ? 'Assigned to me' : 'Assign to me',
+      disabled: !user?.email || assignedToMe,
+      onClick: () => saveChaseField('assigned_coder_email')(user.email),
+    },
+    // "Open query" stays inert: provider-query workflow is not yet modeled on
+    // the backend (tracked under the coding-query decision).
     { key: 'query', label: 'Open query' },
-    { key: 'audit', label: 'Audit' },
+    { key: 'audit', label: 'Audit', onClick: () => setTab('audit') },
   ];
 
   const rightSlot = (

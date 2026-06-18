@@ -17,6 +17,12 @@ from ..models.coding import (
 )
 
 
+# Sentinel the worklist UI sends for the "Unassigned" saved view. It is not a
+# real coder email — it means "chases with no assignee" — so it gets its own
+# NULL/empty branch instead of an equality match (see fetch_worklist).
+UNASSIGNED_SENTINEL = "__unassigned__"
+
+
 def _normalize_sequence(values: Optional[Sequence[str]]) -> list[str]:
     if not values:
         return []
@@ -51,7 +57,15 @@ async def fetch_worklist(
     if priority_values:
         filters.append(CodingMemberChase.priority.in_(priority_values))
     if assigned:
-        filters.append(func.lower(CodingMemberChase.assigned_coder_email) == assigned.lower())
+        if assigned.lower() == UNASSIGNED_SENTINEL:
+            filters.append(
+                or_(
+                    CodingMemberChase.assigned_coder_email.is_(None),
+                    func.trim(CodingMemberChase.assigned_coder_email) == "",
+                )
+            )
+        else:
+            filters.append(func.lower(CodingMemberChase.assigned_coder_email) == assigned.lower())
     if search:
         like = f"%{search.lower()}%"
         filters.append(

@@ -21,21 +21,21 @@ const Insights = () => {
       <h3>The Future of Capitation in Value-Based Care</h3>
       <p>Published: August 10, 2025</p>
       <p>Explore how advanced analytics can optimize capitation models for payers...</p>
-      <a href="#">Read More</a>
+      <a href="/insights/future-capitation">Read More</a>
     </div>
     
     <div className="blog-post" id="predictive-modeling" style={{ borderBottom: '1px solid #ddd', padding: '20px 0' }}>
       <h3>Reducing Risks with Predictive Modeling</h3>
       <p>Published: July 25, 2025</p>
       <p>Learn how data-driven tools identify high-risk members early...</p>
-      <a href="#">Read More</a>
+      <a href="/insights/predictive-modeling">Read More</a>
     </div>
     
     <div className="blog-post" id="cost-savings" style={{ borderBottom: '1px solid #ddd', padding: '20px 0' }}>
       <h3>Cost Savings Strategies for Payer Groups</h3>
       <p>Published: June 15, 2025</p>
       <p>Discover data-backed approaches to lower healthcare costs...</p>
-      <a href="#">Read More</a>
+      <a href="/insights/cost-savings">Read More</a>
     </div>
 
     <footer className="bg-dark text-white text-center py-3 mt-5">

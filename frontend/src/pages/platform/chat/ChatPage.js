@@ -28,7 +28,6 @@ import {
   listWorkbooks,
   removeProjectMember,
   renameConversation,
-  sendChat,
   streamChat,
   streamConversationMessage,
   updateProject,
@@ -951,7 +950,6 @@ const ChatPage = () => {
     if (!text && !attachedFile) return;
     setError(null);
 
-    const usingTool = Boolean(activeWorkbookId) || datasetMode;
     const fileToSend = attachedFile;
 
     const userMsg = {
@@ -1038,30 +1036,23 @@ const ChatPage = () => {
           if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
           refreshConversations();
         } else {
-          // No conversation created — fall back to the ephemeral non-persisting
-          // path. The /api/chat endpoint dispatches workbook/dataset chats
-          // internally; we use sendChat for that case since /api/chat/stream
-          // doesn't yet route workbook/dataset itself.
-          if (usingTool) {
-            const res = await sendChat({
-              token, tenant: tenantKey, model,
-              messages: nextMessages, workbookId: activeWorkbookId, dataset: datasetMode,
-            });
-            setMessages([...nextMessages, { role: 'assistant', content: res.reply }]);
-          } else {
-            let buffer = '';
-            await streamChat({
-              token, tenant: tenantKey, model,
-              messages: nextMessages,
-              onDelta: (delta) => {
-                buffer += delta;
-                setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
-              },
-              onError: (err) => setError(err),
-              ...toolHandlers,
-            });
-            if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
-          }
+          // No conversation created — ephemeral, non-persisting path.
+          // /api/chat/stream now routes workbook/dataset itself, so this path
+          // streams uniformly whether or not a tool is active.
+          let buffer = '';
+          await streamChat({
+            token, tenant: tenantKey, model,
+            messages: nextMessages,
+            workbookId: activeWorkbookId,
+            dataset: datasetMode,
+            onDelta: (delta) => {
+              buffer += delta;
+              setMessages([...nextMessages, { role: 'assistant', content: buffer }]);
+            },
+            onError: (err) => setError(err),
+            ...toolHandlers,
+          });
+          if (!buffer) setMessages([...nextMessages, { role: 'assistant', content: '(no response)' }]);
         }
       } else {
         let buffer = '';
