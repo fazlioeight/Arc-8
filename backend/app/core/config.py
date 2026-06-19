@@ -146,12 +146,17 @@ class Settings(BaseSettings):
     DATASET_ADMIN_EMAILS: List[str] = []
 
 
-    # ── Transactional email (SMTP) ───────────────────────────────────────────
+    # ── Transactional email ──────────────────────────────────────────────────
     # Outbound mail for non-PHI notifications such as the marketing contact
-    # form. When SMTP_HOST is unset the sender degrades to logging the message
-    # in non-production and raising in production — mirroring the deliberately
-    # stubbed password-reset email path. Production should point this at a
-    # BAA-eligible relay (Azure Communication Services / SendGrid).
+    # form. Provider precedence: SendGrid (when SENDGRID_API_KEY is set) → SMTP
+    # (when SMTP_HOST is set) → no-op. With no provider configured the sender
+    # degrades to logging the message in non-production and raising in
+    # production — mirroring the deliberately stubbed password-reset email path.
+    #
+    # SendGrid v3 Web API (preferred). EMAIL_FROM must be a SendGrid-verified
+    # sender identity. The API key only needs the "Mail Send" scope.
+    SENDGRID_API_KEY: Optional[str] = None
+    # SMTP relay (fallback / alternative — also works with SendGrid's relay).
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 587
     SMTP_USERNAME: Optional[str] = None
