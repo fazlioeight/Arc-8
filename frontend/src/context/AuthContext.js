@@ -74,6 +74,18 @@ const normalizeState = (raw) => {
     inactivityTimeoutMs: baseSession.inactivityTimeoutMs || DEFAULT_TIMEOUT,
   };
 
+  // Rotating refresh token + absolute access-token expiry. ``expires_in`` is
+  // seconds-from-now (login/refresh responses); ``expiresAt`` is the persisted
+  // absolute timestamp (rehydrated state). Impersonation/staff tokens carry
+  // neither, so refresh is simply skipped for them.
+  const refreshToken = raw.refresh_token ?? raw.refreshToken ?? null;
+  let expiresAt = null;
+  if (raw.expires_in != null) {
+    expiresAt = now + Number(raw.expires_in) * 1000;
+  } else if (raw.expiresAt != null) {
+    expiresAt = raw.expiresAt;
+  }
+
   let impersonation = null;
   if (raw.impersonation) {
     const impersonationTenantKey = raw.impersonation.tenant || tenantKey;
@@ -92,6 +104,8 @@ const normalizeState = (raw) => {
   return {
     email: raw.email,
     token: raw.token,
+    refreshToken,
+    expiresAt,
     role: raw.role || 'user',
     tenant: tenantKey,
     tenantInfo,
@@ -172,6 +186,11 @@ export const AuthProvider = ({ children }) => {
   const persistTimerRef = useRef(null);
   const lastSerializedRef = useRef(null);
   const lastTouchRef = useRef(0);
+  // Latest auth state for event handlers/timers that must read it without
+  // re-subscribing, plus a single-flight guard so concurrent 401s (or a 401
+  // racing the proactive timer) don't double-spend the rotating refresh token.
+  const authStateRef = useRef(authState);
+  const refreshInFlightRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -290,11 +309,81 @@ export const AuthProvider = ({ children }) => {
   }, [authState]);
 
   useEffect(() => {
+    authStateRef.current = authState;
+  }, [authState]);
+
+  // Rotate the access token via the refresh endpoint. Single-flight: concurrent
+  // callers share one in-flight request so the rotating refresh token is spent
+  // exactly once (replaying a consumed token revokes the whole session chain).
+  // Returns true on success, false otherwise. A hard auth failure (invalid /
+  // expired refresh token → non-2xx) clears the session; a transient network
+  // error leaves the session intact so the user can retry.
+  const refreshAccessToken = useCallback(async () => {
+    if (refreshInFlightRef.current) return refreshInFlightRef.current;
+    const current = authStateRef.current;
+    const refreshToken = current?.refreshToken;
+    const tenant = current?.tenant;
+    if (!refreshToken) return false;
+
+    const run = (async () => {
+      const apiBase = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+      let res;
+      try {
+        res = await fetch(`${apiBase}/api/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(tenant ? { 'X-Tenant-Key': tenant } : {}),
+          },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+      } catch (error) {
+        // Network/transient failure — keep the session; a later call can retry.
+        return false;
+      }
+      if (!res.ok) {
+        setAuthState(null);
+        return false;
+      }
+      const data = await res.json();
+      setAuthState((prev) => {
+        if (!prev) return prev;
+        // Re-normalize the fresh login envelope while preserving local-only
+        // state (session activity, audit trail, impersonation, staff actor).
+        return normalizeState({
+          ...data,
+          availableTenants: prev.availableTenants,
+          session: prev.session,
+          auditTrail: prev.auditTrail,
+          impersonation: prev.impersonation,
+          staffActor: prev.staffActor,
+        });
+      });
+      return true;
+    })();
+    refreshInFlightRef.current = run;
+    try {
+      return await run;
+    } finally {
+      refreshInFlightRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    const handler = () => setAuthState(null);
+    // On a 401 for an authenticated request: try to rotate the token before
+    // giving up. If there's no refresh token (impersonation/staff sessions) or
+    // the refresh fails, fall back to clearing the session.
+    const handler = () => {
+      if (authStateRef.current?.refreshToken) {
+        void refreshAccessToken();
+      } else {
+        setAuthState(null);
+      }
+    };
     window.addEventListener('auth:unauthorized', handler);
     return () => window.removeEventListener('auth:unauthorized', handler);
-  }, []);
+  }, [refreshAccessToken]);
 
   const setTenant = useCallback((tenantKey) => {
     if (!tenantKey) return;
@@ -580,6 +669,21 @@ export const AuthProvider = ({ children }) => {
     return () => window.clearTimeout(timer);
   }, [authState?.token, authState?.session?.lastActiveAt, authState?.session?.inactivityTimeoutMs]);
 
+  // Proactively rotate the access token shortly before it expires, so most
+  // requests never see a 401. No-op for sessions without a refresh token
+  // (impersonation / staff-entered tenants).
+  useEffect(() => {
+    if (!authState?.token || !authState?.refreshToken || !authState?.expiresAt) {
+      return undefined;
+    }
+    const LEAD_MS = 60 * 1000;
+    const delay = Math.max(1000, authState.expiresAt - Date.now() - LEAD_MS);
+    const timer = window.setTimeout(() => {
+      void refreshAccessToken();
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [authState?.token, authState?.refreshToken, authState?.expiresAt, refreshAccessToken]);
+
   const effectiveApplications = authState?.impersonation?.applications || authState?.applications || {};
   const effectiveAvailableApplications = authState?.impersonation?.availableApplications || authState?.availableApplications || [];
   const effectivePurchasedApplications = authState?.impersonation?.purchasedApplications || authState?.purchasedApplications || effectiveAvailableApplications;
@@ -622,6 +726,7 @@ export const AuthProvider = ({ children }) => {
     hasApplicationAccess,
     login,
     logout,
+    refreshAccessToken,
     setTenant,
     startImpersonation,
     endImpersonation,
@@ -651,6 +756,7 @@ export const AuthProvider = ({ children }) => {
     hasApplicationAccess,
     login,
     logout,
+    refreshAccessToken,
     setTenant,
     startImpersonation,
     endImpersonation,
