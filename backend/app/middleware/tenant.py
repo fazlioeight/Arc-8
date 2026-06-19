@@ -37,10 +37,14 @@ class TenantMiddleware(BaseHTTPMiddleware):
         # /api/staff/* is the Nexora platform-staff surface — its identity
         # tokens are not tenant-bound, and the impersonate route resolves the
         # tenant itself via path param + tenant_registry.
+        # /api/contact is the public marketing contact form — unauthenticated
+        # visitors carry no tenant header, and a lead is global, not
+        # tenant-scoped, so it must not 404 on tenant resolution.
         if (
             path.startswith("/health/")
             or path.startswith("/api/chat/artifacts/")
             or path.startswith("/api/staff/")
+            or path == "/api/contact"
         ):
             request.state.tenant = None
             request.state.tenant_key = None

@@ -25,6 +25,7 @@ from .routes import analytics as analytics_router
 from .routes import auth as auth_router
 from .routes import chat as chat_router
 from .routes import coding as coding_router
+from .routes import contact as contact_router
 from .routes import coding_dashboards as coding_dashboards_router
 from .routes import dashboard as dashboard_router
 from .routes import imports as imports_router
@@ -560,4 +561,5 @@ app.include_router(settings_router.router)
 app.include_router(chat_router.router)
 app.include_router(ai_router.router)
 app.include_router(staff_router.router)
+app.include_router(contact_router.router)
 

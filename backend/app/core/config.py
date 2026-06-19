@@ -146,6 +146,22 @@ class Settings(BaseSettings):
     DATASET_ADMIN_EMAILS: List[str] = []
 
 
+    # ── Transactional email (SMTP) ───────────────────────────────────────────
+    # Outbound mail for non-PHI notifications such as the marketing contact
+    # form. When SMTP_HOST is unset the sender degrades to logging the message
+    # in non-production and raising in production — mirroring the deliberately
+    # stubbed password-reset email path. Production should point this at a
+    # BAA-eligible relay (Azure Communication Services / SendGrid).
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_USE_TLS: bool = True
+    # From address for outbound mail. Falls back to SMTP_USERNAME when unset.
+    EMAIL_FROM: Optional[str] = None
+    # Destination inbox for marketing contact-form submissions.
+    CONTACT_INBOX_EMAIL: str = "contact@nexoralab.co"
+
     HIPAA_MODE: bool = True
     ALLOW_DUMMY_LOGIN: bool = False
 

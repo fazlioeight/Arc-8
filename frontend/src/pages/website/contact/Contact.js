@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { submitContactForm } from '../../../services/contactService';
 
 const Contact = () => {
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   const validate = () => {
     const newErrors = {};
@@ -30,13 +32,16 @@ const Contact = () => {
       return;
     }
     setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
+    setSubmitError(null);
+    try {
+      await submitContactForm(formData);
       setSubmitted(true);
       setFormData({ name: '', email: '', subject: '', message: '' });
-    }, 1200);
-    // For real API: await axios.post('/api/contact', formData)
+    } catch (err) {
+      setSubmitError(err.message || 'Something went wrong. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const location = useLocation();
@@ -56,6 +61,12 @@ const Contact = () => {
       {submitted && (
         <div className="alert alert-success text-center" role="alert">
           Thank you for contacting us! We'll get back to you soon.
+        </div>
+      )}
+
+      {submitError && (
+        <div className="alert alert-danger text-center" role="alert">
+          {submitError}
         </div>
       )}
 

@@ -193,3 +193,34 @@ async def test_docs_search_requires_access_and_returns_shape(fastapi_app):
 
     assert resp.status_code == 200, resp.text
     assert {"articles", "total"} <= resp.json().keys()
+
+
+async def test_contact_form_accepts_submission_without_tenant(fastapi_app):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        # No auth, no X-Tenant-Key: the public contact endpoint must be exempt
+        # from tenant resolution and still accept the submission.
+        resp = await client.post(
+            "/api/contact",
+            json={
+                "name": "Jane Doe",
+                "email": "jane@example.com",
+                "subject": "Demo request",
+                "message": "I'd like a demo of the platform.",
+            },
+        )
+    assert resp.status_code == 202, resp.text
+    body = resp.json()
+    assert body["status"] == "received"
+    # No SMTP backend configured in tests, so it logs instead of dispatching.
+    assert body["delivered"] is False
+
+
+async def test_contact_form_rejects_missing_message(fastapi_app):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        resp = await client.post(
+            "/api/contact",
+            json={"name": "Jane Doe", "email": "jane@example.com"},
+        )
+    assert resp.status_code == 422, resp.text
