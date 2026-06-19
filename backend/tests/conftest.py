@@ -212,6 +212,13 @@ async def _bootstrap_async():
                 open_slots=4,
             )
         )
+        # Populate the dashboard fact tables so the dashboard endpoints return
+        # real rows in tests (reuses the demo seeder's generator).
+        import random as _random
+
+        from scripts.seed_prominence_demo import _ensure_dashboard_facts
+
+        await _ensure_dashboard_facts(session, _random.Random(33))
         await session.commit()
 
 

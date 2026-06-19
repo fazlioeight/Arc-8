@@ -42,6 +42,8 @@ const ChatPage = lazy(() => import('./pages/platform/chat/ChatPage'));
 const Docs = lazy(() => import('./pages/docs/Docs'));
 const ProvidersPage = lazy(() => import('./pages/platform/providers/ProvidersPage'));
 const ProviderDetailPage = lazy(() => import('./pages/platform/providers/ProviderDetailPage'));
+const RideBookingPage = lazy(() => import('./pages/platform/ride-booking/RideBookingPage'));
+const DashboardPage = lazy(() => import('./pages/platform/dashboard/DashboardPage'));
 const MasterAdminPage = lazy(() => import('./pages/platform/admin/MasterAdminPage'));
 const StaffLogin = lazy(() => import('./pages/platform/staff/StaffLogin'));
 const StaffBootstrap = lazy(() => import('./pages/platform/staff/StaffBootstrap'));
@@ -51,6 +53,7 @@ const JobStatusCenter = lazy(() => import('./pages/platform/jobs/JobStatusCenter
 const ImportDataPage = lazy(() => import('./pages/platform/jobs/ImportDataPage'));
 const CodingWorklistPage = lazy(() => import('./pages/platform/coding/CodingWorklistPage'));
 const CodingChasePage = lazy(() => import('./pages/platform/coding/CodingChasePage'));
+const WorkbenchPage = lazy(() => import('./pages/platform/coding/WorkbenchPage'));
 const Mission = lazy(() => import('./pages/website/about/Mission'));
 const Values = lazy(() => import('./pages/website/about/Values'));
 const Team = lazy(() => import('./pages/website/about/Team'));
@@ -111,6 +114,8 @@ const Shell = ({ themePreference, setThemePreference }) => {
     ROUTES.MEMBER_360.LANDING,
     ROUTES.MEMBER360_LAB.DASHBOARD,
     ROUTES.PROVIDERS.LANDING,
+    ROUTES.RIDE_BOOKING,
+    ROUTES.DASHBOARD,
     ROUTES.SETTINGS,
     "/admin",
     "/jobs",
@@ -222,6 +227,16 @@ const Shell = ({ themePreference, setThemePreference }) => {
               <ProviderDetailPage />
             </ErrorBoundary>
           )} />
+          <Route path={ROUTES.RIDE_BOOKING} element={(
+            <ErrorBoundary title="Ride booking failed to load">
+              <RideBookingPage />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.DASHBOARD} element={(
+            <ErrorBoundary title="Dashboard failed to load">
+              <DashboardPage />
+            </ErrorBoundary>
+          )} />
           <Route path="/admin/master" element={<MasterAdminPage />} />
           <Route path={ROUTES.STAFF.LOGIN} element={<StaffLogin />} />
           <Route path={ROUTES.STAFF.BOOTSTRAP} element={<StaffBootstrap />} />
@@ -237,6 +252,11 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path={`${ROUTES.CODING.CHASE_ROOT}/:chaseId`} element={(
             <ErrorBoundary title="Chase failed to load">
               <CodingChasePage />
+            </ErrorBoundary>
+          )} />
+          <Route path={`${ROUTES.CODING.WORKBENCH_ROOT}/:memberId`} element={(
+            <ErrorBoundary title="Workbench failed to load">
+              <WorkbenchPage />
             </ErrorBoundary>
           )} />
         </Routes>

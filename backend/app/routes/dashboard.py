@@ -5,8 +5,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..dependencies.tenant import get_tenant_context
+from ..dependencies.tenant import get_tenant_context, get_tenant_session
 from ..db.tenant_manager import TenantContext
 from ..schemas.dashboard import (
     DeadlineRadarResponse,
@@ -47,11 +48,13 @@ async def get_raf_delta(
     provider_group: str = Query(default="All", alias="provider_group"),
     forecast: Optional[str] = Query(default=None),
     tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
     _: AuthenticatedUser = Depends(get_current_user),
 ) -> RafDeltaResponse:
     target_year = model_year or date.today().year
     include_forecast = _should_include_forecast(forecast)
-    return generate_raf_delta(
+    return await generate_raf_delta(
+        session=session,
         tenant=tenant,
         model_year=target_year,
         lob=lob,
@@ -65,13 +68,14 @@ async def get_suspects_funnel(
     from_date: Optional[str] = Query(default=None, alias="from"),
     to_date: Optional[str] = Query(default=None, alias="to"),
     tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
     _: AuthenticatedUser = Depends(get_current_user),
 ) -> SuspectsFunnelResponse:
     end = _parse_iso_date(to_date, "to") if to_date else date.today()
     start = _parse_iso_date(from_date, "from") if from_date else end - timedelta(days=30)
     if start > end:
         raise HTTPException(status_code=400, detail="'from' date must be before 'to' date.")
-    return generate_suspects_funnel(tenant=tenant, start_date=start, end_date=end)
+    return await generate_suspects_funnel(session=session, tenant=tenant, start_date=start, end_date=end)
 
 
 @router.get("/deadlines/radar", response_model=DeadlineRadarResponse)
@@ -79,10 +83,11 @@ async def get_deadline_radar(
     cutoff: str = Query(...),
     stage: str = Query(default="accepted"),
     tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
     _: AuthenticatedUser = Depends(get_current_user),
 ) -> DeadlineRadarResponse:
     cutoff_date = _parse_iso_date(cutoff, "cutoff")
-    return generate_deadline_radar(tenant=tenant, cutoff=cutoff_date, stage=stage or "accepted")
+    return await generate_deadline_radar(session=session, tenant=tenant, cutoff=cutoff_date, stage=stage or "accepted")
 
 
 @router.get("/deadlines/radar/export")
@@ -93,10 +98,11 @@ async def export_deadline_radar_csv(
     model_year: Optional[int] = Query(default=None, alias="model_year"),
     provider_group: Optional[str] = Query(default=None, alias="provider_group"),
     tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
     user: AuthenticatedUser = Depends(get_current_user),
 ):
     cutoff_date = _parse_iso_date(cutoff, "cutoff")
-    radar = generate_deadline_radar(tenant=tenant, cutoff=cutoff_date, stage=stage or "accepted")
+    radar = await generate_deadline_radar(session=session, tenant=tenant, cutoff=cutoff_date, stage=stage or "accepted")
 
     header = "member_id,provider_id,stage,days_to_cutoff,count"
     rows = [header]
@@ -122,9 +128,11 @@ async def get_provider_heatmap(
     lob: str = Query(default="MA"),
     provider_group: str = Query(default="All", alias="provider_group"),
     tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
     _: AuthenticatedUser = Depends(get_current_user),
 ) -> ProviderHeatmapResponse:
-    return generate_provider_heatmap(
+    return await generate_provider_heatmap(
+        session=session,
         tenant=tenant,
         lob=lob,
         provider_group=provider_group or "All",

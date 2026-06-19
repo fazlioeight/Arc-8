@@ -6,6 +6,7 @@ from . import chat as chat  # noqa: F401
 from . import chat_history as chat_history  # noqa: F401
 from . import chat_projects as chat_projects  # noqa: F401
 from . import member360 as member360  # noqa: F401
+from . import dashboard_facts as dashboard_facts  # noqa: F401
 from .tables import ControlBase, TenantDataBase
 
 

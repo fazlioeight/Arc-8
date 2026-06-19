@@ -33,6 +33,20 @@ export const PORTAL_NAV_ITEMS = [
       path.startsWith(`${ROUTES.CODING.WORKLIST}/`),
   },
   {
+    key: "dashboard",
+    label: "Dashboard",
+    href: ROUTES.DASHBOARD,
+    match: (path) => path === ROUTES.DASHBOARD,
+  },
+  {
+    key: "ride_booking",
+    label: "Ride Booking",
+    href: ROUTES.RIDE_BOOKING,
+    match: (path) =>
+      path === ROUTES.RIDE_BOOKING ||
+      path.startsWith(`${ROUTES.RIDE_BOOKING}/`),
+  },
+  {
     key: "chat",
     label: "Nexora Chat",
     href: ROUTES.CHAT,

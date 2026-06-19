@@ -300,7 +300,15 @@ export default function CodingChasePage() {
             <WorkspaceTabs tabs={TABS} activeKey={tab} onChange={setTab} />
             <div className="p-5">
               {tab === 'overview' && <ChaseOverviewTab chase={chase} />}
-              {tab === 'codes' && <CodeSelectionsTab />}
+              {tab === 'codes' && (
+                <CodeSelectionsTab
+                  onOpenWorkbench={
+                    chase.member_key
+                      ? () => navigate(`${ROUTES.CODING.WORKBENCH_ROOT}/${encodeURIComponent(chase.member_key)}`)
+                      : null
+                  }
+                />
+              )}
               {tab === 'documents' && <DocumentsTab />}
               {tab === 'audit' && <AuditTab chase={chase} />}
             </div>
@@ -335,16 +343,27 @@ function ChaseOverviewTab({ chase }) {
   );
 }
 
-function CodeSelectionsTab() {
+function CodeSelectionsTab({ onOpenWorkbench }) {
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-semibold coding-text-strong">Code selections</h3>
       <p className="text-sm coding-text-soft">
-        ICD-10 / CPT picker and quality pane will render here. The HERO spec requires no autosave — coders explicitly click Save.
+        Review suspect conditions, select supporting evidence, and finalize HCC codes in the coding workbench.
+        The HERO spec requires no autosave — coders explicitly finalize.
       </p>
-      <div className="rounded-md border coding-border-dashed p-6 text-center text-sm coding-text-soft">
-        Coding workspace UI not yet wired. Tracked separately under the HERO Internal Programs spec.
-      </div>
+      {onOpenWorkbench ? (
+        <button
+          type="button"
+          onClick={onOpenWorkbench}
+          className="rounded-md bg-[var(--brand-primary)] text-white px-3 py-2 text-sm font-semibold hover:bg-brand-700"
+        >
+          Open coding workbench →
+        </button>
+      ) : (
+        <div className="rounded-md border coding-border-dashed p-6 text-center text-sm coding-text-soft">
+          Member identifier unavailable for this chase.
+        </div>
+      )}
     </div>
   );
 }

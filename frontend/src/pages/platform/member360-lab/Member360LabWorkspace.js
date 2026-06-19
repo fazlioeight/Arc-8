@@ -4,6 +4,7 @@ import PortalPageLayout from '../../../components/PortalPageLayout';
 import { AuthContext } from '../../../context/AuthContext';
 import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import ErrorBoundary from '../../../components/ErrorBoundary';
+import AiAssistantPanel from '../../../components/ai/AiAssistantPanel';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import {
@@ -91,6 +92,7 @@ const Member360LabWorkspace = () => {
   const [actionMessage, setActionMessage] = useState(null);
   const [submissionState, setSubmissionState] = useState('idle');
   const [submissionResult, setSubmissionResult] = useState(null);
+  const [aiOpen, setAiOpen] = useState(false);
   const [journeyTemplates, setJourneyTemplates] = useState([]);
 
   const reload = useCallback(() => {
@@ -532,6 +534,27 @@ const Member360LabWorkspace = () => {
       {actionMessage && (
         <div className="rounded-lg ring-1 ring-emerald-200 dark:ring-emerald-700/40 bg-emerald-50/70 dark:bg-emerald-900/20 px-3 py-2 text-sm coding-text-strong">
           {actionMessage}
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setAiOpen((v) => !v)}
+          className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-3 py-1.5 text-sm font-semibold"
+          aria-expanded={aiOpen}
+        >
+          {aiOpen ? 'Close AI assistant' : 'Ask AI about this member'}
+        </button>
+      </div>
+
+      {aiOpen && (
+        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l coding-border bg-[var(--coding-surface,#fff)] shadow-2xl">
+          <AiAssistantPanel
+            memberId={member.member_key}
+            title={`Ask about ${member.first_name || member.member_key}`}
+            onClose={() => setAiOpen(false)}
+          />
         </div>
       )}
 

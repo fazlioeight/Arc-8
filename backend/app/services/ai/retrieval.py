@@ -125,6 +125,15 @@ async def answer_question(
             f"Question exceeds max length ({settings.AI_ASK_MAX_QUESTION_CHARS} chars)"
         )
 
+    # Surface an unconfigured environment as a clean 503 (RetrievalError → 503)
+    # instead of a raw client-construction 500, so the panel can show a tidy
+    # "not available yet" message rather than a stack-trace detail.
+    if not (settings.AZURE_SEARCH_ENDPOINT and settings.AZURE_OPENAI_ENDPOINT):
+        raise RetrievalError(
+            "The AI assistant isn't configured in this environment yet "
+            "(Azure AI Search and Azure OpenAI must be provisioned first)."
+        )
+
     k = top_k or settings.AZURE_SEARCH_DEFAULT_TOP_K
     k = min(k, settings.AI_ASK_MAX_CONTEXT_CHUNKS)
 

@@ -26,7 +26,10 @@ export const ROUTES = {
   CODING: {
     WORKLIST: "/coding",
     CHASE_ROOT: "/coding/chases",
+    WORKBENCH_ROOT: "/coding/workbench",
   },
+  RIDE_BOOKING: "/ride-booking",
+  DASHBOARD: "/dashboard",
   JOBS: {
     STATUS_CENTER: "/jobs/status-center",
     IMPORT_DATA: "/jobs/import-data",

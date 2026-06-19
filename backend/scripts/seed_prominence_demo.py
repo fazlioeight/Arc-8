@@ -58,7 +58,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.config import settings  # noqa: E402
 from app.models import load_all_models  # noqa: E402
-from app.models.coding import CodingProvider, CodingProviderLocation  # noqa: E402
+from app.models.coding import (  # noqa: E402
+    CodingClaim,
+    CodingMember,
+    CodingMemberChase,
+    CodingMemberPriority,
+    CodingProvider,
+    CodingProviderLocation,
+)
 from app.models.member360 import (  # noqa: E402
     Member360Accumulator,
     Member360CareJourney,
@@ -70,6 +77,23 @@ from app.models.member360 import (  # noqa: E402
     Member360Problem,
     Member360RiskInsight,
     Member360Task,
+)
+from app.models.dashboard_facts import (  # noqa: E402
+    DashboardDeadlineBucket,
+    DashboardFunnelContributor,
+    DashboardFunnelStage,
+    DashboardProviderMetric,
+    DashboardRafMeta,
+    DashboardRafSeriesPoint,
+)
+from app.models.ride_booking import (  # noqa: E402
+    RideBooking,
+    RidePartner,
+    RidePartnerBillingProfile,
+    RidePartnerSchedule,
+    RidePaymentEvent,
+    RidePaymentRecord,
+    RideReconciliationItem,
 )
 
 
@@ -192,6 +216,66 @@ _PROVIDER_SEED: tuple[dict, ...] = (
      "phone": "(775) 555-1112", "email": "zwilliams@prominencehealth.com",
      "address_line1": "480 Galletti Way",  "city": "Sparks",      "state": "NV", "postal_code": "89431",
      "is_pcp": False},
+)
+
+
+# ── Coding vocabulary ───────────────────────────────────────────────────────
+# (icd10, hcc, description) tuples the coding generator samples to build open
+# chases and supporting claims. Vocabulary primitives, not row payloads.
+_CODING_CONDITIONS = (
+    ("E11.9", "HCC18",  "Type 2 diabetes mellitus without complications"),
+    ("I10",   "HCC161", "Essential (primary) hypertension"),
+    ("N18.4", "HCC138", "Chronic kidney disease, stage 4"),
+    ("J44.1", "HCC111", "COPD with acute exacerbation"),
+    ("I50.9", "HCC226", "Heart failure, unspecified"),
+    ("F32.9", "HCC155", "Major depressive disorder, single episode"),
+)
+_CLAIM_TYPES = ("professional", "professional", "outpatient", "inpatient")
+
+
+# ── Dashboard fact vocabulary ───────────────────────────────────────────────
+_DASHBOARD_LOBS = ("MA",)
+_FUNNEL_STAGES = ("suspected", "coder_reviewed", "accepted", "submitted", "payer_accepted", "on_score")
+_DEADLINE_RANGES = ("0-3", "4-7", "8-14", "15-30", "30+")
+_DEADLINE_WEIGHTS = (0.18, 0.24, 0.26, 0.20, 0.12)
+_HEATMAP_METRICS = ("open_raf", "denial_rate", "days_aging", "qa_fail_rate")
+_RAF_BREAKDOWN_GROUPS = ("All", "Accountable Care", "Independent", "Hospital-owned")
+_FALLBACK_HEATMAP_PROVIDERS = (
+    "Atlas Medical Group", "North Valley IPA", "Community Care Collaborative",
+    "Prime Health Associates", "Summit Family Practice", "Vista Specialists Network",
+)
+
+
+def _heatmap_value(metric: str, rng: random.Random) -> float:
+    if metric == "open_raf":
+        return round(rng.uniform(120, 200), 1)
+    if metric == "denial_rate":
+        return round(rng.uniform(0.05, 0.17), 3)
+    if metric == "days_aging":
+        return round(rng.uniform(12, 37), 1)
+    return round(rng.uniform(0.04, 0.14), 3)  # qa_fail_rate
+
+
+# ── Ride-booking vocabulary ─────────────────────────────────────────────────
+# Named transportation vendors (vocabulary primitives, like the provider
+# catalogue) plus small tuples the generator samples to build schedules,
+# rides, and payment rows. No literal multi-row payloads — see module docstring.
+_RIDE_PARTNER_SEED: tuple[dict, ...] = (
+    {"company_name": "Uber Health",      "contact_name": "Dispatch Desk",   "contact_email": "health@uber.example",        "contact_phone": "(800) 555-2001"},
+    {"company_name": "Lyft Assist",      "contact_name": "Care Rides Team",  "contact_email": "assist@lyft.example",        "contact_phone": "(800) 555-2002"},
+    {"company_name": "MedTrans Nevada",  "contact_name": "Ops Center",       "contact_email": "ops@medtrans-nv.example",    "contact_phone": "(775) 555-2003"},
+    {"company_name": "Silver State NEMT","contact_name": "Scheduling",       "contact_email": "schedule@silverstate.example","contact_phone": "(702) 555-2004"},
+)
+_RIDE_DESTINATIONS = (
+    "Renown Primary Care", "Carson Medical Group", "Northern NV Dialysis",
+    "Sierra Imaging Center", "Las Vegas Cardiology", "Henderson Family Clinic",
+)
+# Weighted toward completed/queued so the demo shows a realistic mix.
+_RIDE_STATUSES = ("completed", "completed", "queued", "scheduled", "in_progress", "cancelled")
+_RECON_ITEMS = (
+    ("Mismatched fare on completed ride", "high"),
+    ("Missing receipt for subscriber invoice", "medium"),
+    ("Duplicate payout flagged for review", "low"),
 )
 
 
@@ -742,6 +826,367 @@ async def _ensure_providers(session: AsyncSession) -> dict:
     return {"providers_existing": 0, "providers_inserted": inserted}
 
 
+async def _ensure_dashboard_facts(session: AsyncSession, rng: random.Random) -> dict:
+    """Populate the dashboard_* fact tables (RAF delta, suspects funnel,
+    deadline radar, provider heatmap) if they are empty.
+
+    Idempotent at the table level (keyed on the funnel-stage table). Heatmap
+    providers come from the seeded coding provider catalogue when present, else
+    a fallback vocabulary, so the dashboard always renders. Model years cover
+    the prior, current, and 2025 vintages so both the live UI default and the
+    fixtures find data.
+    """
+    existing = int(
+        (await session.scalar(select(func.count()).select_from(DashboardFunnelStage))) or 0
+    )
+    if existing > 0:
+        return {"dashboard_funnel_stages_existing": existing, "dashboard_seeded": False}
+
+    today = _naive_utcnow().date()
+    model_years = sorted({today.year, today.year - 1, 2025})
+
+    # ── RAF delta: meta + 30-day realized series + forecast points ───────────
+    for my in model_years:
+        for lob in _DASHBOARD_LOBS:
+            target = round(rng.uniform(2.6, 4.2), 2)
+            realized_total = round(target * rng.uniform(0.55, 0.8), 3)
+            cutoff = date(my + 1, 1, 31)
+
+            breakdown = []
+            for idx, grp in enumerate(_RAF_BREAKDOWN_GROUPS):
+                frac = 0.4 if idx == 0 else 0.2
+                breakdown.append(
+                    {"group": grp, "realized": round(max(0.0, realized_total * frac * rng.uniform(0.85, 1.1)), 3)}
+                )
+            session.add(
+                DashboardRafMeta(
+                    model_year=my, lob=lob, provider_group="All",
+                    target=target, cutoff_date=cutoff, breakdown=breakdown,
+                )
+            )
+
+            daily = [rng.uniform(0.4, 1.0) for _ in range(30)]
+            total_weight = sum(daily) or 1.0
+            cumulative = 0.0
+            start = today - timedelta(days=29)
+            for i in range(30):
+                add = realized_total * daily[i] / total_weight
+                cumulative += add
+                session.add(
+                    DashboardRafSeriesPoint(
+                        model_year=my, lob=lob, provider_group="All",
+                        as_of_date=start + timedelta(days=i),
+                        realized=round(cumulative, 3), daily_add=round(add, 3), is_forecast=False,
+                    )
+                )
+
+            projected = realized_total + (target - realized_total) * 0.85
+            spread = max(0.05, projected * 0.08)
+            for horizon in (cutoff - timedelta(days=21), cutoff - timedelta(days=14), cutoff - timedelta(days=7), cutoff):
+                session.add(
+                    DashboardRafSeriesPoint(
+                        model_year=my, lob=lob, provider_group="All",
+                        as_of_date=horizon, realized=0.0, daily_add=0.0, is_forecast=True,
+                        realized_p50=round(projected, 3),
+                        lo80=round(max(0.0, projected - spread), 3),
+                        hi80=round(projected + spread, 3),
+                    )
+                )
+
+    # ── Suspects funnel: stages + contributors ───────────────────────────────
+    running = rng.randint(1200, 2000)
+    for pos, stage in enumerate(_FUNNEL_STAGES):
+        if pos > 0:
+            running = int(running * rng.uniform(0.78, 0.92))
+        session.add(
+            DashboardFunnelStage(
+                stage_key=stage, position=pos, count=running, median_days=round(rng.uniform(3, 7), 1)
+            )
+        )
+
+    provider_names = list((await session.execute(select(CodingProvider.name))).scalars())
+    heatmap_providers = (provider_names or list(_FALLBACK_HEATMAP_PROVIDERS))[:6]
+    for name in rng.sample(heatmap_providers, k=min(5, len(heatmap_providers))):
+        session.add(
+            DashboardFunnelContributor(
+                stage_key=rng.choice(_FUNNEL_STAGES), name=name, count=rng.randint(20, 160)
+            )
+        )
+
+    # ── Deadline radar: buckets per stage ────────────────────────────────────
+    for stage in _FUNNEL_STAGES:
+        total_items = rng.randint(320, 560)
+        for pos, (label, weight) in enumerate(zip(_DEADLINE_RANGES, _DEADLINE_WEIGHTS)):
+            session.add(
+                DashboardDeadlineBucket(
+                    stage=stage, range_label=label, position=pos,
+                    count=int(total_items * weight * rng.uniform(0.9, 1.1)),
+                )
+            )
+
+    # ── Provider heatmap: value + 12-point sparkline per provider+metric ─────
+    for lob in _DASHBOARD_LOBS:
+        for provider in heatmap_providers:
+            for metric in _HEATMAP_METRICS:
+                value = _heatmap_value(metric, rng)
+                sparkline = [round(_heatmap_value(metric, rng), 3) for _ in range(12)]
+                session.add(
+                    DashboardProviderMetric(
+                        lob=lob, provider_group="All", provider=provider,
+                        metric=metric, value=value, sparkline=sparkline,
+                    )
+                )
+
+    return {
+        "dashboard_seeded": True,
+        "dashboard_model_years": model_years,
+        "dashboard_heatmap_providers": len(heatmap_providers),
+    }
+
+
+async def _ensure_coding_demo(session: AsyncSession, rng: random.Random) -> dict:
+    """Seed the Coding app (members + open chases + supporting claims) if
+    ``coding_members`` is empty. Each member gets 1-2 open chases drawn from the
+    HCC vocabulary; each open chase gets 2-4 claims whose diagnosis_codes
+    include the chase's ICD-10 so the workbench surfaces qualifying evidence.
+
+    Idempotent at the table level: any existing coding member means we leave the
+    module alone. (The legacy ``coding_members.ensure_seed_data`` helper is not
+    wired into any runtime path, so without this the coding tables stay empty.)
+    """
+    existing = int(
+        (await session.scalar(select(func.count()).select_from(CodingMember))) or 0
+    )
+    if existing > 0:
+        return {"coding_members_existing": existing, "coding_members_inserted": 0}
+
+    provider_ids = list(
+        (await session.execute(select(CodingProvider.id))).scalars()
+    )
+    pcp_names = list(_pcp_names())
+    all_first = _FIRST_NAMES_F + _FIRST_NAMES_M
+    today = _naive_utcnow().date()
+
+    members_inserted = 0
+    chases_inserted = 0
+    claims_inserted = 0
+    for seq in range(1, 9):  # 8 coding members
+        city = rng.choice(_CITIES_NV)
+        member = CodingMember(
+            member_key=f"PH-{seq:04d}",
+            first_name=rng.choice(all_first),
+            last_name=rng.choice(_LAST_NAMES),
+            status="active",
+            line_of_business=rng.choice(("Medicare Advantage", "Medicare Advantage", "Commercial")),
+            risk_score=round(rng.uniform(0.4, 1.6), 2),
+            primary_language=rng.choice(_LANGUAGES),
+            pcp_name=pcp_names[(seq - 1) % len(pcp_names)] if pcp_names else None,
+            address_city=city[0],
+            address_state=city[1],
+        )
+        session.add(member)
+        await session.flush()  # id for chase/claim FKs
+        members_inserted += 1
+
+        conditions = rng.sample(_CODING_CONDITIONS, k=rng.randint(1, 2))
+        # Risk-prioritization row so the /member/{id}/risk endpoint has data.
+        session.add(
+            CodingMemberPriority(
+                member_id=member.id,
+                priority_score=round(rng.uniform(0.4, 2.4), 2),
+                priority_tier=rng.choice(("high", "normal", "low")),
+                hcc_opportunity_count=len(conditions),
+            )
+        )
+        for idx, (icd10, hcc, _desc) in enumerate(conditions, start=1):
+            dos = today - timedelta(days=rng.randint(20, 300))
+            session.add(
+                CodingMemberChase(
+                    member_id=member.id,
+                    chase_code=f"PH-CH-{seq:04d}-{idx}",
+                    status="open",
+                    priority=rng.choice(("high", "normal", "normal", "low")),
+                    icd10_code=icd10,
+                    hcc_code=hcc,
+                    service_date_from=dos,
+                    due_date=today + timedelta(days=rng.randint(10, 60)),
+                )
+            )
+            chases_inserted += 1
+
+            for c in range(rng.randint(2, 4)):
+                # First claim carries the chase ICD so evidence is "qualifying";
+                # the rest add incidental codes for realism.
+                primary = icd10 if c == 0 else rng.choice(_CODING_CONDITIONS)[0]
+                extra = rng.choice(_CODING_CONDITIONS)[0]
+                session.add(
+                    CodingClaim(
+                        member_id=member.id,
+                        provider_id=rng.choice(provider_ids) if provider_ids else None,
+                        claim_number=f"CLM-{seq:04d}-{idx}-{c}",
+                        claim_type=rng.choice(_CLAIM_TYPES),
+                        service_date=dos - timedelta(days=rng.randint(0, 30)),
+                        diagnosis_codes={primary: "primary", extra: "secondary"},
+                    )
+                )
+                claims_inserted += 1
+
+    return {
+        "coding_members_inserted": members_inserted,
+        "coding_chases_inserted": chases_inserted,
+        "coding_claims_inserted": claims_inserted,
+    }
+
+
+async def _ensure_ride_booking(session: AsyncSession, rng: random.Random) -> dict:
+    """Seed the ride-booking module (partners + schedules + billing profiles +
+    rides + payment records + reconciliation items + payment events).
+
+    Idempotent at the table level: any existing ``ride_partners`` row means an
+    operator has curated the data, so we leave the whole module alone. Rider
+    identities are drawn from already-seeded Member360 members so member_ids
+    are coherent across the demo; if none exist we fall back to the name
+    vocabulary.
+    """
+    existing = int(
+        (await session.scalar(select(func.count()).select_from(RidePartner))) or 0
+    )
+    if existing > 0:
+        return {"ride_partners_existing": existing, "ride_partners_inserted": 0}
+
+    today = _naive_utcnow().date()
+    partners: list[RidePartner] = []
+    for spec in _RIDE_PARTNER_SEED:
+        partner = RidePartner(
+            company_name=spec["company_name"],
+            contact_name=spec["contact_name"],
+            contact_email=spec["contact_email"],
+            contact_phone=spec["contact_phone"],
+            status="active",
+        )
+        session.add(partner)
+        await session.flush()  # populate id for schedule/billing FKs
+        partners.append(partner)
+
+        freq = rng.choice(("daily", "weekly"))
+        session.add(
+            RidePartnerSchedule(
+                partner_id=partner.id,
+                frequency=freq,
+                start_date=today - timedelta(days=30),
+                end_date=today + timedelta(days=180),
+                open_slots=rng.randint(3, 12),
+                days_of_week=["mon", "tue", "wed", "thu", "fri"] if freq == "weekly" else [],
+                days_of_month=[],
+            )
+        )
+        session.add(
+            RidePartnerBillingProfile(
+                partner_id=partner.id,
+                pay_to_name=spec["company_name"],
+                payment_email=spec["contact_email"],
+                payment_method=rng.choice(("ach", "check", "card")),
+                remit_address=f"PO Box {rng.randint(1000, 9999)}, Reno, NV 89501",
+                tax_id=f"{rng.randint(10, 99)}-{rng.randint(1000000, 9999999)}",
+            )
+        )
+
+    members = list(
+        (await session.execute(select(Member360Member).limit(20))).scalars()
+    )
+    all_first = _FIRST_NAMES_F + _FIRST_NAMES_M
+
+    rides: list[RideBooking] = []
+    for i in range(12):
+        partner = rng.choice(partners)
+        if members:
+            m = rng.choice(members)
+            member_id = m.member_key or f"PROM-{i:04d}"
+            first, last = m.first_name, m.last_name
+        else:
+            member_id = f"PROM-{i:04d}"
+            first, last = rng.choice(all_first), rng.choice(_LAST_NAMES)
+        city = rng.choice(_CITIES_NV)
+        sched = _naive_utcnow() + timedelta(days=rng.randint(-14, 14), hours=rng.randint(7, 17))
+        cost = round(rng.uniform(12, 65), 2)
+        ride = RideBooking(
+            partner_id=partner.id,
+            member_id=member_id,
+            first_name=first,
+            last_name=last,
+            ride_type=partner.company_name,
+            pickup="Home",
+            pickup_address=f"{rng.randint(100, 9999)} {rng.choice(_STREETS)} {rng.choice(_STREET_TYPES)}, {city[0]}, {city[1]} {city[2]}",
+            dropoff=rng.choice(_RIDE_DESTINATIONS),
+            dropoff_address=f"{rng.randint(100, 9999)} {rng.choice(_STREETS)} {rng.choice(_STREET_TYPES)}, {city[0]}, {city[1]} {city[2]}",
+            scheduled_pickup=sched,
+            estimated_dropoff=sched + timedelta(minutes=rng.randint(20, 60)),
+            cost_usd=cost,
+            status=rng.choice(_RIDE_STATUSES),
+            created_by="seed_prominence_demo",
+        )
+        session.add(ride)
+        await session.flush()
+        rides.append(ride)
+
+    # Provider + subscriber payment records for each completed ride; the
+    # subscriber share mirrors the route's 1.12x convention.
+    payment_records = 0
+    for ride in rides:
+        if ride.status != "completed":
+            continue
+        session.add(
+            RidePaymentRecord(
+                ride_id=ride.id,
+                payer_type="provider",
+                counterparty_name=ride.ride_type,
+                invoice_number=f"INV-{rng.randint(100000, 999999)}",
+                amount_usd=ride.cost_usd or 0.0,
+                status=rng.choice(("paid", "open", "open")),
+            )
+        )
+        session.add(
+            RidePaymentRecord(
+                ride_id=ride.id,
+                payer_type="subscriber",
+                counterparty_name=f"{ride.first_name} {ride.last_name}",
+                invoice_number=f"SUB-{rng.randint(100000, 999999)}",
+                amount_usd=round((ride.cost_usd or 0.0) * 1.12, 2),
+                status=rng.choice(("paid", "open")),
+            )
+        )
+        payment_records += 2
+
+    for title, priority in _RECON_ITEMS:
+        session.add(
+            RideReconciliationItem(
+                title=title,
+                detail="Auto-flagged during nightly reconciliation.",
+                status="open",
+                priority=priority,
+            )
+        )
+
+    for _ in range(5):
+        session.add(
+            RidePaymentEvent(
+                source=rng.choice(("uber", "lyft", "stripe", "manual")),
+                event_type=rng.choice(
+                    ("payout.created", "invoice.paid", "dispute.opened", "charge.succeeded")
+                ),
+                detail="Synthetic demo payment event.",
+                payload={},
+                event_at=_naive_utcnow() - timedelta(days=rng.randint(0, 10)),
+            )
+        )
+
+    return {
+        "ride_partners_inserted": len(partners),
+        "rides_inserted": len(rides),
+        "ride_payment_records_inserted": payment_records,
+    }
+
+
 async def _align_member_pcps(
     session: AsyncSession,
 ) -> int:
@@ -971,6 +1416,23 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
                 )
                 counts["accumulators"] += await _topup_accumulator(session, m)
                 counts["care_journey_rows"] += await _topup_care_journey(session, m)
+
+            # 3) Coding app (members + open chases + qualifying claims) so the
+            #    coding worklist and workbench have real data to operate on.
+            summary.update(
+                await _ensure_coding_demo(session, random.Random(RANDOM_SEED + 55))
+            )
+
+            # 4) Dashboard fact tables (RAF / funnel / deadline / heatmap).
+            summary.update(
+                await _ensure_dashboard_facts(session, random.Random(RANDOM_SEED + 33))
+            )
+
+            # 5) Ride-booking module (partners/rides/payments). Seeded after
+            #    members so rider identities reference real member keys.
+            summary.update(
+                await _ensure_ride_booking(session, random.Random(RANDOM_SEED + 99))
+            )
 
             await session.commit()
             summary["topups"] = counts

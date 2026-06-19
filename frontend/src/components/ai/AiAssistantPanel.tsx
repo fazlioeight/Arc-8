@@ -25,6 +25,8 @@ import type { Citation } from '../../types/ai';
 
 import CitationChip from './CitationChip';
 
+import './aiAssistantPanel.css';
+
 interface AiAssistantPanelProps {
   /** When set, the AI scopes retrieval to this member. */
   memberId?: string;
