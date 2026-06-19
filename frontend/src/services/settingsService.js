@@ -38,3 +38,21 @@ export const updateUserPreferences = async ({ token, tenant, settings, memories 
   });
   return handleResponse(response);
 };
+
+// Soft-delete all of the caller's chat conversations server-side.
+export const clearChatHistory = async ({ token, tenant } = {}) => {
+  const response = await fetch(`${API_BASE}/api/chat/conversations`, {
+    method: 'DELETE',
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(response);
+};
+
+// Self-service account deactivation (soft close + token revocation, audited).
+export const deactivateAccount = async ({ token, tenant } = {}) => {
+  const response = await fetch(`${API_BASE}/api/account/deactivate`, {
+    method: 'POST',
+    headers: buildHeaders(token, tenant),
+  });
+  return handleResponse(response);
+};

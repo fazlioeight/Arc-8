@@ -30,6 +30,7 @@ from ..schemas.workbench import (
     Suspect,
     WorkbenchPayload,
 )
+from ..services.coding_status import COMPLETED, OPEN
 from ..utils.audit_logger import record_audit_event
 from ..utils.security import AuthenticatedUser, get_current_user
 
@@ -99,7 +100,7 @@ async def get_suspects(
 
     chases_result = await tenant_session.execute(
         select(CodingMemberChase)
-        .where(CodingMemberChase.member_id == member.id, CodingMemberChase.status == "open")
+        .where(CodingMemberChase.member_id == member.id, CodingMemberChase.status == OPEN)
         .order_by(CodingMemberChase.id)
     )
     chases = list(chases_result.scalars().all())
@@ -214,7 +215,7 @@ async def finalize_code(
         )
         chase = chase_result.scalar_one_or_none()
         if chase is not None:
-            chase.status = "coded"
+            chase.status = COMPLETED
             if payload.selected_icd:
                 chase.icd10_code = payload.selected_icd
 

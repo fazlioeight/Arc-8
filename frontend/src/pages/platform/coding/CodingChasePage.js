@@ -10,6 +10,7 @@ import { AuthContext } from '../../../context/AuthContext';
 import { fetchCodingWorklist, updateCodingChase } from '../../../services/codingService';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
+import { CHASE_STATUS_OPTIONS } from '../../../constants/codingStatus';
 import '../../../styles/memberWorkspace.css';
 
 const TABS = [
@@ -224,14 +225,7 @@ export default function CodingChasePage() {
                 value={<span className="capitalize">{formatStatus(chase.status)}</span>}
                 editValue={chase.status || 'open'}
                 type="select"
-                options={[
-                  { value: 'open', label: 'Open' },
-                  { value: 'in_progress', label: 'In progress' },
-                  { value: 'pending_review', label: 'Pending review' },
-                  { value: 'audit_feedback', label: 'Audit feedback' },
-                  { value: 'query_pending', label: 'Query pending' },
-                  { value: 'completed', label: 'Completed' },
-                ]}
+                options={CHASE_STATUS_OPTIONS.map((s) => ({ value: s.key, label: s.label }))}
                 onEdit={saveChaseField('status')}
               />
               <PropertyRow

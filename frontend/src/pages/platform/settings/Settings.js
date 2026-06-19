@@ -9,7 +9,12 @@ import DarkModeToggle from "../../../components/DarkModeToggle";
 import ToggleSwitch from "../../../components/ToggleSwitch";
 import { AuthContext } from "../../../context/AuthContext";
 import { useUserPreferences } from "../../../context/UserPreferencesContext";
-import { fetchUserPreferences, updateUserPreferences } from "../../../services/settingsService";
+import {
+  fetchUserPreferences,
+  updateUserPreferences,
+  clearChatHistory,
+  deactivateAccount,
+} from "../../../services/settingsService";
 
 const NAV_ITEMS = [
   { key: "home", label: "Home & Landing" },
@@ -29,7 +34,7 @@ const NAV_ITEMS = [
 
 const Settings = ({ themePreference, setThemePreference }) => {
   const navigate = useNavigate();
-  const { isAuthenticated, role, token, tenant } = useContext(AuthContext) || {};
+  const { isAuthenticated, role, token, tenant, logout } = useContext(AuthContext) || {};
   const { roleMenus, setNavVisibility } = useUserPreferences();
   const [active, setActive] = useState("general");
   const [menuRole, setMenuRole] = useState(() => role || "admin");
@@ -128,18 +133,34 @@ const Settings = ({ themePreference, setThemePreference }) => {
     URL.revokeObjectURL(url);
   };
 
-  const clearHistory = () => {
-    localStorage.removeItem("chatHistory");
-    alert("Chat history cleared.");
+  const clearHistory = async () => {
+    if (!window.confirm("Clear all of your chat history? This cannot be undone.")) return;
+    try {
+      await clearChatHistory({ token, tenant });
+      localStorage.removeItem("chatHistory");
+      alert("Chat history cleared.");
+    } catch (err) {
+      alert(err.message || "Could not clear chat history. Please try again.");
+    }
   };
 
-  const deleteAccount = () => {
-    if (!window.confirm("This will delete your local account data. Continue?")) return;
+  const deleteAccount = async () => {
+    if (!window.confirm(
+      "This will deactivate your account and sign you out. An administrator can reactivate it. Continue?"
+    )) return;
+    try {
+      await deactivateAccount({ token, tenant });
+    } catch (err) {
+      alert(err.message || "Could not deactivate your account. Please try again.");
+      return;
+    }
+    // End the session (also best-effort revokes server-side) and clear local data.
+    if (typeof logout === "function") {
+      logout();
+    }
     localStorage.removeItem("liSettings");
     localStorage.removeItem("liMemories");
     localStorage.removeItem("themePreference");
-    localStorage.removeItem("token");
-    alert("Local account data deleted.");
     navigate("/login");
   };
 

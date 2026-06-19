@@ -1577,6 +1577,30 @@ async def rename_conversation(
     return _convo_to_summary(convo)
 
 
+@router.delete("/conversations", status_code=204)
+async def delete_all_conversations(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+):
+    """Clear the caller's chat history — soft-deletes all their conversations.
+
+    Backs the Settings "Clear chat history" action. Audited on the control
+    plane with the number of conversations cleared.
+    """
+    count = await history_svc.archive_all_conversations(session, user_id=current_user.id)
+    await session.commit()
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="chat.history.cleared",
+        payload={"tenant": tenant.key, "conversations_cleared": count},
+    )
+    await control_session.commit()
+
+
 @router.delete("/conversations/{conversation_id}", status_code=204)
 async def delete_conversation(
     conversation_id: str,

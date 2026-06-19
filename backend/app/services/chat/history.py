@@ -256,6 +256,29 @@ async def archive_conversation(
     await session.flush()
 
 
+async def archive_all_conversations(
+    session: AsyncSession,
+    *,
+    user_id: int,
+) -> int:
+    """Soft-delete every active conversation owned by ``user_id``.
+
+    Backs the Settings "clear chat history" action. Like the single-archive
+    path this is a soft delete (rows stay for audit / right-to-erasure ops).
+    Returns the number of conversations archived.
+    """
+    stmt = (
+        update(ChatConversation)
+        .where(
+            ChatConversation.user_id == user_id,
+            ChatConversation.archived_at.is_(None),
+        )
+        .values(archived_at=datetime.now(timezone.utc))
+    )
+    result = await session.execute(stmt)
+    return int(result.rowcount or 0)
+
+
 # ── Message append ──────────────────────────────────────────────────────────
 
 

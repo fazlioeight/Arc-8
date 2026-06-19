@@ -6,6 +6,8 @@ from typing import Optional, Sequence
 from sqlalchemy import and_, case, distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .coding_status import PENDING_REVIEW, TERMINAL_CHASE_STATUSES
+
 from ..models.coding import (
     CodingMao004Record,
     CodingMember,
@@ -125,7 +127,7 @@ async def fetch_worklist(
 
     overdue_stmt = due_base.where(
         CodingMemberChase.due_date < today,
-        CodingMemberChase.status != 'closed',
+        CodingMemberChase.status.notin_(TERMINAL_CHASE_STATUSES),
     )
     if filters:
         overdue_stmt = overdue_stmt.where(and_(*filters))
@@ -195,7 +197,7 @@ async def fetch_review_dashboard(
     assigned_email: Optional[str] = None,
     limit: int = 50,
 ) -> dict[str, object]:
-    base_filters = [CodingMemberChase.status != 'closed']
+    base_filters = [CodingMemberChase.status.notin_(TERMINAL_CHASE_STATUSES)]
 
     total_open_stmt = select(func.count()).select_from(CodingMemberChase).where(and_(*base_filters))
     total_open = await session.scalar(total_open_stmt) or 0
@@ -214,7 +216,7 @@ async def fetch_review_dashboard(
     overdue_stmt = total_open_stmt.where(CodingMemberChase.due_date < today)
     overdue = await session.scalar(overdue_stmt) or 0
 
-    in_review_stmt = select(func.count()).select_from(CodingMemberChase).where(CodingMemberChase.status == 'in_review')
+    in_review_stmt = select(func.count()).select_from(CodingMemberChase).where(CodingMemberChase.status == PENDING_REVIEW)
     in_review = await session.scalar(in_review_stmt) or 0
 
     notes_subquery = (
@@ -365,7 +367,7 @@ async def fetch_group_overview(
     search: Optional[str] = None,
 ) -> list[dict[str, object]]:
     active_gap = case(
-        (CodingMemberChase.status != 'closed', 1),
+        (CodingMemberChase.status.notin_(TERMINAL_CHASE_STATUSES), 1),
         else_=0,
     )
 

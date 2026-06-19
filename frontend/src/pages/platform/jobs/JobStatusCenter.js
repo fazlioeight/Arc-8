@@ -46,7 +46,6 @@ const normaliseJob = (row) => ({
   name: row.name || row.file_name || row.entity || row.id,
   status: row.status,
   progress: row.progress ?? 0,
-  tenant: row.tenant_id != null ? String(row.tenant_id) : "",
   startedAt: row.started_at,
   finishedAt: row.completed_at,
   initiatedBy: row.initiated_by || "system",
@@ -59,7 +58,7 @@ const normaliseJob = (row) => ({
 });
 
 const JobStatusCenter = () => {
-  const { token, tenant, availableTenants = [], recordAuditEvent } = useContext(AuthContext) || {};
+  const { token, tenant, recordAuditEvent } = useContext(AuthContext) || {};
   const navigate = useNavigate();
   const { registerCommands } = useCommandPalette();
 
@@ -68,7 +67,6 @@ const JobStatusCenter = () => {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [selectedJobDetail, setSelectedJobDetail] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
-  const [tenantFilter, setTenantFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRows, setSelectedRows] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -216,14 +214,13 @@ const JobStatusCenter = () => {
     const term = searchTerm.trim().toLowerCase();
     return jobs.filter((job) => {
       if (statusFilter && job.status !== statusFilter) return false;
-      if (tenantFilter && job.tenant !== tenantFilter) return false;
       if (term) {
         const haystack = `${job.name} ${job.initiatedBy} ${job.id}`.toLowerCase();
         if (!haystack.includes(term)) return false;
       }
       return true;
     });
-  }, [jobs, statusFilter, tenantFilter, searchTerm]);
+  }, [jobs, statusFilter, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filteredJobs.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -272,7 +269,7 @@ const JobStatusCenter = () => {
     <div className="flex flex-col gap-3">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">Operations</p>
       <h1 className="text-3xl font-semibold coding-text-strong">Job &amp; Status Center</h1>
-      <p className="text-sm coding-text-soft">Track imports, model runs, and exports across tenants. Retry failures or download logs without leaving the page.</p>
+      <p className="text-sm coding-text-soft">Track imports, model runs, and exports. Retry failures or download logs without leaving the page.</p>
     </div>
   );
 
@@ -320,22 +317,12 @@ const JobStatusCenter = () => {
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
-          <select
-            value={tenantFilter}
-            onChange={(event) => setTenantFilter(event.target.value)}
-            className="coding-input rounded-md px-3 py-2 text-sm lg:w-44"
-          >
-            <option value="">All tenants</option>
-            {availableTenants.map((option) => (
-              <option key={option.key} value={option.key}>{option.name}</option>
-            ))}
-          </select>
         </div>
         <div className="border-t coding-border px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => { setStatusFilter(""); setTenantFilter(""); setSearchTerm(""); }}
+              onClick={() => { setStatusFilter(""); setSearchTerm(""); }}
               className="text-[var(--brand-primary)] font-medium hover:underline"
             >
               Clear filters

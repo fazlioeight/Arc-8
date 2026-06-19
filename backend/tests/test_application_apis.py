@@ -224,3 +224,72 @@ async def test_contact_form_rejects_missing_message(fastapi_app):
             json={"name": "Jane Doe", "email": "jane@example.com"},
         )
     assert resp.status_code == 422, resp.text
+
+
+async def test_clear_chat_history_archives_all_conversations(fastapi_app):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = {"Authorization": f"Bearer {token}", **TENANT_HEADER}
+
+        for title in ("First chat", "Second chat"):
+            created = await client.post("/api/chat/conversations", headers=headers, json={"title": title})
+            assert created.status_code == 201, created.text
+
+        listed = await client.get("/api/chat/conversations", headers=headers)
+        assert listed.status_code == 200
+        assert len(listed.json()["conversations"]) >= 2
+
+        cleared = await client.delete("/api/chat/conversations", headers=headers)
+        assert cleared.status_code == 204, cleared.text
+
+        after = await client.get("/api/chat/conversations", headers=headers)
+        assert after.status_code == 200
+        assert after.json()["conversations"] == []
+
+
+async def test_account_deactivate_disables_login(fastapi_app):
+    import bcrypt
+    from sqlalchemy import select as _select
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.core.config import settings as app_settings
+    from app.models.tables import Tenant as _Tenant, User as _User
+
+    # A dedicated user so deactivating it can't poison the shared test user.
+    ctrl_engine = create_async_engine(app_settings.CONTROL_DATABASE_URL, future=True, echo=False)
+    ctrl_factory = async_sessionmaker(ctrl_engine, expire_on_commit=False)
+    async with ctrl_factory() as session:
+        tenant_row = await session.scalar(_select(_Tenant).where(_Tenant.key == TENANT_KEY))
+        session.add(
+            _User(
+                tenant_id=tenant_row.id,
+                email="deactivate-me@example.com",
+                password_hash=bcrypt.hashpw(b"password", bcrypt.gensalt()).decode(),
+                role="analyst",
+                app_permissions={"portal": "user", "settings": "user"},
+            )
+        )
+        await session.commit()
+    await ctrl_engine.dispose()
+
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        login = await client.post(
+            "/api/login",
+            json={"email": "deactivate-me@example.com", "password": "password", "tenant": TENANT_KEY},
+            headers=TENANT_HEADER,
+        )
+        assert login.status_code == 200, login.text
+        headers = {"Authorization": f"Bearer {login.json()['token']}", **TENANT_HEADER}
+
+        resp = await client.post("/api/account/deactivate", headers=headers)
+        assert resp.status_code == 204, resp.text
+
+        # Account is now inactive: re-login is rejected.
+        relogin = await client.post(
+            "/api/login",
+            json={"email": "deactivate-me@example.com", "password": "password", "tenant": TENANT_KEY},
+            headers=TENANT_HEADER,
+        )
+        assert relogin.status_code == 401

@@ -10,15 +10,9 @@ import FilterDropdown from '../../../components/ui/FilterDropdown';
 import KpiTile from '../../../components/ui/KpiTile';
 import SavedViewsBar from '../../../components/ui/SavedViewsBar';
 import SearchInput from '../../../components/ui/SearchInput';
+import { CHASE_STATUS, CHASE_STATUS_OPTIONS } from '../../../constants/codingStatus';
 
-const STATUSES = [
-  { key: 'open', label: 'Open' },
-  { key: 'in_progress', label: 'In progress' },
-  { key: 'pending_review', label: 'Pending review' },
-  { key: 'audit_feedback', label: 'Audit feedback' },
-  { key: 'query_pending', label: 'Query pending' },
-  { key: 'completed', label: 'Completed' },
-];
+const STATUSES = CHASE_STATUS_OPTIONS;
 
 const PRIORITIES = [
   { key: 'urgent', label: 'Urgent' },
@@ -32,7 +26,7 @@ const SAVED_VIEWS = [
   { key: 'mine', label: 'My chases', assignedMode: 'me' },
   { key: 'unassigned', label: 'Unassigned', assigned: '__unassigned__' },
   { key: 'overdue', label: 'Overdue', overdueOnly: true },
-  { key: 'completed', label: 'Completed', statuses: ['completed'] },
+  { key: 'completed', label: 'Completed', statuses: [CHASE_STATUS.COMPLETED] },
 ];
 
 const STATUS_TONE = {

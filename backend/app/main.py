@@ -403,6 +403,51 @@ async def logout(
     return None
 
 
+@app.post("/api/account/deactivate", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_account(
+    request: Request,
+    token: str = Depends(oauth2_scheme),
+    tenant: TenantContext = Depends(get_tenant_context),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_control_session),
+) -> None:
+    """Self-service account deactivation (soft close).
+
+    Sets the user inactive, revokes the current access token and all of their
+    refresh tokens, and writes an audit event. The row is retained for the
+    audit trail; an admin can reactivate. The SPA logs out after calling this.
+    """
+    user = await session.get(User, current_user.id)
+    if user is None or user.tenant_id != tenant.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.is_active = False
+
+    # Revoke the current access token (by jti) and every refresh token so the
+    # session can't continue or be resurrected.
+    try:
+        payload = decode_token(token)
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if jti and exp:
+            ttl = int(exp) - int(datetime.now(timezone.utc).timestamp())
+            if ttl > 0:
+                await revoke_jti(jti, ttl)
+    except HTTPException:
+        pass
+    await revoke_user_refresh_tokens(session, tenant_id=tenant.id, user_id=user.id)
+
+    await record_audit_event(
+        session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="account.deactivated",
+        payload={"tenant": tenant.key, "ip": client_ip(request)},
+    )
+    await session.commit()
+    return None
+
+
 @app.get("/api/auth/azure/config")
 async def azure_auth_config():
     return {

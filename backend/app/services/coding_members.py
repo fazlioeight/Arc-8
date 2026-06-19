@@ -6,6 +6,7 @@ from typing import Iterable, Optional, Sequence, Tuple
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .coding_status import TERMINAL_CHASE_STATUSES
 from .risk_prioritization import refresh_member_priority, refresh_priorities
 
 from ..models.tables import User
@@ -265,7 +266,7 @@ async def ensure_seed_data(session: AsyncSession) -> None:
             CodingMemberChase(
                 member_id=seed_member.id,
                 chase_code="PH-CH-1002",
-                status="in_review",
+                status="pending_review",
                 priority="normal",
                 assigned_coder_email="reviewer@nexora.test",
                 icd10_code="I10",
@@ -317,7 +318,7 @@ async def load_assignment_metadata(
     result = await session.execute(stmt)
     assignments: dict[int, tuple[set[int], set[str]]] = {}
     for member_id, coder_id, coder_email, status in result:
-        if status and status.lower() == 'closed':
+        if status and status.lower() in TERMINAL_CHASE_STATUSES:
             continue
         coder_ids, coder_emails = assignments.setdefault(member_id, (set(), set()))
         if coder_id is not None:
@@ -446,7 +447,7 @@ async def list_open_assignments(session: AsyncSession) -> list[dict[str, object]
             CodingMemberChase.updated_at.label("updated_at"),
         )
         .join(CodingMember, CodingMember.id == CodingMemberChase.member_id)
-        .where(CodingMemberChase.status != 'closed')
+        .where(CodingMemberChase.status.notin_(TERMINAL_CHASE_STATUSES))
         .order_by(CodingMemberChase.updated_at.desc())
     )
     rows = (await session.execute(stmt)).all()
@@ -488,7 +489,7 @@ async def assign_chases_to_coder(
     if member_ids:
         member_stmt = select(CodingMemberChase.id).where(
             CodingMemberChase.member_id.in_(member_ids),
-            CodingMemberChase.status != 'closed',
+            CodingMemberChase.status.notin_(TERMINAL_CHASE_STATUSES),
         )
         member_rows = (await session.execute(member_stmt)).scalars().all()
         target_ids.update(member_rows)
