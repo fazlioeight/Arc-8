@@ -143,3 +143,33 @@ async def test_get_provider_detail(fastapi_app):
     assert detail_resp.status_code == 200
     detail = detail_resp.json()
     assert detail["id"] == provider_id
+
+
+async def test_update_provider_npi(fastapi_app):
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url=BASE_URL) as client:
+        token = await _login(client)
+        headers = {"Authorization": f"Bearer {token}", "X-Tenant-Key": TENANT_KEY}
+
+        list_resp = await client.get("/api/coding/providers", headers=headers)
+        items = list_resp.json()["items"]
+        provider_id = items[0]["id"]
+
+        new_npi = f"99{uuid.uuid4().int % 10_000_000:07d}"
+        patch_resp = await client.patch(
+            f"/api/coding/providers/{provider_id}",
+            json={"npi": new_npi},
+            headers=headers,
+        )
+        assert patch_resp.status_code == 200, patch_resp.text
+        assert patch_resp.json()["npi"] == new_npi
+
+        # A second provider cannot take the same (unique) NPI — expect 409.
+        other = next((p for p in items if p["id"] != provider_id), None)
+        if other is not None:
+            conflict_resp = await client.patch(
+                f"/api/coding/providers/{other['id']}",
+                json={"npi": new_npi},
+                headers=headers,
+            )
+            assert conflict_resp.status_code == 409, conflict_resp.text

@@ -108,6 +108,7 @@ class ProviderManagementResponse(BaseModel):
 
 class ProviderContactUpdate(BaseModel):
     name: Optional[str] = None
+    npi: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     tax_id: Optional[str] = None

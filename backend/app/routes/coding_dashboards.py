@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..dependencies.tenant import get_tenant_session
@@ -136,7 +137,15 @@ async def update_provider_management(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
     update_payload = payload.model_dump(exclude_none=True)
-    provider = await update_provider_contact(session, provider_id, update_payload)
+    try:
+        provider = await update_provider_contact(session, provider_id, update_payload)
+    except IntegrityError:
+        # npi carries a unique constraint; a collision surfaces here at flush.
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="NPI already in use by another provider.",
+        )
     if provider is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
     await session.commit()

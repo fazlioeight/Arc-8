@@ -221,7 +221,7 @@ const ProviderDetailPage = () => {
             </header>
             <dl>
               <PropertyRow label="Name" value={provider.name} onEdit={saveProviderField('name')} />
-              <PropertyRow label="NPI" value={provider.npi} editable />
+              <PropertyRow label="NPI" value={provider.npi} onEdit={saveProviderField('npi')} />
               <PropertyRow label="Tax ID" value={provider.tax_id} onEdit={saveProviderField('tax_id')} />
               <PropertyRow label="Phone" value={provider.phone} type="tel" onEdit={saveProviderField('phone')} />
               <PropertyRow
@@ -231,7 +231,6 @@ const ProviderDetailPage = () => {
                 validate={(v) => v && !/.+@.+\..+/.test(v) ? 'Enter a valid email' : null}
                 onEdit={saveProviderField('email')}
               />
-              <PropertyRow label="Queue" value={provider.queue_name} editable />
             </dl>
 
             <PropertySection title="Location">

@@ -489,7 +489,7 @@ async def update_provider_contact(
     if not provider:
         return None
 
-    updatable_fields = ("name", "phone", "email", "tax_id")
+    updatable_fields = ("name", "npi", "phone", "email", "tax_id")
     for field in updatable_fields:
         if field in payload:
             setattr(provider, field, payload[field])
