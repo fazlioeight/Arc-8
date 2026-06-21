@@ -33,6 +33,7 @@ from app.models.coding import (
     CodingProvider,
     CodingProviderLocation,
 )
+from app.models.member360 import Member360Member
 from app.models.ride_booking import RidePartner, RidePartnerSchedule
 
 from cryptography.fernet import Fernet as _Fernet
@@ -42,6 +43,29 @@ TEST_TENANT_DB_TEMPLATE = "sqlite+aiosqlite:///./tests/tenants/{tenant_key}.db"
 TEST_SECRET = "super-secret-for-tests"
 TEST_TENANT_KEY = "prominencehealth"
 TEST_FIELD_KEY = _Fernet.generate_key().decode("utf-8")
+
+# A second tenant lets isolation tests prove that a member of one health plan
+# cannot register against / read another's data even with a matching member id.
+SECOND_TENANT_KEY = "northwind"
+
+# Seeded Member360 members used by member-portal (Feature 1+) tests. Each is the
+# identity-proofing target for self-registration in its tenant.
+PROMINENCE_MEMBER = {
+    "member_key": "M360-1001",
+    "first_name": "Ada",
+    "last_name": "Lovelace",
+    "date_of_birth": date(1950, 12, 10),
+    "address_zip": "73301",
+    "email": "ada@example.com",
+}
+NORTHWIND_MEMBER = {
+    "member_key": "NW-2002",
+    "first_name": "Grace",
+    "last_name": "Hopper",
+    "date_of_birth": date(1956, 12, 9),
+    "address_zip": "20001",
+    "email": "grace@example.com",
+}
 
 
 os.environ["ENVIRONMENT"] = "test"
@@ -160,6 +184,8 @@ async def _bootstrap_async():
         claim = Claim(member_key="M001", service_date=None, cost=Decimal("100.00"))
         session.add(claim)
 
+        session.add(Member360Member(**PROMINENCE_MEMBER))
+
         coding_member = CodingMember(
             member_key="COD001",
             first_name="Case",
@@ -221,6 +247,31 @@ async def _bootstrap_async():
         await _ensure_dashboard_facts(session, _random.Random(33))
         await session.commit()
 
+    # ---- Second tenant (isolation tests) --------------------------------
+    async with session_factory() as session:
+        second = Tenant(
+            key=SECOND_TENANT_KEY,
+            slug=SECOND_TENANT_KEY,
+            name="Northwind Health",
+            db_connection_uri=TEST_TENANT_DB_TEMPLATE.format(tenant_key=SECOND_TENANT_KEY),
+            billing_plan="standard",
+            phi_data_classification="restricted",
+            purchased_applications={"member360": True},
+        )
+        session.add(second)
+        await session.commit()
+
+    second_engine = create_async_engine(
+        TEST_TENANT_DB_TEMPLATE.format(tenant_key=SECOND_TENANT_KEY), future=True, echo=False
+    )
+    async with second_engine.begin() as conn:
+        await conn.run_sync(TenantDataBase.metadata.drop_all)
+        await conn.run_sync(TenantDataBase.metadata.create_all)
+    second_session_factory = async_sessionmaker(second_engine, expire_on_commit=False)
+    async with second_session_factory() as session:
+        session.add(Member360Member(**NORTHWIND_MEMBER))
+        await session.commit()
+
 
 @pytest.fixture(scope="session", autouse=True)
 def bootstrap_test_environment():
@@ -249,4 +300,6 @@ def disable_audit(monkeypatch):
     monkeypatch.setattr('app.utils.audit_logger.record_audit_event', _noop)
     monkeypatch.setattr('app.routes.coding.record_audit_event', _noop)
     monkeypatch.setattr('app.routes.member360.record_audit_event', _noop)
+    monkeypatch.setattr('app.routes.member_portal.record_audit_event', _noop)
+    monkeypatch.setattr('app.routes.member_portal_session.record_audit_event', _noop)
     monkeypatch.setattr('app.main.record_audit_event', _noop)

@@ -1,0 +1,82 @@
+name: Deploy member edge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "edge/member-portal/**"
+      - "infra/azure/07-deploy-member-edge.ps1"
+      - ".github/workflows/deploy-member-edge.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-member-edge
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: edge/member-portal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Run proxy tests
+        run: pytest -q
+
+  deploy:
+    needs: test
+    # Self-hosted runner inside the VNet (same as backend) so the edge image
+    # build + Container App update run against in-VNet ACR/ACA.
+    runs-on: [self-hosted, linux, nexora-vnet]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure containerapp extension
+        run: az extension add --name containerapp --upgrade --only-show-errors
+
+      - name: Deploy member edge Container App
+        shell: pwsh
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
+        run: |
+          ./infra/azure/07-deploy-member-edge.ps1 `
+            -ResourceGroup $env:AZURE_RESOURCE_GROUP `
+            -AcrName $env:AZURE_ACR_NAME
+
+      - name: Smoke test (edge liveness)
+        env:
+          URL: ${{ vars.AZURE_MEMBER_EDGE_URL }}
+        run: |
+          # Only runs once AZURE_MEMBER_EDGE_URL is set as a repo var.
+          if [ -n "$URL" ]; then
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$URL/health/live")
+            echo "edge health/live: $status"
+            test "$status" = "200"
+          else
+            echo "AZURE_MEMBER_EDGE_URL not set; skipping smoke test."
+          fi

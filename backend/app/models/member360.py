@@ -25,6 +25,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -100,6 +101,16 @@ class Member360Member(TenantDataBase):
         back_populates="member", cascade="all, delete-orphan"
     )
     labs: Mapped[list["Member360Lab"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
+    # Member-portal (Feature 3) additive relationships.
+    coverages: Mapped[list["Member360Coverage"]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
+    dependents: Mapped[list["Member360Dependent"]] = relationship(
+        back_populates="subscriber", cascade="all, delete-orphan"
+    )
+    accumulator_scopes: Mapped[list["Member360AccumulatorScope"]] = relationship(
         back_populates="member", cascade="all, delete-orphan"
     )
 
@@ -270,6 +281,13 @@ class Member360Claim(TenantDataBase):
     member_responsibility: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
 
     member: Mapped[Member360Member] = relationship(back_populates="claims")
+    # Member-portal (Feature 3) additive relationships.
+    lines: Mapped[list["Member360ClaimLine"]] = relationship(
+        back_populates="claim", cascade="all, delete-orphan", order_by="Member360ClaimLine.line_number"
+    )
+    detail: Mapped[Optional["Member360ClaimDetail"]] = relationship(
+        back_populates="claim", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class Member360Accumulator(TenantDataBase):
@@ -516,3 +534,225 @@ class Member360CareOptionPolicy(TenantDataBase):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ---------------------- Member-portal additive tables ------------------------
+# Net-new tables (NOT alterations of existing m360_* tables) so the tenant
+# schema sync (TenantDataBase.metadata.create_all / ensure_tenant_schema) picks
+# them up everywhere idempotently. They back the member-facing dashboard
+# (Feature 3): coverage/eligibility detail, dependents, claim line-items, claim
+# denial + EOB linkage, and the individual-vs-family accumulator split.
+
+
+class Member360Coverage(TenantDataBase):
+    """A coverage span for a member (current or historical).
+
+    Supplies the eligibility fields the base ``m360_members`` row lacks:
+    coverage status, effective/term dates, tier, and subscriber relationship.
+    A member may have more than one row (e.g. medical + Part D, or successive
+    plan years); ``is_primary`` flags the one the dashboard headlines.
+    """
+
+    __tablename__ = "m360_coverages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_members.id", ondelete="CASCADE"), index=True
+    )
+    plan_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    line_of_business: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    coverage_status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    effective_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    term_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    coverage_tier: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    relationship_to_subscriber: Mapped[str] = mapped_column(String(32), default="subscriber")
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=True)
+    as_of_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    member: Mapped[Member360Member] = relationship(back_populates="coverages")
+
+
+class Member360Dependent(TenantDataBase):
+    """A covered dependent listed under a subscriber member."""
+
+    __tablename__ = "m360_member_dependents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subscriber_member_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_members.id", ondelete="CASCADE"), index=True
+    )
+    first_name: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    last_name: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    relationship_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # If the dependent is themselves an m360 member, their key; else null.
+    member_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    coverage_status: Mapped[str] = mapped_column(String(32), default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    subscriber: Mapped[Member360Member] = relationship(back_populates="dependents")
+
+
+class Member360ClaimLine(TenantDataBase):
+    """A single service line on a claim, with the member-responsibility split
+    (copay / coinsurance / deductible) and per-line denial reason."""
+
+    __tablename__ = "m360_claim_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    claim_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_claims.id", ondelete="CASCADE"), index=True
+    )
+    line_number: Mapped[int] = mapped_column(Integer, default=1)
+    service_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    procedure_code: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    procedure_description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    billed_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    allowed_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    paid_amount: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    member_responsibility: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    copay: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    coinsurance: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    deductible: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="paid")
+    denial_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    claim: Mapped[Member360Claim] = relationship(back_populates="lines")
+
+
+class Member360ClaimDetail(TenantDataBase):
+    """1:1 supplement to a claim: claim-level denial reason and the EOB document
+    link. Kept separate from ``m360_claims`` to avoid altering the base table."""
+
+    __tablename__ = "m360_claim_details"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    claim_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_claims.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    denial_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    eob_document_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("m360_documents.id", ondelete="SET NULL"), nullable=True
+    )
+    remittance_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    claim: Mapped[Member360Claim] = relationship(back_populates="detail")
+    eob_document: Mapped[Optional["Member360Document"]] = relationship()
+
+
+class Member360AccumulatorScope(TenantDataBase):
+    """Per-scope accumulator (``individual`` or ``family``).
+
+    Supplements the legacy single-row ``m360_accumulators`` (treated as the
+    individual scope when no scoped rows exist), enabling the individual-vs-
+    family split the dashboard needs.
+    """
+
+    __tablename__ = "m360_accumulator_scopes"
+    __table_args__ = (
+        UniqueConstraint("member_id", "scope", name="uq_m360_accumulator_scope"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    member_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_members.id", ondelete="CASCADE"), index=True
+    )
+    scope: Mapped[str] = mapped_column(String(16), default="individual")
+    deductible: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    deductible_met: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    out_of_pocket_max: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    out_of_pocket_met: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    plan_year_start: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    as_of_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    member: Mapped[Member360Member] = relationship(back_populates="accumulator_scopes")
+
+
+# ---------------------- Provider directory (Feature 6) -----------------------
+# m360 has no provider tables, so the member-facing provider/PCP search gets its
+# own directory in the m360 domain. New tables only (create_all-friendly).
+# Geocodes are CACHED on the location row + in m360_geocode_cache so provider
+# addresses are never re-sent to Google on every request. PRIVACY: only provider
+# addresses and the member-entered search location ever leave to Google — never
+# member identity (enforced by the geocoding service taking address strings only).
+
+
+class Member360Provider(TenantDataBase):
+    __tablename__ = "m360_providers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    npi: Mapped[Optional[str]] = mapped_column(String(15), unique=True, index=True, nullable=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    specialty: Mapped[Optional[str]] = mapped_column(String(120), nullable=True, index=True)
+    is_pcp: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    accepting_new_patients: Mapped[bool] = mapped_column(Boolean, default=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    gender: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    languages: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    locations: Mapped[list["Member360ProviderLocation"]] = relationship(
+        back_populates="provider", cascade="all, delete-orphan"
+    )
+    networks: Mapped[list["Member360ProviderNetwork"]] = relationship(
+        back_populates="provider", cascade="all, delete-orphan"
+    )
+
+
+class Member360ProviderLocation(TenantDataBase):
+    __tablename__ = "m360_provider_locations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_providers.id", ondelete="CASCADE"), index=True
+    )
+    address_line1: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    address_line2: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    state: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
+    postal_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # pending | ok | failed — drives the batch geocoder; cached so we never
+    # re-geocode an address that already resolved.
+    geocode_status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    geocoded_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    provider: Mapped[Member360Provider] = relationship(back_populates="locations")
+
+
+class Member360ProviderNetwork(TenantDataBase):
+    __tablename__ = "m360_provider_networks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider_id: Mapped[int] = mapped_column(
+        ForeignKey("m360_providers.id", ondelete="CASCADE"), index=True
+    )
+    plan_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    line_of_business: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    network_status: Mapped[str] = mapped_column(String(24), default="in_network")
+
+    provider: Mapped[Member360Provider] = relationship(back_populates="networks")
+
+
+class Member360GeocodeCache(TenantDataBase):
+    """Cache of geocoded query strings (provider addresses and member-entered
+    search locations) so an address is sent to Google at most once."""
+
+    __tablename__ = "m360_geocode_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    query_text: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="ok")  # ok | failed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -43,6 +43,14 @@ param(
     # generated on first deploy.
     [switch]$StrictSecrets,
 
+    # Member-portal edge lockdown (fast-follow). When set, the backend receives
+    # MEMBER_EDGE_SHARED_SECRET, which switches ON enforcement that /api/member/*
+    # is reachable only via the member edge (X-Edge-Auth). Leave OFF until the
+    # edge Container App is deployed and sending the header, or you will 404 the
+    # member API. The secret is always provisioned in Key Vault so the edge can
+    # pick it up first; this flag only controls backend enforcement.
+    [switch]$EnableMemberEdgeGuard,
+
     [switch]$FollowLogs
 )
 
@@ -218,6 +226,42 @@ if ($fkResult.ok) {
     # Fernet requires url-safe base64 (no '+/' chars, '=' padding kept).
     $FieldKey = ([Convert]::ToBase64String($fkBytes)) -replace '\+', '-' -replace '/', '_'
     az keyvault secret set --vault-name $KeyVaultName --name "platform-field-encryption-key" --value $FieldKey --output none | Out-Null
+}
+
+# Generate (or reuse) the member-portal JWT signing key (separate realm from
+# SECRET_KEY). Safe to enable immediately: setting it makes member tokens use
+# this key; in-flight member access tokens (<=15 min) re-mint via refresh.
+$mjkResult = Get-KvSecretValue -VaultName $KeyVaultName -SecretName "platform-member-jwt-key"
+if ($mjkResult.ok) {
+    $MemberJwtKey = $mjkResult.value
+} elseif ($mjkResult.reason -eq "forbidden") {
+    throw "Cannot read Key Vault secret 'platform-member-jwt-key' -- principal lacks data-plane read on '$KeyVaultName'. See docs/RUNBOOK_CI_IAM.md."
+} elseif ($StrictSecrets) {
+    throw "Key Vault secret 'platform-member-jwt-key' is missing. -StrictSecrets is on; refusing to regenerate (would invalidate live member access tokens). Bootstrap it manually."
+} else {
+    Write-Host "Generating member JWT signing key..."
+    $bytes = New-Object byte[] 48
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $MemberJwtKey = [Convert]::ToBase64String($bytes)
+    az keyvault secret set --vault-name $KeyVaultName --name "platform-member-jwt-key" --value $MemberJwtKey --output none | Out-Null
+}
+
+# Generate (or reuse) the member edge<->backend shared secret. Always stored in
+# Key Vault (so the edge can present it); only INJECTED into the backend when
+# -EnableMemberEdgeGuard is set (which turns on enforcement). See the runbook.
+$edgeResult = Get-KvSecretValue -VaultName $KeyVaultName -SecretName "member-edge-shared-secret"
+if ($edgeResult.ok) {
+    $MemberEdgeSecret = $edgeResult.value
+} elseif ($edgeResult.reason -eq "forbidden") {
+    throw "Cannot read Key Vault secret 'member-edge-shared-secret' -- principal lacks data-plane read on '$KeyVaultName'. See docs/RUNBOOK_CI_IAM.md."
+} elseif ($StrictSecrets) {
+    throw "Key Vault secret 'member-edge-shared-secret' is missing. -StrictSecrets is on; refusing to regenerate. Bootstrap it manually."
+} else {
+    Write-Host "Generating member edge shared secret..."
+    $bytes = New-Object byte[] 32
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $MemberEdgeSecret = ([Convert]::ToBase64String($bytes)) -replace '[+/=]', ''
+    az keyvault secret set --vault-name $KeyVaultName --name "member-edge-shared-secret" --value $MemberEdgeSecret --output none | Out-Null
 }
 
 # Generate (or reuse) initial admin password.
@@ -537,6 +581,7 @@ if (-not $SkipBackend) {
     $ContainerSecrets = @(
         "platform-secret-key=$SecretKey",
         "platform-field-encryption-key=$FieldKey",
+        "platform-member-jwt-key=$MemberJwtKey",
         "platform-control-db-url=$ControlDsnAsyncpg",
         "platform-tenant-db-url=$TenantDsnAsyncpg"
     )
@@ -546,6 +591,8 @@ if (-not $SkipBackend) {
         "ALLOW_DUMMY_LOGIN=false",
         "SECRET_KEY=secretref:platform-secret-key",
         "FIELD_ENCRYPTION_KEY=secretref:platform-field-encryption-key",
+        # Dedicated member-realm JWT key (isolated from staff SECRET_KEY).
+        "MEMBER_JWT_SECRET_KEY=secretref:platform-member-jwt-key",
         "CONTROL_DATABASE_URL=secretref:platform-control-db-url",
         "DEFAULT_TENANT_DATABASE_URL=secretref:platform-tenant-db-url",
         "CORS_ORIGINS=$InitialCorsOrigins",
@@ -558,6 +605,16 @@ if (-not $SkipBackend) {
         "CLAUDE_MODEL=claude-sonnet-4-6",
         "APPLICATIONINSIGHTS_CONNECTION_STRING=$ConnStr"
     )
+
+    # Member edge lockdown: only enforce when explicitly enabled, so we never
+    # 404 the member API before the edge is live and sending X-Edge-Auth.
+    if ($EnableMemberEdgeGuard) {
+        $ContainerSecrets += "member-edge-shared-secret=$MemberEdgeSecret"
+        $ContainerEnvVars += "MEMBER_EDGE_SHARED_SECRET=secretref:member-edge-shared-secret"
+        Write-Host "Member edge guard ENABLED: /api/member/* now requires X-Edge-Auth from the edge."
+    } else {
+        Write-Host "Member edge guard dormant (run with -EnableMemberEdgeGuard once the edge is live)."
+    }
 
     # Anthropic API key as a Key Vault reference. The Container App's
     # managed identity already has Key Vault Secrets User on this KV

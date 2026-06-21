@@ -14,6 +14,7 @@ from .core.logging_config import setup_logging
 from .dependencies.tenant import get_tenant_context
 from .db.session import get_control_session
 from .db.tenant_manager import TenantContext, tenant_connection_manager
+from .middleware.member_edge_guard import MemberEdgeGuardMiddleware
 from .middleware.rate_limit import RateLimitMiddleware, auth_rate_limit
 from .middleware.request_logging import RequestLoggingMiddleware
 from .middleware.security_headers import SecurityHeadersMiddleware
@@ -35,6 +36,11 @@ from .routes import member_cost as member_cost_router
 from .routes import member_risk as member_risk_router
 from .routes import member360 as member360_router
 from .routes import member360_admin as member360_admin_router
+from .routes import member_portal as member_portal_router
+from .routes import member_portal_session as member_portal_session_router
+from .routes import member_portal_dashboard as member_portal_dashboard_router
+from .routes import member_portal_documents as member_portal_documents_router
+from .routes import member_portal_providers as member_portal_providers_router
 from .routes import portal as portal_router
 from .routes import ride_booking as ride_booking_router
 from .routes import settings as settings_router
@@ -70,6 +76,11 @@ assert_required_settings(settings)
 app = FastAPI(title="Nexora Lab API", version="2.0.0")
 
 app.add_middleware(RequestLoggingMiddleware)
+# Reject /api/member/* requests that didn't come through the member edge (when
+# the shared secret is provisioned). Added before TenantMiddleware so a bypass
+# attempt is refused before any tenant/DB work; its 404 still flows back out
+# through SecurityHeaders + CORS.
+app.add_middleware(MemberEdgeGuardMiddleware)
 app.add_middleware(
     TenantMiddleware,
     default_tenant=None if settings.is_production else "prominencehealth",
@@ -599,6 +610,11 @@ app.include_router(utilization_router.router)
 app.include_router(member_risk_router.router)
 app.include_router(member360_router.router)
 app.include_router(member360_admin_router.router)
+app.include_router(member_portal_router.router)
+app.include_router(member_portal_session_router.router)
+app.include_router(member_portal_dashboard_router.router)
+app.include_router(member_portal_documents_router.router)
+app.include_router(member_portal_providers_router.router)
 app.include_router(imports_router.router)
 app.include_router(ride_booking_router.router)
 app.include_router(docs_router.router)

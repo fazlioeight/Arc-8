@@ -58,6 +58,37 @@ class Settings(BaseSettings):
     REQUIRE_ADMIN_MFA: bool = True
     MFA_ISSUER: str = "Nexora Lab"
 
+    # ── Member-facing portal (Feature 1+) ─────────────────────────────────
+    # Public base URL of the white-labeled member portal SPA, used to build
+    # email-verification / password-reset links. Optional in dev.
+    MEMBER_PORTAL_BASE_URL: Optional[str] = None
+    MEMBER_EMAIL_VERIFICATION_TTL_MINUTES: int = 24 * 60
+    MEMBER_PASSWORD_RESET_TTL_MINUTES: int = 60
+
+    # Dedicated signing key for the member-portal JWT realm. When unset it falls
+    # back to SECRET_KEY (backward compatible); set it (per deployment, from Key
+    # Vault) so a compromise of member-token signing can never mint staff tokens.
+    MEMBER_JWT_SECRET_KEY: Optional[str] = None
+
+    # Shared secret the member edge (BFF) presents on every proxied request as
+    # the ``X-Edge-Auth`` header. When set, the backend rejects any /api/member/*
+    # request that lacks it — so member routes are reachable ONLY via the edge,
+    # not the backend's public FQDN. Dormant (no enforcement) when unset, so the
+    # backend can be deployed before the edge starts sending it.
+    MEMBER_EDGE_SHARED_SECRET: Optional[str] = None
+    # Lifetime of a signed document-download grant (capability token in the URL).
+    # Deliberately short: it is minted on demand right before the download.
+    MEMBER_DOC_GRANT_TTL_SECONDS: int = 120
+
+    # Provider search (Feature 6). Server-side Geocoding key NEVER leaves the
+    # backend; the browser Maps/Places key is public but must be HTTP-referrer
+    # restricted in the Google console. PRIVACY: only provider addresses and the
+    # member-entered search location are ever sent to Google — never member PHI.
+    GOOGLE_GEOCODING_API_KEY: Optional[str] = None
+    GOOGLE_MAPS_BROWSER_KEY: Optional[str] = None
+    PROVIDER_SEARCH_DEFAULT_RADIUS_MILES: float = 25.0
+    PROVIDER_SEARCH_MAX_CANDIDATES: int = 2000
+
     FIELD_ENCRYPTION_KEY: Optional[str] = None
 
     ALLOWED_TENANT_HOSTS: Dict[str, str] = {}

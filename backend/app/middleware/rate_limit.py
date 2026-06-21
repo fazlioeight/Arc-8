@@ -182,3 +182,22 @@ def phi_rate_limit() -> Callable[..., Awaitable[None]]:
             raise _too_many(retry_after, "PHI rate limit exceeded")
 
     return _dependency
+
+
+def member_phi_rate_limit() -> Callable[..., Awaitable[None]]:
+    """Factory: 30 req/min per authenticated *member*. Attach to member-portal
+    PHI routes. Same counter/limit as ``phi_rate_limit`` but keyed off the
+    member account so the two realms don't share a budget."""
+    from ..utils.member_auth import AuthenticatedMember, get_current_member
+
+    async def _dependency(
+        current_member: "AuthenticatedMember" = Depends(get_current_member),
+    ) -> None:
+        allowed, retry_after = await check_rate_limit(
+            "phi-member", str(current_member.id) or current_member.email,
+            settings.PHI_RATE_LIMIT_PER_MINUTE, 60,
+        )
+        if not allowed:
+            raise _too_many(retry_after, "PHI rate limit exceeded")
+
+    return _dependency
