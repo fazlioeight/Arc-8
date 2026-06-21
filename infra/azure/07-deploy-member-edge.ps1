@@ -89,6 +89,16 @@ if ($edgeSecret) {
     Write-Host "member-edge-shared-secret not in Key Vault yet; edge runs without it (guard stays dormant)."
 }
 
+# ACR admin credentials for the image pull. We deliberately do NOT use
+# `--registry-identity system`: granting the new edge MI AcrPull needs
+# roleAssignments/write on the ACR, which the CI service principal lacks — and
+# when that auto-grant fails, `az containerapp create` silently falls back to
+# the quickstart placeholder image (env vars stick, image doesn't). Admin creds
+# (same pattern as deploy-to-azure.ps1) pull the real image with no RBAC write.
+$acrUser = $AcrName
+$acrPass = az acr credential show -n $AcrName --query "passwords[0].value" -o tsv
+if (-not $acrPass) { throw "Could not read ACR admin credentials for $AcrName (is the admin user enabled?)." }
+
 $appExists = $true
 az containerapp show --resource-group $ResourceGroup --name $EdgeAppName *> $null
 if ($LASTEXITCODE -ne 0) { $appExists = $false }
@@ -102,7 +112,8 @@ if (-not $appExists) {
         "--image", $fullImage,
         "--system-assigned",
         "--registry-server", $acrServer,
-        "--registry-identity", "system",
+        "--registry-username", $acrUser,
+        "--registry-password", $acrPass,
         "--target-port", "8000",
         "--ingress", "external",
         "--min-replicas", "0",
@@ -115,6 +126,8 @@ if (-not $appExists) {
     az containerapp create @createArgs
 } else {
     Write-Host "Updating edge Container App $EdgeAppName..."
+    az containerapp registry set --resource-group $ResourceGroup --name $EdgeAppName `
+        --server $acrServer --username $acrUser --password $acrPass
     if ($secretArgs.Count -gt 0) {
         az containerapp secret set --resource-group $ResourceGroup --name $EdgeAppName --secrets $secretArgs
     }
@@ -133,6 +146,15 @@ foreach ($name in ($secretNames -split "`n" | Where-Object { $_ })) {
 if ($forbidden.Count -gt 0) {
     throw "SECURITY: edge app $EdgeAppName holds forbidden secret(s): $($forbidden -join ', '). The internet-facing tier must never hold DB creds or signing keys. Aborting."
 }
+
+# Assert the real edge image is running — never let a placeholder/quickstart
+# fallback pass as a successful deploy.
+$runningImage = az containerapp show --resource-group $ResourceGroup --name $EdgeAppName `
+    --query "properties.template.containers[0].image" -o tsv
+if ($runningImage -notlike "*${ImageName}:*") {
+    throw "Edge deploy did not apply the expected image (running: '$runningImage'). Aborting."
+}
+Write-Host "Edge image confirmed: $runningImage"
 
 $edgeFqdn = az containerapp show --resource-group $ResourceGroup --name $EdgeAppName `
     --query "properties.configuration.ingress.fqdn" -o tsv
