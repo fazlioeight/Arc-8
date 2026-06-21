@@ -61,12 +61,12 @@ jobs:
       - name: Deploy member edge Container App
         shell: pwsh
         env:
+          # Both fall back to project defaults inside the script when the repo
+          # vars are unset, so the pipeline works before they're configured.
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           AZURE_ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
         run: |
-          ./infra/azure/07-deploy-member-edge.ps1 `
-            -ResourceGroup $env:AZURE_RESOURCE_GROUP `
-            -AcrName $env:AZURE_ACR_NAME
+          ./infra/azure/07-deploy-member-edge.ps1
 
       - name: Smoke test (edge liveness)
         env:

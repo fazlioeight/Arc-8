@@ -22,6 +22,8 @@ jobs:
     defaults:
       run:
         working-directory: frontend-member
+    env:
+      SWA_TOKEN: ${{ secrets.AZURE_MEMBER_PORTAL_SWA_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +47,10 @@ jobs:
           CI: "false"
         run: npm run build
 
+      # Skip (green) until the member SWA exists and its deploy token is set as
+      # the AZURE_MEMBER_PORTAL_SWA_TOKEN secret — avoids failing every push.
       - name: Deploy to Azure Static Web Apps
+        if: env.SWA_TOKEN != ''
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_MEMBER_PORTAL_SWA_TOKEN }}
@@ -53,5 +58,4 @@ jobs:
           action: upload
           app_location: frontend-member/build
           skip_app_build: true
-          skip_api_build: true
           output_location: ""

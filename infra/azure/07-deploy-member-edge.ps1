@@ -21,9 +21,11 @@
   Mirrors infra/azure/01-deploy-backend-containerapp.ps1 conventions. Idempotent.
 #>
 param(
-    [string]$ResourceGroup       = $env:AZURE_RESOURCE_GROUP,
+    [string]$ResourceGroup       = $(if ($env:AZURE_RESOURCE_GROUP) { $env:AZURE_RESOURCE_GROUP } else { "nexora-chat-rg" }),
     [string]$ContainerAppEnvironment = "nexora-chat-env-v2",
-    [string]$AcrName             = $env:AZURE_ACR_NAME,
+    # Defaults to the project ACR (same as deploy-to-azure.ps1) so the pipeline
+    # works without an AZURE_ACR_NAME repo var; override via param/env if needed.
+    [string]$AcrName             = $(if ($env:AZURE_ACR_NAME) { $env:AZURE_ACR_NAME } else { "nexorachatacr65700" }),
     [string]$KeyVaultName        = "nexora-chat-kv",
     [string]$EdgeAppName         = "nexora-member-portal",
     [string]$BackendAppName      = "nexora-chat-v2",

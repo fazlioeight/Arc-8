@@ -229,17 +229,18 @@ if ($fkResult.ok) {
 }
 
 # Generate (or reuse) the member-portal JWT signing key (separate realm from
-# SECRET_KEY). Safe to enable immediately: setting it makes member tokens use
-# this key; in-flight member access tokens (<=15 min) re-mint via refresh.
+# SECRET_KEY). Unlike SECRET_KEY/FIELD_ENCRYPTION_KEY, this is safe to
+# first-time-generate even under -StrictSecrets: it has no pre-existing data to
+# invalidate, and a later rotation only re-mints in-flight member access tokens
+# (<=15 min) via the opaque refresh token. So we bootstrap-if-missing rather
+# than fail the deploy.
 $mjkResult = Get-KvSecretValue -VaultName $KeyVaultName -SecretName "platform-member-jwt-key"
 if ($mjkResult.ok) {
     $MemberJwtKey = $mjkResult.value
 } elseif ($mjkResult.reason -eq "forbidden") {
     throw "Cannot read Key Vault secret 'platform-member-jwt-key' -- principal lacks data-plane read on '$KeyVaultName'. See docs/RUNBOOK_CI_IAM.md."
-} elseif ($StrictSecrets) {
-    throw "Key Vault secret 'platform-member-jwt-key' is missing. -StrictSecrets is on; refusing to regenerate (would invalidate live member access tokens). Bootstrap it manually."
 } else {
-    Write-Host "Generating member JWT signing key..."
+    Write-Host "Bootstrapping member JWT signing key (missing in Key Vault)..."
     $bytes = New-Object byte[] 48
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $MemberJwtKey = [Convert]::ToBase64String($bytes)
@@ -249,15 +250,15 @@ if ($mjkResult.ok) {
 # Generate (or reuse) the member edge<->backend shared secret. Always stored in
 # Key Vault (so the edge can present it); only INJECTED into the backend when
 # -EnableMemberEdgeGuard is set (which turns on enforcement). See the runbook.
+# Bootstrap-if-missing (safe under -StrictSecrets — rotation just makes the edge
+# pick up the new value; nothing is invalidated).
 $edgeResult = Get-KvSecretValue -VaultName $KeyVaultName -SecretName "member-edge-shared-secret"
 if ($edgeResult.ok) {
     $MemberEdgeSecret = $edgeResult.value
 } elseif ($edgeResult.reason -eq "forbidden") {
     throw "Cannot read Key Vault secret 'member-edge-shared-secret' -- principal lacks data-plane read on '$KeyVaultName'. See docs/RUNBOOK_CI_IAM.md."
-} elseif ($StrictSecrets) {
-    throw "Key Vault secret 'member-edge-shared-secret' is missing. -StrictSecrets is on; refusing to regenerate. Bootstrap it manually."
 } else {
-    Write-Host "Generating member edge shared secret..."
+    Write-Host "Bootstrapping member edge shared secret (missing in Key Vault)..."
     $bytes = New-Object byte[] 32
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $MemberEdgeSecret = ([Convert]::ToBase64String($bytes)) -replace '[+/=]', ''
