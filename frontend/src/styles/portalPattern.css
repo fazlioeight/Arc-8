@@ -1,0 +1,220 @@
+/* portalPattern.css
+   Portal UI utility layer: list items, pills, ghost buttons, section grid.
+   PortalCard / PortalStat / PortalPageHeader now use Tailwind utilities.
+   This file is imported via PortalCard.js so pages using PortalCard
+   automatically inherit these helpers without a separate import.
+*/
+
+/* ─── Page header ─────────────────────────────────────────────────────── */
+/* Kept for pages that render PortalPageHeader with the CSS class directly */
+.portal-page-header {
+  display: grid;
+  gap: var(--space-md);
+  align-items: center;
+}
+@media (min-width: 768px) {
+  .portal-page-header { grid-template-columns: 1fr auto; }
+}
+
+/* ─── List container ──────────────────────────────────────────────────── */
+.portal-list {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+/* ─── List items ──────────────────────────────────────────────────────── */
+.portal-list-item {
+  border: var(--border-width) solid color-mix(in srgb, var(--border) 78%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 96%, transparent);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.portal-list-item__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-primary);
+  flex-shrink: 0;
+}
+
+.portal-list-item__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+
+.portal-list-item__title {
+  margin: 0;
+  font-weight: 600;
+  font-size: var(--font-size-md);
+  color: var(--text);
+}
+
+.portal-list-item__meta {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.portal-list-item__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex-wrap: wrap;
+}
+
+/* Tone modifiers */
+.portal-list-item--info {
+  border-color: color-mix(in srgb, var(--brand-primary) 36%, var(--border));
+  background:   color-mix(in srgb, var(--brand-primary) 8%, var(--bg-card));
+}
+.portal-list-item--success {
+  border-color: color-mix(in srgb, var(--state-positive) 36%, var(--border));
+  background:   color-mix(in srgb, var(--state-positive) 8%, var(--bg-card));
+}
+.portal-list-item--warning {
+  border-color: color-mix(in srgb, var(--state-warning) 38%, var(--border));
+  background:   color-mix(in srgb, var(--state-warning) 10%, var(--bg-card));
+}
+.portal-list-item--danger {
+  border-color: color-mix(in srgb, var(--state-critical) 36%, var(--border));
+  background:   color-mix(in srgb, var(--state-critical) 8%, var(--bg-card));
+}
+
+/* ─── Pills ───────────────────────────────────────────────────────────── */
+.portal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--border) 40%, transparent);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+.portal-pill--ghost {
+  background: color-mix(in srgb, var(--bg-card) 85%, transparent);
+  color: var(--text);
+}
+.portal-pill--solid {
+  background: color-mix(in srgb, var(--brand-primary) 20%, var(--bg-card));
+  color: var(--brand-primary);
+}
+
+/* ─── Ghost button ────────────────────────────────────────────────────── */
+.portal-ghost-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 90%, transparent);
+  color: var(--text);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    transform var(--transition-quick),
+    box-shadow var(--transition-quick),
+    border-color var(--transition-quick);
+}
+.portal-ghost-button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--border));
+  box-shadow: var(--shadow-sm);
+}
+.portal-ghost-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ─── Task link (hyperlink-style action inside list items) ────────────── */
+.portal-task-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--brand-primary) 80%, #000 20%);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color var(--transition-quick);
+}
+.portal-task-link:hover {
+  color: color-mix(in srgb, var(--brand-primary) 60%, #000 40%);
+}
+.portal-task-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+/* ─── Section grid ────────────────────────────────────────────────────── */
+.portal-section-grid {
+  display: grid;
+  gap: clamp(var(--space-md), 2.5vw, var(--space-xl));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+/* ─── Alert shell (used in portal member area) ────────────────────────── */
+.portal-alert-shell {
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 92%, var(--bg) 8%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  padding: 16px;
+}
+
+.portal-alert-button {
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 85%, transparent);
+  color: color-mix(in srgb, var(--text) 90%, var(--text-muted) 10%);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+.portal-alert-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--bg-card) 78%, var(--bg-light) 22%);
+  border-color: color-mix(in srgb, var(--border) 78%, var(--brand-primary) 22%);
+  transform: translateY(-1px);
+}
+.portal-alert-button:disabled { cursor: not-allowed; opacity: 0.65; }
+
+.portal-alert-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
+  background: color-mix(in srgb, var(--bg-card) 86%, var(--bg) 14%);
+  color: color-mix(in srgb, var(--text) 82%, var(--text-muted) 18%);
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  letter-spacing: 0.02em;
+}
+.portal-alert-pill--ghost { background: transparent; }

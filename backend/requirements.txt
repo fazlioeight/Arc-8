@@ -1,0 +1,61 @@
+fastapi
+gunicorn
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+PyJWT
+pyotp
+email-validator
+bcrypt
+sqlalchemy[asyncio]
+asyncpg
+aiosqlite
+psycopg2-binary
+psycopg[binary]
+redis>=4.6.0
+azure-identity
+azure-keyvault-secrets
+azure-monitor-opentelemetry
+azure-servicebus
+azure-storage-blob
+# AI semantic layer SDKs (RAG MVP). All authenticate via DefaultAzureCredential
+# — never API keys — so the Container App's managed identity is the only
+# path to Cosmos / AI Search / Event Hub / Azure OpenAI in production.
+azure-cosmos>=4.7.0
+azure-search-documents>=11.5.0
+azure-eventhub>=5.13.0
+# openai SDK is the Azure OpenAI client we use for embeddings (chat continues
+# via the anthropic SDK already pinned below).
+openai>=1.43
+aiohttp  # async HTTP transport for azure-storage-blob.aio / azure-identity.aio
+pandas
+requests
+streamlit
+alembic
+httpx
+pytest
+pytest-asyncio
+requests_mock
+
+# ── Chat module (merged from nexora-chat) ─────────────────────────────────────
+anthropic
+python-multipart
+slowapi
+python-docx
+openpyxl
+python-pptx
+pillow
+duckdb
+
+# Chat export (docx + pdf rendering). All pure-Python so the slim container
+# image doesn't need extra apt packages. `python-docx` is already declared
+# above for reading uploaded Word docs; here it doubles as the writer.
+markdown>=3.6
+beautifulsoup4>=4.12
+reportlab>=4.2
+
+# Server-side chart rendering for the chat `build_artifact` tool. matplotlib
+# is the lightest pure-Python charting option that produces print-quality
+# PNGs without a headless browser. Used by services/chat/chart_renderer.py.
+matplotlib>=3.8

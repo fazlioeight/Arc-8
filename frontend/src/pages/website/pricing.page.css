@@ -1,0 +1,203 @@
+/* Nexora Lab Pricing page aligned with design system tokens */
+.nx-pricing {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.nx-pricing .ds-container {
+  width: min(var(--content-max-width), 100%);
+}
+
+.nx-pricing__hero {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-primary) 6%, var(--bg-light)), var(--bg));
+  text-align: center;
+  padding-bottom: clamp(var(--space-lg), 6vw, var(--space-2xl));
+}
+
+.nx-heroStack {
+  align-items: center;
+}
+
+.nx-heroStack .ds-lead {
+  margin-inline: auto;
+}
+
+.nx-billingToggle__wrap {
+  display: grid;
+  gap: var(--space-xs);
+  justify-items: center;
+}
+
+.nx-billingToggle__label {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.nx-billingToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border: var(--border-width) solid color-mix(in srgb, var(--border) 65%, transparent);
+}
+
+.nx-toggleBtn {
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 1.15rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background-color var(--transition-quick), color var(--transition-quick), box-shadow var(--transition-quick), transform var(--transition-quick);
+}
+
+.nx-toggleBtn:hover {
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.nx-toggleBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.nx-toggleBtn.active {
+  background: var(--bg-card);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.nx-save {
+  margin-left: var(--space-3xs);
+  color: var(--brand-accent);
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+}
+
+.nx-plans__grid {
+  display: grid;
+  gap: clamp(var(--space-md), 4vw, var(--space-xl));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.nx-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.nx-card--popular {
+  border-color: color-mix(in srgb, var(--brand-primary) 35%, var(--border));
+  box-shadow: var(--shadow-md);
+}
+
+.nx-badge {
+  position: absolute;
+  top: -0.75rem;
+  right: clamp(var(--space-sm), 3vw, var(--space-lg));
+  padding: 0.25rem 0.7rem;
+}
+
+.nx-card__desc {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.nx-card__price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2xs);
+  margin-top: var(--space-xs);
+}
+
+.nx-price__amount {
+  font-size: clamp(2.2rem, 1.8rem + 1.2vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.nx-price__cycle {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.nx-price__custom {
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+}
+
+.nx-card__note {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  gap: var(--space-3xs);
+}
+
+.nx-card__cta {
+  width: 100%;
+}
+
+.nx-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.nx-list__item {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: flex-start;
+  color: var(--text);
+  font-size: var(--font-size-sm);
+}
+
+.nx-list__icon {
+  color: var(--state-positive);
+  margin-top: 2px;
+  display: inline-flex;
+}
+
+.nx-pricing__faq {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.nx-pricing__faq .ds-heading-xl {
+  text-align: center;
+}
+
+.nx-faq__grid {
+  display: grid;
+  gap: clamp(var(--space-md), 4vw, var(--space-xl));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.nx-faq {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.nx-faq .ds-card__meta {
+  font-size: var(--font-size-sm);
+}
+
+@media (min-width: 640px) {
+  .nx-billingToggle__wrap {
+    grid-template-columns: auto auto;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .nx-billingToggle__label {
+    justify-self: end;
+  }
+
+  .nx-billingToggle {
+    justify-self: start;
+  }
+}

@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: arc8-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: arc8-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: arc8-backend
+    restart: unless-stopped
+    ports:
+      - "8989:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./docker/backend-entrypoint.sh:/app/backend-entrypoint.sh:ro
+      - backend_data:/app/data
+    entrypoint: ["/bin/bash", "/app/backend-entrypoint.sh"]
+    environment:
+      ENVIRONMENT: development
+      HIPAA_MODE: "false"
+      ALLOW_DUMMY_LOGIN: "true"
+      SECRET_KEY: "k2n9m_8A5pQ1wXeR7tYbU3vIzO6sDc0F4gHjL-vWqP8mK0zN9bT6vC3xZ2aL1jK9"
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRES_MINUTES: "60"
+      REFRESH_TOKEN_IDLE_MINUTES: "120"
+      REFRESH_TOKEN_MAX_LIFETIME_MINUTES: "720"
+      FIELD_ENCRYPTION_KEY: "H1tD7Cz4kcO8-B76P9zLVID2dhfkoG52Q5pZGzDzP94="
+      CONTROL_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/nexora_control"
+      DEFAULT_TENANT_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/prominence_tenant"
+      TENANT_DATABASE_URL_TEMPLATE: "postgresql+asyncpg://postgres:postgres@postgres:5432/{tenant_key}"
+      REDIS_URL: "redis://redis:6379/0"
+      CORS_ORIGINS: '["http://localhost:7777","http://127.0.0.1:7777","http://localhost:3000","http://frontend:3000"]'
+      RATE_LIMIT_ENABLED: "false"
+      REQUIRE_ADMIN_MFA: "false"
+      REQUIRE_PHI_MFA: "false"
+      AUDIT_LOG_PATH: logs/audit.log
+      PHI_AUDIT_LOG_PATH: logs/phi_audit.log
+      LOG_LEVEL: INFO
+      MEMBER360_STORAGE_BACKEND: local
+      MEMBER360_STORAGE_ROOT: data/member360
+      CHAT_ARTIFACT_DIR: data/chat_artifacts
+      WORKBOOK_DATA_DIR: data/workbooks
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_BASE: http://localhost:8989
+    container_name: arc8-frontend
+    restart: unless-stopped
+    ports:
+      - "7777:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  backend_data:

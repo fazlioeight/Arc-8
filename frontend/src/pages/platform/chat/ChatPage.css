@@ -1,0 +1,100 @@
+/* Chat-specific styling that Tailwind utilities can't express cleanly.
+   Everything else lives in className on the components and follows the
+   portal-theme tokens defined in styles/memberWorkspace.css. */
+
+.nx-chat-root {
+  font-family: var(--font-sans);
+}
+
+/* Slim scrollbars in the chat shell. */
+.nx-scroll::-webkit-scrollbar       { width: 8px; height: 8px; }
+.nx-scroll::-webkit-scrollbar-track { background: transparent; }
+.nx-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 4px;
+}
+.nx-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-muted) 50%, transparent);
+}
+
+/* Blinking typing cursor for assistant streaming. */
+.nx-typing::after {
+  content: '▍';
+  color: var(--brand-primary);
+  animation: nx-cursor-blink 1s step-end infinite;
+}
+@keyframes nx-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+/* Markdown content rendered via marked + DOMPurify. Tailwind's typography
+   plugin isn't installed, so opt into a hand-rolled stylesheet anchored on
+   portal-theme design tokens. */
+.nx-md {
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+.nx-md h1, .nx-md h2, .nx-md h3, .nx-md h4 {
+  color: var(--text);
+  font-weight: 600;
+  margin: 18px 0 8px;
+  line-height: 1.3;
+}
+.nx-md h1 { font-size: 1.25rem; }
+.nx-md h2 { font-size: 1.125rem; }
+.nx-md h3 { font-size: 1rem; }
+.nx-md h4 { font-size: 0.9375rem; color: var(--text-muted); }
+.nx-md p  { margin: 8px 0; color: var(--text); }
+.nx-md strong { color: var(--text); font-weight: 600; }
+.nx-md em     { font-style: italic; }
+.nx-md ul, .nx-md ol { margin: 8px 0; padding-left: 24px; color: var(--text); }
+.nx-md li { margin: 3px 0; }
+.nx-md ul li::marker { color: var(--brand-primary); }
+.nx-md a { color: var(--brand-primary); text-decoration: underline; }
+.nx-md a:hover { text-decoration: none; }
+.nx-md code {
+  background: color-mix(in srgb, var(--bg-light) 60%, var(--bg-card));
+  color: var(--brand-primary);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+}
+.nx-md pre {
+  background: color-mix(in srgb, var(--bg-light) 60%, var(--bg-card));
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 12px 0;
+  font-family: 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+.nx-md pre code { background: transparent; color: var(--text); padding: 0; font-size: inherit; }
+.nx-md blockquote {
+  border-left: 3px solid var(--brand-primary);
+  margin: 12px 0;
+  padding: 4px 0 4px 14px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--brand-primary) 4%, transparent);
+  border-radius: 0 4px 4px 0;
+}
+.nx-md table {
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 0.85rem;
+  width: 100%;
+}
+.nx-md th, .nx-md td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  color: var(--text);
+}
+.nx-md th {
+  background: color-mix(in srgb, var(--bg-light) 60%, var(--bg-card));
+  color: var(--text);
+  font-weight: 600;
+}

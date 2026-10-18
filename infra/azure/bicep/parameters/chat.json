@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": { "value": "nexora-chat" },
+    "location": { "value": "westus3" },
+    "tags": {
+      "value": {
+        "app": "nexora",
+        "workload": "chat",
+        "environment": "prod",
+        "managed-by": "bicep"
+      }
+    },
+    "vnetAddressPrefix": { "value": "10.30.0.0/16" },
+    "acaSubnetPrefix": { "value": "10.30.0.0/23" },
+    "postgresSubnetPrefix": { "value": "10.30.2.0/24" },
+    "peSubnetPrefix": { "value": "10.30.4.0/24" },
+    "containerImage": { "value": "nexorachatacr.azurecr.io/nexora-platform:latest" },
+    "postgresSkuName": { "value": "Standard_D2ds_v5" },
+    "postgresStorageGB": { "value": 128 },
+    "controlDatabaseName": { "value": "nexora_control" },
+    "tenantDatabaseName": { "value": "nexora_tenant_prominencehealth" },
+    "initialTenantKey": { "value": "prominencehealth" },
+    "initialAdminEmail": { "value": "admin@nexora.local" },
+    "claudeModel": { "value": "claude-sonnet-4-6" },
+    "anthropicModel": { "value": "claude-opus-4-7" },
+    "allowedEmails": { "value": "" },
+    "corsOrigins": { "value": "" }
+  }
+}

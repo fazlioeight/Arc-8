@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": {
+      "value": "nexora-prod"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "vnetId": {
+      "value": "TODO_REPLACE_WITH_PROD_VNET_RESOURCE_ID"
+    },
+    "privateEndpointSubnetId": {
+      "value": "TODO_REPLACE_WITH_PROD_PE_SUBNET_RESOURCE_ID"
+    },
+    "containerAppPrincipalId": {
+      "value": "TODO_REPLACE_WITH_PROD_CONTAINER_APP_MI_PRINCIPAL_ID"
+    },
+    "openAiEmbeddingCapacity": {
+      "value": 250
+    }
+  }
+}

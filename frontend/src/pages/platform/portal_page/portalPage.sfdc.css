@@ -1,0 +1,158 @@
+/* portalPage.sfdc.css
+   Retained styles: hero, auth card, search overlay, portal panels.
+   The utility bar (sfdc-utilitybar / sfdc-*) has been migrated to Tailwind
+   inline in PortalUtilityBar.js and is no longer needed here.
+*/
+
+:root {
+  --sfdc-bg:           var(--bg);
+  --sfdc-card:         var(--bg-card);
+  --sfdc-text:         var(--text);
+  --sfdc-muted:        var(--text-muted, #6f7780);
+  --sfdc-border:       var(--border);
+  --sfdc-shadow:       var(--shadow);
+  --sfdc-shadow-lg:    0 8px 24px rgba(10, 102, 194, 0.18);
+  --sfdc-brand:        #0a66c2;
+  --sfdc-brand-dark:   #004182;
+  --sfdc-brand-contrast: #ffffff;
+}
+
+/* ─── Hero ─────────────────────────────────────────────────────────────── */
+.sfdc-hero {
+  position: relative;
+  background: linear-gradient(135deg, var(--sfdc-brand), var(--sfdc-brand-dark));
+  color: var(--sfdc-brand-contrast);
+  padding: 36px 20px 72px;
+  box-shadow: var(--sfdc-shadow-lg);
+  overflow: hidden;
+}
+
+.sfdc-hero::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px; height: 110px;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="1" d="M0,224L48,213.3C96,203,192,181,288,165.3C384,149,480,139,576,133.3C672,128,768,128,864,149.3C960,171,1056,213,1152,213.3C1248,213,1344,171,1392,149.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') center bottom/cover no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dark-mode .sfdc-hero::after,
+.dark .sfdc-hero::after {
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%231d2226" fill-opacity="1" d="M0,224L48,213.3C96,203,192,181,288,165.3C384,149,480,139,576,133.3C672,128,768,128,864,149.3C960,171,1056,213,1152,213.3C1248,213,1344,171,1392,149.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') center bottom/cover no-repeat;
+}
+
+.sfdc-hero__content {
+  max-width: 1120px;
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.sfdc-hero + * {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.sfdc-hero__text      { max-width: min(720px, 100%); }
+.sfdc-hero__actions   { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; position: relative; z-index: 1; }
+.sfdc-hero__title     { margin: 0; font-weight: 700; letter-spacing: 0.2px; }
+.sfdc-hero__subtitle  { margin: 6px 0 16px; font-size: 1rem; opacity: 0.95; }
+
+.sfdc-hero--left .sfdc-hero__content  { text-align: left; align-items: flex-start; }
+.sfdc-hero--left .sfdc-hero__actions  { justify-content: flex-start; }
+.sfdc-hero--flat::after               { display: none; }
+
+.sfdc-button_brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--sfdc-brand);
+  color: var(--sfdc-brand-contrast);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-weight: 600;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.05), var(--sfdc-shadow);
+  transition: transform 120ms var(--easing-standard), filter 160ms var(--easing-standard);
+  cursor: pointer;
+}
+.sfdc-button_brand:hover  { filter: brightness(1.05); transform: translateY(-1px); }
+.sfdc-button_brand:active { transform: translateY(0); }
+.sfdc-button_brand:focus-visible { outline: 2px solid #8ab4f8; outline-offset: 2px; }
+
+/* ─── Grid / card shells used by portal overview ──────────────────────── */
+.sfdc-grid {
+  max-width: 1120px;
+  margin: -52px auto 24px;
+  padding: 0 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.sfdc-card {
+  background: var(--sfdc-card);
+  border: 1px solid var(--sfdc-border);
+  border-radius: 10px;
+  box-shadow: var(--sfdc-shadow);
+  padding: 16px 18px 18px;
+  transition: transform var(--dur-fast) var(--easing-standard), box-shadow var(--dur-fast) var(--easing-standard);
+}
+.sfdc-card:hover          { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(0,0,0,0.08); }
+.sfdc-card__title         { color: var(--sfdc-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.sfdc-card__value         { font-size: 1.8rem; font-weight: 700; color: var(--sfdc-text); }
+.sfdc-card__hint          { color: var(--sfdc-muted); font-size: 0.9rem; margin-top: 6px; }
+.sfdc-card__body          { color: var(--sfdc-text); margin: 0; }
+.sfdc-card--full          { grid-column: 1 / -1; }
+
+.sfdc-footer { text-align: center; color: var(--sfdc-muted); padding: 8px 16px 28px; }
+
+/* ─── Search overlay ──────────────────────────────────────────────────── */
+.sfdc-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in oklab, var(--sfdc-bg) 70%, #000 30%);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: start center;
+  padding-top: 14vh;
+  z-index: 50;
+}
+.sfdc-overlay__panel   { width: min(880px, 92vw); background: var(--sfdc-card); border: 1px solid var(--sfdc-border); border-radius: 12px; box-shadow: var(--sfdc-shadow-lg); overflow: hidden; }
+.sfdc-overlay__header  { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 12px; border-bottom: 1px solid var(--sfdc-border); }
+.sfdc-overlay__input   { width: 100%; padding: 10px 12px; border: 1px solid var(--sfdc-border); border-radius: 8px; background: var(--sfdc-bg); color: var(--sfdc-text); font-size: 1rem; }
+.sfdc-overlay__body    { padding: 14px; color: var(--sfdc-text); }
+.sfdc-overlay__hint    { color: var(--sfdc-muted); font-size: .95rem; }
+
+/* ─── Coding portal adjustments ──────────────────────────────────────── */
+.coding-portal { --coding-header-offset: 64px; }
+@media (max-width: 768px) { .coding-portal { --coding-header-offset: 72px; } }
+.coding-portal .coding-content  { margin-top: var(--coding-header-offset); }
+.coding-portal .sfdc-hero        { padding-bottom: 32px; }
+.coding-portal .sfdc-hero::after { display: none; }
+.coding-portal .sfdc-grid        { margin: 24px auto; }
+
+/* ─── Portal overview loading panel ──────────────────────────────────── */
+.portal-overview__loading {
+  background: var(--sfdc-bg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.portal-loading-panel {
+  margin: 18vh auto 0;
+  width: min(620px, 90vw);
+  background: var(--sfdc-card);
+  border: 1px solid var(--sfdc-border);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  color: var(--sfdc-text);
+  box-shadow: var(--sfdc-shadow);
+  font-size: 1.1rem;
+}

@@ -1,0 +1,137 @@
+.import-data {
+  background: var(--sfdc-bg);
+  min-height: 100vh;
+}
+
+.import-data__header {
+  max-width: 1120px;
+  margin: 24px auto 16px;
+  padding: 0 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.import-data__header h1 {
+  margin-bottom: 4px;
+}
+
+.import-data__summary {
+  background: var(--sfdc-card);
+  border: 1px solid var(--sfdc-border);
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+}
+
+.import-data__summary > div {
+  display: grid;
+  gap: 4px;
+}
+
+.import-data__summary strong {
+  font-size: 1.1rem;
+}
+
+.import-data__grid {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.import-data__card {
+  background: var(--sfdc-card);
+  border: 1px solid var(--sfdc-border);
+  border-radius: 18px;
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+  position: relative;
+}
+
+.import-data__dropzone {
+  border: 1px dashed var(--sfdc-border);
+  border-radius: 12px;
+  padding: 24px 12px;
+  text-align: center;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.import-data__dropzone.is-active {
+  border-color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.import-data__dropzone input[type="file"] {
+  display: none;
+}
+
+.import-data__preview {
+  background: rgba(148, 163, 184, 0.14);
+  border-radius: 12px;
+  padding: 12px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.82rem;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--sfdc-text);
+}
+
+.import-data__preview.is-empty {
+  font-style: italic;
+  color: var(--sfdc-muted);
+}
+
+.import-data__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.import-data__actions small {
+  color: var(--sfdc-muted);
+}
+
+.import-data__queue {
+  max-width: 1120px;
+  margin: 32px auto 40px;
+  padding: 0 16px 24px;
+}
+
+.import-data__queue-table {
+  background: var(--sfdc-card);
+  border: 1px solid var(--sfdc-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.import-data__empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--sfdc-muted);
+}
+
+.import-data__empty strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 640px) {
+  .import-data__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .import-data__summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
