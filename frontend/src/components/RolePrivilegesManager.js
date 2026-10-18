@@ -44,17 +44,63 @@ const RolePrivilegesManager = () => {
     setTimeout(() => setSaveToast(false), 2500);
   };
 
-  const selectAllCategory = (catPerms) => {
+  const toggleModuleWithSubs = (mod) => {
     const nextSet = new Set(activePermsForRole);
-    catPerms.forEach((p) => nextSet.add(p.key));
+    const isModuleActive = nextSet.has(mod.key);
+    if (isModuleActive) {
+      nextSet.delete(mod.key);
+    } else {
+      nextSet.add(mod.key);
+      if (mod.subPermissions) {
+        const hasAnySub = mod.subPermissions.some((s) => nextSet.has(s.key));
+        if (!hasAnySub) {
+          mod.subPermissions.forEach((s) => {
+            if (!s.supervisorOnly || selectedRoleKey === "platform_admin" || selectedRoleKey === "admin") {
+              nextSet.add(s.key);
+            }
+          });
+        }
+      }
+    }
     updateRolePermissions(selectedRoleKey, Array.from(nextSet));
     setSaveToast(true);
     setTimeout(() => setSaveToast(false), 2500);
   };
 
-  const clearAllCategory = (catPerms) => {
+  const selectAllSubPermissions = (mod) => {
     const nextSet = new Set(activePermsForRole);
-    catPerms.forEach((p) => nextSet.delete(p.key));
+    nextSet.add(mod.key);
+    (mod.subPermissions || []).forEach((s) => nextSet.add(s.key));
+    updateRolePermissions(selectedRoleKey, Array.from(nextSet));
+    setSaveToast(true);
+    setTimeout(() => setSaveToast(false), 2500);
+  };
+
+  const clearAllSubPermissions = (mod) => {
+    const nextSet = new Set(activePermsForRole);
+    (mod.subPermissions || []).forEach((s) => nextSet.delete(s.key));
+    updateRolePermissions(selectedRoleKey, Array.from(nextSet));
+    setSaveToast(true);
+    setTimeout(() => setSaveToast(false), 2500);
+  };
+
+  const selectAllCategory = (cat) => {
+    const nextSet = new Set(activePermsForRole);
+    cat.modules.forEach((m) => {
+      nextSet.add(m.key);
+      (m.subPermissions || []).forEach((s) => nextSet.add(s.key));
+    });
+    updateRolePermissions(selectedRoleKey, Array.from(nextSet));
+    setSaveToast(true);
+    setTimeout(() => setSaveToast(false), 2500);
+  };
+
+  const clearAllCategory = (cat) => {
+    const nextSet = new Set(activePermsForRole);
+    cat.modules.forEach((m) => {
+      nextSet.delete(m.key);
+      (m.subPermissions || []).forEach((s) => nextSet.delete(s.key));
+    });
     updateRolePermissions(selectedRoleKey, Array.from(nextSet));
     setSaveToast(true);
     setTimeout(() => setSaveToast(false), 2500);
@@ -71,15 +117,37 @@ const RolePrivilegesManager = () => {
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim()) return PERMISSION_CATEGORIES;
     const q = searchQuery.toLowerCase();
-    return PERMISSION_CATEGORIES.map((cat) => ({
-      ...cat,
-      permissions: cat.permissions.filter(
-        (p) =>
-          p.label.toLowerCase().includes(q) ||
-          p.description.toLowerCase().includes(q) ||
-          p.key.toLowerCase().includes(q)
-      ),
-    })).filter((cat) => cat.permissions.length > 0);
+    return PERMISSION_CATEGORIES.map((cat) => {
+      const matchingModules = cat.modules
+        .map((m) => {
+          const moduleMatches =
+            m.label.toLowerCase().includes(q) ||
+            m.description.toLowerCase().includes(q) ||
+            m.key.toLowerCase().includes(q);
+          const matchingSubs = (m.subPermissions || []).filter(
+            (s) =>
+              s.label.toLowerCase().includes(q) ||
+              s.description.toLowerCase().includes(q) ||
+              s.key.toLowerCase().includes(q)
+          );
+          if (moduleMatches) {
+            return m;
+          }
+          if (matchingSubs.length > 0) {
+            return {
+              ...m,
+              subPermissions: matchingSubs,
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
+
+      return {
+        ...cat,
+        modules: matchingModules,
+      };
+    }).filter((cat) => cat.modules.length > 0);
   }, [searchQuery]);
 
   const getToneClasses = (tone, isSelected) => {
@@ -106,7 +174,7 @@ const RolePrivilegesManager = () => {
             Role & Privileges Management Center
           </h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Configure granular capability matrices, clinical PHI boundaries, and workflow access across organizational roles.
+            Configure granular module authority and sub-menu privileges matching the platform menu hierarchy.
           </p>
         </div>
 
@@ -206,7 +274,7 @@ const RolePrivilegesManager = () => {
               </span>
             </div>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Toggle specific capabilities on or off for this role profile. Changes apply dynamically across workspace sessions.
+              Grant or revoke access to entire menu modules or fine-tune individual sub-menu privileges.
             </p>
           </div>
 
@@ -214,7 +282,7 @@ const RolePrivilegesManager = () => {
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search privileges..."
+                placeholder="Search modules or sub-menus..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 pl-8 text-xs text-slate-900 placeholder-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -227,29 +295,30 @@ const RolePrivilegesManager = () => {
           </div>
         </div>
 
-        {/* Categories Accordions / Blocks */}
-        <div className="mt-6 space-y-6">
+        {/* Categories Mirroring Left Sidebar Menu */}
+        <div className="mt-6 space-y-8">
           {filteredCategories.map((category) => {
-            const catPermKeys = category.permissions.map((p) => p.key);
-            const activeInCat = catPermKeys.filter((k) => activePermsForRole.has(k)).length;
-            const isAllActive = activeInCat === catPermKeys.length;
+            const allCatKeys = category.modules.flatMap((m) => [m.key, ...(m.subPermissions || []).map((s) => s.key)]);
+            const activeInCat = allCatKeys.filter((k) => activePermsForRole.has(k)).length;
 
             return (
               <div
                 key={category.id}
-                className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 transition dark:border-slate-800/80 dark:bg-slate-900/40"
+                className="rounded-2xl border border-slate-200/80 bg-slate-50/40 p-5 transition dark:border-slate-800/80 dark:bg-slate-900/40"
               >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/60 pb-3 dark:border-slate-800/60">
+                {/* Category Header */}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/60 pb-4 dark:border-slate-800/60">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-2 w-2 rounded-full bg-sky-400" />
+                      <h4 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-wide">
                         {category.title}
                       </h4>
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        {activeInCat} / {catPermKeys.length} enabled
+                      <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        {activeInCat} / {allCatKeys.length} enabled
                       </span>
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 pl-4.5">
                       {category.description}
                     </p>
                   </div>
@@ -257,67 +326,175 @@ const RolePrivilegesManager = () => {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => selectAllCategory(category.permissions)}
-                      className="text-[11px] font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
+                      onClick={() => selectAllCategory(category)}
+                      className="text-xs font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
                     >
-                      Enable All
+                      Enable Section
                     </button>
                     <span className="text-slate-300 dark:text-slate-700">|</span>
                     <button
                       type="button"
-                      onClick={() => clearAllCategory(category.permissions)}
-                      className="text-[11px] font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      onClick={() => clearAllCategory(category)}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                     >
-                      Disable All
+                      Disable Section
                     </button>
                   </div>
                 </div>
 
-                {/* Permissions Grid */}
-                <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  {category.permissions.map((perm) => {
-                    const isGranted = activePermsForRole.has(perm.key);
+                {/* Modules List */}
+                <div className="mt-4 space-y-4">
+                  {category.modules.map((mod) => {
+                    const isModuleGranted = activePermsForRole.has(mod.key);
+                    const subPerms = mod.subPermissions || [];
+                    const activeSubs = subPerms.filter((s) => activePermsForRole.has(s.key)).length;
 
                     return (
                       <div
-                        key={perm.key}
-                        onClick={() => togglePermission(perm.key)}
+                        key={mod.key}
                         className={[
-                          "flex cursor-pointer items-start justify-between rounded-lg border p-3 transition",
-                          isGranted
-                            ? "border-sky-200 bg-white shadow-xs dark:border-sky-900/60 dark:bg-slate-800/80"
-                            : "border-slate-200/70 bg-white/60 opacity-75 hover:opacity-100 dark:border-slate-800 dark:bg-slate-900/50",
+                          "rounded-xl border transition-all",
+                          isModuleGranted
+                            ? "border-sky-500/30 bg-white dark:border-sky-500/20 dark:bg-slate-800/60 shadow-xs"
+                            : "border-slate-200/80 bg-white/50 dark:border-slate-800/80 dark:bg-slate-900/30",
                         ].join(" ")}
                       >
-                        <div className="pr-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
-                              {perm.label}
-                            </span>
-                            <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                              ({perm.key})
-                            </span>
+                        {/* Module Header Bar */}
+                        <div className="flex items-center justify-between p-3.5">
+                          <div
+                            className="flex-1 cursor-pointer pr-3"
+                            onClick={() => toggleModuleWithSubs(mod)}
+                          >
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                                {mod.label}
+                              </span>
+                              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                {mod.key}
+                              </span>
+                              {subPerms.length > 0 && (
+                                <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-400 border border-sky-400/20">
+                                  {activeSubs}/{subPerms.length} Sub-Menus Active
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                              {mod.description}
+                            </p>
                           </div>
-                          <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                            {perm.description}
-                          </p>
+
+                          {/* Master Module Toggle */}
+                          <div className="shrink-0 flex items-center gap-3">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                              {isModuleGranted ? "Module Active" : "Module Hidden"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => toggleModuleWithSubs(mod)}
+                              className={[
+                                "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                isModuleGranted ? "bg-sky-600" : "bg-slate-300 dark:bg-slate-700",
+                              ].join(" ")}
+                            >
+                              <span
+                                className={[
+                                  "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
+                                  isModuleGranted ? "translate-x-5" : "translate-x-0",
+                                ].join(" ")}
+                              />
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="pt-0.5 shrink-0">
-                          <span
-                            className={[
-                              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-                              isGranted ? "bg-sky-600" : "bg-slate-300 dark:bg-slate-700",
-                            ].join(" ")}
-                          >
-                            <span
-                              className={[
-                                "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
-                                isGranted ? "translate-x-4" : "translate-x-0",
-                              ].join(" ")}
-                            />
-                          </span>
-                        </div>
+                        {/* Nested Sub-Menu Privileges (Hierarchical Tree) */}
+                        {subPerms.length > 0 && (
+                          <div className="border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40 p-3.5 rounded-b-xl">
+                            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/50 dark:border-slate-800/50">
+                              <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                <svg className="h-3.5 w-3.5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                                <span>Sub-Menu & Chart Tab Authority</span>
+                                {!isModuleGranted && (
+                                  <span className="text-[10px] text-amber-400 font-normal italic">
+                                    (Parent module is disabled — sub-menus cannot be viewed until module is enabled)
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => selectAllSubPermissions(mod)}
+                                  className="text-[11px] font-medium text-sky-500 hover:text-sky-400"
+                                >
+                                  Enable All Subs
+                                </button>
+                                <span className="text-slate-300 dark:text-slate-700">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() => clearAllSubPermissions(mod)}
+                                  className="text-[11px] font-medium text-slate-400 hover:text-slate-300"
+                                >
+                                  Disable All Subs
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Sub-menu Privileges Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                              {subPerms.map((sub) => {
+                                const isSubGranted = activePermsForRole.has(sub.key);
+
+                                return (
+                                  <div
+                                    key={sub.key}
+                                    onClick={() => togglePermission(sub.key)}
+                                    className={[
+                                      "flex items-start justify-between p-2.5 rounded-lg border cursor-pointer transition",
+                                      isSubGranted
+                                        ? "border-sky-500/40 bg-white dark:bg-slate-900/80 shadow-xs"
+                                        : "border-slate-200 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/20 opacity-70 hover:opacity-100",
+                                      !isModuleGranted ? "opacity-50" : "",
+                                    ].join(" ")}
+                                  >
+                                    <div className="pr-2">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                          {sub.label}
+                                        </span>
+                                        {sub.supervisorOnly && (
+                                          <span className="rounded bg-amber-500/10 px-1 py-0.2 text-[9px] font-bold text-amber-400 border border-amber-400/20">
+                                            Supervisor Only
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                        {sub.description}
+                                      </p>
+                                    </div>
+
+                                    <div className="pt-0.5 shrink-0">
+                                      <span
+                                        className={[
+                                          "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out",
+                                          isSubGranted ? "bg-sky-500" : "bg-slate-300 dark:bg-slate-700",
+                                        ].join(" ")}
+                                      >
+                                        <span
+                                          className={[
+                                            "pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
+                                            isSubGranted ? "translate-x-3" : "translate-x-0",
+                                          ].join(" ")}
+                                        />
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

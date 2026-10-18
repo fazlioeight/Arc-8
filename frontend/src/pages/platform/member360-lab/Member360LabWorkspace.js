@@ -1,10 +1,11 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
 import { AuthContext } from '../../../context/AuthContext';
 import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import ErrorBoundary from '../../../components/ErrorBoundary';
 import AiAssistantPanel from '../../../components/ai/AiAssistantPanel';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import {
@@ -50,22 +51,20 @@ import AuditLogPage from './chart/AuditLogPage';
 import SharingPage from './chart/SharingPage';
 import SettingsPage from './chart/SettingsPage';
 
+/**
+ * 7 Core Clinical Tabs for Care Advocates + 2 Supervisor Tabs
+ * Filtered dynamically by role privilege authority matrix
+ */
 const TABS = [
-  { key: 'timeline', label: 'Timeline' },
-  { key: 'notes', label: 'Notes' },
-  { key: 'messages', label: 'Messages' },
-  { key: 'care_journey', label: 'Care Journey' },
-  { key: 'problems_hcc', label: 'Problems / HCC' },
-  { key: 'medications', label: 'Medications' },
-  { key: 'labs_imaging', label: 'Labs & Imaging' },
-  { key: 'care_gaps', label: 'Care Gaps' },
-  { key: 'claims', label: 'Claims' },
-  { key: 'accumulators', label: 'Accumulators' },
-  { key: 'documents', label: 'Documents' },
-  { key: 'portal', label: 'Portal Preview' },
-  { key: 'audit_log', label: 'Audit Log' },
-  { key: 'sharing', label: 'Sharing' },
-  { key: 'settings', label: 'Settings' },
+  { key: 'timeline', label: 'Timeline', permission: 'tab:timeline' },
+  { key: 'notes', label: 'Notes', permission: 'tab:notes' },
+  { key: 'care_journey', label: 'Care Journey', permission: 'tab:care_journey' },
+  { key: 'clinical_gaps', label: 'Clinical & Gaps', permission: 'tab:clinical_gaps' },
+  { key: 'medications_labs', label: 'Medications & Labs', permission: 'tab:medications_labs' },
+  { key: 'claims_benefits', label: 'Claims & Benefits', permission: 'tab:claims_benefits' },
+  { key: 'documents', label: 'Documents', permission: 'tab:documents' },
+  { key: 'audit_log', label: 'Audit Log', permission: 'tab:audit_log', supervisorOnly: true },
+  { key: 'settings', label: 'Settings', permission: 'tab:settings', supervisorOnly: true },
 ];
 
 const PRIMARY_ACTIONS = [
@@ -82,10 +81,16 @@ const currencyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency
 const Member360LabWorkspace = () => {
   const { memberId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+
   const { token, tenant } = useContext(AuthContext) || {};
+  const { can } = usePermissions();
   const [detail, setDetail] = useState(null);
   const [gap, setGap] = useState(null);
-  const [tab, setTab] = useState('timeline');
+  const [tab, setTab] = useState(requestedTab || 'timeline');
+  const [clinicalSubTab, setClinicalSubTab] = useState('problems');
+  const [medsSubTab, setMedsSubTab] = useState('medications');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionDialog, setActionDialog] = useState(null);
@@ -94,6 +99,40 @@ const Member360LabWorkspace = () => {
   const [submissionResult, setSubmissionResult] = useState(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [journeyTemplates, setJourneyTemplates] = useState([]);
+
+  // Filter tabs dynamically based on user role privileges authority
+  const visibleTabs = useMemo(() => {
+    return TABS.filter((t) => !t.permission || can(t.permission));
+  }, [can]);
+
+  // Sync with URL query parameter ?tab= if present
+  useEffect(() => {
+    if (requestedTab && visibleTabs.some((t) => t.key === requestedTab) && tab !== requestedTab) {
+      setTab(requestedTab);
+    }
+  }, [requestedTab, visibleTabs, tab]);
+
+  // Ensure active tab is valid under current role authority
+  useEffect(() => {
+    if (visibleTabs.length && !visibleTabs.some((t) => t.key === tab)) {
+      const fallback = visibleTabs[0].key;
+      setTab(fallback);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', fallback);
+        return next;
+      }, { replace: true });
+    }
+  }, [visibleTabs, tab, setSearchParams]);
+
+  const handleTabChange = useCallback((newTab) => {
+    setTab(newTab);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', newTab);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -405,70 +444,161 @@ const Member360LabWorkspace = () => {
             </ul>
           </div>
         );
-      case 'claims':
+      case 'clinical_gaps':
         return (
-          <div className="overflow-hidden rounded-lg ring-1 ring-black/5 dark:ring-white/10">
-            <table className="min-w-full text-sm">
-              <thead className="coding-surface-subtle text-xs uppercase tracking-wide coding-text-muted">
-                <tr>
-                  <th className="text-left px-3 py-2 font-medium">Claim</th>
-                  <th className="text-left px-3 py-2 font-medium">Service date</th>
-                  <th className="text-left px-3 py-2 font-medium">Provider</th>
-                  <th className="text-left px-3 py-2 font-medium">Category</th>
-                  <th className="text-left px-3 py-2 font-medium">Status</th>
-                  <th className="text-right px-3 py-2 font-medium">Billed</th>
-                  <th className="text-right px-3 py-2 font-medium">Paid</th>
-                  <th className="text-right px-3 py-2 font-medium">Member resp.</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y coding-divider">
-                {(detail.claims || []).map((c) => (
-                  <tr key={c.id}>
-                    <td className="px-3 py-2 font-mono text-xs">{c.claim_number}</td>
-                    <td className="px-3 py-2">{c.service_date || '—'}</td>
-                    <td className="px-3 py-2">{c.provider || '—'}</td>
-                    <td className="px-3 py-2">{c.category || '—'}</td>
-                    <td className="px-3 py-2 capitalize">{c.status}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{c.billed_amount != null ? currencyFmt.format(c.billed_amount) : '—'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{c.paid_amount != null ? currencyFmt.format(c.paid_amount) : '—'}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{c.member_responsibility != null ? currencyFmt.format(c.member_responsibility) : '—'}</td>
-                  </tr>
-                ))}
-                {(detail.claims || []).length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-6 text-center text-xs coding-text-soft">No claims on file.</td></tr>
-                )}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-900/60 rounded-xl border border-slate-800/80 w-fit">
+              <button
+                type="button"
+                onClick={() => setClinicalSubTab('problems')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                  clinicalSubTab === 'problems'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                ⚠️ Diagnosed Conditions & HCC ({detail?.diagnoses?.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setClinicalSubTab('gaps')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                  clinicalSubTab === 'gaps'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🛡️ Open Care Gaps ({missingHccCount || 0})
+              </button>
+            </div>
+            {clinicalSubTab === 'problems' ? (
+              <ProblemsHCCPage detail={detail} />
+            ) : (
+              <CareGapsPage gap={gap} member={member} />
+            )}
           </div>
         );
-      case 'accumulators': {
+
+      case 'medications_labs':
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-900/60 rounded-xl border border-slate-800/80 w-fit">
+              <button
+                type="button"
+                onClick={() => setMedsSubTab('medications')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                  medsSubTab === 'medications'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                💊 Active Medications ({(detail?.medications || []).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setMedsSubTab('labs')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                  medsSubTab === 'labs'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🧪 Labs & Diagnostics ({(detail?.labs || []).length + (detail?.imaging || []).length})
+              </button>
+            </div>
+            {medsSubTab === 'medications' ? (
+              <MedicationsPage detail={detail} />
+            ) : (
+              <LabsImagingPage detail={detail} />
+            )}
+          </div>
+        );
+
+      case 'claims_benefits': {
         const a = detail.accumulator || {};
         const dedPct = a.deductible ? Math.min(((a.deductible_met || 0) / a.deductible) * 100, 100) : 0;
         const oopPct = a.out_of_pocket_max ? Math.min(((a.out_of_pocket_met || 0) / a.out_of_pocket_max) * 100, 100) : 0;
         return (
-          <div className="space-y-4">
-            <div className="coding-surface-subtle rounded-lg p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="coding-text-strong font-semibold">Deductible</span>
-                <span className="tabular-nums coding-text-muted">{currencyFmt.format(a.deductible_met || 0)} / {currencyFmt.format(a.deductible || 0)}</span>
+          <div className="space-y-6">
+            {/* Deductible & Out-of-pocket Accumulator summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="coding-surface-subtle rounded-xl p-4 border border-slate-800/60">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="coding-text-strong font-semibold flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-sky-400" />
+                    Annual Deductible
+                  </span>
+                  <span className="tabular-nums coding-text-muted">{currencyFmt.format(a.deductible_met || 0)} / {currencyFmt.format(a.deductible || 0)}</span>
+                </div>
+                <div className="mt-2.5 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
+                  <div className="h-full bg-sky-500" style={{ width: `${dedPct}%` }} />
+                </div>
               </div>
-              <div className="mt-2 h-2 w-full rounded-full bg-slate-200/60 dark:bg-slate-700/40 overflow-hidden">
-                <div className="h-full bg-[var(--brand-primary)]" style={{ width: `${dedPct}%` }} />
+              <div className="coding-surface-subtle rounded-xl p-4 border border-slate-800/60">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="coding-text-strong font-semibold flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    Out-of-Pocket Maximum
+                  </span>
+                  <span className="tabular-nums coding-text-muted">{currencyFmt.format(a.out_of_pocket_met || 0)} / {currencyFmt.format(a.out_of_pocket_max || 0)}</span>
+                </div>
+                <div className="mt-2.5 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
+                  <div className="h-full bg-emerald-500" style={{ width: `${oopPct}%` }} />
+                </div>
               </div>
             </div>
-            <div className="coding-surface-subtle rounded-lg p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="coding-text-strong font-semibold">Out-of-pocket max</span>
-                <span className="tabular-nums coding-text-muted">{currencyFmt.format(a.out_of_pocket_met || 0)} / {currencyFmt.format(a.out_of_pocket_max || 0)}</span>
-              </div>
-              <div className="mt-2 h-2 w-full rounded-full bg-slate-200/60 dark:bg-slate-700/40 overflow-hidden">
-                <div className="h-full bg-emerald-500" style={{ width: `${oopPct}%` }} />
+
+            {/* Claims History Table */}
+            <div>
+              <h4 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Itemized Medical Claims</h4>
+              <div className="overflow-hidden rounded-xl border border-slate-800/80">
+                <table className="min-w-full text-sm">
+                  <thead className="coding-surface-subtle text-xs uppercase tracking-wide text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="text-left px-3.5 py-2.5 font-semibold">Claim #</th>
+                      <th className="text-left px-3.5 py-2.5 font-semibold">Service Date</th>
+                      <th className="text-left px-3.5 py-2.5 font-semibold">Provider / Facility</th>
+                      <th className="text-left px-3.5 py-2.5 font-semibold">Category</th>
+                      <th className="text-left px-3.5 py-2.5 font-semibold">Status</th>
+                      <th className="text-right px-3.5 py-2.5 font-semibold">Billed</th>
+                      <th className="text-right px-3.5 py-2.5 font-semibold">Plan Paid</th>
+                      <th className="text-right px-3.5 py-2.5 font-semibold">Member Responsibility</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {(detail.claims || []).map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-800/30 transition">
+                        <td className="px-3.5 py-2.5 font-mono text-xs text-sky-400">{c.claim_number}</td>
+                        <td className="px-3.5 py-2.5 text-slate-300">{c.service_date || '—'}</td>
+                        <td className="px-3.5 py-2.5 text-slate-200">{c.provider || '—'}</td>
+                        <td className="px-3.5 py-2.5 text-slate-300">{c.category || '—'}</td>
+                        <td className="px-3.5 py-2.5">
+                          <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-semibold capitalize ${
+                            c.status === 'paid' ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40' : 'bg-slate-800 text-slate-300'
+                          }`}>
+                            {c.status}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-400">{c.billed_amount != null ? currencyFmt.format(c.billed_amount) : '—'}</td>
+                        <td className="px-3.5 py-2.5 text-right tabular-nums text-emerald-400 font-semibold">{c.paid_amount != null ? currencyFmt.format(c.paid_amount) : '—'}</td>
+                        <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-300">{c.member_responsibility != null ? currencyFmt.format(c.member_responsibility) : '—'}</td>
+                      </tr>
+                    ))}
+                    {(detail.claims || []).length === 0 && (
+                      <tr><td colSpan={8} className="px-3.5 py-8 text-center text-xs text-slate-400">No medical claims on file for this plan year.</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-            <p className="text-xs coding-text-muted">Plan year start: {a.plan_year_start || '—'}</p>
           </div>
         );
       }
+
+      case 'claims':
+      case 'accumulators':
+        return null;
+
       case 'portal':
         return <PortalPreview detail={detail} />;
       case 'problems_hcc':
@@ -559,7 +689,7 @@ const Member360LabWorkspace = () => {
       )}
 
       <section className="coding-surface rounded-2xl shadow-sm">
-        <WorkspaceTabs tabs={TABS} activeKey={tab} onChange={setTab} />
+        <WorkspaceTabs tabs={visibleTabs} activeKey={tab} onChange={handleTabChange} />
         <div className="p-4">
           {/* Scope an error boundary to each tab so a broken sub-page
               (e.g. a chart sub-page that throws on unexpected detail

@@ -115,11 +115,28 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, tenant, tenantInfo, logout, login } = useContext(AuthContext) || {};
-  const { activeRoleConfig } = usePermissions();
+  const { activeRoleConfig, can } = usePermissions();
   const [showPersonaModal, setShowPersonaModal] = useState(false);
 
   const currentPath = location.pathname;
   const currentHash = location.hash;
+
+  const memberMatch = location.pathname.match(/\/member360\/members\/(\d+)/);
+  const activeMemberId = memberMatch ? memberMatch[1] : '48';
+
+  const [expandedMenuKeys, setExpandedMenuKeys] = useState({
+    [ROUTES.MEMBER360_LAB.MEMBERS]: true,
+    [ROUTES.SETTINGS]: false,
+  });
+
+  const toggleExpand = (href, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpandedMenuKeys((prev) => ({
+      ...prev,
+      [href]: !prev[href],
+    }));
+  };
 
   const isActive = (href, matchExact = false) => {
     if (href.includes('#')) {
@@ -127,6 +144,22 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
       return currentPath === pathPart && currentHash === `#${hashPart}`;
     }
     if (matchExact) return currentPath === href;
+    return currentPath === href || currentPath.startsWith(`${href}/`);
+  };
+
+  const isSubActive = (href, exact = false) => {
+    if (href.includes('?')) {
+      const [pathPart, queryPart] = href.split('?');
+      const params = new URLSearchParams(queryPart);
+      const tabParam = params.get('tab');
+      const isPathMatch = currentPath === pathPart || currentPath.startsWith(`${pathPart}/`);
+      return isPathMatch && (location.search.includes(`tab=${tabParam}`) || (!location.search && tabParam === 'timeline'));
+    }
+    if (href.includes('#')) {
+      const [pathPart, hashPart] = href.split('#');
+      return currentPath === pathPart && currentHash === `#${hashPart}`;
+    }
+    if (exact) return currentPath === href;
     return currentPath === href || currentPath.startsWith(`${href}/`);
   };
 
@@ -149,35 +182,98 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
     {
       title: 'Clinical Operations',
       items: [
-        { label: 'Care Intelligence', href: ROUTES.MEMBER360_LAB.DASHBOARD, icon: SvgPulse, exact: true },
-        { label: 'Patient Roster', href: ROUTES.MEMBER360_LAB.MEMBERS, icon: SvgUsers, badge: '50' },
-        { label: 'Clinical Tasks', href: ROUTES.MEMBER360_LAB.TASKS, icon: SvgTasks, badge: '36', badgeTone: 'critical' },
-        { label: 'Care Journeys', href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS, icon: SvgJourney, badge: '18' },
-        { label: 'Risk Intelligence', href: ROUTES.MEMBER360_LAB.RISK_INTELLIGENCE, icon: SvgRisk },
-        { label: 'Care Options', href: ROUTES.MEMBER360_LAB.CARE_OPTIONS, icon: SvgCareOptions },
-        { label: 'Messages', href: ROUTES.MEMBER360_LAB.MESSAGES, icon: SvgMessages },
-        { label: 'Documents', href: ROUTES.MEMBER360_LAB.DOCUMENTS, icon: SvgDocs },
+        { label: 'Care Intelligence', href: ROUTES.MEMBER360_LAB.DASHBOARD, icon: SvgPulse, exact: true, permission: 'menu:care_intelligence' },
+        {
+          label: 'Patient Roster',
+          href: ROUTES.MEMBER360_LAB.MEMBERS,
+          icon: SvgUsers,
+          badge: '50',
+          permission: 'menu:patient_roster',
+          subItems: [
+            { label: 'All Patients Roster', href: ROUTES.MEMBER360_LAB.MEMBERS, exact: true },
+            { label: 'Timeline', href: `/member360/members/${activeMemberId}?tab=timeline`, permission: 'tab:timeline' },
+            { label: 'Clinical Notes', href: `/member360/members/${activeMemberId}?tab=notes`, permission: 'tab:notes' },
+            { label: 'Care Journey', href: `/member360/members/${activeMemberId}?tab=care_journey`, permission: 'tab:care_journey' },
+            { label: 'Clinical & Gaps', href: `/member360/members/${activeMemberId}?tab=clinical_gaps`, permission: 'tab:clinical_gaps' },
+            { label: 'Medications & Labs', href: `/member360/members/${activeMemberId}?tab=medications_labs`, permission: 'tab:medications_labs' },
+            { label: 'Claims & Benefits', href: `/member360/members/${activeMemberId}?tab=claims_benefits`, permission: 'tab:claims_benefits' },
+            { label: 'Patient Documents', href: `/member360/members/${activeMemberId}?tab=documents`, permission: 'tab:documents' },
+            { label: 'Audit Log', href: `/member360/members/${activeMemberId}?tab=audit_log`, permission: 'tab:audit_log', supervisorOnly: true },
+            { label: 'Member Settings', href: `/member360/members/${activeMemberId}?tab=settings`, permission: 'tab:settings', supervisorOnly: true },
+          ],
+        },
+        { label: 'Clinical Tasks', href: ROUTES.MEMBER360_LAB.TASKS, icon: SvgTasks, badge: '36', badgeTone: 'critical', permission: 'menu:tasks' },
+        { label: 'Care Journeys', href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS, icon: SvgJourney, badge: '18', permission: 'menu:care_journeys' },
+        { label: 'Risk Intelligence', href: ROUTES.MEMBER360_LAB.RISK_INTELLIGENCE, icon: SvgRisk, permission: 'menu:risk_intelligence' },
+        { label: 'Care Options', href: ROUTES.MEMBER360_LAB.CARE_OPTIONS, icon: SvgCareOptions, permission: 'menu:care_options' },
+        { label: 'Messages', href: ROUTES.MEMBER360_LAB.MESSAGES, icon: SvgMessages, permission: 'menu:messages' },
+        { label: 'Documents', href: ROUTES.MEMBER360_LAB.DOCUMENTS, icon: SvgDocs, permission: 'menu:documents' },
       ],
     },
     {
       title: 'Value-Based Care & Ops',
       items: [
-        { label: 'Coding Worklist', href: ROUTES.CODING.WORKLIST, icon: SvgCoding, badge: 'v28' },
-        { label: 'Executive Dashboards', href: ROUTES.DASHBOARD, icon: SvgDashboard },
-        { label: 'Provider Directory', href: ROUTES.PROVIDERS.LANDING, icon: SvgProviders },
-        { label: 'Ride Booking (NEMT)', href: ROUTES.RIDE_BOOKING, icon: SvgTransport },
-        { label: 'Nexora AI Chat', href: ROUTES.CHAT, icon: SvgChat },
+        {
+          label: 'Coding Worklist',
+          href: ROUTES.CODING.WORKLIST,
+          icon: SvgCoding,
+          badge: 'v28',
+          permission: 'menu:coding_worklist',
+          subItems: [
+            { label: 'Worklist Queue', href: ROUTES.CODING.WORKLIST, exact: true, permission: 'sub:coding_worklist' },
+            { label: 'Suspect Workbench', href: `${ROUTES.CODING.WORKLIST}#workbench`, permission: 'sub:coding_chases' },
+          ],
+        },
+        {
+          label: 'Executive Dashboards',
+          href: ROUTES.DASHBOARD,
+          icon: SvgDashboard,
+          permission: 'menu:executive_dashboards',
+          subItems: [
+            { label: 'PMPM Financials', href: `${ROUTES.DASHBOARD}#pmpm`, permission: 'sub:exec_financial' },
+            { label: 'Quality & Star Ratings', href: `${ROUTES.DASHBOARD}#hedis`, permission: 'sub:exec_hedis' },
+          ],
+        },
+        { label: 'Provider Directory', href: ROUTES.PROVIDERS.LANDING, icon: SvgProviders, permission: 'menu:provider_directory' },
+        { label: 'Ride Booking (NEMT)', href: ROUTES.RIDE_BOOKING, icon: SvgTransport, permission: 'menu:ride_booking' },
+        { label: 'Nexora AI Chat', href: ROUTES.CHAT, icon: SvgChat, permission: 'menu:ai_chat' },
       ],
     },
     {
       title: 'Governance & Admin',
       items: [
-        { label: 'Role & Privileges', href: `${ROUTES.SETTINGS}#privileges`, icon: SvgPrivileges, badge: 'HIPAA', badgeTone: 'success' },
-        { label: 'Master Admin', href: ROUTES.ADMIN.MASTER, icon: SvgAdmin },
-        { label: 'Platform Settings', href: ROUTES.SETTINGS, icon: SvgSettings, exact: true },
+        { label: 'Role & Privileges', href: `${ROUTES.SETTINGS}#privileges`, icon: SvgPrivileges, badge: 'HIPAA', badgeTone: 'success', permission: 'menu:role_privileges' },
+        { label: 'Master Admin', href: ROUTES.ADMIN.MASTER, icon: SvgAdmin, permission: 'menu:master_admin' },
+        {
+          label: 'Platform Settings',
+          href: ROUTES.SETTINGS,
+          icon: SvgSettings,
+          exact: true,
+          permission: 'menu:platform_settings',
+          subItems: [
+            { label: 'General Profile', href: `${ROUTES.SETTINGS}#general`, permission: 'sub:settings_general' },
+            { label: 'Security & HIPAA', href: `${ROUTES.SETTINGS}#audit`, permission: 'sub:settings_security' },
+            { label: 'FHIR Integrations', href: `${ROUTES.SETTINGS}#integrations`, permission: 'sub:settings_integrations' },
+          ],
+        },
       ],
     },
   ];
+
+  // Dynamic role-based filtering: hide modules and sub-menus that current role is not authorized to see
+  const filteredNavGroups = navGroups
+    .map((g) => ({
+      ...g,
+      items: g.items
+        .filter((item) => !item.permission || can(item.permission))
+        .map((item) => ({
+          ...item,
+          subItems: item.subItems
+            ? item.subItems.filter((sub) => !sub.permission || can(sub.permission))
+            : undefined,
+        })),
+    }))
+    .filter((g) => g.items.length > 0);
 
   const currentPersona = DEMO_PERSONAS.find((p) => p.email === user?.email) || {
     name: user?.email ? user.email.split('@')[0] : 'Dr. Sarah Chen',
@@ -239,7 +335,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
 
       {/* ── Navigation List ──────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6 no-scrollbar">
-        {navGroups.map((group, gIdx) => (
+        {filteredNavGroups.map((group, gIdx) => (
           <div key={gIdx} className="space-y-1">
             {!collapsed ? (
               <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400/80">
@@ -252,48 +348,112 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
               {group.items.map((item) => {
                 const active = isActive(item.href, item.exact);
                 const IconComponent = item.icon;
+                const hasSubs = item.subItems && item.subItems.length > 0;
+                const isExpanded = !!expandedMenuKeys[item.href];
+
                 return (
-                  <Link
-                    key={item.href}
-                    to={item.href}
-                    title={collapsed ? item.label : undefined}
-                    className={[
-                      'group flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all relative',
-                      active
-                        ? 'bg-sky-500/15 text-sky-300 font-semibold shadow-sm shadow-sky-500/5'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/50',
-                      collapsed ? 'justify-center px-0' : '',
-                    ].join(' ')}
-                  >
-                    {active && (
-                      <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-sky-400 shadow-sm shadow-sky-400" />
-                    )}
-                    <span
+                  <div key={item.href} className="space-y-0.5">
+                    <div
                       className={[
-                        'transition-colors',
-                        active ? 'text-sky-400' : 'text-slate-400 group-hover:text-slate-200',
+                        'group flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all relative',
+                        active
+                          ? 'bg-sky-500/15 text-sky-300 font-semibold shadow-sm shadow-sky-500/5'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50',
+                        collapsed ? 'justify-center px-0' : '',
                       ].join(' ')}
                     >
-                      <IconComponent />
-                    </span>
-                    {!collapsed && (
-                      <span className="flex-1 truncate tracking-tight">{item.label}</span>
-                    )}
-                    {!collapsed && item.badge && (
-                      <span
-                        className={[
-                          'text-[10px] px-1.5 py-0.2 rounded-full font-semibold tabular-nums',
-                          item.badgeTone === 'critical'
-                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                            : item.badgeTone === 'success'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-slate-800 text-slate-300 border border-slate-700/60',
-                        ].join(' ')}
+                      {active && (
+                        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-sky-400 shadow-sm shadow-sky-400" />
+                      )}
+                      <Link
+                        to={item.href}
+                        title={collapsed ? item.label : undefined}
+                        className="flex items-center gap-3 flex-1 min-w-0"
                       >
-                        {item.badge}
-                      </span>
+                        <span
+                          className={[
+                            'transition-colors',
+                            active ? 'text-sky-400' : 'text-slate-400 group-hover:text-slate-200',
+                          ].join(' ')}
+                        >
+                          <IconComponent />
+                        </span>
+                        {!collapsed && (
+                          <span className="flex-1 truncate tracking-tight">{item.label}</span>
+                        )}
+                      </Link>
+
+                      {!collapsed && item.badge && (
+                        <span
+                          className={[
+                            'text-[10px] px-1.5 py-0.2 rounded-full font-semibold tabular-nums shrink-0',
+                            item.badgeTone === 'critical'
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              : item.badgeTone === 'success'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-slate-800 text-slate-300 border border-slate-700/60',
+                          ].join(' ')}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+
+                      {!collapsed && hasSubs && (
+                        <button
+                          type="button"
+                          onClick={(e) => toggleExpand(item.href, e)}
+                          title={isExpanded ? 'Collapse sub-menus' : 'Expand sub-menus'}
+                          className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-700/50 transition shrink-0"
+                        >
+                          <svg
+                            className={`h-3 w-3 transition-transform duration-200 ${
+                              isExpanded ? 'rotate-90 text-sky-400' : ''
+                            }`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Sub-Items Tree */}
+                    {!collapsed && hasSubs && isExpanded && (
+                      <div className="ml-5 pl-2.5 border-l border-slate-800/80 my-1 space-y-0.5 animate-fadeIn">
+                        {item.subItems.map((sub) => {
+                          const subActive = isSubActive(sub.href, sub.exact);
+                          return (
+                            <Link
+                              key={sub.href}
+                              to={sub.href}
+                              className={[
+                                'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all',
+                                subActive
+                                  ? 'bg-sky-500/15 text-sky-300 font-semibold shadow-xs'
+                                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40',
+                              ].join(' ')}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                <span
+                                  className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                                    subActive ? 'bg-sky-400 ring-2 ring-sky-400/30' : 'bg-slate-600'
+                                  }`}
+                                />
+                                <span className="truncate">{sub.label}</span>
+                              </div>
+                              {sub.supervisorOnly && (
+                                <span className="text-[9px] font-bold text-amber-400/90 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20 shrink-0">
+                                  Admin
+                                </span>
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </div>
                     )}
-                  </Link>
+                  </div>
                 );
               })}
             </div>
