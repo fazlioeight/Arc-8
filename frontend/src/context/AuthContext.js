@@ -186,9 +186,6 @@ export const AuthProvider = ({ children }) => {
   const persistTimerRef = useRef(null);
   const lastSerializedRef = useRef(null);
   const lastTouchRef = useRef(0);
-  // Latest auth state for event handlers/timers that must read it without
-  // re-subscribing, plus a single-flight guard so concurrent 401s (or a 401
-  // racing the proactive timer) don't double-spend the rotating refresh token.
   const authStateRef = useRef(authState);
   const refreshInFlightRef = useRef(null);
 
@@ -279,8 +276,10 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback((sessionData) => {
     if (!sessionData) return;
+    const effectiveToken = sessionData.token || authStateRef.current?.token;
     const base = normalizeState({
       ...sessionData,
+      token: effectiveToken,
       availableTenants: sessionData.tenants || sessionData.availableTenants,
     });
     if (!base) return;
@@ -291,11 +290,21 @@ export const AuthProvider = ({ children }) => {
     setAuthState(next);
   }, []);
 
+  const resolveApiBase = () => {
+    if (process.env.REACT_APP_API_BASE) {
+      return process.env.REACT_APP_API_BASE.replace(/\/$/, '');
+    }
+    if (typeof window !== 'undefined' && window.location.port === '3000') {
+      return 'http://localhost:8989';
+    }
+    return '';
+  };
+
   const logout = useCallback(() => {
     const token = authState?.token;
     const tenant = authState?.tenant;
     if (token) {
-      const apiBase = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+      const apiBase = resolveApiBase();
       // Best-effort revocation; ignore failures so logout is never blocked.
       fetch(`${apiBase}/api/logout`, {
         method: 'POST',
@@ -326,7 +335,7 @@ export const AuthProvider = ({ children }) => {
     if (!refreshToken) return false;
 
     const run = (async () => {
-      const apiBase = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+      const apiBase = resolveApiBase();
       let res;
       try {
         res = await fetch(`${apiBase}/api/auth/refresh`, {

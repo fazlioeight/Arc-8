@@ -90,19 +90,55 @@ export const usePermissions = () => {
   }, []);
 
   const switchRole = useCallback(
-    (newRole) => {
-      if (!auth.isAuthenticated) return;
+    async (newRole) => {
+      const personaEmailMap = {
+        [ROLES.PLATFORM_ADMIN]: "admin@admin.com",
+        [ROLES.ADMIN]: "admin@admin.com",
+        [ROLES.CLINICIAN]: "dr.chen@prominencehealth.com",
+        [ROLES.NURSE]: "elena.nurse@prominencehealth.com",
+        [ROLES.CODER]: "marcus.coder@prominencehealth.com",
+        [ROLES.BILLING]: "rachel.billing@prominencehealth.com",
+        [ROLES.PATIENT]: "james.member@prominencehealth.com",
+      };
+      const email = personaEmailMap[newRole] || "admin@admin.com";
+      const apiBase = process.env.REACT_APP_API_BASE
+        ? process.env.REACT_APP_API_BASE.replace(/\/$/, "")
+        : (typeof window !== "undefined" && window.location.port === "3000" ? "http://localhost:8989" : "");
+      const tenantKey = auth?.tenant || "prominencehealth";
+
+      try {
+        const res = await fetch(`${apiBase}/api/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Tenant-Key": tenantKey,
+          },
+          body: JSON.stringify({
+            email,
+            password: "admin",
+            tenant: tenantKey,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data?.token && typeof auth?.login === "function") {
+          auth.login(data);
+          return;
+        }
+      } catch (e) {
+        console.warn("Real login switch failed, falling back to impersonation", e);
+      }
+
       if (typeof startImpersonation === "function") {
         startImpersonation({
-          email: `${newRole}@prominencehealth.com`,
-          name: `${newRole.toUpperCase()} Demo User`,
+          email,
+          name: `${newRole.toUpperCase()} User`,
           role: newRole,
-          tenant: auth.tenant || "prominencehealth",
+          tenant: tenantKey,
           reason: "Role switcher preview",
         });
       }
     },
-    [auth.isAuthenticated, auth.tenant, startImpersonation]
+    [auth, startImpersonation]
   );
 
   return {

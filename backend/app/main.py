@@ -254,10 +254,10 @@ async def login(
     DUMMY_ROLES = {
         "admin@admin.com": ("admin", ["admin_console", "chat", "coding", "dashboard", "docs", "job_center", "member360", "portal", "ride_booking", "settings", "providers"]),
         "dr.chen@prominencehealth.com": ("clinician", ["member360", "providers", "portal", "chat", "docs", "dashboard"]),
-        "elena.nurse@prominencehealth.com": ("nurse", ["member360", "ride_booking", "portal", "chat", "docs"]),
+        "elena.nurse@prominencehealth.com": ("nurse", ["member360", "ride_booking", "portal", "chat", "docs", "dashboard"]),
         "marcus.coder@prominencehealth.com": ("coder", ["coding", "member360", "portal", "dashboard", "docs"]),
         "rachel.billing@prominencehealth.com": ("billing", ["dashboard", "portal", "docs", "member360"]),
-        "james.member@prominencehealth.com": ("patient", ["portal", "ride_booking"]),
+        "james.member@prominencehealth.com": ("patient", ["portal", "ride_booking", "member360", "dashboard"]),
     }
     if settings.ALLOW_DUMMY_LOGIN and credentials.email in DUMMY_ROLES and credentials.password in ("admin", "demo123", "password"):
         demo_role, demo_apps = DUMMY_ROLES[credentials.email]

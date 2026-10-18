@@ -166,14 +166,32 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const handleSwitchPersona = async (persona) => {
     try {
       setShowPersonaModal(false);
-      await login({
-        email: persona.email,
-        password: 'password',
-        tenant: tenant || 'prominencehealth',
+      const apiBase = process.env.REACT_APP_API_BASE
+        ? process.env.REACT_APP_API_BASE.replace(/\/$/, '')
+        : (typeof window !== 'undefined' && window.location.port === '3000' ? 'http://localhost:8989' : '');
+      const tenantKey = tenant || 'prominencehealth';
+      const res = await fetch(`${apiBase}/api/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-Key': tenantKey,
+        },
+        body: JSON.stringify({
+          email: persona.email,
+          password: 'admin',
+          tenant: tenantKey,
+        }),
       });
-      navigate(ROUTES.MEMBER360_LAB.DASHBOARD);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Authentication failed');
+      if (typeof login === 'function') {
+        login(data);
+      }
+      setTimeout(() => {
+        navigate(ROUTES.MEMBER360_LAB.DASHBOARD);
+      }, 50);
     } catch (e) {
-      // Fallback redirect
+      console.error('Failed to switch persona via real auth', e);
       navigate('/login');
     }
   };
