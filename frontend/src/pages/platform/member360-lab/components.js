@@ -5,6 +5,7 @@ import SharedRecordHeader from '../../../components/ui/RecordHeader';
 import SharedWorkspaceTabs from '../../../components/ui/WorkspaceTabs';
 import SharedWorkspaceDrawer from '../../../components/ui/WorkspaceDrawer';
 import { PropertyRow as SharedPropertyRow, PropertySection } from '../../../components/ui/PropertyList';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 // Re-export the generic primitives so existing imports from this module
 // continue to work. New consumers should import from /components/ui directly.
@@ -14,23 +15,30 @@ export const WorkspaceDrawer = SharedWorkspaceDrawer;
 const joinClass = (...parts) => parts.filter(Boolean).join(' ');
 
 export const LAB_SUB_NAV = [
-  { key: 'dashboard', label: 'Dashboard', href: ROUTES.MEMBER360_LAB.DASHBOARD, exact: true },
-  { key: 'chart', label: 'Chart', href: ROUTES.MEMBER_360.LANDING, exact: true },
-  { key: 'members', label: 'Members', href: ROUTES.MEMBER360_LAB.MEMBERS, prefix: ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT },
-  { key: 'tasks', label: 'Tasks', href: ROUTES.MEMBER360_LAB.TASKS },
-  { key: 'care_journeys', label: 'Care Journeys', href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS },
-  { key: 'risk', label: 'Risk Intelligence', href: ROUTES.MEMBER360_LAB.RISK_INTELLIGENCE },
-  { key: 'care_options', label: 'Care Options', href: ROUTES.MEMBER360_LAB.CARE_OPTIONS },
-  { key: 'messages', label: 'Messages', href: ROUTES.MEMBER360_LAB.MESSAGES },
-  { key: 'documents', label: 'Documents', href: ROUTES.MEMBER360_LAB.DOCUMENTS },
-  { key: 'admin', label: 'Admin', href: ROUTES.MEMBER360_LAB.ADMIN },
+  { key: 'dashboard', label: 'Dashboard', href: ROUTES.MEMBER360_LAB.DASHBOARD, exact: true, permission: 'menu:care_intelligence' },
+  { key: 'members', label: 'Members', href: ROUTES.MEMBER360_LAB.MEMBERS, prefix: ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT, permission: 'menu:patient_roster' },
+  { key: 'tasks', label: 'Tasks', href: ROUTES.MEMBER360_LAB.TASKS, permission: 'menu:tasks' },
+  { key: 'care_journeys', label: 'Care Journeys', href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS, permission: 'menu:care_journeys' },
+  { key: 'risk', label: 'Risk Intelligence', href: ROUTES.MEMBER360_LAB.RISK_INTELLIGENCE, permission: 'menu:risk_intelligence' },
+  { key: 'care_options', label: 'Care Options', href: ROUTES.MEMBER360_LAB.CARE_OPTIONS, permission: 'menu:care_options' },
+  { key: 'messages', label: 'Messages', href: ROUTES.MEMBER360_LAB.MESSAGES, permission: 'menu:messages' },
+  { key: 'documents', label: 'Documents', href: ROUTES.MEMBER360_LAB.DOCUMENTS, permission: 'menu:documents' },
+  { key: 'admin', label: 'Admin', href: ROUTES.MEMBER360_LAB.ADMIN, permission: 'menu:master_admin', adminOnly: true },
 ];
 
 export function LabSubNav() {
   const { pathname } = useLocation();
+  const { can, isAdmin } = usePermissions();
+
+  const visibleItems = LAB_SUB_NAV.filter((item) => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (item.permission && !can(item.permission)) return false;
+    return true;
+  });
+
   return (
     <nav className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-900/80 border border-slate-800/80 shadow-sm mb-4">
-      {LAB_SUB_NAV.map((item) => {
+      {visibleItems.map((item) => {
         const active = item.exact
           ? pathname === item.href
           : pathname === item.href || pathname.startsWith(`${item.href}/`) ||
