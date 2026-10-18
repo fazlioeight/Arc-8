@@ -253,7 +253,7 @@ async def login(
 
     DUMMY_ROLES = {
         "admin@admin.com": ("admin", ["admin_console", "chat", "coding", "dashboard", "docs", "job_center", "member360", "portal", "ride_booking", "settings", "providers"]),
-        "dr.chen@prominencehealth.com": ("clinician", ["member360", "providers", "portal", "chat", "docs", "dashboard"]),
+        "dr.chen@prominencehealth.com": ("clinician", ["member360", "providers", "portal", "chat", "docs", "dashboard", "coding"]),
         "elena.nurse@prominencehealth.com": ("nurse", ["member360", "ride_booking", "portal", "chat", "docs", "dashboard"]),
         "marcus.coder@prominencehealth.com": ("coder", ["coding", "member360", "portal", "dashboard", "docs"]),
         "rachel.billing@prominencehealth.com": ("billing", ["dashboard", "portal", "docs", "member360"]),

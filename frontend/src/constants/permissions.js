@@ -313,9 +313,6 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "menu:care_options",
     "menu:messages",
     "menu:documents",
-    "menu:coding_worklist",
-    "sub:coding_worklist",
-    "sub:coding_chases",
     "menu:executive_dashboards",
     "sub:exec_financial",
     "sub:exec_hedis",
@@ -373,7 +370,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
   ],
 };
 
-const STORAGE_KEY = "nexora_role_permissions_matrix";
+const STORAGE_KEY = "nexora_role_permissions_matrix_v3";
 
 export const getPersistedRolePermissions = () => {
   if (typeof window === "undefined") return DEFAULT_ROLE_PERMISSIONS;
