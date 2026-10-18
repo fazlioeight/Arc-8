@@ -121,11 +121,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const currentPath = location.pathname;
   const currentHash = location.hash;
 
-  const memberMatch = location.pathname.match(/\/member360\/members\/(\d+)/);
-  const activeMemberId = memberMatch ? memberMatch[1] : '48';
-
   const [expandedMenuKeys, setExpandedMenuKeys] = useState({
-    [ROUTES.MEMBER360_LAB.MEMBERS]: true,
     [ROUTES.SETTINGS]: false,
   });
 
@@ -207,18 +203,6 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
           icon: SvgUsers,
           badge: '50',
           permission: 'menu:patient_roster',
-          subItems: [
-            { label: 'All Patients Roster', href: ROUTES.MEMBER360_LAB.MEMBERS, exact: true },
-            { label: 'Timeline', href: `/member360/members/${activeMemberId}?tab=timeline`, permission: 'tab:timeline' },
-            { label: 'Clinical Notes', href: `/member360/members/${activeMemberId}?tab=notes`, permission: 'tab:notes' },
-            { label: 'Care Journey', href: `/member360/members/${activeMemberId}?tab=care_journey`, permission: 'tab:care_journey' },
-            { label: 'Clinical & Gaps', href: `/member360/members/${activeMemberId}?tab=clinical_gaps`, permission: 'tab:clinical_gaps' },
-            { label: 'Medications & Labs', href: `/member360/members/${activeMemberId}?tab=medications_labs`, permission: 'tab:medications_labs' },
-            { label: 'Claims & Benefits', href: `/member360/members/${activeMemberId}?tab=claims_benefits`, permission: 'tab:claims_benefits' },
-            { label: 'Patient Documents', href: `/member360/members/${activeMemberId}?tab=documents`, permission: 'tab:documents' },
-            { label: 'Audit Log', href: `/member360/members/${activeMemberId}?tab=audit_log`, permission: 'tab:audit_log', supervisorOnly: true },
-            { label: 'Member Settings', href: `/member360/members/${activeMemberId}?tab=settings`, permission: 'tab:settings', supervisorOnly: true },
-          ],
         },
         { label: 'Clinical Tasks', href: ROUTES.MEMBER360_LAB.TASKS, icon: SvgTasks, badge: '36', badgeTone: 'critical', permission: 'menu:tasks' },
         { label: 'Care Journeys', href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS, icon: SvgJourney, badge: '18', permission: 'menu:care_journeys' },
