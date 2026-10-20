@@ -61,7 +61,7 @@ services:
       DEFAULT_TENANT_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/prominence_tenant"
       TENANT_DATABASE_URL_TEMPLATE: "postgresql+asyncpg://postgres:postgres@postgres:5432/{tenant_key}"
       REDIS_URL: "redis://redis:6379/0"
-      CORS_ORIGINS: '["http://localhost:7777","http://127.0.0.1:7777","http://localhost:3000","http://frontend:3000"]'
+      CORS_ORIGINS: '["http://localhost:7777","http://127.0.0.1:7777","http://localhost:7778","http://127.0.0.1:7778","http://localhost:3000","http://frontend:3000"]'
       RATE_LIMIT_ENABLED: "false"
       REQUIRE_ADMIN_MFA: "false"
       REQUIRE_PHI_MFA: "false"

@@ -93,6 +93,11 @@ for origin in settings.CORS_ORIGINS:
     cors_origins.append(origin_str)
     cors_origins.append(f"{origin_str}/")
 
+for extra in ["http://localhost:7777", "http://localhost:7778", "http://127.0.0.1:7777", "http://127.0.0.1:7778", "http://localhost:3000"]:
+    if extra not in cors_origins:
+        cors_origins.append(extra)
+        cors_origins.append(f"{extra}/")
+
 app.add_middleware(SecurityHeadersMiddleware)
 # Global per-IP rate limit. Added before CORS so CORS remains the outermost
 # layer and a 429 still carries Access-Control-Allow-Origin (otherwise browsers
