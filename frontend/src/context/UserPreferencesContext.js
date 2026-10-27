@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { AuthContext } from './AuthContext';
+import { translateText } from '../constants/translations';
 
 const USER_PREF_PREFIX = 'nexora-user-pref-';
 const ROLE_MENU_STORAGE_KEY = 'nexora-role-menus';
@@ -138,6 +139,38 @@ export const UserPreferencesProvider = ({ children }) => {
 
   const [roleMenus, setRoleMenus] = useState(() => loadRoleMenuConfig());
   const [preferences, setPreferences] = useState(() => loadUserPrefs(email));
+  const [language, setLanguageState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('liSettings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.language) return parsed.language;
+      }
+    } catch {}
+    return 'English';
+  });
+
+  const setLanguage = useCallback((nextLang) => {
+    const validLang = nextLang || 'English';
+    setLanguageState(validLang);
+    try {
+      const saved = localStorage.getItem('liSettings');
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem('liSettings', JSON.stringify({ ...parsed, language: validLang }));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined' && document.documentElement) {
+      const langCode = language === 'Spanish' ? 'es' : language === 'French' ? 'fr' : 'en';
+      document.documentElement.lang = langCode;
+    }
+  }, [language]);
+
+  const t = useCallback(
+    (key, fallback = '') => translateText(language, key, fallback),
+    [language]
+  );
 
   useEffect(() => {
     setPreferences(loadUserPrefs(email));
@@ -250,6 +283,9 @@ export const UserPreferencesProvider = ({ children }) => {
     markNotificationRead,
     viewPreferences: preferences.views || {},
     notificationPrefs: preferences.notifications || { dismissed: [], lastRead: null },
+    language,
+    setLanguage,
+    t,
   }), [
     roleMenus,
     navVisibility,
@@ -264,6 +300,9 @@ export const UserPreferencesProvider = ({ children }) => {
     markNotificationRead,
     preferences.views,
     preferences.notifications,
+    language,
+    setLanguage,
+    t,
   ]);
 
   return (

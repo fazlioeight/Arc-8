@@ -9,6 +9,7 @@ import DarkModeToggle from "../../../components/DarkModeToggle";
 import ToggleSwitch from "../../../components/ToggleSwitch";
 import { AuthContext } from "../../../context/AuthContext";
 import { useUserPreferences } from "../../../context/UserPreferencesContext";
+import { usePermissions } from "../../../hooks/usePermissions";
 import {
   fetchUserPreferences,
   updateUserPreferences,
@@ -36,29 +37,41 @@ const NAV_ITEMS = [
 const Settings = ({ themePreference, setThemePreference }) => {
   const navigate = useNavigate();
   const { isAuthenticated, role, token, tenant, logout } = useContext(AuthContext) || {};
-  const { roleMenus, setNavVisibility } = useUserPreferences();
+  const { roleMenus, setNavVisibility, language, setLanguage, t } = useUserPreferences();
+  const { currentRole, can, isAdmin } = usePermissions();
+  const canViewPrivileges = isAdmin || can("menu:role_privileges");
+
   const [active, setActive] = useState(() => {
     if (typeof window !== "undefined" && window.location.hash) {
       const h = window.location.hash.replace("#", "");
       if (["privileges", "general", "data", "personalization", "memory", "notifications", "beta", "about", "navigation"].includes(h)) {
+        if (h === "privileges" && !canViewPrivileges) {
+          return "general";
+        }
         return h;
       }
     }
-    return "privileges";
+    return canViewPrivileges ? "privileges" : "general";
   });
-  const [menuRole, setMenuRole] = useState(() => role || "admin");
+  const [menuRole, setMenuRole] = useState(() => currentRole || role || "admin");
 
   useEffect(() => {
-    if (role) {
-      setMenuRole(role);
+    if (currentRole || role) {
+      setMenuRole(currentRole || role);
     }
-  }, [role]);
+  }, [currentRole, role]);
+
+  useEffect(() => {
+    if (!canViewPrivileges && active === "privileges") {
+      setActive("general");
+    }
+  }, [canViewPrivileges, active]);
 
   const [prefs, setPrefs] = useState(() => {
     const saved = localStorage.getItem("liSettings");
     const basePrefs = {
       theme: themePreference || "system",
-      language: "English",
+      language: language || "English",
       chatHistory: true,
       training: true,
       personalization: true,
@@ -83,7 +96,15 @@ const Settings = ({ themePreference, setThemePreference }) => {
     localStorage.setItem("liSettings", JSON.stringify(prefs));
   }, [prefs]);
 
-  const updatePref = (key, value) => setPrefs((p) => ({ ...p, [key]: value }));
+  const updatePref = (key, value) => {
+    setPrefs((p) => ({ ...p, [key]: value }));
+    if (key === "language" && typeof setLanguage === "function") {
+      setLanguage(value);
+    }
+    if (key === "theme" && typeof setThemePreference === "function") {
+      setThemePreference(value);
+    }
+  };
 
   useEffect(() => {
     if (themePreference && themePreference !== prefs.theme) {
@@ -186,17 +207,17 @@ const Settings = ({ themePreference, setThemePreference }) => {
 
   const navSections = useMemo(
     () => [
-      { id: "privileges", label: "Roles & Privileges" },
-      { id: "general", label: "General" },
-      { id: "data", label: "Data controls" },
-      { id: "personalization", label: "Personalization" },
-      { id: "memory", label: "Memory" },
-      { id: "notifications", label: "Notifications" },
-      { id: "beta", label: "Beta features" },
-      { id: "about", label: "About" },
-      ...(role === "admin" ? [{ id: "navigation", label: "Navigation" }] : []),
+      ...(canViewPrivileges ? [{ id: "privileges", label: t("Roles & Privileges") }] : []),
+      { id: "general", label: t("General") },
+      { id: "data", label: t("Data controls") },
+      { id: "personalization", label: t("Personalization") },
+      { id: "memory", label: t("Memory") },
+      { id: "notifications", label: t("Notifications") },
+      { id: "beta", label: t("Beta features") },
+      { id: "about", label: t("About") },
+      ...(isAdmin ? [{ id: "navigation", label: t("Navigation") }] : []),
     ],
-    [role]
+    [canViewPrivileges, isAdmin, t]
   );
 
   const layoutProps = useMemo(
@@ -211,9 +232,9 @@ const Settings = ({ themePreference, setThemePreference }) => {
 
   const headerContent = (
     <div className="flex flex-col gap-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">Settings</p>
-      <h1 className="text-3xl font-semibold coding-text-strong">Manage your Nexora Lab preferences</h1>
-      <p className="text-sm coding-text-soft">Personalize your workspace, navigation, and notifications.</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">{t("Settings")}</p>
+      <h1 className="text-3xl font-semibold coding-text-strong">{t("Manage your Nexora Lab preferences")}</h1>
+      <p className="text-sm coding-text-soft">{t("Personalize your workspace, navigation, and notifications.")}</p>
     </div>
   );
 
@@ -225,16 +246,16 @@ const Settings = ({ themePreference, setThemePreference }) => {
       utilityBar={isAuthenticated}
     >
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiTile label="Role" value={(menuRole || 'User').replace(/_/g, ' ')} hint="Access level" small />
-        <KpiTile label="Sections" value={navSections.length} hint="Available" />
-        <KpiTile label="Memories" value={memories.length} hint="Saved" />
-        <KpiTile label="Theme" value={prefs.theme || 'system'} hint="Current" small />
+        <KpiTile label={t("Role")} value={(currentRole || menuRole || 'User').replace(/_/g, ' ')} hint="Access level" small />
+        <KpiTile label={t("Sections")} value={navSections.length} hint="Available" />
+        <KpiTile label={t("Memories")} value={memories.length} hint="Saved" />
+        <KpiTile label={t("Theme")} value={prefs.theme || 'system'} hint="Current" small />
       </section>
 
       <div className="grid gap-4 sm:grid-cols-[240px_1fr]">
         <nav className="coding-surface rounded-2xl shadow-sm overflow-hidden sm:sticky sm:top-4 sm:self-start">
           <header className="px-4 py-2.5 border-b coding-border">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">Sections</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">{t("Sections")}</h3>
           </header>
           <ul>
             {navSections.map((s) => {
@@ -259,38 +280,37 @@ const Settings = ({ themePreference, setThemePreference }) => {
         </nav>
 
         <section className="space-y-4">
-          {active === "privileges" && (
+          {active === "privileges" && canViewPrivileges && (
             <div className="coding-surface rounded-2xl p-6 shadow-sm">
               <RolePrivilegesManager />
             </div>
           )}
 
           {active === "general" && (
-            <PortalCard title="General" subtitle="Theme and language preferences.">
+            <PortalCard title={t("General")} subtitle={t("Theme and language preferences.")}>
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Theme</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-300">Choose system, light, or dark</div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t("Theme")}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-300">{t("Choose system, light, or dark")}</div>
                   </div>
                   <DarkModeToggle
                     themePreference={prefs.theme}
                     setThemePreference={(value) => {
-                      setPrefs((p) => ({ ...p, theme: value }));
-                      setThemePreference?.(value);
+                      updatePref("theme", value);
                     }}
                   />
                 </div>
                 <div>
-                  <div className="text-xs text-slate-500 dark:text-slate-300">Language</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-300">{t("Language")}</div>
                   <select
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-sky-400 dark:focus:ring-sky-500/40"
                     value={prefs.language}
                     onChange={(event) => updatePref("language", event.target.value)}
                   >
-                    <option>English</option>
-                    <option>Spanish</option>
-                    <option>French</option>
+                    <option value="English">English</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="French">French</option>
                   </select>
                 </div>
               </div>

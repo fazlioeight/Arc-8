@@ -50,13 +50,13 @@ const PortalPageLayout = ({
   const alignment = useMemo(() => ALIGNMENT[align] || ALIGNMENT.left, [align]);
   const { className: navClassName = '', ...restNavProps } = navProps || {};
   const isInvertedHeader = headerTone === 'inverted';
-  const eyebrowClass = isInvertedHeader ? 'text-slate-300' : 'text-sky-400 font-semibold';
+  const eyebrowClass = isInvertedHeader ? 'text-slate-300' : 'text-sky-600 dark:text-sky-400 font-semibold';
   const titleClass = isInvertedHeader
     ? 'text-2xl md:text-3xl font-bold tracking-tight text-white'
-    : 'text-2xl md:text-3xl font-bold tracking-tight text-slate-100';
+    : 'text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100';
   const subtitleClass = isInvertedHeader
     ? 'text-sm text-slate-300'
-    : 'text-sm text-slate-400';
+    : 'text-sm text-slate-600 dark:text-slate-400';
 
   const header = headerContent ?? (
     <div className={['flex flex-col gap-2', alignment.stack].join(' ')}>
@@ -88,12 +88,12 @@ const PortalPageLayout = ({
   );
 
   return (
-    <div className="portal-theme dark dark-mode flex h-screen w-screen overflow-hidden bg-[#070b14] font-sans text-slate-100 antialiased">
+    <div className="portal-theme flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-[#070b14] dark:text-slate-100 font-sans antialiased">
       {/* ── Professional Left Sidebar Menu ────────────────── */}
       <PortalSidebar collapsed={collapsed} onToggle={toggleCollapsed} />
 
       {/* ── Main Workspace Viewport ───────────────────────── */}
-      <div className="flex flex-1 flex-col h-full overflow-hidden bg-[#0a0f1d]">
+      <div className="flex flex-1 flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-[#0a0f1d]">
         {/* Top Utility Bar */}
         {utilityBar ? (
           <PortalUtilityBar
@@ -103,8 +103,8 @@ const PortalPageLayout = ({
         ) : null}
 
         {/* Scrollable Content Viewport */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className={['mx-auto w-full py-6', maxWidthClassName, paddingClassName, 'pb-12'].join(' ')}>
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+          <div className={['mx-auto w-full py-6', maxWidthClassName, paddingClassName, 'pb-16'].join(' ')}>
             {!hideHeader && (
               <header className="mb-6 space-y-4">
                 {header}

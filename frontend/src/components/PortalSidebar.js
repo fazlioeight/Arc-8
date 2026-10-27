@@ -1,7 +1,9 @@
 import React, { useContext, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useUserPreferences } from '../context/UserPreferencesContext';
 import { usePermissions } from '../hooks/usePermissions';
+import { DEMO_PERSONAS } from '../constants/permissions';
 import { ROUTES } from '../constants/routes';
 
 /* ─── SVG Icons ────────────────────────────────────────────────────────── */
@@ -102,20 +104,12 @@ const SvgSettings = () => (
   </svg>
 );
 
-const DEMO_PERSONAS = [
-  { email: 'dr.chen@prominencehealth.com', name: 'Dr. Sarah Chen', role: 'clinician', title: 'Physician (MD/DO)', color: 'from-sky-500 to-indigo-600' },
-  { email: 'admin@admin.com', name: 'Alexander Cross', role: 'admin', title: 'Platform Admin', color: 'from-indigo-600 to-purple-600' },
-  { email: 'elena.nurse@prominencehealth.com', name: 'Elena Rostova, RN', role: 'nurse', title: 'Care Coordinator', color: 'from-emerald-500 to-teal-700' },
-  { email: 'marcus.coder@prominencehealth.com', name: 'Marcus Vance, CPC', role: 'coder', title: 'Risk Adjustment Coder', color: 'from-purple-500 to-pink-600' },
-  { email: 'rachel.billing@prominencehealth.com', name: 'Rachel Adams', role: 'billing', title: 'Capitation Specialist', color: 'from-blue-600 to-cyan-600' },
-  { email: 'james.member@prominencehealth.com', name: 'James Wilson', role: 'patient', title: 'Member / Patient', color: 'from-teal-500 to-emerald-600' },
-];
-
 export default function PortalSidebar({ collapsed = false, onToggle }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, tenant, tenantInfo, logout, login } = useContext(AuthContext) || {};
-  const { activeRoleConfig, can } = usePermissions();
+  const { currentRole, activeRoleConfig, can } = usePermissions();
+  const { t } = useUserPreferences();
   const [showPersonaModal, setShowPersonaModal] = useState(false);
 
   const currentPath = location.pathname;
@@ -162,9 +156,14 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const handleSwitchPersona = async (persona) => {
     try {
       setShowPersonaModal(false);
-      const apiBase = process.env.REACT_APP_API_BASE
-        ? process.env.REACT_APP_API_BASE.replace(/\/$/, '')
-        : (typeof window !== 'undefined' && window.location.port === '3000' ? 'http://localhost:8989' : '');
+      const apiBase = (() => {
+        if (typeof window !== 'undefined' && window.location) {
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return `${window.location.protocol}//${window.location.hostname}:8989`;
+          }
+        }
+        return (process.env.REACT_APP_API_BASE || 'http://localhost:8989').replace(/\/$/, '');
+      })();
       const tenantKey = tenant || 'prominencehealth';
       const res = await fetch(`${apiBase}/api/login`, {
         method: 'POST',
@@ -184,7 +183,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         login(data);
       }
       setTimeout(() => {
-        navigate(ROUTES.MEMBER360_LAB.DASHBOARD);
+        navigate(persona.role === 'patient' ? ROUTES.PORTAL.LANDING : ROUTES.MEMBER360_LAB.DASHBOARD);
       }, 50);
     } catch (e) {
       console.error('Failed to switch persona via real auth', e);
@@ -194,68 +193,68 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
 
   const navGroups = [
     {
-      title: 'Clinical Operations',
+      title: t('nav.group.clinical_ops', 'Clinical Operations'),
       items: [
-        { label: 'Care Intelligence', href: ROUTES.MEMBER360_LAB.DASHBOARD, icon: SvgPulse, exact: true, permission: 'menu:care_intelligence' },
+        { label: t('nav.care_intelligence', 'Care Intelligence'), href: ROUTES.MEMBER360_LAB.DASHBOARD, icon: SvgPulse, exact: true, permission: 'menu:care_intelligence' },
         {
-          label: 'Patient Roster',
+          label: t('nav.patient_roster', 'Patient Roster'),
           href: ROUTES.MEMBER360_LAB.MEMBERS,
           icon: SvgUsers,
           badge: '50',
           permission: 'menu:patient_roster',
         },
-        { label: 'Clinical Tasks', href: ROUTES.MEMBER360_LAB.TASKS, icon: SvgTasks, badge: '36', badgeTone: 'critical', permission: 'menu:tasks' },
-        { label: 'Care Journeys', href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS, icon: SvgJourney, badge: '18', permission: 'menu:care_journeys' },
-        { label: 'Risk Intelligence', href: ROUTES.MEMBER360_LAB.RISK_INTELLIGENCE, icon: SvgRisk, permission: 'menu:risk_intelligence' },
-        { label: 'Care Options', href: ROUTES.MEMBER360_LAB.CARE_OPTIONS, icon: SvgCareOptions, permission: 'menu:care_options' },
-        { label: 'Messages', href: ROUTES.MEMBER360_LAB.MESSAGES, icon: SvgMessages, permission: 'menu:messages' },
-        { label: 'Documents', href: ROUTES.MEMBER360_LAB.DOCUMENTS, icon: SvgDocs, permission: 'menu:documents' },
+        { label: t('nav.clinical_tasks', 'Clinical Tasks'), href: ROUTES.MEMBER360_LAB.TASKS, icon: SvgTasks, badge: '36', badgeTone: 'critical', permission: 'menu:tasks' },
+        { label: t('nav.care_journeys', 'Care Journeys'), href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS, icon: SvgJourney, badge: '18', permission: 'menu:care_journeys' },
+        { label: t('nav.risk_intelligence', 'Risk Intelligence'), href: ROUTES.MEMBER360_LAB.RISK_INTELLIGENCE, icon: SvgRisk, permission: 'menu:risk_intelligence' },
+        { label: t('nav.care_options', 'Care Options'), href: ROUTES.MEMBER360_LAB.CARE_OPTIONS, icon: SvgCareOptions, permission: 'menu:care_options' },
+        { label: t('nav.messages', 'Messages'), href: ROUTES.MEMBER360_LAB.MESSAGES, icon: SvgMessages, permission: 'menu:messages' },
+        { label: t('nav.documents', 'Documents'), href: ROUTES.MEMBER360_LAB.DOCUMENTS, icon: SvgDocs, permission: 'menu:documents' },
       ],
     },
     {
-      title: 'Value-Based Care & Ops',
+      title: t('nav.group.vbc_ops', 'Value-Based Care & Ops'),
       items: [
         {
-          label: 'Coding Worklist',
+          label: t('nav.coding_worklist', 'Coding Worklist'),
           href: ROUTES.CODING.WORKLIST,
           icon: SvgCoding,
           badge: 'v28',
           permission: 'menu:coding_worklist',
           subItems: [
-            { label: 'Worklist Queue', href: ROUTES.CODING.WORKLIST, exact: true, permission: 'sub:coding_worklist' },
-            { label: 'Suspect Workbench', href: `${ROUTES.CODING.WORKLIST}#workbench`, permission: 'sub:coding_chases' },
+            { label: t('nav.sub.worklist_queue', 'Worklist Queue'), href: ROUTES.CODING.WORKLIST, exact: true, permission: 'sub:coding_worklist' },
+            { label: t('nav.sub.suspect_workbench', 'Suspect Workbench'), href: `${ROUTES.CODING.WORKLIST}#workbench`, permission: 'sub:coding_chases' },
           ],
         },
         {
-          label: 'Executive Dashboards',
+          label: t('nav.executive_dashboards', 'Executive Dashboards'),
           href: ROUTES.DASHBOARD,
           icon: SvgDashboard,
           permission: 'menu:executive_dashboards',
           subItems: [
-            { label: 'PMPM Financials', href: `${ROUTES.DASHBOARD}#pmpm`, permission: 'sub:exec_financial' },
-            { label: 'Quality & Star Ratings', href: `${ROUTES.DASHBOARD}#hedis`, permission: 'sub:exec_hedis' },
+            { label: t('nav.sub.pmpm_financials', 'PMPM Financials'), href: `${ROUTES.DASHBOARD}#pmpm`, permission: 'sub:exec_financial' },
+            { label: t('nav.sub.quality_star', 'Quality & Star Ratings'), href: `${ROUTES.DASHBOARD}#hedis`, permission: 'sub:exec_hedis' },
           ],
         },
-        { label: 'Provider Directory', href: ROUTES.PROVIDERS.LANDING, icon: SvgProviders, permission: 'menu:provider_directory' },
-        { label: 'Ride Booking (NEMT)', href: ROUTES.RIDE_BOOKING, icon: SvgTransport, permission: 'menu:ride_booking' },
-        { label: 'Nexora AI Chat', href: ROUTES.CHAT, icon: SvgChat, permission: 'menu:ai_chat' },
+        { label: t('nav.provider_directory', 'Provider Directory'), href: ROUTES.PROVIDERS.LANDING, icon: SvgProviders, permission: 'menu:provider_directory' },
+        { label: t('nav.ride_booking', 'Ride Booking (NEMT)'), href: ROUTES.RIDE_BOOKING, icon: SvgTransport, permission: 'menu:ride_booking' },
+        { label: t('nav.ai_chat', 'Nexora AI Chat'), href: ROUTES.CHAT, icon: SvgChat, permission: 'menu:ai_chat' },
       ],
     },
     {
-      title: 'Governance & Admin',
+      title: t('nav.group.governance', 'Governance & Admin'),
       items: [
-        { label: 'Role & Privileges', href: `${ROUTES.SETTINGS}#privileges`, icon: SvgPrivileges, badge: 'HIPAA', badgeTone: 'success', permission: 'menu:role_privileges' },
-        { label: 'Master Admin', href: ROUTES.ADMIN.MASTER, icon: SvgAdmin, permission: 'menu:master_admin' },
+        { label: t('nav.role_privileges', 'Role & Privileges'), href: `${ROUTES.SETTINGS}#privileges`, icon: SvgPrivileges, badge: 'HIPAA', badgeTone: 'success', permission: 'menu:role_privileges' },
+        { label: t('nav.master_admin', 'Master Admin'), href: ROUTES.ADMIN.MASTER, icon: SvgAdmin, permission: 'menu:master_admin' },
         {
-          label: 'Platform Settings',
+          label: t('nav.platform_settings', 'Platform Settings'),
           href: ROUTES.SETTINGS,
           icon: SvgSettings,
           exact: true,
           permission: 'menu:platform_settings',
           subItems: [
-            { label: 'General Profile', href: `${ROUTES.SETTINGS}#general`, permission: 'sub:settings_general' },
-            { label: 'Security & HIPAA', href: `${ROUTES.SETTINGS}#audit`, permission: 'sub:settings_security' },
-            { label: 'FHIR Integrations', href: `${ROUTES.SETTINGS}#integrations`, permission: 'sub:settings_integrations' },
+            { label: t('nav.sub.general_profile', 'General Profile'), href: `${ROUTES.SETTINGS}#general`, permission: 'sub:settings_general' },
+            { label: t('nav.sub.security_hipaa', 'Security & HIPAA'), href: `${ROUTES.SETTINGS}#audit`, permission: 'sub:settings_security' },
+            { label: t('nav.sub.fhir_integrations', 'FHIR Integrations'), href: `${ROUTES.SETTINGS}#integrations`, permission: 'sub:settings_integrations' },
           ],
         },
       ],
@@ -277,11 +276,14 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
     }))
     .filter((g) => g.items.length > 0);
 
-  const currentPersona = DEMO_PERSONAS.find((p) => p.email === user?.email) || {
-    name: user?.email ? user.email.split('@')[0] : 'Dr. Sarah Chen',
-    role: role || 'clinician',
-    title: activeRoleConfig?.label || 'Clinical Staff',
-    color: 'from-sky-500 to-indigo-600',
+  const matchedPersona =
+    DEMO_PERSONAS.find((p) => p.email?.toLowerCase() === (user?.email || '').toLowerCase()) ||
+    DEMO_PERSONAS.find((p) => p.role === currentRole);
+  const currentPersona = {
+    name: matchedPersona?.name || (user?.email ? user.email.split('@')[0] : 'Dr. Sarah Chen'),
+    role: currentRole || role || matchedPersona?.role || 'clinician',
+    title: `${(currentRole || role || matchedPersona?.role || 'user').replace(/_/g, ' ').toUpperCase()} · ${matchedPersona?.title || activeRoleConfig?.name || 'Clinical Staff'}`,
+    color: matchedPersona?.color || 'from-sky-500 to-indigo-600',
   };
 
   return (
@@ -329,7 +331,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         <div className="px-4 py-2 bg-slate-900/60 border-b border-slate-800/40 flex items-center justify-between text-[11px]">
           <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            HIPAA Compliant
+            {t('sidebar.hipaa_compliant', 'HIPAA Compliant')}
           </span>
           <span className="text-slate-500 font-mono text-[10px]">SOC-2 TYPE II</span>
         </div>
@@ -493,7 +495,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                 onClick={() => setShowPersonaModal(true)}
                 className="flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/20 hover:bg-sky-500/20 transition text-center"
               >
-                Switch Role ▾
+                {t('sidebar.switch_role', 'Switch Role ▾')}
               </button>
               <button
                 type="button"
@@ -541,9 +543,9 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
           >
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-base font-bold text-white">Switch Clinical Persona</h3>
+                <h3 className="text-base font-bold text-white">{t('sidebar.switch_persona_title', 'Switch Clinical Persona')}</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Select a persona to immediately preview role-specific clinical permissions.
+                  {t('sidebar.switch_persona_desc', 'Select a persona to immediately preview role-specific clinical permissions.')}
                 </p>
               </div>
               <button
@@ -601,7 +603,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                 onClick={() => setShowPersonaModal(false)}
                 className="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 transition"
               >
-                Cancel
+                {t('sidebar.cancel', 'Cancel')}
               </button>
             </div>
           </div>

@@ -51,6 +51,26 @@ router = APIRouter(
 )
 
 
+async def _require_provider_directory_access(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> AuthenticatedUser:
+    """Allow clinical, supervisor, coordinator, nurse, coder, and admin roles to query the provider directory."""
+    allowed_apps = {"coding", "member360", "providers", "portal"}
+    if not any(app in (current_user.app_permissions or {}) for app in allowed_apps):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User does not have access to the provider directory",
+        )
+    return current_user
+
+
+providers_router = APIRouter(
+    prefix="/api/coding",
+    tags=["coding"],
+    dependencies=[Depends(_require_provider_directory_access)],
+)
+
+
 def _member_to_summary(member, assignment: Optional[Dict[str, list]] = None) -> CodingMemberSummary:
     assignment = assignment or {}
     return CodingMemberSummary(
@@ -678,7 +698,7 @@ async def create_member_attachment(
     return _attachment_to_schema(attachment)
 
 
-@router.get("/providers", response_model=CodingProviderSearchResponse)
+@providers_router.get("/providers", response_model=CodingProviderSearchResponse)
 async def list_coding_providers(
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
@@ -704,7 +724,7 @@ async def list_coding_providers(
     return CodingProviderSearchResponse(items=items, total=total)
 
 
-@router.get("/providers/{provider_id}", response_model=CodingProviderDetail)
+@providers_router.get("/providers/{provider_id}", response_model=CodingProviderDetail)
 async def get_coding_provider(
     provider_id: int,
     tenant: TenantContext = Depends(get_tenant_context),

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useCommandPalette } from '../context/CommandPaletteContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { ROUTES } from '../constants/routes';
 import Icon from './ui/Icon';
 
@@ -84,7 +85,9 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
   } = useContext(AuthContext) || {};
 
   const { openPalette } = useCommandPalette();
-  const { favorites, toggleFavorite, isFavorite, isNavItemEnabled } = useUserPreferences();
+  const { favorites, toggleFavorite, isFavorite, isNavItemEnabled, t } = useUserPreferences();
+  const { currentRole, can } = usePermissions();
+  const effectiveRoleLabel = (currentRole || role || 'user').replace(/_/g, ' ');
 
   const [showWaffle,     setShowWaffle]     = useState(false);
   const [showNotif,      setShowNotif]      = useState(false);
@@ -193,7 +196,7 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
       {/* Bar */}
       <div
         ref={barRef}
-        className="relative z-40 border-b border-slate-800/80 bg-[#0a0f1d]/90 backdrop-blur-md"
+        className="relative z-40 border-b border-slate-200 bg-white/90 dark:border-slate-800/80 dark:bg-[#0a0f1d]/90 backdrop-blur-md"
       >
         <div className="flex w-full items-center justify-between gap-3 px-6 py-2.5">
 
@@ -206,7 +209,7 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
                 title={sidebarCollapsed ? 'Expand sidebar menu' : 'Collapse sidebar menu'}
                 onClick={onToggleSidebar}
               >
-                <svg className="h-4 w-4 fill-current text-slate-300" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 fill-current text-slate-600 dark:text-slate-300" viewBox="0 0 24 24">
                   <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
                 </svg>
               </button>
@@ -228,7 +231,7 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
                   className="absolute left-0 top-full z-50 mt-1.5 w-[min(90vw,560px)] rounded-xl p-3 shadow-dropdown coding-surface"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <DropdownHeader>Quick links</DropdownHeader>
+                  <DropdownHeader>{t('utility.quick_links', 'Quick links')}</DropdownHeader>
                   <div className="mt-1.5 grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2">
                     {accessibleApps.map((app) => (
                       <button
@@ -389,7 +392,7 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
             <div className="hidden md:flex items-center">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-xs font-semibold text-sky-700 dark:text-sky-300">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {(role || "User").replace(/_/g, " ").toUpperCase()}
+                {effectiveRoleLabel.toUpperCase()}
               </span>
             </div>
 
@@ -409,27 +412,29 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
                   <div className="px-3 py-2 border-b coding-divider">
                     <div className="text-xs font-bold coding-text-strong">{user?.email}</div>
                     <div className="text-[11px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">
-                      Role: {(role || "User").replace(/_/g, " ")}
+                      {t('utility.role', 'Role')}: {effectiveRoleLabel}
                     </div>
                   </div>
-                  <DropdownItem onClick={() => { closeAll(); navigate(`${ROUTES.SETTINGS}#privileges`); }}>
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-sm font-medium">Roles &amp; Privileges</span>
-                      <span className="rounded bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 px-1.5 py-0.2 text-[10px] font-bold uppercase">
-                        Config
-                      </span>
-                    </div>
-                  </DropdownItem>
-                  <DropdownItem onClick={() => { closeAll(); navigate(ROUTES.SETTINGS); }}>
-                    <span className="text-sm font-medium">Profile &amp; preferences</span>
+                  {can('menu:role_privileges') && (
+                    <DropdownItem onClick={() => { closeAll(); navigate(`${ROUTES.SETTINGS}#privileges`); }}>
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-sm font-medium">{t('utility.roles_privileges', 'Roles & Privileges')}</span>
+                        <span className="rounded bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 px-1.5 py-0.2 text-[10px] font-bold uppercase">
+                          Config
+                        </span>
+                      </div>
+                    </DropdownItem>
+                  )}
+                  <DropdownItem onClick={() => { closeAll(); navigate(`${ROUTES.SETTINGS}#general`); }}>
+                    <span className="text-sm font-medium">{t('utility.profile_preferences', 'Profile & preferences')}</span>
                   </DropdownItem>
                   <DropdownItem onClick={() => { closeAll(); handleCommandPalette(); }}>
-                    <span className="flex-1 text-sm font-medium">Open command palette</span>
+                    <span className="flex-1 text-sm font-medium">{t('utility.open_command_palette', 'Open command palette')}</span>
                     <span className="text-xs coding-text-muted">⌘K</span>
                   </DropdownItem>
                   <div className="my-1 border-t coding-divider" />
                   <DropdownItem onClick={() => { closeAll(); logout?.(); navigate('/login'); }}>
-                    <span className="text-sm font-medium text-red-600 dark:text-red-400">Log out</span>
+                    <span className="text-sm font-medium text-red-600 dark:text-red-400">{t('utility.log_out', 'Log out')}</span>
                   </DropdownItem>
                 </DropdownShell>
               )}

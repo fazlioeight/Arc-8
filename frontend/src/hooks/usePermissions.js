@@ -2,6 +2,8 @@ import { useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { AuthContext } from "../context/AuthContext";
 import {
   ROLES,
+  ROLE_DEFINITIONS,
+  DEMO_PERSONAS,
   getPersistedRolePermissions,
   savePersistedRolePermissions,
   DEFAULT_ROLE_PERMISSIONS,
@@ -9,7 +11,7 @@ import {
 
 export const usePermissions = () => {
   const auth = useContext(AuthContext) || {};
-  const { user, role: authRole, startImpersonation, endImpersonation } = auth;
+  const { user, role: authRole, isImpersonating, startImpersonation } = auth;
 
   const [matrix, setMatrix] = useState(() => getPersistedRolePermissions());
 
@@ -22,17 +24,40 @@ export const usePermissions = () => {
   }, []);
 
   const currentRole = useMemo(() => {
+    const emailLower = (user?.email || "").toLowerCase();
+    if (!isImpersonating && emailLower) {
+      const matchedPersona = DEMO_PERSONAS.find(
+        (p) => p.email.toLowerCase() === emailLower
+      );
+      if (matchedPersona?.role) {
+        return matchedPersona.role;
+      }
+    }
     const r = (user?.role || authRole || "user").toLowerCase();
-    // Normalize aliases
+    // Normalize aliases without conflating distinct roles
     if (r === "platform_admin") return ROLES.PLATFORM_ADMIN;
     if (r === "admin") return ROLES.ADMIN;
+    if (r === "business_admin") return ROLES.BUSINESS_ADMIN;
+    if (r === "supervisor") return ROLES.SUPERVISOR;
+    if (r === "coordinator") return ROLES.COORDINATOR;
+    if (r === "compliance_auditor" || r === "auditor") return ROLES.COMPLIANCE_AUDITOR;
     if (r === "clinician" || r === "doctor" || r === "physician") return ROLES.CLINICIAN;
-    if (r === "nurse" || r === "coordinator") return ROLES.NURSE;
+    if (r === "nurse") return ROLES.NURSE;
     if (r === "coder" || r === "analyst") return ROLES.CODER;
     if (r === "billing" || r === "finance") return ROLES.BILLING;
     if (r === "patient" || r === "member" || r === "user") return ROLES.PATIENT;
     return r;
-  }, [user?.role, authRole]);
+  }, [user?.email, user?.role, authRole, isImpersonating]);
+
+  const activeRoleConfig = useMemo(() => {
+    return (
+      ROLE_DEFINITIONS.find((r) => r.key === currentRole) || {
+        key: currentRole,
+        name: (currentRole || "User").replace(/_/g, " "),
+        label: (currentRole || "User").replace(/_/g, " "),
+      }
+    );
+  }, [currentRole]);
 
   const activePermissions = useMemo(() => {
     const rolePerms = matrix[currentRole] || DEFAULT_ROLE_PERMISSIONS[currentRole] || [];
@@ -94,6 +119,10 @@ export const usePermissions = () => {
       const personaEmailMap = {
         [ROLES.PLATFORM_ADMIN]: "admin@admin.com",
         [ROLES.ADMIN]: "admin@admin.com",
+        [ROLES.BUSINESS_ADMIN]: "business.admin@prominencehealth.com",
+        [ROLES.SUPERVISOR]: "supervisor@prominencehealth.com",
+        [ROLES.COORDINATOR]: "coordinator@prominencehealth.com",
+        [ROLES.COMPLIANCE_AUDITOR]: "compliance.auditor@prominencehealth.com",
         [ROLES.CLINICIAN]: "dr.chen@prominencehealth.com",
         [ROLES.NURSE]: "elena.nurse@prominencehealth.com",
         [ROLES.CODER]: "marcus.coder@prominencehealth.com",
@@ -101,9 +130,14 @@ export const usePermissions = () => {
         [ROLES.PATIENT]: "james.member@prominencehealth.com",
       };
       const email = personaEmailMap[newRole] || "admin@admin.com";
-      const apiBase = process.env.REACT_APP_API_BASE
-        ? process.env.REACT_APP_API_BASE.replace(/\/$/, "")
-        : (typeof window !== "undefined" && window.location.port === "3000" ? "http://localhost:8989" : "");
+      const apiBase = (() => {
+        if (typeof window !== "undefined" && window.location) {
+          if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+            return `${window.location.protocol}//${window.location.hostname}:8989`;
+          }
+        }
+        return (process.env.REACT_APP_API_BASE || "http://localhost:8989").replace(/\/$/, "");
+      })();
       const tenantKey = auth?.tenant || "prominencehealth";
 
       try {
@@ -143,6 +177,7 @@ export const usePermissions = () => {
 
   return {
     currentRole,
+    activeRoleConfig,
     isAdmin,
     isPlatformAdmin,
     permissions: activePermissions,

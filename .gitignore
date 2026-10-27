@@ -29,3 +29,8 @@ Thumbs.db
 .idea/
 *.log
 install_mingit.ps1
+
+# Tester credentials (never commit)
+docs/private/
+scratch/
+*.db-journal

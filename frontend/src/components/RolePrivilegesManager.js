@@ -18,7 +18,10 @@ const RolePrivilegesManager = () => {
     resetPermissions,
     switchRole,
     isAdmin,
+    can,
   } = usePermissions();
+
+  const canManagePrivileges = isAdmin || can("menu:role_privileges");
 
   const { token, tenant } = useContext(AuthContext) || {};
 
@@ -320,6 +323,19 @@ const RolePrivilegesManager = () => {
     }
   };
 
+  if (!canManagePrivileges) {
+    return (
+      <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-center space-y-2">
+        <h3 className="text-base font-bold text-rose-600 dark:text-rose-300">
+          Access Restricted — Administrative Authority Required
+        </h3>
+        <p className="text-xs text-slate-600 dark:text-slate-300">
+          Your active role ({(currentRole || "user").replace(/_/g, " ").toUpperCase()}) is not authorized to view or modify organization-wide Role &amp; Privileges configurations.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header & Quick stats */}
@@ -460,9 +476,9 @@ const RolePrivilegesManager = () => {
           </div>
 
           {/* User Roster Table */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="overflow-x-auto overflow-y-auto max-h-[65vh] rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-sm">
-              <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+              <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800/95 text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider backdrop-blur-xs">
                 <tr>
                   <th className="px-4 py-3.5 text-left">Staff / Member Name</th>
                   <th className="px-4 py-3.5 text-left">Email Address</th>

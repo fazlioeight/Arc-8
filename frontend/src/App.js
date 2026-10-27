@@ -285,7 +285,8 @@ function App() {
     const mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
     const applyTheme = (pref) => {
-      const useDark = pref !== 'light';
+      const systemDark = mql ? mql.matches : true;
+      const useDark = pref === 'dark' || (pref === 'system' && systemDark);
       const resolvedTheme = useDark ? 'dark' : 'light';
 
       root.classList.toggle('dark-mode', useDark);
@@ -296,6 +297,7 @@ function App() {
       if (document.body) {
         document.body.classList.toggle('dark-mode', useDark);
         document.body.classList.toggle('light-mode', !useDark);
+        document.body.classList.toggle('dark', useDark);
         document.body.dataset.theme = resolvedTheme;
       }
     };

@@ -4,9 +4,15 @@ import { AuthContext } from "../../context/AuthContext";
 import { ROUTES } from "../../constants/routes";
 import { DEMO_PERSONAS } from "../../constants/permissions";
 
-const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:8000";
+const API_BASE = (() => {
+  if (typeof window !== "undefined" && window.location) {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return `${window.location.protocol}//${window.location.hostname}:8989`;
+    }
+  }
+  return process.env.REACT_APP_API_BASE || "http://localhost:8989";
+})();
 const DEFAULT_TENANT = process.env.REACT_APP_DEFAULT_TENANT || "prominencehealth";
-const AZURE_AUTH_STORAGE_KEY = "nexoraAzureLoginRequest";
 
 const inputCls =
   "w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-600/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder-slate-500 dark:focus:border-sky-400";
@@ -28,40 +34,6 @@ const Field = ({ id, label, type = "text", value, onChange, placeholder, require
   </div>
 );
 
-const base64UrlEncode = (buffer) => {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return window.btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
-
-const randomToken = (length = 48) => {
-  const bytes = new Uint8Array(length);
-  window.crypto.getRandomValues(bytes);
-  return base64UrlEncode(bytes);
-};
-
-const createCodeChallenge = async (codeVerifier) => {
-  const digest = await window.crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(codeVerifier)
-  );
-  return base64UrlEncode(digest);
-};
-
-const getRedirectUri = () =>
-  process.env.REACT_APP_AZURE_REDIRECT_URI || `${window.location.origin}/login`;
-
-const envAzureConfig = {
-  enabled: Boolean(process.env.REACT_APP_AZURE_CLIENT_ID && process.env.REACT_APP_AZURE_TENANT_ID),
-  client_id: process.env.REACT_APP_AZURE_CLIENT_ID,
-  tenant_id: process.env.REACT_APP_AZURE_TENANT_ID,
-  authority_host: process.env.REACT_APP_AZURE_AUTHORITY_HOST || "https://login.microsoftonline.com",
-  scopes: process.env.REACT_APP_AZURE_AUTH_SCOPES || "openid profile email",
-};
-
 const Login = () => {
   const [formData, setFormData] = useState({
     email: "admin@admin.com",
@@ -74,137 +46,116 @@ const Login = () => {
   const [submitting, setSubmitting] = useState(false);
   const [activePersonaEmail, setActivePersonaEmail] = useState("");
   const [loadingConfig, setLoadingConfig] = useState(true);
-  const [azureConfig, setAzureConfig] = useState(envAzureConfig);
-
-  const azureReady = useMemo(
-    () => Boolean(azureConfig.enabled && azureConfig.client_id && azureConfig.tenant_id),
-    [azureConfig]
-  );
+  const [oidcConfig, setOidcConfig] = useState(null);
+  const [selectedIdpGroup, setSelectedIdpGroup] = useState("Prominence_Care_Coordinators");
 
   const handleChange = (e) =>
     setFormData((prev) => ({ ...prev, [e.target.id]: e.target.value }));
 
   useEffect(() => {
     let mounted = true;
-    fetch(`${API_BASE}/api/auth/azure/config`)
+    fetch(`${API_BASE}/api/auth/oidc/config`)
       .then((res) => (res.ok ? res.json() : null))
-      .then((config) => {
-        if (!mounted || !config) return;
-        if (config.enabled && config.client_id && config.tenant_id) {
-          setAzureConfig({
-            ...envAzureConfig,
-            ...config,
-          });
-        }
+      .then((cfg) => {
+        if (mounted && cfg) setOidcConfig(cfg);
       })
       .catch(() => undefined)
       .finally(() => {
         if (mounted) setLoadingConfig(false);
       });
+
     return () => {
       mounted = false;
     };
   }, []);
 
-  const completeAzureLogin = useCallback(async (code, state) => {
+  const completeOidcLogin = useCallback(async (code, state) => {
     setSubmitting(true);
     setError("");
     try {
-      const rawPending = window.sessionStorage.getItem(AZURE_AUTH_STORAGE_KEY);
-      const pending = rawPending ? JSON.parse(rawPending) : null;
-      if (!pending || pending.state !== state) {
-        throw new Error("Azure login state could not be verified.");
-      }
-
-      const res = await fetch(`${API_BASE}/api/auth/azure/exchange`, {
+      const res = await fetch(`${API_BASE}/api/auth/oidc/exchange`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Tenant-Key": pending.tenant || DEFAULT_TENANT,
+          "X-Tenant-Key": formData.tenant.trim() || DEFAULT_TENANT,
         },
         body: JSON.stringify({
           code,
           state,
-          code_verifier: pending.codeVerifier,
-          redirect_uri: pending.redirectUri,
+          redirect_uri: `${window.location.origin}/login`,
+          tenant: formData.tenant.trim() || DEFAULT_TENANT,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Azure sign-in failed.");
+      if (!res.ok) throw new Error(data.detail || "OIDC sign-in failed.");
 
-      window.sessionStorage.removeItem(AZURE_AUTH_STORAGE_KEY);
       window.history.replaceState({}, document.title, "/login");
       login(data);
       navigate(ROUTES.PORTAL.LANDING);
     } catch (err) {
-      setError(err.message || "Azure login failed.");
+      setError(err.message || "OIDC authentication failed.");
     } finally {
       setSubmitting(false);
     }
-  }, [login, navigate]);
+  }, [formData.tenant, login, navigate]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
-    const azureError = params.get("error_description") || params.get("error");
+    const authError = params.get("error_description") || params.get("error");
 
-    if (azureError) {
-      setError(azureError);
+    if (authError) {
+      setError(authError);
       window.history.replaceState({}, document.title, "/login");
       return;
     }
-    if (code && state) {
-      completeAzureLogin(code, state);
+    if (code) {
+      completeOidcLogin(code, state);
     }
-  }, [completeAzureLogin]);
+  }, [completeOidcLogin]);
 
-  const handleAzureLogin = async () => {
+  const handleOidcLogin = async (groupToTest) => {
     setError("");
-    if (!azureReady) {
-      setError("Azure login is not configured yet.");
-      return;
-    }
-    if (!window.crypto?.subtle || !window.crypto?.getRandomValues) {
-      setError("This browser does not support secure Azure login.");
-      return;
-    }
-
     setSubmitting(true);
+    const targetGroup = groupToTest || selectedIdpGroup;
+
     try {
-      const tenant = formData.tenant.trim() || DEFAULT_TENANT;
-      const state = randomToken(32);
-      const nonce = randomToken(32);
-      const codeVerifier = randomToken(64);
-      const codeChallenge = await createCodeChallenge(codeVerifier);
-      const redirectUri = getRedirectUri();
+      // Map group to simulated test code for development/local environment
+      const groupCodeMap = {
+        "Prominence_Care_Coordinators": "mock_coordinator",
+        "Prominence_Clinical_Supervisors": "mock_supervisor",
+        "Prominence_Business_Admins": "mock_business_admin",
+        "Prominence_Compliance_Auditors": "mock_compliance_auditor",
+        "External_Contractors_Unmapped": "mock_unauthorized",
+      };
+      const code = groupCodeMap[targetGroup] || "mock_unauthorized";
 
-      window.sessionStorage.setItem(
-        AZURE_AUTH_STORAGE_KEY,
-        JSON.stringify({ state, nonce, codeVerifier, redirectUri, tenant })
-      );
+      const res = await fetch(`${API_BASE}/api/auth/oidc/exchange`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Tenant-Key": formData.tenant.trim() || DEFAULT_TENANT,
+        },
+        body: JSON.stringify({
+          code,
+          redirect_uri: window.location.origin + "/login",
+          tenant: formData.tenant.trim() || DEFAULT_TENANT,
+        }),
+      });
 
-      const authorizeUrl = new URL(
-        `${azureConfig.authority_host.replace(/\/$/, "")}/${azureConfig.tenant_id}/oauth2/v2.0/authorize`
-      );
-      authorizeUrl.search = new URLSearchParams({
-        client_id: azureConfig.client_id,
-        response_type: "code",
-        redirect_uri: redirectUri,
-        response_mode: "query",
-        scope: azureConfig.scopes || "openid profile email",
-        state,
-        nonce,
-        code_challenge: codeChallenge,
-        code_challenge_method: "S256",
-        prompt: "select_account",
-      }).toString();
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "OIDC sign-in failed.");
+      }
 
-      window.location.assign(authorizeUrl.toString());
+      login(data);
+      navigate(ROUTES.PORTAL.LANDING);
     } catch (err) {
+      setError(err.message || "OIDC authentication failed.");
+    } finally {
       setSubmitting(false);
-      setError(err.message || "Azure login could not be started.");
     }
   };
 
@@ -351,16 +302,83 @@ const Login = () => {
               {error && (
                 <div
                   role="alert"
-                  className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-xs text-rose-300 flex items-center gap-2"
+                  className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-xs text-rose-300 flex items-start gap-2.5"
                 >
-                  <svg className="h-4 w-4 shrink-0 text-rose-400" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
-                  <span>{error}</span>
+                  <div>
+                    <span className="font-bold">Authentication & Authorization Alert:</span>
+                    <p className="mt-0.5">{error}</p>
+                  </div>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="mt-5 space-y-3.5">
+              {/* Enterprise SSO (OIDC / Cognito) Card */}
+              <div className="mt-5 rounded-2xl border border-sky-800/60 bg-sky-950/30 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-600/30 text-sky-400 font-bold text-xs">
+                      SSO
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-bold text-white">Enterprise OIDC / Cognito Sign-In</h4>
+                      <p className="text-[11px] text-slate-400">IdP Group-to-Role Mapping & Deny-by-Default</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
+                    OIDC Active
+                  </span>
+                </div>
+
+                <div className="mt-3.5 space-y-2">
+                  <label className="block text-[11px] font-semibold uppercase text-slate-300">
+                    Simulate IdP User Group (Cognito / Okta / Entra):
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedIdpGroup}
+                      onChange={(e) => setSelectedIdpGroup(e.target.value)}
+                      className="flex-1 rounded-xl border border-slate-700 bg-slate-800/90 px-3 py-2 text-xs text-white outline-none focus:border-sky-500"
+                    >
+                      <option value="Prominence_Care_Coordinators">
+                        Prominence_Care_Coordinators → Coordinator
+                      </option>
+                      <option value="Prominence_Clinical_Supervisors">
+                        Prominence_Clinical_Supervisors → Supervisor
+                      </option>
+                      <option value="Prominence_Business_Admins">
+                        Prominence_Business_Admins → Business Admin
+                      </option>
+                      <option value="Prominence_Compliance_Auditors">
+                        Prominence_Compliance_Auditors → Compliance Auditor
+                      </option>
+                      <option value="External_Contractors_Unmapped">
+                        External_Contractors_Unmapped (Deny-by-Default 403 Test)
+                      </option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOidcLogin(selectedIdpGroup)}
+                      disabled={submitting}
+                      className="rounded-xl bg-sky-600 hover:bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-md transition disabled:opacity-50"
+                    >
+                      Sign In with OIDC
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="my-5 flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-800" />
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                  Or Sign In with Local Credentials
+                </span>
+                <div className="h-px flex-1 bg-slate-800" />
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-3.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field
                     id="tenant"

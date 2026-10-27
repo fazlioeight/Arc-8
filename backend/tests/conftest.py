@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import os
 import sys
 from datetime import date
@@ -38,8 +38,13 @@ from app.models.ride_booking import RidePartner, RidePartnerSchedule
 
 from cryptography.fernet import Fernet as _Fernet
 
-TEST_CONTROL_DB = "sqlite+aiosqlite:///./tests/test_control.db"
-TEST_TENANT_DB_TEMPLATE = "sqlite+aiosqlite:///./tests/tenants/{tenant_key}.db"
+TEST_DB_DIR = os.environ.get("TEST_DB_DIR")
+if TEST_DB_DIR:
+    TEST_CONTROL_DB = f"sqlite+aiosqlite:///{TEST_DB_DIR}/test_control.db"
+    TEST_TENANT_DB_TEMPLATE = f"sqlite+aiosqlite:///{TEST_DB_DIR}/tenants/{{tenant_key}}.db"
+else:
+    TEST_CONTROL_DB = "sqlite+aiosqlite:///./tests/test_control.db"
+    TEST_TENANT_DB_TEMPLATE = "sqlite+aiosqlite:///./tests/tenants/{tenant_key}.db"
 TEST_SECRET = "super-secret-for-tests"
 TEST_TENANT_KEY = "prominencehealth"
 TEST_FIELD_KEY = _Fernet.generate_key().decode("utf-8")
@@ -88,6 +93,8 @@ config_module.settings.FIELD_ENCRYPTION_KEY = TEST_FIELD_KEY
 config_module.settings.RATE_LIMIT_ENABLED = False
 
 def _tests_dir() -> Path:
+    if TEST_DB_DIR:
+        return Path(TEST_DB_DIR)
     return Path(BACKEND_ROOT) / "tests"
 
 

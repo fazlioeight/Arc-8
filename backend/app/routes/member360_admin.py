@@ -35,6 +35,7 @@ from ..schemas.member360_admin import (
 from ..services import member360_admin as admin_service
 from ..services import member360 as member360_service
 from ..utils.audit_logger import record_audit_event
+from ..utils.rbac import Role, require_role
 from ..utils.security import AuthenticatedUser, require_admin
 
 router = APIRouter(prefix="/api/member360/admin", tags=["member360-admin"])
@@ -451,7 +452,15 @@ async def list_audit_events(
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_control_session),
-    current_user: AuthenticatedUser = Depends(require_admin),
+    current_user: AuthenticatedUser = Depends(
+        require_role(
+            Role.COMPLIANCE_AUDITOR,
+            Role.SUPERVISOR,
+            Role.BUSINESS_ADMIN,
+            Role.ADMIN,
+            Role.PLATFORM_ADMIN,
+        )
+    ),
 ):
     rows, total = await admin_service.list_audit_events(
         session,

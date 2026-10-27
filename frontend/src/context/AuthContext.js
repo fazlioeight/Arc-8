@@ -291,11 +291,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const resolveApiBase = () => {
+    if (typeof window !== 'undefined' && window.location) {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `${window.location.protocol}//${window.location.hostname}:8989`;
+      }
+    }
     if (process.env.REACT_APP_API_BASE) {
       return process.env.REACT_APP_API_BASE.replace(/\/$/, '');
-    }
-    if (typeof window !== 'undefined' && window.location.port === '3000') {
-      return 'http://localhost:8989';
     }
     return '';
   };

@@ -8,14 +8,13 @@
 // at module load instead so the misconfiguration is obvious in the browser
 // console rather than buried as a per-request failure.
 const API_BASE = (() => {
+  if (typeof window !== "undefined" && window.location) {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return `${window.location.protocol}//${window.location.hostname}:8989`;
+    }
+  }
   if (process.env.REACT_APP_API_BASE) return process.env.REACT_APP_API_BASE;
-  if (process.env.NODE_ENV !== 'production') return 'http://localhost:8000';
-  // eslint-disable-next-line no-console
-  console.error(
-    'REACT_APP_API_BASE is not set on this production build. Member360 API ' +
-    'calls will fail. Set REACT_APP_API_BASE in the build environment.'
-  );
-  return '';
+  return "http://localhost:8989";
 })();
 
 const buildHeaders = (token, tenant) => ({

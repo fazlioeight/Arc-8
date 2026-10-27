@@ -1465,7 +1465,7 @@ const ChatPage = () => {
           </SidebarSection>
 
           <div className="mt-auto border-t coding-border-subtle pt-3 text-[10px] leading-snug coding-text-muted">
-            Nexora AI · Azure-hosted<br />
+            Arc-8 Clinical AI · HIPAA Compliant<br />
             Claude-powered
           </div>
         </aside>

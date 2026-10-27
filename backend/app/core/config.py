@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import secrets
@@ -117,10 +117,14 @@ class Settings(BaseSettings):
     MEMBER360_STORAGE_ROOT: str = "data/member360"
     MEMBER360_STORAGE_MAX_UPLOAD_MB: int = 25
 
-    # Azure Blob backend. Auth is via DefaultAzureCredential (managed
-    # identity in prod; az login / VS Code / env vars for dev) — no
-    # connection string or account key needed. Account name is provided
-    # per deployment (e.g. ``nexorachatstor53684``).
+    # AWS S3 Document Storage (Target AWS Architecture)
+    AWS_REGION: str = "us-east-1"
+    AWS_S3_BUCKET: Optional[str] = None
+    AWS_S3_PREFIX: str = "m360/"
+    AWS_S3_KMS_KEY_ID: Optional[str] = None
+    AWS_S3_ENDPOINT_URL: Optional[str] = None  # For LocalStack or custom endpoints
+
+    # Azure Blob backend (legacy/optional). Auth is via DefaultAzureCredential.
     AZURE_STORAGE_ACCOUNT_NAME: Optional[str] = None
     AZURE_STORAGE_CONTAINER_PREFIX: str = "m360-"
 
@@ -207,6 +211,37 @@ class Settings(BaseSettings):
     AZURE_CLIENT_SECRET: Optional[str] = None
     AZURE_AUTHORITY_HOST: str = "https://login.microsoftonline.com"
     AZURE_AUTH_SCOPES: str = "openid profile email"
+
+    # ── OIDC / SSO Configuration (AWS Cognito / Standard OIDC) ──────────────
+    OIDC_AUTH_ENABLED: bool = True
+    OIDC_ISSUER_URL: Optional[str] = None  # e.g. "https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}"
+    OIDC_CLIENT_ID: Optional[str] = None
+    OIDC_CLIENT_SECRET: Optional[str] = None
+    OIDC_JWKS_URL: Optional[str] = None
+    OIDC_ALGORITHMS: List[str] = ["RS256"]
+    OIDC_AUDIENCE: Optional[str] = None
+    OIDC_GROUPS_CLAIM: str = "cognito:groups"
+    OIDC_SCOPES: str = "openid profile email"
+
+    # Canonical IdP group to role mapping for deny-by-default access control
+    IDP_GROUP_ROLE_MAPPING: Dict[str, str] = {
+        "Prominence_Care_Coordinators": "coordinator",
+        "Prominence_Clinical_Supervisors": "supervisor",
+        "Prominence_Business_Admins": "business_admin",
+        "Prominence_Compliance_Auditors": "compliance_auditor",
+        "Prominence_Administrators": "admin",
+        "Care_Coordinators": "coordinator",
+        "Clinical_Supervisors": "supervisor",
+        "Business_Admins": "business_admin",
+        "Compliance_Auditors": "compliance_auditor",
+        "Administrators": "admin",
+        "coordinators": "coordinator",
+        "supervisors": "supervisor",
+        "business_admins": "business_admin",
+        "compliance_auditors": "compliance_auditor",
+        "administrators": "admin",
+        "admin": "admin",
+    }
 
     # Allowed values for Tenant.data_residency. HIPAA BAAs and EU sovereignty
     # requirements forbid moving PHI across geographies, so this is the

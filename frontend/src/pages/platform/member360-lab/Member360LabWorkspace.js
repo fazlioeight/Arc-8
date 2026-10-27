@@ -84,7 +84,7 @@ const Member360LabWorkspace = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
 
-  const { token, tenant } = useContext(AuthContext) || {};
+  const { token, tenant, role } = useContext(AuthContext) || {};
   const { can } = usePermissions();
   const [detail, setDetail] = useState(null);
   const [gap, setGap] = useState(null);
@@ -99,6 +99,18 @@ const Member360LabWorkspace = () => {
   const [submissionResult, setSubmissionResult] = useState(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [journeyTemplates, setJourneyTemplates] = useState([]);
+
+  const isComplianceAuditor = role === 'compliance_auditor';
+  const isBusinessAdmin = role === 'business_admin';
+
+  // Role-based action authority (deny mutations for Compliance Auditor; deny clinical notes for Business Admin)
+  const availableActions = useMemo(() => {
+    if (isComplianceAuditor) return [];
+    if (isBusinessAdmin) {
+      return PRIMARY_ACTIONS.filter((a) => a.key === 'escalate' || a.key === 'create_task');
+    }
+    return PRIMARY_ACTIONS;
+  }, [isComplianceAuditor, isBusinessAdmin]);
 
   // Filter tabs dynamically based on user role privileges authority
   const visibleTabs = useMemo(() => {
@@ -650,11 +662,25 @@ const Member360LabWorkspace = () => {
       mainClassName="space-y-4"
       hideHeader
     >
+      {isComplianceAuditor && (
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-200"
+        >
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 font-bold">
+            !
+          </span>
+          <div>
+            <strong>Compliance Auditor View:</strong> Read-only HIPAA audit & compliance mode enabled. Clinical data creation, note authoring, and status mutations are restricted.
+          </div>
+        </div>
+      )}
+
       <RecordHeader
         member={member}
         gapCount={missingHccCount}
         onAction={(key) => handleAction(key)}
-        actions={PRIMARY_ACTIONS}
+        actions={availableActions}
         onBack={() => navigate(ROUTES.MEMBER360_LAB.MEMBERS)}
         onDashboard={() => navigate(ROUTES.MEMBER360_LAB.DASHBOARD)}
         pcpHref={pcpHref}
