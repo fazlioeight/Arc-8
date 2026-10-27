@@ -110,7 +110,7 @@ export const usePortalOverview = ({
   availableApplications = [],
   purchasedApplications = [],
   appCatalog = [],
-  apiBaseUrl = process.env.REACT_APP_API_BASE || process.env.REACT_APP_API_URL || "http://localhost:8000",
+  apiBaseUrl = (typeof window !== 'undefined' && window.location && (window.location.port === '7777' || window.location.port === '7778' || window.location.port === '3000' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ? (window.location.protocol + '//' + window.location.hostname + ':8989') : (process.env.REACT_APP_API_BASE || process.env.REACT_APP_API_URL || 'http://localhost:8989'),
   token,
   tenant,
   fallbackBuilder = buildFallbackOverview,

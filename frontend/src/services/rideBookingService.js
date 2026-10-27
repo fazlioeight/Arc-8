@@ -1,7 +1,7 @@
 // Ride Booking API client. Mirrors the codingService convention: stateless
 // named functions that take (token, tenant, ...) and hit /api/ride-booking/*.
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+const API_BASE = (typeof window !== 'undefined' && window.location && (window.location.port === '7777' || window.location.port === '7778' || window.location.port === '3000' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ? (window.location.protocol + '//' + window.location.hostname + ':8989') : (process.env.REACT_APP_API_BASE || 'http://localhost:8989');
 
 const buildHeaders = (token, tenant) => ({
   'Content-Type': 'application/json',

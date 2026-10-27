@@ -6,7 +6,7 @@ import {
 
 const API_BASE = (() => {
   if (typeof window !== 'undefined' && window.location) {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '7777' || window.location.port === '7778' || window.location.port === '3000') {
       return `${window.location.protocol}//${window.location.hostname}:8989`;
     }
   }
