@@ -1,5 +1,5 @@
 // Public marketing contact form. Posts to the tenant-exempt /api/contact
-// endpoint, which emails the submission to the Nexora contact inbox. No auth
+// endpoint, which emails the submission to the Arc-8 contact inbox. No auth
 // or tenant header — visitors here are unauthenticated.
 
 const API_BASE = (typeof window !== 'undefined' && window.location && (window.location.port === '7777' || window.location.port === '7778' || window.location.port === '3000' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ? (window.location.protocol + '//' + window.location.hostname + ':8989') : (process.env.REACT_APP_API_BASE || 'http://localhost:8989');

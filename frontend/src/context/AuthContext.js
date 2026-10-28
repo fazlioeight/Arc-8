@@ -745,7 +745,7 @@ export const AuthProvider = ({ children }) => {
     touchSession,
     unlockSession,
     clearMustChangePassword,
-    // Nexora platform-staff surface
+    // Arc-8 platform-staff surface
     staffSession,
     isStaffAuthenticated: Boolean(staffSession?.token),
     isStaffActor: Boolean(staffSession?.token && authState?.staffActor),

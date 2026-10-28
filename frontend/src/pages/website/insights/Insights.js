@@ -39,7 +39,7 @@ const Insights = () => {
     </div>
 
     <footer className="bg-dark text-white text-center py-3 mt-5">
-      <p>&copy; 2025 Nexora Lab. All rights reserved. | <a href="#" className="text-white">Privacy Policy</a> | <a href="#" className="text-white">Terms of Service</a></p>
+      <p>&copy; 2025 Arc-8. All rights reserved. | <a href="#" className="text-white">Privacy Policy</a> | <a href="#" className="text-white">Terms of Service</a></p>
     </footer>
   </div>
   );

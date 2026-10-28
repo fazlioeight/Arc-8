@@ -118,7 +118,7 @@ const renderWorkspaceAt = (memberId) => {
   const auth = {
     token: "sample-token",
     tenant: "sample-tenant",
-    user: { email: "test@nexoralab.test", role: "admin" },
+    user: { email: "test@arc8.test", role: "admin" },
     hasApplicationAccess: () => true,
     availableApplications: ["portal", "member360"],
     purchasedApplications: ["portal", "member360"],

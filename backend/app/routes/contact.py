@@ -21,7 +21,7 @@ async def submit_contact(
     # protection (no authentication, so this is the only gate).
     _rl: None = Depends(auth_rate_limit),
 ) -> ContactResponse:
-    subject = f"[Nexora contact] {payload.subject or 'New inquiry'}"
+    subject = f"[Arc-8 contact] {payload.subject or 'New inquiry'}"
     body = (
         f"Name: {payload.name}\n"
         f"Email: {payload.email}\n"

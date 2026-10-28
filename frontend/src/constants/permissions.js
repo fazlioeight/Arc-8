@@ -263,7 +263,7 @@ export const PERMISSION_CATEGORIES = [
       },
       {
         key: "menu:ai_chat",
-        label: "Nexora Clinical AI Chat",
+        label: "Arc-8 Clinical AI Chat",
         description: "Interactive AI copilot for clinical guidelines, drug interactions, and member summaries.",
       },
     ],
@@ -474,7 +474,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
   ],
 };
 
-const STORAGE_KEY = "nexora_role_permissions_matrix_v3";
+const STORAGE_KEY = "arc8_role_permissions_matrix_v3";
 
 export const getPersistedRolePermissions = () => {
   if (typeof window === "undefined") return DEFAULT_ROLE_PERMISSIONS;

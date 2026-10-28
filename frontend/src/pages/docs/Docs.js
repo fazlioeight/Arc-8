@@ -65,7 +65,7 @@ const Docs = () => {
         <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="flex flex-col gap-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] coding-text-muted">Docs</p>
-            <h1 className="text-3xl font-semibold coding-text-strong">Nexora Lab documentation</h1>
+            <h1 className="text-3xl font-semibold coding-text-strong">Arc-8 documentation</h1>
             <p className="text-sm coding-text-soft max-w-2xl">
               Search knowledge articles and implementation guides.
             </p>

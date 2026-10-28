@@ -1,6 +1,6 @@
 # Architecture Assessment & Codebase Walkthrough Memo
 
-**Project:** Arc-8 / Nexora Platform (Prominence Health)  
+**Project:** Arc-8 Platform (Prominence Health)  
 **Deliverable:** [Week 1] Repo Walkthrough & Architecture Assessment Memo (Jira Task #104)  
 **Author:** Syed Sana Fazli (Architecture Lead)  
 **Date:** October 2026  
@@ -10,7 +10,7 @@
 
 ## 1. Executive Summary
 
-This assessment evaluates the inherited "pseudo-MVP" codebase for **Arc-8 / Nexora Platform**. The platform is intended to serve as a multi-tenant, HIPAA-ready healthcare analytics, risk adjustment, and member intelligence platform for payers, ACOs, and MSOs.
+This assessment evaluates the inherited "pseudo-MVP" codebase for **Arc-8 /  Platform**. The platform is intended to serve as a multi-tenant, HIPAA-ready healthcare analytics, risk adjustment, and member intelligence platform for payers, ACOs, and MSOs.
 
 The codebase represents a functional prototype with substantial business logic already codified in **FastAPI** (backend) and **React** (frontend). However, it exhibits characteristic "prototype debt":
 - Dual frontend apps (`frontend` and `frontend-member`) built with JavaScript and CRA/CRACO rather than typed, performant enterprise tooling.

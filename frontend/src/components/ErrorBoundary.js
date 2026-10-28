@@ -1,6 +1,6 @@
 import React from 'react';
 
-const RELOAD_FLAG_KEY = 'nexora.errorBoundary.reloadedForChunk';
+const RELOAD_FLAG_KEY = 'arc8.errorBoundary.reloadedForChunk';
 
 const isChunkLoadError = (error) => {
   if (!error) return false;

@@ -88,7 +88,7 @@ const SUGGESTED_PROMPTS = [
   {
     title: 'Investor roadmap',
     summary: 'Roadmap with milestones, risks, and chart.',
-    prompt: 'Create an investor-ready roadmap for Nexora AI. Include phases, milestones, risks, costs, a table, and a chart.',
+    prompt: 'Create an investor-ready roadmap for Arc-8 AI. Include phases, milestones, risks, costs, a table, and a chart.',
   },
 ];
 
@@ -542,7 +542,7 @@ const ChatPage = () => {
           file: m.file || null,
           timestamp: m.timestamp || null,
         }));
-      const title = `Nexora Chat — ${new Date().toLocaleDateString()}`;
+      const title = `Arc-8 Chat — ${new Date().toLocaleDateString()}`;
       const { blob, filename } = await exportConversation({
         token,
         tenant: tenantKey,
@@ -1148,20 +1148,20 @@ const ChatPage = () => {
         {/* ─ Sidebar ────────────────────────────────────────────────── */}
         <aside
           className="nx-scroll coding-sidebar flex h-full flex-col gap-4 overflow-y-auto p-4"
-          aria-label="Nexora AI navigation"
+          aria-label="Arc-8 AI navigation"
         >
           <div className="border-b coding-border-subtle pb-3">
             <div className="flex items-center gap-2">
               <div
-                className="grid h-8 w-8 place-items-center rounded-md text-base font-semibold text-white"
+                className="grid h-8 w-8 place-items-center rounded-lg text-xs font-extrabold text-white shadow-sm"
                 style={{ background: 'var(--brand-primary)' }}
                 aria-hidden="true"
               >
-                N
+                A8
               </div>
               <div>
                 <div className="text-sm font-semibold coding-text-strong">
-                  Nexora <span style={{ color: 'var(--brand-primary)' }}>AI</span>
+                  Arc-8 <span style={{ color: 'var(--brand-primary)' }}>AI</span>
                 </div>
                 <div className="text-[11px] leading-tight coding-text-muted">
                   Claude-powered assistant
@@ -1475,7 +1475,7 @@ const ChatPage = () => {
           {/* Inner topbar — Status + signed-in user + export controls. */}
           <header className="coding-member-toolbar flex h-12 flex-none items-center justify-between px-5">
             <div className="flex items-baseline gap-3">
-              <strong className="text-sm font-semibold coding-text-strong">Nexora Chat</strong>
+              <strong className="text-sm font-semibold coding-text-strong">Arc-8 Chat</strong>
               <span className="text-xs coding-text-muted">Claude-powered AI assistant</span>
             </div>
             <div className="flex items-center gap-2" role="status" aria-live="polite">
@@ -1546,7 +1546,7 @@ const ChatPage = () => {
             <div className="mx-auto flex max-w-[820px] flex-col">
               {messages.length === 0 ? (
                 <div className="py-8">
-                  <h1 className="mb-2 text-2xl font-semibold leading-tight coding-text-strong">Nexora AI</h1>
+                  <h1 className="mb-2 text-2xl font-semibold leading-tight coding-text-strong">Arc-8 AI</h1>
                   <p className="mb-5 max-w-[620px] text-sm leading-relaxed coding-text-muted">
                     Ask a question or attach a file (PDF, DOCX, XLSX, PPTX, CSV, JSON, TXT, PNG, JPG) for analysis.
                     Responses can include tables, charts, and markdown formatting.
@@ -1708,7 +1708,7 @@ const ChatPage = () => {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={handleKey}
-                  placeholder="Message Nexora…"
+                  placeholder="Message Arc-8…"
                   rows={1}
                   disabled={busy}
                   className="w-full min-h-[36px] max-h-[140px] resize-none border-none bg-transparent px-1 py-2 text-sm leading-relaxed coding-text-strong outline-none placeholder:text-[var(--text-muted)]"

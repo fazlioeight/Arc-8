@@ -177,7 +177,7 @@ const Member360LabDocumentsPage = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title={isPatientRole ? t('My Health Documents') : t('Documents')}
       subtitle={
         isPatientRole

@@ -8,12 +8,12 @@ import React, {
   useState,
 } from 'react';
 
-const TOUR_STORAGE_KEY = 'nexora-guided-tour-v1';
+const TOUR_STORAGE_KEY = 'arc8-guided-tour-v1';
 
 const DEFAULT_STEPS = [
   {
     id: 'navigation',
-    title: 'Welcome to Nexora Lab',
+    title: 'Welcome to Arc-8',
     description: 'The global navigation keeps your most-used areas one click away. Explore analytics, providers, jobs, and resources.',
     highlights: [
       'Use the top navigation bar to jump between analytics, providers, jobs, and docs.',

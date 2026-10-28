@@ -36,7 +36,7 @@ const About = () => {
   <main className="container py-5" aria-labelledby="about-title">
     <header>
       <h1 id="about-title" className="text-center mb-4">
-        About Nexora Lab
+        About Arc-8
       </h1>
       <p className="lead text-center">
         We are a healthcare tech startup dedicated to providing advanced
@@ -90,7 +90,7 @@ const About = () => {
       role="contentinfo"
     >
       <p>
-        &copy; 2025 Nexora Lab. All rights reserved. |{" "}
+        &copy; 2025 Arc-8. All rights reserved. |{" "}
         <a href="/privacy" className="text-white text-decoration-underline">
           Privacy Policy
         </a>{" "}
@@ -101,8 +101,8 @@ const About = () => {
       </p>
       <address className="mt-2" style={{ fontStyle: "normal" }}>
         Contact us:{" "}
-        <a href="mailto:info@nexora.com" className="text-white">
-          info@nexora.com
+        <a href="mailto:info@arc8.com" className="text-white">
+          info@arc8.com
         </a>
       </address>
     </footer>

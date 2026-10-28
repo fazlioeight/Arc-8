@@ -237,7 +237,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         },
         { label: t('nav.provider_directory', 'Provider Directory'), href: ROUTES.PROVIDERS.LANDING, icon: SvgProviders, permission: 'menu:provider_directory' },
         { label: t('nav.ride_booking', 'Ride Booking (NEMT)'), href: ROUTES.RIDE_BOOKING, icon: SvgTransport, permission: 'menu:ride_booking' },
-        { label: t('nav.ai_chat', 'Nexora AI Chat'), href: ROUTES.CHAT, icon: SvgChat, permission: 'menu:ai_chat' },
+        { label: t('nav.ai_chat', 'Arc-8 AI Chat'), href: ROUTES.CHAT, icon: SvgChat, permission: 'menu:ai_chat' },
       ],
     },
     {
@@ -295,16 +295,26 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
     >
       {/* ── Brand Header ────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800/70">
-        <Link to={ROUTES.MEMBER360_LAB.DASHBOARD} className="flex items-center gap-3 overflow-hidden">
-          <div className="h-9 w-9 shrink-0 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 text-white font-black text-sm tracking-wider">
-            NL
-          </div>
+        <Link to={ROUTES.MEMBER360_LAB.DASHBOARD} className="group flex items-center gap-3 overflow-hidden">
+          <img
+            src="/images/arc8-logo.png"
+            alt="Arc-8 logo"
+            className="h-9 w-auto shrink-0 rounded-lg object-contain shadow-md shadow-sky-500/20 transition-transform duration-200 group-hover:scale-105"
+          />
           {!collapsed && (
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
-                NEXORA <span className="text-[10px] font-semibold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">OS</span>
+              <span className="flex items-center gap-2">
+                <span
+                  className="flex items-baseline text-[19px] font-extrabold leading-none"
+                  style={{ fontFamily: "'Outfit', 'Space Grotesk', 'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.03em' }}
+                >
+                  <span className="bg-gradient-to-r from-white via-slate-100 to-sky-100 bg-clip-text text-transparent">Arc</span>
+                  <span className="mx-0.5 font-bold text-sky-400">-</span>
+                  <span className="bg-gradient-to-br from-sky-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">8</span>
+                </span>
+                <span className="text-[10px] font-semibold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">OS</span>
               </span>
-              <span className="text-[11px] text-slate-400 truncate">
+              <span className="text-[11px] text-slate-400 truncate mt-0.5">
                 {tenantInfo?.name || tenant || 'Prominence Health'}
               </span>
             </div>

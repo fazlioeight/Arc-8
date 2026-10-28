@@ -71,7 +71,7 @@ const RouteFallback = () => (
   <div className="py-12">
     <LoadingState
       title="Loading"
-      description="Preparing your Nexora Lab workspace..."
+      description="Preparing your Arc-8 workspace..."
       className="mx-auto max-w-md"
     />
   </div>
@@ -149,7 +149,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/portalPage" element={<Navigate to={ROUTES.PORTAL.LANDING} replace />} />
           <Route path={ROUTES.MEMBER_360.LANDING} element={<Member360LandingPage />} />
           <Route path={ROUTES.MEMBER360_LAB.DASHBOARD} element={(
-            <ErrorBoundary title="Nexora Lab Member360 failed to load" description="Try again to reload the care intelligence workspace.">
+            <ErrorBoundary title="Arc-8 Member360 failed to load" description="Try again to reload the care intelligence workspace.">
               <Member360LabDashboard />
             </ErrorBoundary>
           )} />

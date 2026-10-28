@@ -72,7 +72,7 @@ class RagAnswer:
 # ── Prompt assembly ─────────────────────────────────────────────────────────
 
 
-_SYSTEM_PROMPT = """You are Nexora, an AI assistant embedded in a healthcare analytics platform.
+_SYSTEM_PROMPT = """You are Arc-8, an AI assistant embedded in a healthcare analytics platform.
 You answer clinicians' and care managers' questions about specific members and claims using ONLY the context blocks provided below.
 
 Rules:

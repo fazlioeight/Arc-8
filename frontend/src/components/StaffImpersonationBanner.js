@@ -24,7 +24,7 @@ const StaffImpersonationBanner = () => {
       <div className="flex items-center gap-2">
         <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-amber-500" aria-hidden="true" />
         <span>
-          <strong>Nexora staff session</strong> — you are signed in as{' '}
+          <strong>Arc-8 staff session</strong> — you are signed in as{' '}
           <span className="font-mono text-xs">{staffActor?.email || 'staff'}</span>{' '}
           acting on <strong>{tenantLabel}</strong>. All actions are audited.
         </span>

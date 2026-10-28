@@ -654,7 +654,7 @@ const Member360LabAdminPage = () => {
   if (!isAdmin) {
     return (
       <PortalPageLayout
-        eyebrow="Nexora Lab Member360"
+        eyebrow="Arc-8 Member360"
         title="Admin Settings"
         subtitle="Access restricted to platform and tenant administrators."
         navItems={PORTAL_NAV_ITEMS}
@@ -676,7 +676,7 @@ const Member360LabAdminPage = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title="Admin"
       subtitle="Configure templates, risk rules, queues, channels, and care option policies. All edits are tenant-scoped and audited."
       navItems={PORTAL_NAV_ITEMS}

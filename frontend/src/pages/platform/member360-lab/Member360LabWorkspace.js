@@ -636,14 +636,14 @@ const Member360LabWorkspace = () => {
 
   if (loading) {
     return (
-      <PortalPageLayout eyebrow="Nexora Lab Member360" title="Loading member" navItems={PORTAL_NAV_ITEMS} currentNav="member360-lab" maxWidthClassName="max-w-7xl">
+      <PortalPageLayout eyebrow="Arc-8 Member360" title="Loading member" navItems={PORTAL_NAV_ITEMS} currentNav="member360-lab" maxWidthClassName="max-w-7xl">
         <LoadingState title="Loading workspace" />
       </PortalPageLayout>
     );
   }
   if (error || !detail) {
     return (
-      <PortalPageLayout eyebrow="Nexora Lab Member360" title="Member unavailable" navItems={PORTAL_NAV_ITEMS} currentNav="member360-lab" maxWidthClassName="max-w-7xl">
+      <PortalPageLayout eyebrow="Arc-8 Member360" title="Member unavailable" navItems={PORTAL_NAV_ITEMS} currentNav="member360-lab" maxWidthClassName="max-w-7xl">
         <ErrorState title="Could not open member" description={error || 'Member not found'} />
         <button type="button" onClick={() => navigate(ROUTES.MEMBER360_LAB.MEMBERS)} className="mt-3 rounded-md bg-[var(--brand-primary)] text-white px-3 py-1.5 text-xs font-semibold">Back to members</button>
       </PortalPageLayout>
@@ -652,7 +652,7 @@ const Member360LabWorkspace = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title={`${member.first_name || ''} ${member.last_name || ''}`.trim() || member.member_key}
       subtitle={`${member.member_key} · ${member.plan_name || 'Plan unknown'}`}
       navItems={PORTAL_NAV_ITEMS}

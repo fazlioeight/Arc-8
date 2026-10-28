@@ -9,8 +9,8 @@ import React, {
 import { AuthContext } from './AuthContext';
 import { translateText } from '../constants/translations';
 
-const USER_PREF_PREFIX = 'nexora-user-pref-';
-const ROLE_MENU_STORAGE_KEY = 'nexora-role-menus';
+const USER_PREF_PREFIX = 'arc8-user-pref-';
+const ROLE_MENU_STORAGE_KEY = 'arc8-role-menus';
 
 const DEFAULT_NAV_KEYS = [
   'home',

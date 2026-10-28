@@ -62,8 +62,8 @@ class ExportTheme:
     palette: tuple[str, ...] = chart_renderer.DEFAULT_PALETTE
     primary_color: tuple[int, int, int] = (0xD9, 0x77, 0x06)
     primary_color_dark: tuple[int, int, int] = (0xB4, 0x53, 0x09)
-    caption: str = "Nexora Lab  ·  Confidential  ·  Internal use"
-    eyebrow: str = "NEXORA"
+    caption: str = "Arc-8  ·  Confidential  ·  Internal use"
+    eyebrow: str = "ARC-8"
     template: str = "default"
     logo_png: Optional[bytes] = None  # raw PNG bytes for the cover slide
 
@@ -239,7 +239,7 @@ def export_to_docx(
     _apply_default_docx_styles(doc, Pt, RGBColor)
 
     # Title page header.
-    doc_title = title or "Nexora Chat Transcript"
+    doc_title = title or "Arc-8 Chat Transcript"
     header = doc.add_heading(doc_title, level=0)
     header.alignment = WD_ALIGN_PARAGRAPH.LEFT
     meta = doc.add_paragraph()
@@ -370,12 +370,12 @@ def export_to_pdf(
         rightMargin=0.75 * inch,
         topMargin=0.75 * inch,
         bottomMargin=0.75 * inch,
-        title=title or "Nexora Chat Transcript",
+        title=title or "Arc-8 Chat Transcript",
     )
     styles = _build_pdf_styles(ParagraphStyle, getSampleStyleSheet, colors)
     story: list = []
 
-    story.append(Paragraph(title or "Nexora Chat Transcript", styles["title"]))
+    story.append(Paragraph(title or "Arc-8 Chat Transcript", styles["title"]))
     story.append(
         Paragraph(
             f"Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} · "

@@ -203,13 +203,22 @@ const Login = () => {
     <div className="flex min-h-screen flex-col bg-slate-900 text-slate-100">
       {/* Top enterprise navigation header */}
       <header className="flex h-16 items-center justify-between border-b border-slate-800 bg-slate-950/80 px-6 backdrop-blur-md">
-        <NavLink to="/" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-600 text-base font-black text-white shadow-md">
-            N
-          </div>
-          <div>
-            <span className="text-base font-bold tracking-tight text-white">Nexora Lab</span>
-            <span className="ml-2 rounded-md bg-sky-950 px-2 py-0.5 text-[10px] font-semibold text-sky-400 border border-sky-800/60">
+        <NavLink to="/" className="group flex items-center gap-3">
+          <img
+            src="/images/arc8-logo.png"
+            alt="Arc-8 logo"
+            className="h-9 w-auto rounded-lg object-contain shadow-md shadow-sky-500/20 transition-transform duration-200 group-hover:scale-105"
+          />
+          <div className="flex items-center">
+            <span
+              className="flex items-baseline text-[21px] font-extrabold leading-none"
+              style={{ fontFamily: "'Outfit', 'Space Grotesk', 'Plus Jakarta Sans', sans-serif", letterSpacing: "-0.03em" }}
+            >
+              <span className="bg-gradient-to-r from-white via-slate-100 to-sky-100 bg-clip-text text-transparent">Arc</span>
+              <span className="mx-0.5 font-bold text-sky-400">-</span>
+              <span className="bg-gradient-to-br from-sky-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">8</span>
+            </span>
+            <span className="ml-2.5 rounded-md bg-sky-950 px-2 py-0.5 text-[10px] font-semibold text-sky-400 border border-sky-800/60">
               Enterprise Health
             </span>
           </div>

@@ -149,7 +149,7 @@ const Member360LandingPage = () => {
     <PortalPageLayout
       title="Launch a member chart in seconds"
       subtitle="Search across your Member360 roster and jump directly into the chart workspace without leaving Member360."
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       navItems={PORTAL_NAV_ITEMS}
       currentNav="member360-lab"
       navProps={{ align: "center", tone: "surface" }}

@@ -31,7 +31,7 @@ const PortalPageLayout = ({
 }) => {
   const [collapsed, setCollapsed] = useState(() => {
     try {
-      return localStorage.getItem('nexora_sidebar_collapsed') === 'true';
+      return localStorage.getItem('arc8_sidebar_collapsed') === 'true';
     } catch {
       return false;
     }
@@ -41,7 +41,7 @@ const PortalPageLayout = ({
     setCollapsed((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem('nexora_sidebar_collapsed', String(next));
+        localStorage.setItem('arc8_sidebar_collapsed', String(next));
       } catch {}
       return next;
     });

@@ -42,7 +42,7 @@ jest.mock('../context/UserPreferencesContext', () => ({
 
 const renderBar = () => {
   const authValue = {
-    user: { email: 'tester@nexora.test' },
+    user: { email: 'tester@arc8.test' },
     tenant: 'prominencehealth',
     tenantInfo: { name: 'ProminenceHealth' },
     hasApplicationAccess: () => true,

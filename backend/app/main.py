@@ -80,7 +80,7 @@ setup_logging()
 assert_required_settings(settings)
 
 
-app = FastAPI(title="Nexora Lab API", version="2.0.0")
+app = FastAPI(title="Arc-8 API", version="2.0.0")
 
 app.add_middleware(RequestLoggingMiddleware)
 # Reject /api/member/* requests that didn't come through the member edge (when
@@ -227,7 +227,7 @@ def _build_login_response(user: User, tenant: TenantContext) -> dict:
 
 @app.get("/")
 async def read_root():
-    return {"message": "Nexora Lab Backend"}
+    return {"message": "Arc-8 Backend"}
 
 
 @app.get("/health/live", tags=["health"])

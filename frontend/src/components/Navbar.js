@@ -118,13 +118,22 @@ const Navbar = () => {
         <NavLink
           to="/"
           onClick={closeAll}
-          className="flex shrink-0 items-center gap-2.5"
+          className="group flex shrink-0 items-center gap-3"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-[13px] font-black text-white shadow-sm">
-            N
-          </div>
-          <span className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
-            Nexora Lab
+          <img
+            src="/images/arc8-logo.png"
+            alt="Arc-8 logo"
+            className="h-9 w-auto rounded-lg object-contain shadow-sm transition-transform duration-200 group-hover:scale-105"
+          />
+          <span
+            className="flex items-baseline text-[21px] font-extrabold leading-none"
+            style={{ fontFamily: "'Outfit', 'Space Grotesk', 'Plus Jakarta Sans', sans-serif", letterSpacing: "-0.03em" }}
+          >
+            <span className="text-slate-900 dark:text-white">Arc</span>
+            <span className="mx-0.5 font-bold text-sky-500 dark:text-sky-400">-</span>
+            <span className="bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-500 dark:from-sky-400 dark:via-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
+              8
+            </span>
           </span>
         </NavLink>
 

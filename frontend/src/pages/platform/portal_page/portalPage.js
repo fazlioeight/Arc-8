@@ -195,7 +195,7 @@ const PortalPage = () => {
       },
       {
         key: "chat",
-        label: "Nexora Chat",
+        label: "Arc-8 Chat",
         desc: "Claude assistant, files, workbooks, dataset",
         path: ROUTES.CHAT,
         icon: "AI",
@@ -245,7 +245,7 @@ const PortalPage = () => {
   const todoItems = overview.todos || [];
   const openTasks = todoItems.length;
 
-  const tenantLabel = overview.profile?.tenant || tenant || 'Nexora Lab';
+  const tenantLabel = overview.profile?.tenant || tenant || 'Arc-8';
   const lastLoginText = overview.profile?.lastLogin
     ? `Last login ${formatRelativeTime(overview.profile.lastLogin)}`
     : 'Last login just now';
@@ -292,7 +292,7 @@ const PortalPage = () => {
       >
         <section className="flex items-center justify-center py-16">
           <LoadingState
-            title="Loading your Nexora Lab workspace"
+            title="Loading your Arc-8 workspace"
             description="Pulling recent tasks, saved items, and applications."
             className="w-full max-w-2xl"
           />

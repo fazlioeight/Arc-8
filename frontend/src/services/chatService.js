@@ -199,7 +199,7 @@ export const exportConversation = async ({
   // Honor the server-provided filename if it set one.
   const cd = res.headers.get('Content-Disposition') || '';
   const match = cd.match(/filename="?([^";]+)"?/i);
-  const filename = match ? match[1] : `nexora-chat-transcript.${format}`;
+  const filename = match ? match[1] : `arc8-chat-transcript.${format}`;
   return { blob, filename };
 };
 

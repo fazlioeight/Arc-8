@@ -99,7 +99,7 @@ const Member360LabMembersPage = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title="Members"
       subtitle="Search, filter, and triage your member roster by risk, journeys, and open work."
       navItems={PORTAL_NAV_ITEMS}

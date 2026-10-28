@@ -86,7 +86,7 @@ const Member360LabCareJourneysPage = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title="Care Journeys"
       subtitle="Templates that codify outreach playbooks, and the live journeys running against your population."
       navItems={PORTAL_NAV_ITEMS}

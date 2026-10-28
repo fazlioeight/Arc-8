@@ -92,7 +92,7 @@ const StaffConsole = () => {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-              Nexora staff console
+              Arc-8 staff console
             </div>
             <h1 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
               Tenants
@@ -128,7 +128,7 @@ const StaffConsole = () => {
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Select a tenant to enter as <span className="font-medium">platform_admin</span>.
-            Every action you take inside the tenant is audited under your Nexora staff email.
+            Every action you take inside the tenant is audited under your Arc-8 staff email.
           </p>
           <input
             type="search"

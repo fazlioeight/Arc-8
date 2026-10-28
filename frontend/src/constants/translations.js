@@ -20,7 +20,7 @@ export const TRANSLATIONS = {
     'nav.sub.quality_star': 'Quality & Star Ratings',
     'nav.provider_directory': 'Provider Directory',
     'nav.ride_booking': 'Ride Booking (NEMT)',
-    'nav.ai_chat': 'Nexora AI Chat',
+    'nav.ai_chat': 'Arc-8 AI Chat',
     'nav.role_privileges': 'Role & Privileges',
     'nav.master_admin': 'Master Admin',
     'nav.platform_settings': 'Platform Settings',
@@ -47,7 +47,7 @@ export const TRANSLATIONS = {
 
     // Settings Page
     'settings.eyebrow': 'Settings',
-    'settings.title': 'Manage your Nexora Lab preferences',
+    'settings.title': 'Manage your Arc-8 preferences',
     'settings.subtitle': 'Personalize your workspace, navigation, and notifications.',
     'settings.kpi.role': 'Role',
     'settings.kpi.access_level': 'Access level',
@@ -115,7 +115,7 @@ export const TRANSLATIONS = {
     'nav.sub.quality_star': 'Calidad y Calificación Estrella',
     'nav.provider_directory': 'Directorio de Proveedores',
     'nav.ride_booking': 'Reserva de Transporte (NEMT)',
-    'nav.ai_chat': 'Chat IA Nexora',
+    'nav.ai_chat': 'Chat IA Arc-8',
     'nav.role_privileges': 'Roles y Privilegios',
     'nav.master_admin': 'Administración Maestra',
     'nav.platform_settings': 'Configuración de Plataforma',
@@ -142,7 +142,7 @@ export const TRANSLATIONS = {
 
     // Settings Page
     'settings.eyebrow': 'Configuración',
-    'settings.title': 'Administre sus preferencias de Nexora Lab',
+    'settings.title': 'Administre sus preferencias de Arc-8',
     'settings.subtitle': 'Personalice su espacio de trabajo, navegación y notificaciones.',
     'settings.kpi.role': 'Rol',
     'settings.kpi.access_level': 'Nivel de acceso',
@@ -210,7 +210,7 @@ export const TRANSLATIONS = {
     'nav.sub.quality_star': 'Qualité & Étoiles',
     'nav.provider_directory': 'Annuaire des Prestataires',
     'nav.ride_booking': 'Transport Médical (NEMT)',
-    'nav.ai_chat': 'Chat IA Nexora',
+    'nav.ai_chat': 'Chat IA Arc-8',
     'nav.role_privileges': 'Rôles & Privilèges',
     'nav.master_admin': 'Administration Principale',
     'nav.platform_settings': 'Paramètres de la Plateforme',
@@ -237,7 +237,7 @@ export const TRANSLATIONS = {
 
     // Settings Page
     'settings.eyebrow': 'Paramètres',
-    'settings.title': 'Gérez vos préférences Nexora Lab',
+    'settings.title': 'Gérez vos préférences Arc-8',
     'settings.subtitle': 'Personnalisez votre espace de travail, la navigation et les notifications.',
     'settings.kpi.role': 'Rôle',
     'settings.kpi.access_level': "Niveau d'accès",

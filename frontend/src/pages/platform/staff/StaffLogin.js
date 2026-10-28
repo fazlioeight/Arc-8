@@ -56,10 +56,10 @@ const StaffLogin = () => {
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 inline-flex items-center justify-center rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-            Nexora Staff
+            Arc-8 Staff
           </div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-            Sign in to the Nexora platform
+            Sign in to the Arc-8 platform
           </h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Internal-only console for administering tenants.
@@ -76,7 +76,7 @@ const StaffLogin = () => {
               value={form.email}
               onChange={onChange}
               className={inputCls}
-              placeholder="you@nexora.io"
+              placeholder="you@arc8.io"
             />
           </div>
           <div>
@@ -120,7 +120,7 @@ const StaffLogin = () => {
           </button>
         </form>
         <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-500">
-          Not a Nexora employee?{' '}
+          Not an Arc-8 employee?{' '}
           <Link to="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
             Use the tenant login
           </Link>

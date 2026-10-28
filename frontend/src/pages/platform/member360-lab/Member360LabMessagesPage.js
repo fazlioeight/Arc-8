@@ -108,7 +108,7 @@ const Member360LabMessagesPage = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title="Messages"
       subtitle="Inbound and outbound member messaging across every channel."
       navItems={PORTAL_NAV_ITEMS}

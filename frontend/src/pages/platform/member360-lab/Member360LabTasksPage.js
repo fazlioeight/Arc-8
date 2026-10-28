@@ -164,7 +164,7 @@ const Member360LabTasksPage = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title="Tasks queue"
       subtitle="Every member task in one place — prioritized, filterable, actionable."
       navItems={PORTAL_NAV_ITEMS}

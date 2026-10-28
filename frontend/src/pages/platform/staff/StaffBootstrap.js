@@ -50,7 +50,7 @@ const StaffBootstrap = () => {
             One-time setup
           </div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-            Create the first Nexora staff account
+            Create the first Arc-8 staff account
           </h1>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             This page works only while no staff exist. Subsequent accounts must be created from{' '}

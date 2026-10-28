@@ -9,7 +9,7 @@ const mockTeam = [
 const Team = () => (
   <div className="container py-5">
     <h1>Team</h1>
-    <p>Meet a few of the folks building Nexora Lab (placeholder data):</p>
+    <p>Meet a few of the folks building Arc-8 (placeholder data):</p>
     <div className="row">
       {mockTeam.map((m) => (
         <div key={m.name} className="col-md-4 mb-3">

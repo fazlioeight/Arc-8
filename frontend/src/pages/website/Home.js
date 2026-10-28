@@ -69,7 +69,7 @@ const Home = () => {
                   <span className="h-3 w-3 rounded-full bg-amber-500/80" />
                   <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
                 </div>
-                <span className="font-mono text-slate-400">nexora-clinical-ops.us-east.hipaa-secure</span>
+                <span className="font-mono text-slate-400">arc8-clinical-ops.us-east.hipaa-secure</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-emerald-950 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-800">
@@ -442,7 +442,7 @@ const Home = () => {
         <div className="rounded-3xl border border-sky-800/50 bg-gradient-to-r from-sky-950/60 via-slate-900 to-slate-950 p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
           <div>
             <h3 className="text-2xl font-black text-white">Ready to modernize your clinical operations?</h3>
-            <p className="text-sm text-slate-400 mt-1">Deploy Nexora Lab across your health plan or provider network today.</p>
+            <p className="text-sm text-slate-400 mt-1">Deploy Arc-8 across your health plan or provider network today.</p>
           </div>
           <div className="flex items-center gap-3">
             <NavLink to="/login" className="nx-btn-primary">
@@ -459,7 +459,7 @@ const Home = () => {
       <footer className="nx-footer-enterprise">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div>
-            © {new Date().getFullYear()} Nexora Lab Enterprise Healthcare. All rights reserved.
+            © {new Date().getFullYear()} Arc-8 Enterprise Healthcare. All rights reserved.
           </div>
           <div className="flex items-center gap-6">
             <span className="text-emerald-400">HIPAA Compliant</span>
