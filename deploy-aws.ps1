@@ -44,7 +44,8 @@ if (!(Test-Path $SshKeyPath)) {
 # 1. Optional Git Commit & Push
 if ($GitPush) {
   Write-Host "`n[1/5] Committing and pushing to GitHub remotes..." -ForegroundColor Yellow
-  $gitExe = if (Get-Command git -ErrorAction SilentlyContinue) { "git" } else { "C:\Users\DELL\AppData\Local\Programs\MinGit\cmd\git.exe" }
+  $gitCmd = Get-Command git -ErrorAction SilentlyContinue
+  $gitExe = if ($gitCmd) { $gitCmd.Source } else { "C:\Users\DELL\AppData\Local\Programs\MinGit\cmd\git.exe" }
   if (Test-Path $gitExe) {
     Push-Location $ProjectRoot
     try {
