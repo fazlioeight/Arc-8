@@ -9,8 +9,23 @@ import {
 
 const EXPORT_ALLOWED_ROLES = new Set(["risk_ops", "coding_mgr", "admin"]);
 
+const API_BASE = (() => {
+  if (typeof window !== "undefined" && window.location) {
+    if (
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      window.location.port === "7777" ||
+      window.location.port === "7778" ||
+      window.location.port === "3000"
+    ) {
+      return `${window.location.protocol}//${window.location.hostname}:8989`;
+    }
+  }
+  return (process.env.REACT_APP_API_BASE || "").replace(/\/$/, "");
+})();
+
 const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE || "",
+  baseURL: API_BASE,
   timeout: 15000,
 });
 

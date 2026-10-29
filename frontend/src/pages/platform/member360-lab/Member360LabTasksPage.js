@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
 import { AuthContext } from '../../../context/AuthContext';
 import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
@@ -55,8 +55,74 @@ const SAVED_VIEWS = [
 
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
 
+const TASKS_FILTER_STORAGE_KEY = 'arc8.tasks.filters.v1';
+
+const readSavedTaskFilters = (searchParams) => {
+  let stored = null;
+  try {
+    const raw = window.sessionStorage.getItem(TASKS_FILTER_STORAGE_KEY);
+    if (raw) stored = JSON.parse(raw);
+  } catch (_err) {
+    stored = null;
+  }
+
+  const hasUrlParams =
+    searchParams.has('status') ||
+    searchParams.has('priority') ||
+    searchParams.has('due') ||
+    searchParams.has('sort') ||
+    searchParams.has('q') ||
+    searchParams.has('view');
+
+  if (hasUrlParams) {
+    const rawStatus = searchParams.get('status');
+    const statuses =
+      rawStatus === null
+        ? stored?.statuses ?? ['open', 'in_progress']
+        : rawStatus === 'none' || rawStatus === ''
+        ? []
+        : rawStatus.split(',').filter(Boolean);
+    const rawPriority = searchParams.get('priority');
+    const priorities =
+      rawPriority === null
+        ? stored?.priorities ?? []
+        : rawPriority === 'none' || rawPriority === ''
+        ? []
+        : rawPriority.split(',').filter(Boolean);
+    return {
+      search: searchParams.get('q') ?? stored?.search ?? '',
+      activeView: searchParams.get('view') ?? stored?.activeView ?? (statuses.length === 2 && statuses.includes('open') && statuses.includes('in_progress') ? 'open' : 'all'),
+      statuses,
+      priorities,
+      due: searchParams.get('due') || stored?.due || 'any',
+      sortKey: searchParams.get('sort') || stored?.sortKey || 'priority',
+    };
+  }
+
+  if (stored && typeof stored === 'object') {
+    return {
+      search: typeof stored.search === 'string' ? stored.search : '',
+      activeView: typeof stored.activeView === 'string' ? stored.activeView : 'open',
+      statuses: Array.isArray(stored.statuses) ? stored.statuses : ['open', 'in_progress'],
+      priorities: Array.isArray(stored.priorities) ? stored.priorities : [],
+      due: typeof stored.due === 'string' ? stored.due : 'any',
+      sortKey: typeof stored.sortKey === 'string' ? stored.sortKey : 'priority',
+    };
+  }
+
+  return {
+    search: '',
+    activeView: 'open',
+    statuses: ['open', 'in_progress'],
+    priorities: [],
+    due: 'any',
+    sortKey: 'priority',
+  };
+};
+
 const Member360LabTasksPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { token, tenant } = useContext(AuthContext) || {};
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
@@ -64,13 +130,33 @@ const Member360LabTasksPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [search, setSearch] = useState('');
-  const [activeView, setActiveView] = useState('open');
-  const [statuses, setStatuses] = useState(['open', 'in_progress']);
-  const [priorities, setPriorities] = useState([]);
-  const [due, setDue] = useState('any');
-  const [sortKey, setSortKey] = useState('priority');
+  const [initialFilters] = useState(() => readSavedTaskFilters(searchParams));
+  const [search, setSearch] = useState(initialFilters.search);
+  const [activeView, setActiveView] = useState(initialFilters.activeView);
+  const [statuses, setStatuses] = useState(initialFilters.statuses);
+  const [priorities, setPriorities] = useState(initialFilters.priorities);
+  const [due, setDue] = useState(initialFilters.due);
+  const [sortKey, setSortKey] = useState(initialFilters.sortKey);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        TASKS_FILTER_STORAGE_KEY,
+        JSON.stringify({ search, activeView, statuses, priorities, due, sortKey })
+      );
+    } catch (_err) {
+      // Ignore storage quota errors
+    }
+    const next = new URLSearchParams();
+    next.set('status', statuses.length > 0 ? statuses.join(',') : 'none');
+    if (priorities.length > 0) next.set('priority', priorities.join(','));
+    if (due && due !== 'any') next.set('due', due);
+    if (sortKey && sortKey !== 'priority') next.set('sort', sortKey);
+    if (search.trim()) next.set('q', search.trim());
+    if (activeView) next.set('view', activeView);
+    setSearchParams(next, { replace: true });
+  }, [search, activeView, statuses, priorities, due, sortKey, setSearchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,10 +181,23 @@ const Member360LabTasksPage = () => {
     setDue(view?.due || 'any');
   };
 
-  const toggleStatus = (key) =>
-    setStatuses((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
-  const togglePriority = (key) =>
-    setPriorities((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  const toggleStatus = (key) => {
+    setStatuses((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      if (next.length === 0 && priorities.length === 0 && due === 'any') setActiveView('all');
+      else if (next.length === 2 && next.includes('open') && next.includes('in_progress') && priorities.length === 0 && due === 'any') setActiveView('open');
+      else if (next.length === 1 && next[0] === 'completed' && priorities.length === 0 && due === 'any') setActiveView('completed');
+      else setActiveView('custom');
+      return next;
+    });
+  };
+  const togglePriority = (key) => {
+    setPriorities((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      setActiveView('custom');
+      return next;
+    });
+  };
 
   const filtered = useMemo(() => {
     const today = startOfDay(new Date());

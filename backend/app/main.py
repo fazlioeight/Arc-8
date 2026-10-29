@@ -276,7 +276,7 @@ async def login(
         "coder": {"coding": "user", "member360": "user", "portal": "user", "dashboard": "user", "docs": "user"},
         "billing": {"dashboard": "user", "portal": "user", "docs": "user", "member360": "user"},
         "patient": {"portal": "user", "ride_booking": "user"},
-        "coordinator": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user"},
+        "coordinator": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "providers": "user"},
         "supervisor": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user", "dashboard": "user", "settings": "user", "providers": "user"},
         "business_admin": {"member360": "user", "admin_console": "admin", "portal": "user", "docs": "user", "settings": "admin", "job_center": "admin"},
         "compliance_auditor": {"member360": "user", "portal": "user", "docs": "user"},
@@ -589,7 +589,7 @@ async def oidc_auth_exchange(
     oidc_role_apps = {
         "admin": {"admin_console": "admin", "chat": "admin", "coding": "admin", "dashboard": "admin", "docs": "admin", "job_center": "admin", "member360": "admin", "portal": "admin", "ride_booking": "admin", "settings": "admin", "providers": "admin"},
         "platform_admin": {"admin_console": "admin", "chat": "admin", "coding": "admin", "dashboard": "admin", "docs": "admin", "job_center": "admin", "member360": "admin", "portal": "admin", "ride_booking": "admin", "settings": "admin", "providers": "admin"},
-        "coordinator": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user"},
+        "coordinator": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "providers": "user"},
         "supervisor": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user", "dashboard": "user", "settings": "user", "providers": "user"},
         "business_admin": {"member360": "user", "admin_console": "admin", "portal": "user", "docs": "user", "settings": "admin", "job_center": "admin"},
         "compliance_auditor": {"member360": "user", "portal": "user", "docs": "user"},

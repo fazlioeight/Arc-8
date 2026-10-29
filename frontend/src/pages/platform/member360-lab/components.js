@@ -84,11 +84,47 @@ const STATUS_STYLES = {
   escalated: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200',
 };
 
+const normalizeRiskTier = (tier) => {
+  if (!tier) return 'Unknown';
+  const lower = String(tier).trim().toLowerCase();
+  if (lower === 'critical' || lower === 'complex') return 'Critical';
+  if (lower === 'high') return 'High';
+  if (lower === 'moderate' || lower === 'rising' || lower === 'medium') return 'Moderate';
+  if (lower === 'low') return 'Low';
+  return tier;
+};
+
+export function parseUtcDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const str = String(value).trim();
+  if (!str) return null;
+  // Date-only ISO string (YYYY-MM-DD): treat as local calendar date so it never shifts backward by 1 day.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const d = new Date(`${str}T00:00:00`);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  // Naive ISO datetime from server (UTC without Z/offset): append 'Z' so browser converts UTC -> local time.
+  const normalized =
+    /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(str) && !/(Z|[+-]\d{2}:?\d{2})$/i.test(str)
+      ? `${str.replace(' ', 'T')}Z`
+      : str;
+  const d = new Date(normalized);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function formatLocalDateTime(value) {
+  const d = parseUtcDate(value);
+  if (!d) return value || '—';
+  return d.toLocaleString();
+}
+
 export function RiskBadge({ tier, score }) {
-  const style = RISK_TIER_STYLES[tier] || RISK_TIER_STYLES.Low;
+  const canonical = normalizeRiskTier(tier);
+  const style = RISK_TIER_STYLES[canonical] || RISK_TIER_STYLES.Low;
   return (
     <span className={joinClass('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1', style)}>
-      <span className="font-semibold">{tier || 'Unknown'}</span>
+      <span className="font-semibold">{canonical}</span>
       {typeof score === 'number' && (
         <span className="opacity-80 font-normal">{score.toFixed(1)}</span>
       )}
@@ -571,7 +607,7 @@ export function MemberTimeline({ detail }) {
     (detail?.care_options || []).forEach((o) => items.push({ kind: 'care_option', timestamp: detail?.member?.last_interaction_at || new Date().toISOString(), title: `Care option · ${o.service_type}`, body: o.rationale, author: o.recommended_provider }));
     return items
       .filter((i) => i.timestamp)
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .sort((a, b) => (parseUtcDate(b.timestamp)?.getTime() || 0) - (parseUtcDate(a.timestamp)?.getTime() || 0))
       .slice(0, 25);
   }, [detail]);
 
@@ -594,7 +630,7 @@ export function MemberTimeline({ detail }) {
           <div className="flex-1 pb-3">
             <div className="flex items-center justify-between text-xs">
               <p className="font-semibold coding-text-strong">{e.title}</p>
-              <p className="coding-text-muted">{new Date(e.timestamp).toLocaleString()}</p>
+              <p className="coding-text-muted">{formatLocalDateTime(e.timestamp)}</p>
             </div>
             <p className="text-sm coding-text-strong line-clamp-2">{e.body}</p>
             {e.author && <p className="text-[11px] coding-text-soft">{e.author}</p>}

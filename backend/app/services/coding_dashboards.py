@@ -69,13 +69,35 @@ async def fetch_worklist(
         else:
             filters.append(func.lower(CodingMemberChase.assigned_coder_email) == assigned.lower())
     if search:
-        like = f"%{search.lower()}%"
+        term = search.strip().lower()
+        like = f"%{term}%"
+        compact = term.replace(" ", "").replace("-", "")
+        compact_like = f"%{compact}%"
+        hcc_digits = compact[3:] if compact.startswith("hcc") and compact[3:].isdigit() else compact
+        hcc_alt_like = f"%hcc{hcc_digits}%" if hcc_digits.isdigit() else compact_like
+        full_name = (
+            func.coalesce(func.lower(CodingMember.first_name), "")
+            + " "
+            + func.coalesce(func.lower(CodingMember.last_name), "")
+        )
+        normalized_hcc = func.replace(
+            func.replace(func.lower(func.coalesce(CodingMemberChase.hcc_code, "")), " ", ""),
+            "-",
+            "",
+        )
         filters.append(
             or_(
                 func.lower(CodingMember.member_key).like(like),
                 func.lower(CodingMember.first_name).like(like),
                 func.lower(CodingMember.last_name).like(like),
+                full_name.like(like),
                 func.lower(CodingMember.pcp_name).like(like),
+                func.lower(CodingMemberChase.hcc_code).like(like),
+                normalized_hcc.like(compact_like),
+                normalized_hcc.like(hcc_alt_like),
+                func.lower(CodingMemberChase.icd10_code).like(like),
+                func.lower(CodingMemberChase.chase_code).like(like),
+                func.lower(CodingMemberChase.assigned_coder_email).like(like),
             )
         )
 

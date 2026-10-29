@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from "react";
+import React, { useContext, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import KpiTile from "../../../components/ui/KpiTile";
@@ -111,6 +111,8 @@ const PortalPage = () => {
     return new Member360MemberSearchService({ token, tenant });
   }, [hasCoding, hasMember360, tenant, token]);
 
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   const {
     memberQuery,
     memberOptions,
@@ -119,6 +121,7 @@ const PortalPage = () => {
     statusMessage: memberSearchStatus,
     handleMemberQueryChange,
     handleMemberSearch,
+    handleSuggestionSelect,
   } = useMemberSearch({
     token,
     tenant,
@@ -192,14 +195,6 @@ const PortalPage = () => {
         path: ROUTES.DOCS,
         icon: "DL",
         color: "#6366f1",
-      },
-      {
-        key: "chat",
-        label: "Arc-8 Chat",
-        desc: "Claude assistant, files, workbooks, dataset",
-        path: ROUTES.CHAT,
-        icon: "AI",
-        color: "#7c3aed",
       },
       {
         key: "settings",
@@ -322,31 +317,52 @@ const PortalPage = () => {
             onSubmit={handleMemberSearch}
             aria-label="Member quick search"
           >
-            <div className="flex-1">
+            <div className="flex-1 relative">
               <label
                 className="block text-[11px] font-medium uppercase tracking-wider coding-text-muted mb-1"
                 htmlFor="portal-member-search-input"
               >
-                Member ID
+                {t("Member ID, Name, or Plan")}
               </label>
               <SearchInput
                 id="portal-member-search-input"
                 autoComplete="off"
                 placeholder="Search by member ID, name, or plan"
                 value={memberQuery}
-                onChange={(event) => handleMemberQueryChange(event.target.value)}
-                list="portal-member-suggestions"
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => window.setTimeout(() => setShowSuggestions(false), 180)}
+                onChange={(event) => {
+                  setShowSuggestions(true);
+                  handleMemberQueryChange(event.target.value);
+                }}
                 aria-describedby="portal-member-search-help"
                 className="pl-9 pr-3 py-2.5"
                 wrapperClassName="w-full"
               />
-              <datalist id="portal-member-suggestions">
-                {memberOptions.map((option) => (
-                  <option key={option.key} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </datalist>
+              {showSuggestions && memberOptions.length > 0 && memberQuery.trim().length >= 2 && (
+                <ul
+                  role="listbox"
+                  aria-label="Matching members"
+                  className="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-auto rounded-xl border coding-border coding-surface shadow-xl divide-y divide-slate-200 dark:divide-slate-800"
+                >
+                  {memberOptions.map((option) => (
+                    <li key={option.key}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setShowSuggestions(false);
+                          handleSuggestionSelect(option);
+                        }}
+                        className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-[var(--coding-hover)] flex items-center justify-between gap-2 transition"
+                      >
+                        <span className="font-semibold coding-text-strong truncate">{option.label}</span>
+                        <span className="shrink-0 text-[11px] font-medium text-[var(--brand-primary)]">Open chart →</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <button
               className="inline-flex items-center justify-center rounded-md bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"

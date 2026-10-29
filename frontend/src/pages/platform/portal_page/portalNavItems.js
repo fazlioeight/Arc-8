@@ -46,10 +46,4 @@ export const PORTAL_NAV_ITEMS = [
       path === ROUTES.RIDE_BOOKING ||
       path.startsWith(`${ROUTES.RIDE_BOOKING}/`),
   },
-  {
-    key: "chat",
-    label: "Arc-8 Chat",
-    href: ROUTES.CHAT,
-    match: (path) => path === ROUTES.CHAT,
-  },
 ];

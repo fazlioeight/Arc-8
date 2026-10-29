@@ -261,11 +261,6 @@ export const PERMISSION_CATEGORIES = [
         label: "Ride Booking (NEMT Logistics)",
         description: "Schedule non-emergency medical transportation for member clinical appointments.",
       },
-      {
-        key: "menu:ai_chat",
-        label: "Arc-8 Clinical AI Chat",
-        description: "Interactive AI copilot for clinical guidelines, drug interactions, and member summaries.",
-      },
     ],
   },
   {
@@ -474,7 +469,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
   ],
 };
 
-const STORAGE_KEY = "arc8_role_permissions_matrix_v3";
+const STORAGE_KEY = "arc8_role_permissions_matrix_v4";
 
 export const getPersistedRolePermissions = () => {
   if (typeof window === "undefined") return DEFAULT_ROLE_PERMISSIONS;

@@ -5,6 +5,7 @@ import {
   uploadMember360Document,
 } from "../../../../services/member360LabService";
 import { ChartTabHeader, ChartTable } from "./chartPrimitives";
+import { formatLocalDateTime, parseUtcDate } from "../components";
 
 const DOCUMENT_COLUMNS = [
   { label: "Uploaded", accessor: "uploaded_at" },
@@ -15,12 +16,7 @@ const DOCUMENT_COLUMNS = [
   { label: "Status", accessor: "status" },
 ];
 
-const formatDate = (iso) => {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString();
-};
+const formatDate = (iso) => formatLocalDateTime(iso);
 
 const formatSize = (bytes) => {
   if (bytes == null) return "—";
@@ -86,7 +82,11 @@ export default function DocumentsPage({ detail, memberId, onUploaded }) {
 
   const isPreviewable = (d) => d?.storage_path || d?.storage_backend;
 
-  const rows = (detail?.documents || []).map((d) => ({
+  const sortedDocs = [...(detail?.documents || [])].sort(
+    (a, b) => (parseUtcDate(b.uploaded_at)?.getTime() || 0) - (parseUtcDate(a.uploaded_at)?.getTime() || 0)
+  );
+
+  const rows = sortedDocs.map((d) => ({
     id: d.id,
     uploaded_at: formatDate(d.uploaded_at),
     document_type: d.document_type || "—",

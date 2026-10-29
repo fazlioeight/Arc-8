@@ -237,7 +237,6 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         },
         { label: t('nav.provider_directory', 'Provider Directory'), href: ROUTES.PROVIDERS.LANDING, icon: SvgProviders, permission: 'menu:provider_directory' },
         { label: t('nav.ride_booking', 'Ride Booking (NEMT)'), href: ROUTES.RIDE_BOOKING, icon: SvgTransport, permission: 'menu:ride_booking' },
-        { label: t('nav.ai_chat', 'Arc-8 AI Chat'), href: ROUTES.CHAT, icon: SvgChat, permission: 'menu:ai_chat' },
       ],
     },
     {

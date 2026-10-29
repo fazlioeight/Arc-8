@@ -102,7 +102,7 @@ async def ensure_control_plane() -> str:
             ("marcus.coder@prominencehealth.com", "coder", {"coding": "user", "member360": "user", "portal": "user", "dashboard": "user", "docs": "user"}),
             ("rachel.billing@prominencehealth.com", "billing", {"dashboard": "user", "portal": "user", "docs": "user", "member360": "user"}),
             ("james.member@prominencehealth.com", "patient", {"portal": "user", "ride_booking": "user"}),
-            ("coordinator@prominencehealth.com", "coordinator", {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user"}),
+            ("coordinator@prominencehealth.com", "coordinator", {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "providers": "user"}),
             ("supervisor@prominencehealth.com", "supervisor", {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user", "dashboard": "user", "settings": "user", "providers": "user"}),
             ("business.admin@prominencehealth.com", "business_admin", {"member360": "user", "admin_console": "admin", "portal": "user", "docs": "user", "settings": "admin", "job_center": "admin"}),
             ("compliance.auditor@prominencehealth.com", "compliance_auditor", {"member360": "user", "portal": "user", "docs": "user"}),

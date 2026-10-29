@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import AlertShell from "../../../components/ui/AlertShell";
@@ -34,9 +34,10 @@ const ProvidersPage = () => {
   const [activeView, setActiveView] = useState("all");
   const [hasNpi, setHasNpi] = useState(false);
   const [hasTaxId, setHasTaxId] = useState(false);
+  const initializedRef = useRef(false);
 
   const loadProviders = useCallback(
-    async (term = search) => {
+    async (term = "") => {
       if (!canQuery) return;
       setLoading(true);
       setError(null);
@@ -50,16 +51,30 @@ const ProvidersPage = () => {
         setLoading(false);
       }
     },
-    [canQuery, search, tenant, token]
+    [canQuery, tenant, token]
   );
 
   useEffect(() => {
-    if (!isAuthenticated || !canQuery) return;
+    initializedRef.current = false;
+  }, [token, tenant]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !canQuery || initializedRef.current) return;
+    initializedRef.current = true;
     const saved = getViewPreference("providers");
     const initialSearch = saved?.search || "";
     setSearch(initialSearch);
     void loadProviders(initialSearch);
   }, [isAuthenticated, canQuery, getViewPreference, loadProviders]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !canQuery || !initializedRef.current) return undefined;
+    const timer = window.setTimeout(() => {
+      recordViewPreference("providers", { search });
+      void loadProviders(search);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [search, isAuthenticated, canQuery, loadProviders, recordViewPreference]);
 
   const applySavedView = (key) => {
     const view = SAVED_VIEWS.find((v) => v.key === key);

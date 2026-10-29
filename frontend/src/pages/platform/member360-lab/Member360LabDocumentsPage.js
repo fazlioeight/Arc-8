@@ -12,7 +12,7 @@ import {
   fetchMember360Members,
   uploadMember360Document,
 } from '../../../services/member360LabService';
-import { LabSubNav, Pagination, RiskBadge } from './components';
+import { LabSubNav, Pagination, RiskBadge, formatLocalDateTime, parseUtcDate } from './components';
 
 const PAGE_SIZE = 100;
 const DEFAULT_DOCUMENT_TYPES = [
@@ -153,7 +153,7 @@ const Member360LabDocumentsPage = () => {
         if (types.length > 0 && !types.includes(d.document_type)) return false;
         if (statuses.length > 0 && !statuses.includes(d.status)) return false;
         if (waiversOnly && !(d.document_type || '').toLowerCase().includes('waiver')) return false;
-        if (recent && new Date(d.uploaded_at || 0).getTime() < weekAgo) return false;
+        if (recent && (parseUtcDate(d.uploaded_at)?.getTime() || 0) < weekAgo) return false;
         if (search) {
           const term = search.toLowerCase();
           const hay = [d.file_name, d.document_type, d.member_name, d.member_key, d.uploaded_by].filter(Boolean).join(' ').toLowerCase();
@@ -161,7 +161,7 @@ const Member360LabDocumentsPage = () => {
         }
         return true;
       })
-      .sort((a, b) => new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0));
+      .sort((a, b) => (parseUtcDate(b.uploaded_at)?.getTime() || 0) - (parseUtcDate(a.uploaded_at)?.getTime() || 0));
   }, [rows, search, types, statuses, waiversOnly, recent]);
 
   const summary = useMemo(() => {
@@ -404,7 +404,7 @@ const Member360LabDocumentsPage = () => {
                         {d.risk_tier && <RiskBadge tier={d.risk_tier} />}
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-xs coding-text-soft">{d.uploaded_at ? new Date(d.uploaded_at).toLocaleString() : '—'}</td>
+                    <td className="px-3 py-3 text-xs coding-text-soft">{formatLocalDateTime(d.uploaded_at)}</td>
                     <td className="px-3 py-3 text-xs coding-text-soft">{d.uploaded_by || '—'}</td>
                     <td className="px-3 py-3 text-xs">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 capitalize ${STATUS_TONE[d.status] || STATUS_TONE.active}`}>

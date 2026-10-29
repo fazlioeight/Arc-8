@@ -278,12 +278,18 @@ const Member360LabWorkspace = () => {
         });
         setActionMessage(`Note added on ${note.channel}.`);
       } else if (actionDialog.key === 'send_message') {
+        const bodyText = (data.body || '').trim();
+        if (!bodyText) {
+          throw new Error('Please enter a message before submitting.');
+        }
+        const selectedChannel = data.channel || 'SMS';
         const msg = await createMember360Message(token, tenant, member.id, {
-          channel: data.channel || member.preferred_channel || 'SMS',
+          channel: selectedChannel,
           direction: 'outbound',
-          body: data.body || '',
+          body: bodyText,
         });
-        setActionMessage(`Sent ${msg.channel} message.`);
+        const recipientLabel = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.member_key;
+        setActionMessage(`${msg.channel || selectedChannel} message sent to ${recipientLabel}.`);
       } else if (actionDialog.key === 'recommend_care_option') {
         const opt = await createMember360CareOption(token, tenant, {
           member_id: member.id,
@@ -339,9 +345,9 @@ const Member360LabWorkspace = () => {
         setActionMessage(`Escalation routed to ${task.assigned_queue || 'RN'} queue.`);
       }
       setActionDialog(null);
-      reload();
+      await reload();
     } catch (err) {
-      setActionMessage(`Error: ${err.message || err}`);
+      throw err;
     }
   }, [actionDialog, member, token, tenant, reload, journeyTemplates]);
 
@@ -688,29 +694,19 @@ const Member360LabWorkspace = () => {
       />
 
       {actionMessage && (
-        <div className="rounded-lg ring-1 ring-emerald-200 dark:ring-emerald-700/40 bg-emerald-50/70 dark:bg-emerald-900/20 px-3 py-2 text-sm coding-text-strong">
-          {actionMessage}
-        </div>
-      )}
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setAiOpen((v) => !v)}
-          className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-3 py-1.5 text-sm font-semibold"
-          aria-expanded={aiOpen}
+        <div
+          role="status"
+          className="flex items-center justify-between gap-3 rounded-lg ring-1 ring-emerald-200 dark:ring-emerald-700/40 bg-emerald-50/70 dark:bg-emerald-900/20 px-3.5 py-2.5 text-sm coding-text-strong"
         >
-          {aiOpen ? 'Close AI assistant' : 'Ask AI about this member'}
-        </button>
-      </div>
-
-      {aiOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-auto border-l coding-border bg-[var(--coding-surface,#fff)] shadow-2xl">
-          <AiAssistantPanel
-            memberId={member.member_key}
-            title={`Ask about ${member.first_name || member.member_key}`}
-            onClose={() => setAiOpen(false)}
-          />
+          <span>{actionMessage}</span>
+          <button
+            type="button"
+            onClick={() => setActionMessage(null)}
+            className="text-xs coding-text-muted hover:coding-text-strong"
+            aria-label="Dismiss notification"
+          >
+            ✕
+          </button>
         </div>
       )}
 
@@ -826,7 +822,18 @@ const Member360LabWorkspace = () => {
   );
 };
 
+const normalizeMessageChannel = (channel) => {
+  const c = String(channel || '').trim().toLowerCase();
+  if (c === 'sms' || c === 'phone') return 'SMS';
+  if (c === 'chat') return 'Chat';
+  if (c === 'portal' || c === 'secure message' || c === 'secure_message') return 'Secure Message';
+  if (c === 'email') return 'Email';
+  return 'SMS';
+};
+
 function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCancel }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [dialogError, setDialogError] = useState(null);
   const [form, setForm] = useState(() => {
     const rec = dialog.payload?.recommendation;
     if (dialog.key === 'create_task') {
@@ -846,7 +853,7 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
       return { body: rec?.summary || '', channel: 'Internal', note_type: 'Outreach' };
     }
     if (dialog.key === 'send_message') {
-      return { channel: member?.preferred_channel || 'SMS', body: rec?.summary || '' };
+      return { channel: normalizeMessageChannel(member?.preferred_channel), body: rec?.summary || '' };
     }
     if (dialog.key === 'recommend_care_option') {
       return {
@@ -898,6 +905,17 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
   const memberLabel = [member?.first_name, member?.last_name].filter(Boolean).join(' ');
   const subtitle = memberLabel ? `${memberLabel} · ${member?.member_key}` : member?.member_key;
 
+  const handleFormSubmit = async () => {
+    setDialogError(null);
+    setSubmitting(true);
+    try {
+      await onSubmit(form);
+    } catch (err) {
+      setDialogError(err?.message || String(err));
+      setSubmitting(false);
+    }
+  };
+
   return (
     <WorkspaceDrawer
       title={title}
@@ -905,11 +923,21 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
       onClose={onCancel}
       footer={
         <>
-          <button type="button" onClick={onCancel} className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-3 py-1.5 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+          >
             Cancel
           </button>
-          <button type="button" onClick={() => onSubmit(form)} className="rounded-md bg-[var(--brand-primary)] text-white px-3 py-1.5 text-xs font-semibold hover:bg-brand-700">
-            Submit
+          <button
+            type="button"
+            onClick={handleFormSubmit}
+            disabled={submitting}
+            className="rounded-md bg-[var(--brand-primary)] text-white px-3 py-1.5 text-xs font-semibold hover:bg-brand-700 disabled:opacity-60"
+          >
+            {submitting ? 'Submitting...' : 'Submit'}
           </button>
         </>
       }
@@ -918,6 +946,15 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] coding-text-muted">Member context</span>
         <RiskBadge tier={member?.risk_tier} score={member?.risk_score_composite} />
       </div>
+
+      {dialogError && (
+        <div
+          role="alert"
+          className="rounded-lg ring-1 ring-rose-300 dark:ring-rose-700/50 bg-rose-50 dark:bg-rose-900/25 px-3 py-2 text-xs text-rose-700 dark:text-rose-200"
+        >
+          {dialogError}
+        </div>
+      )}
 
       {dialog.key === 'create_task' && (
         <div className="space-y-3">
