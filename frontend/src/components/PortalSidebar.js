@@ -5,6 +5,7 @@ import { useUserPreferences } from '../context/UserPreferencesContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { DEMO_PERSONAS } from '../constants/permissions';
 import { ROUTES } from '../constants/routes';
+import { resolveApiBase } from '../utils/apiBase';
 
 /* ─── SVG Icons ────────────────────────────────────────────────────────── */
 const SvgPulse = () => (
@@ -156,14 +157,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const handleSwitchPersona = async (persona) => {
     try {
       setShowPersonaModal(false);
-      const apiBase = (() => {
-        if (typeof window !== 'undefined' && window.location) {
-          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '7777' || window.location.port === '7778' || window.location.port === '3000') {
-            return `${window.location.protocol}//${window.location.hostname}:8989`;
-          }
-        }
-        return (process.env.REACT_APP_API_BASE || 'http://localhost:8989').replace(/\/$/, '');
-      })();
+      const apiBase = resolveApiBase();
       const tenantKey = tenant || 'prominencehealth';
       const res = await fetch(`${apiBase}/api/login`, {
         method: 'POST',

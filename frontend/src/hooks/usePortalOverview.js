@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { DEFAULT_APPLICATIONS } from "../context/AuthContext";
 import { createPortalOverview } from "../viewModels/common";
+import { API_BASE } from "../utils/apiBase";
 
 const DEFAULT_ERROR_MESSAGE =
   "We could not reach the portal services. Showing the latest synced data.";
@@ -110,7 +111,7 @@ export const usePortalOverview = ({
   availableApplications = [],
   purchasedApplications = [],
   appCatalog = [],
-  apiBaseUrl = (typeof window !== 'undefined' && window.location && (window.location.port === '7777' || window.location.port === '7778' || window.location.port === '3000' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ? (window.location.protocol + '//' + window.location.hostname + ':8989') : (process.env.REACT_APP_API_BASE || process.env.REACT_APP_API_URL || 'http://localhost:8989'),
+  apiBaseUrl = API_BASE,
   token,
   tenant,
   fallbackBuilder = buildFallbackOverview,

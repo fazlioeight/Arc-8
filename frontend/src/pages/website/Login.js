@@ -3,15 +3,8 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 import { ROUTES } from "../../constants/routes";
 import { DEMO_PERSONAS } from "../../constants/permissions";
+import { API_BASE } from "../../utils/apiBase";
 
-const API_BASE = (() => {
-  if (typeof window !== "undefined" && window.location) {
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      return `${window.location.protocol}//${window.location.hostname}:8989`;
-    }
-  }
-  return process.env.REACT_APP_API_BASE || "http://localhost:8989";
-})();
 const DEFAULT_TENANT = process.env.REACT_APP_DEFAULT_TENANT || "prominencehealth";
 
 const inputCls =

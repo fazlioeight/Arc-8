@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { resolveApiBase } from '../utils/apiBase';
 
 export const AuthContext = createContext();
 
@@ -289,18 +290,6 @@ export const AuthProvider = ({ children }) => {
     }));
     setAuthState(next);
   }, []);
-
-  const resolveApiBase = () => {
-    if (typeof window !== 'undefined' && window.location) {
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '7777' || window.location.port === '7778' || window.location.port === '3000') {
-        return `${window.location.protocol}//${window.location.hostname}:8989`;
-      }
-    }
-    if (process.env.REACT_APP_API_BASE) {
-      return process.env.REACT_APP_API_BASE.replace(/\/$/, '');
-    }
-    return '';
-  };
 
   const logout = useCallback(() => {
     const token = authState?.token;

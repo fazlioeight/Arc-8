@@ -85,7 +85,7 @@ if (-not $SkipBuild) {
   } else {
     Write-Host "  -> Local npm not found in PATH; building via Docker (node:20-alpine)..." -ForegroundColor DarkCyan
     $dockerPath = $FrontendDir.Replace('\', '/')
-    docker run --rm -v "${dockerPath}:/app" -w /app node:20-alpine npm run build
+    docker run --rm -v "${dockerPath}:/app" -w /app -e CI=false node:20-alpine npm run build
   }
   if ($LASTEXITCODE -ne 0) {
     throw "Frontend build failed with exit code $LASTEXITCODE"
@@ -142,7 +142,7 @@ cd $RemoteDir
 tar -xzf deploy_backend.tar.gz -C ./backend
 rm -rf ./frontend_build/*
 tar -xzf deploy_frontend.tar.gz -C ./frontend_build
-docker restart arc8-backend arc8-frontend arc8-frontend-testing
+docker restart arc8-backend arc8-frontend arc8-frontend-testing arc8-frontend-prod 2>/dev/null || docker restart arc8-backend arc8-frontend arc8-frontend-testing
 sleep 4
 $seedCmd
 ./status.sh

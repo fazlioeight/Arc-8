@@ -62,7 +62,8 @@ services:
       DEFAULT_TENANT_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/prominence_tenant"
       TENANT_DATABASE_URL_TEMPLATE: "postgresql+asyncpg://postgres:postgres@postgres:5432/{tenant_key}"
       REDIS_URL: "redis://redis:6379/0"
-      CORS_ORIGINS: '["http://localhost:7777","http://127.0.0.1:7777","http://localhost:7778","http://127.0.0.1:7778","http://localhost:3000","http://frontend:3000"]'
+      CORS_ORIGINS: '["http://localhost:7777","http://127.0.0.1:7777","http://localhost:7778","http://127.0.0.1:7778","http://localhost:7779","http://127.0.0.1:7779","http://localhost:3000","http://frontend:3000","https://arc8-mvp.site","https://www.arc8-mvp.site","https://dev.arc8-mvp.site","https://test.arc8-mvp.site"]'
+      ALLOWED_TENANT_HOSTS: '{"arc8-mvp.site":"prominencehealth","www.arc8-mvp.site":"prominencehealth","dev.arc8-mvp.site":"prominencehealth","test.arc8-mvp.site":"prominencehealth"}'
       RATE_LIMIT_ENABLED: "false"
       REQUIRE_ADMIN_MFA: "false"
       REQUIRE_PHI_MFA: "false"
@@ -79,7 +80,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        REACT_APP_API_BASE: http://localhost:8989
+        REACT_APP_API_BASE: ""
     container_name: arc8-frontend
     restart: unless-stopped
     ports:

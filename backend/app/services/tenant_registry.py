@@ -163,7 +163,7 @@ class TenantRegistry:
             if subdomain:
                 return subdomain
         parts = bare_host.split('.')
-        if len(parts) > 2:
+        if len(parts) > 2 and parts[0] not in {"www", "dev", "test", "staging", "api", "app"}:
             return parts[0]
         return None
 

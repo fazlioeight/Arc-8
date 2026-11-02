@@ -41,7 +41,7 @@ import './ChatPage.css';
 // are relative paths (``/api/chat/artifacts/...``), so we prepend the API
 // origin before navigating. Without this, ``<a href="/api/...">`` resolves
 // against the *frontend* origin and the SPA catches it as a 404.
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+import { API_BASE } from '../../../utils/apiBase';
 
 const absoluteApiUrl = (relative) => {
   if (!relative) return relative;

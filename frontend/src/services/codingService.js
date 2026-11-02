@@ -3,15 +3,7 @@ import {
   fetchMember360Members,
   fetchMember360MemberDetail,
 } from './member360LabService';
-
-const API_BASE = (() => {
-  if (typeof window !== 'undefined' && window.location) {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '7777' || window.location.port === '7778' || window.location.port === '3000') {
-      return `${window.location.protocol}//${window.location.hostname}:8989`;
-    }
-  }
-  return (process.env.REACT_APP_API_BASE || 'http://localhost:8989').replace(/\/$/, '');
-})();
+import { API_BASE } from '../utils/apiBase';
 
 const buildHeaders = (token, tenant) => ({
   'Content-Type': 'application/json',

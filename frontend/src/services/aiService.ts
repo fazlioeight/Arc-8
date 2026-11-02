@@ -6,17 +6,7 @@
  * picks up 401s and the auth-context logout path still works.
  */
 import type { AskRequest, AskResponse } from '../types/ai';
-
-const API_BASE: string = (() => {
-  if (process.env.REACT_APP_API_BASE) return process.env.REACT_APP_API_BASE;
-  if (process.env.NODE_ENV !== 'production') return 'http://localhost:8000';
-  // In production a missing base URL is a deploy bug. We log loudly and
-  // return an empty string so the surfaced error is "Failed to fetch"
-  // pointing at the relative URL, not a hung request to localhost.
-  // eslint-disable-next-line no-console
-  console.error('REACT_APP_API_BASE is not set; AI assistant calls will fail.');
-  return '';
-})();
+import { API_BASE } from '../utils/apiBase';
 
 /**
  * Surface for callers — the panel uses this directly, no React Query yet.

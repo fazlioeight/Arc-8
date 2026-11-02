@@ -100,7 +100,19 @@ for origin in settings.CORS_ORIGINS:
     cors_origins.append(origin_str)
     cors_origins.append(f"{origin_str}/")
 
-for extra in ["http://localhost:7777", "http://localhost:7778", "http://127.0.0.1:7777", "http://127.0.0.1:7778", "http://localhost:3000"]:
+for extra in [
+    "http://localhost:7777",
+    "http://localhost:7778",
+    "http://localhost:7779",
+    "http://127.0.0.1:7777",
+    "http://127.0.0.1:7778",
+    "http://127.0.0.1:7779",
+    "http://localhost:3000",
+    "https://arc8-mvp.site",
+    "https://www.arc8-mvp.site",
+    "https://dev.arc8-mvp.site",
+    "https://test.arc8-mvp.site",
+]:
     if extra not in cors_origins:
         cors_origins.append(extra)
         cors_origins.append(f"{extra}/")

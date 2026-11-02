@@ -91,7 +91,12 @@ class Settings(BaseSettings):
 
     FIELD_ENCRYPTION_KEY: Optional[str] = None
 
-    ALLOWED_TENANT_HOSTS: Dict[str, str] = {}
+    ALLOWED_TENANT_HOSTS: Dict[str, str] = {
+        "arc8-mvp.site": "prominencehealth",
+        "www.arc8-mvp.site": "prominencehealth",
+        "dev.arc8-mvp.site": "prominencehealth",
+        "test.arc8-mvp.site": "prominencehealth",
+    }
     CANONICAL_HOST_DOMAIN: Optional[str] = None
 
     AUDIT_LOG_PATH: str = "logs/audit.log"
