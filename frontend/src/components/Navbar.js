@@ -1,5 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useContext } from "react";
 import { NavLink } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
+import { ROUTES } from "../constants/routes";
 
 const NAVIGATION = [
   {
@@ -80,6 +82,7 @@ const DropdownMenu = ({ nav, isOpen, onClose }) => {
 };
 
 const Navbar = () => {
+  const { isAuthenticated, role, user, tenant } = useContext(AuthContext) || {};
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [mobileExpanded, setMobileExpanded] = useState(null);
@@ -115,13 +118,22 @@ const Navbar = () => {
         <NavLink
           to="/"
           onClick={closeAll}
-          className="flex shrink-0 items-center gap-2.5"
+          className="group flex shrink-0 items-center gap-3"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-[13px] font-black text-white shadow-sm">
-            N
-          </div>
-          <span className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
-            Nexora Lab
+          <img
+            src="/images/arc8-logo.png"
+            alt="Arc-8 logo"
+            className="h-9 w-auto rounded-lg object-contain shadow-sm transition-transform duration-200 group-hover:scale-105"
+          />
+          <span
+            className="flex items-baseline text-[21px] font-extrabold leading-none"
+            style={{ fontFamily: "'Outfit', 'Space Grotesk', 'Plus Jakarta Sans', sans-serif", letterSpacing: "-0.03em" }}
+          >
+            <span className="text-slate-900 dark:text-white">Arc</span>
+            <span className="mx-0.5 font-bold text-sky-500 dark:text-sky-400">-</span>
+            <span className="bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-500 dark:from-sky-400 dark:via-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">
+              8
+            </span>
           </span>
         </NavLink>
 
@@ -181,12 +193,35 @@ const Navbar = () => {
 
         {/* ── Desktop CTA ───────────────────────────────────── */}
         <div className="hidden items-center gap-3 lg:flex">
-          <NavLink
-            to="/login"
-            className="inline-flex h-9 items-center justify-center rounded-lg bg-brand-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-          >
-            Sign in
-          </NavLink>
+          {isAuthenticated ? (
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-2.5 py-1 text-xs font-semibold text-sky-700 dark:text-sky-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                {(role || "User").toUpperCase()}
+              </span>
+              <NavLink
+                to={ROUTES.PORTAL.LANDING}
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-sky-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+              >
+                Go to Platform
+              </NavLink>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <NavLink
+                to="/login"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                Sign in
+              </NavLink>
+              <NavLink
+                to="/login"
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-sky-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+              >
+                Launch Workspace
+              </NavLink>
+            </div>
+          )}
         </div>
 
         {/* ── Mobile toggle ─────────────────────────────────── */}

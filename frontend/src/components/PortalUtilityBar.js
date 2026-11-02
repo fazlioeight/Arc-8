@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useCommandPalette } from '../context/CommandPaletteContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { ROUTES } from '../constants/routes';
 import Icon from './ui/Icon';
 
@@ -72,19 +73,21 @@ const JobsIcon    = () => <svg className="h-4 w-4 fill-current" viewBox="0 0 24 
 const ChevronDown = () => <svg className="h-3.5 w-3.5 fill-current opacity-60" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg>;
 
 /* ─── Component ────────────────────────────────────────────────────────── */
-const PortalUtilityBar = () => {
+const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
   const navigate  = useNavigate();
   const location  = useLocation();
   const {
-    user, logout, hasApplicationAccess,
+    user, logout, hasApplicationAccess, role,
     availableApplications = [], availableTenants = [],
     tenant, tenantInfo, setTenant,
-    isImpersonating, impersonation, endImpersonation,
+    isImpersonating, impersonation, endImpersonation, startImpersonation,
     auditTrail = [], recordAuditEvent,
   } = useContext(AuthContext) || {};
 
   const { openPalette } = useCommandPalette();
-  const { favorites, toggleFavorite, isFavorite, isNavItemEnabled } = useUserPreferences();
+  const { favorites, toggleFavorite, isFavorite, isNavItemEnabled, t } = useUserPreferences();
+  const { currentRole, can } = usePermissions();
+  const effectiveRoleLabel = (currentRole || role || 'user').replace(/_/g, ' ');
 
   const [showWaffle,     setShowWaffle]     = useState(false);
   const [showNotif,      setShowNotif]      = useState(false);
@@ -108,13 +111,13 @@ const PortalUtilityBar = () => {
   }, []);
 
   const applicationTiles = useMemo(() => [
-    { key: 'portal',       label: 'Nexora Lab',          desc: 'Metrics & insights',     icon: 'NL', color: '#0176d3', path: ROUTES.PORTAL.LANDING },
+    { key: 'portal',       label: 'Arc-8',                desc: 'Metrics & insights',     icon: 'A8', color: '#0176d3', path: ROUTES.PORTAL.LANDING },
     { key: 'member360',    label: 'Member 360',          desc: 'Chart launchpad',        icon: 'M3', color: '#0891b2', path: ROUTES.MEMBER360_LAB.DASHBOARD },
     { key: 'coding',       label: 'Coding Worklists',    desc: 'Member reviews',         icon: 'CD', color: '#0f172a', path: ROUTES.CODING.WORKLIST },
     { key: 'providers',    label: 'Providers',           desc: 'Directory search',       icon: 'PR', color: '#1f2937', path: ROUTES.PROVIDERS.LANDING },
     { key: 'ride_booking', label: 'Ride Booking',        desc: 'Transportation',         icon: 'RB', color: '#2563eb', path: '/ride-booking' },
     { key: 'dashboard',    label: 'Dashboard',           desc: 'Analytics view',         icon: 'DB', color: '#4f46e5', path: '/dashboard' },
-    { key: 'chat',         label: 'Nexora Chat',         desc: 'Claude assistant',       icon: 'AI', color: '#7c3aed', path: ROUTES.CHAT },
+    { key: 'chat',         label: 'Arc-8 Chat',           desc: 'Claude assistant',       icon: 'AI', color: '#7c3aed', path: ROUTES.CHAT },
     { key: 'docs',         label: 'Docs Library',        desc: 'Knowledge base',         icon: 'DL', color: '#6366f1', path: ROUTES.DOCS },
     { key: 'job_center',   label: 'Job Center',          desc: 'Logs & retry',           icon: 'JC', color: '#0f766e', path: ROUTES.JOBS.STATUS_CENTER },
     { key: 'settings',     label: 'Settings',            desc: 'Preferences',            icon: 'ST', color: '#64748b', path: ROUTES.SETTINGS },
@@ -193,12 +196,25 @@ const PortalUtilityBar = () => {
       {/* Bar */}
       <div
         ref={barRef}
-        className="relative z-40 border-b backdrop-blur-md coding-member-header"
+        className="relative z-40 border-b border-slate-200 bg-white/90 dark:border-slate-800/80 dark:bg-[#0a0f1d]/90 backdrop-blur-md"
       >
-        <div className="mx-auto flex max-w-content items-center justify-between gap-3 px-4 py-2">
+        <div className="flex w-full items-center justify-between gap-3 px-6 py-2.5">
 
           {/* ── Left cluster ────────────────────────── */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            {onToggleSidebar && (
+              <button
+                type="button"
+                className={iconBtn}
+                title={sidebarCollapsed ? 'Expand sidebar menu' : 'Collapse sidebar menu'}
+                onClick={onToggleSidebar}
+              >
+                <svg className="h-4 w-4 fill-current text-slate-600 dark:text-slate-300" viewBox="0 0 24 24">
+                  <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+                </svg>
+              </button>
+            )}
+
             {/* Waffle */}
             <div className="relative">
               <button
@@ -215,7 +231,7 @@ const PortalUtilityBar = () => {
                   className="absolute left-0 top-full z-50 mt-1.5 w-[min(90vw,560px)] rounded-xl p-3 shadow-dropdown coding-surface"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <DropdownHeader>Quick links</DropdownHeader>
+                  <DropdownHeader>{t('utility.quick_links', 'Quick links')}</DropdownHeader>
                   <div className="mt-1.5 grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2">
                     {accessibleApps.map((app) => (
                       <button
@@ -372,10 +388,18 @@ const PortalUtilityBar = () => {
               )}
             </div>
 
+            {/* Role Badge */}
+            <div className="hidden md:flex items-center">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-xs font-semibold text-sky-700 dark:text-sky-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                {effectiveRoleLabel.toUpperCase()}
+              </span>
+            </div>
+
             {/* Avatar / User menu */}
             <div className="relative">
               <button
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-brand-800 text-[13px] font-bold text-white shadow-sm transition hover:brightness-110"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-sky-600 to-sky-800 text-[13px] font-bold text-white shadow-sm transition hover:brightness-110"
                 title="Account"
                 aria-haspopup="true"
                 aria-expanded={showUser}
@@ -385,16 +409,32 @@ const PortalUtilityBar = () => {
               </button>
               {showUser && (
                 <DropdownShell alignRight onClick={(e) => e.stopPropagation()}>
-                  <DropdownItem onClick={() => { closeAll(); navigate(ROUTES.SETTINGS); }}>
-                    <span className="text-sm font-medium">Profile &amp; preferences</span>
+                  <div className="px-3 py-2 border-b coding-divider">
+                    <div className="text-xs font-bold coding-text-strong">{user?.email}</div>
+                    <div className="text-[11px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">
+                      {t('utility.role', 'Role')}: {effectiveRoleLabel}
+                    </div>
+                  </div>
+                  {can('menu:role_privileges') && (
+                    <DropdownItem onClick={() => { closeAll(); navigate(`${ROUTES.SETTINGS}#privileges`); }}>
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-sm font-medium">{t('utility.roles_privileges', 'Roles & Privileges')}</span>
+                        <span className="rounded bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300 px-1.5 py-0.2 text-[10px] font-bold uppercase">
+                          Config
+                        </span>
+                      </div>
+                    </DropdownItem>
+                  )}
+                  <DropdownItem onClick={() => { closeAll(); navigate(`${ROUTES.SETTINGS}#general`); }}>
+                    <span className="text-sm font-medium">{t('utility.profile_preferences', 'Profile & preferences')}</span>
                   </DropdownItem>
                   <DropdownItem onClick={() => { closeAll(); handleCommandPalette(); }}>
-                    <span className="flex-1 text-sm font-medium">Open command palette</span>
+                    <span className="flex-1 text-sm font-medium">{t('utility.open_command_palette', 'Open command palette')}</span>
                     <span className="text-xs coding-text-muted">⌘K</span>
                   </DropdownItem>
                   <div className="my-1 border-t coding-divider" />
                   <DropdownItem onClick={() => { closeAll(); logout?.(); navigate('/login'); }}>
-                    <span className="text-sm font-medium text-red-600 dark:text-red-400">Log out</span>
+                    <span className="text-sm font-medium text-red-600 dark:text-red-400">{t('utility.log_out', 'Log out')}</span>
                   </DropdownItem>
                 </DropdownShell>
               )}

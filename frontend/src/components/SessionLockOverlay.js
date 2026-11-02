@@ -1,4 +1,4 @@
-﻿import React, { useContext, useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import '../styles/sessionLock.css';
 
@@ -26,7 +26,7 @@ const SessionLockOverlay = () => {
         <div className="session-lock__meta">
           <div>
             <span>Signed in as</span>
-            <strong>{user?.email || 'user@nexoralab.test'}</strong>
+            <strong>{user?.email || 'user@arc8.test'}</strong>
           </div>
         </div>
         <div className="session-lock__actions">

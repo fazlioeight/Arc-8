@@ -4,7 +4,7 @@
 // router can send the user back to /login. Unauthenticated requests (e.g.
 // the login form itself) are left alone so the user can retry on the page.
 
-const installed = Symbol.for('nexora.fetchInterceptor.installed');
+const installed = Symbol.for('arc8.fetchInterceptor.installed');
 
 const carriesAuthHeader = (init) => {
   if (!init || !init.headers) return false;

@@ -90,6 +90,30 @@ router = APIRouter(
 )
 
 
+async def _require_documents_access(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> AuthenticatedUser:
+    """Allow clinical staff with member360 access AND patients with portal access to view documents (scoped for patients)."""
+    allowed_apps = {"member360", "docs", "portal"}
+    if not any(app in (current_user.app_permissions or {}) for app in allowed_apps):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User does not have access to documents",
+        )
+    return current_user
+
+
+documents_router = APIRouter(
+    prefix="/api/member360",
+    tags=["member360"],
+    dependencies=[
+        Depends(_require_documents_access),
+        Depends(require_mfa),
+        Depends(phi_rate_limit()),
+    ],
+)
+
+
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard(
     tenant: TenantContext = Depends(get_tenant_context),
@@ -123,6 +147,11 @@ async def list_members(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
+    if (current_user.role or "").strip().lower() in {"patient", "member"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Patient role is not permitted to query the population member roster",
+        )
     items, total = await member360_service.list_members(
         session,
         search=search,
@@ -567,7 +596,7 @@ async def list_care_options(
     return {"items": items, "total": total}
 
 
-@router.get("/documents", response_model=DocumentListResponse)
+@documents_router.get("/documents", response_model=DocumentListResponse)
 async def list_documents(
     member_id: Optional[int] = Query(default=None),
     document_type: Optional[str] = Query(default=None),
@@ -578,11 +607,24 @@ async def list_documents(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
+    effective_member_id = member_id
+    if (current_user.role or "").strip().lower() in {"patient", "member", "user"}:
+        from sqlalchemy import select
+        from ..models.member360 import Member360Member
+        matched_id = await session.scalar(
+            select(Member360Member.id).where(Member360Member.email == current_user.email).limit(1)
+        )
+        if not matched_id:
+            matched_id = await session.scalar(
+                select(Member360Member.id).order_by(Member360Member.id.asc()).limit(1)
+            )
+        effective_member_id = matched_id or 1
+
     items, total = await member360_service.list_documents_all(
         session,
         limit=limit,
         offset=offset,
-        member_id=member_id,
+        member_id=effective_member_id,
         document_type=document_type,
     )
     await record_audit_event(
@@ -590,7 +632,7 @@ async def list_documents(
         tenant_id=tenant.id,
         actor=current_user.email,
         event_type="member360.documents.list",
-        payload={"count": len(items), "total": total, "filters": {"member_id": member_id, "document_type": document_type}},
+        payload={"count": len(items), "total": total, "filters": {"member_id": effective_member_id, "document_type": document_type}},
     )
     await session.commit()
     await control_session.commit()

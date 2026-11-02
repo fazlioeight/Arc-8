@@ -1,22 +1,9 @@
 // API base URL.
 //
 // In development (`npm start`, `npm test`) we fall back to localhost:8000 so
-// engineers don't need to set the env var. In production builds, a missing
-// REACT_APP_API_BASE is a deploy-time misconfiguration — the previous silent
-// fallback to localhost would result in every API call going to the user's
-// own machine and looking like a CORS error or a hung request. Fail loudly
-// at module load instead so the misconfiguration is obvious in the browser
-// console rather than buried as a per-request failure.
-const API_BASE = (() => {
-  if (process.env.REACT_APP_API_BASE) return process.env.REACT_APP_API_BASE;
-  if (process.env.NODE_ENV !== 'production') return 'http://localhost:8000';
-  // eslint-disable-next-line no-console
-  console.error(
-    'REACT_APP_API_BASE is not set on this production build. Member360 API ' +
-    'calls will fail. Set REACT_APP_API_BASE in the build environment.'
-  );
-  return '';
-})();
+// engineers don't need to set the env var. In production builds, domain and
+// container port resolution are handled dynamically by utils/apiBase.
+import { API_BASE } from "../utils/apiBase";
 
 const buildHeaders = (token, tenant) => ({
   'Content-Type': 'application/json',

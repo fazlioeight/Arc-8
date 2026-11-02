@@ -58,7 +58,7 @@ class ChatExportRequest(BaseModel):
     title: Optional[str] = Field(
         default=None,
         max_length=200,
-        description="Optional document title. Defaults to 'Nexora Chat Transcript'.",
+        description="Optional document title. Defaults to 'Arc-8 Chat Transcript'.",
     )
     messages: list[ChatExportMessage] = Field(
         ...,

@@ -12,11 +12,22 @@ export const extractMemberTokens = (member) => {
   if (!member) {
     return [];
   }
+  const fullName =
+    member?.fullName ||
+    [member?.first_name, member?.last_name].filter(Boolean).join(" ").trim() ||
+    null;
   return [
     toLowerString(member?.id),
     toLowerString(member?.member_id),
     toLowerString(member?.memberId),
     toLowerString(member?.member_key),
+    toLowerString(fullName),
+    toLowerString(member?.first_name),
+    toLowerString(member?.last_name),
+    toLowerString(member?.plan_name),
+    toLowerString(member?.planName),
+    toLowerString(member?.line_of_business),
+    toLowerString(member?.lineOfBusiness),
   ].filter(Boolean);
 };
 
@@ -46,6 +57,7 @@ export const formatMemberLabel = (member) => {
   const pieces = [
     pickMemberDisplayValue(member),
     [member?.first_name, member?.last_name].filter(Boolean).join(" "),
+    member?.plan_name || member?.planName || member?.line_of_business || null,
     member?.dob ? `DOB ${member.dob}` : null,
   ].filter(Boolean);
   return pieces.join(" | ");
@@ -71,16 +83,16 @@ export const buildMemberOption = (member) => {
 };
 
 export const DEFAULT_MEMBER_SEARCH_MESSAGES = {
-  emptySearchError: "Enter a member ID to continue.",
+  emptySearchError: "Enter a member ID, name, or health plan to continue.",
   searchErrorFallback: "Unable to search members right now.",
   lookupErrorFallback: "Unable to open that member right now.",
-  notFound: "Member not found. Try another ID.",
+  notFound: "Member not found. Try another member ID, name, or plan.",
   status: {
     launching: "Opening member chart...",
     searching: "Searching members...",
-    prompt: "Enter at least two characters to search by member ID.",
+    prompt: "Enter at least two characters to search by member ID, name, or plan.",
     hasSuggestions:
-      "Press Enter to open the highlighted member chart or pick a suggestion.",
+      "Press Enter or Open chart to launch, or pick a matching member below.",
     empty: "No suggestions yet.",
   },
 };
@@ -188,16 +200,53 @@ export const useMemberSearch = ({
     memberService,
   ]);
 
+  const pickBestMatchFromItems = useCallback((items, rawTerm) => {
+    if (!Array.isArray(items) || !items.length) return null;
+    const lowerTerm = (rawTerm || "").trim().toLowerCase();
+    if (!lowerTerm) return null;
+
+    // 1. Exact ID / member_key match
+    const exactId = items.find((m) =>
+      [m?.id, m?.member_id, m?.memberId, m?.member_key]
+        .filter((v) => v !== undefined && v !== null)
+        .some((v) => String(v).toLowerCase() === lowerTerm)
+    );
+    if (exactId) return exactId;
+
+    // 2. Exact full name match
+    const exactName = items.find((m) => {
+      const full = (m?.fullName || [m?.first_name, m?.last_name].filter(Boolean).join(" ")).trim().toLowerCase();
+      return full && full === lowerTerm;
+    });
+    if (exactName) return exactName;
+
+    // 3. Exact token match (plan name, first/last name, LOB)
+    const exactToken = items.find((m) => extractMemberTokens(m).includes(lowerTerm));
+    if (exactToken) return exactToken;
+
+    // 4. Partial match in tokens or formatted label, or first returned search hit
+    const partial = items.find(
+      (m) =>
+        extractMemberTokens(m).some((tok) => tok.includes(lowerTerm)) ||
+        formatMemberLabel(m).toLowerCase().includes(lowerTerm)
+    );
+    return partial || items[0];
+  }, []);
+
   const resolveMemberId = useCallback(
     (value) => {
       const term = value?.trim().toLowerCase();
       if (!term) {
         return null;
       }
-      const match = memberSuggestions.find((member) =>
-        extractMemberTokens(member).includes(term)
+      // Only immediately short-circuit on an exact ID/member_key match from cached suggestions;
+      // for name or plan searches we confirm against the live search results.
+      const exactIdMatch = memberSuggestions.find((member) =>
+        [member?.id, member?.member_id, member?.memberId, member?.member_key]
+          .filter((v) => v !== undefined && v !== null)
+          .some((v) => String(v).toLowerCase() === term)
       );
-      return pickMemberIdForNavigation(match);
+      return pickMemberIdForNavigation(exactIdMatch);
     },
     [memberSuggestions]
   );
@@ -238,15 +287,8 @@ export const useMemberSearch = ({
           const items = Array.isArray(response?.items) ? response.items : [];
           if (items.length) {
             setMemberSuggestions(items);
-          }
-          const lowerTerm = term.toLowerCase();
-          const exactMatch = items.find((member) =>
-            extractMemberTokens(member).includes(lowerTerm)
-          );
-          if (exactMatch) {
-            memberId = pickMemberIdForNavigation(exactMatch);
-          } else if (items.length === 1) {
-            memberId = pickMemberIdForNavigation(items[0]);
+            const best = pickBestMatchFromItems(items, term);
+            memberId = pickMemberIdForNavigation(best);
           }
         } catch (error) {
           console.error("Member lookup failed", error);
@@ -273,6 +315,7 @@ export const useMemberSearch = ({
       messages.lookupErrorFallback,
       messages.notFound,
       navigateToMember,
+      pickBestMatchFromItems,
       resolveMemberId,
       memberService,
     ]

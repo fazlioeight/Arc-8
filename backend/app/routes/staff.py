@@ -162,7 +162,7 @@ class ImpersonationResponse(BaseModel):
 
 
 def _otpauth_url(secret: str, email: str) -> str:
-    label = quote(f"{settings.MFA_ISSUER}:nexora-staff:{email}", safe="")
+    label = quote(f"{settings.MFA_ISSUER}:arc8-staff:{email}", safe="")
     issuer = quote(settings.MFA_ISSUER, safe="")
     return f"otpauth://totp/{label}?secret={secret}&issuer={issuer}&algorithm=SHA1&digits=6&period=30"
 
@@ -213,7 +213,7 @@ async def bootstrap_first_staff(
     request: Request,
     session: AsyncSession = Depends(get_control_session),
 ) -> StaffUserOut:
-    """Create the first Nexora staff account.
+    """Create the first Arc-8 staff account.
 
     Only works while `staff_users` is empty — otherwise existing staff must
     create new staff via `POST /api/staff/users` (authenticated).
@@ -434,7 +434,7 @@ async def staff_mfa_disable(
     if settings.REQUIRE_ADMIN_MFA:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="MFA is required for Nexora staff and cannot be disabled while REQUIRE_ADMIN_MFA is on",
+            detail="MFA is required for Arc-8 staff and cannot be disabled while REQUIRE_ADMIN_MFA is on",
         )
     staff.mfa_secret = None
     staff.mfa_enrolled_at = None

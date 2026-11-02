@@ -12,7 +12,7 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <ErrorBoundary
-      title="Nexora encountered an unexpected error"
+      title="Arc-8 encountered an unexpected error"
       description="Refresh the page or return home. If the problem persists, contact support."
     >
       <App />

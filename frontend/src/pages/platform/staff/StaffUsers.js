@@ -113,7 +113,7 @@ const StaffUsers = () => {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-              Nexora staff console
+              Arc-8 staff console
             </div>
             <h1 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">
               Manage staff

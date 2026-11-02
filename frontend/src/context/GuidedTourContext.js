@@ -8,12 +8,12 @@ import React, {
   useState,
 } from 'react';
 
-const TOUR_STORAGE_KEY = 'nexora-guided-tour-v1';
+const TOUR_STORAGE_KEY = 'arc8-guided-tour-v1';
 
 const DEFAULT_STEPS = [
   {
     id: 'navigation',
-    title: 'Welcome to Nexora Lab',
+    title: 'Welcome to Arc-8',
     description: 'The global navigation keeps your most-used areas one click away. Explore analytics, providers, jobs, and resources.',
     highlights: [
       'Use the top navigation bar to jump between analytics, providers, jobs, and docs.',
@@ -106,15 +106,9 @@ export const GuidedTourProvider = ({ children }) => {
   }, [startTour]);
 
   useEffect(() => {
-    if (isCompleted || autoStartRef.current) {
-      return undefined;
-    }
-    autoStartRef.current = true;
-    const timer = setTimeout(() => {
-      startTour({ force: true, step: 0 });
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [isCompleted, startTour]);
+    // Keep tour on-demand via Command Palette or Help menu
+    return undefined;
+  }, []);
 
   const value = useMemo(() => ({
     isOpen,

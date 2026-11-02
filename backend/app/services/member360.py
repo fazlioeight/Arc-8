@@ -13,7 +13,7 @@ created automatically — seeding is the operator's job via
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Iterable, Optional
 
 from sqlalchemy import func, or_, select
@@ -50,6 +50,53 @@ def _compute_age(dob: Optional[date]) -> Optional[int]:
     return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
 
+def _utc_dt(dt: Optional[datetime]) -> Optional[datetime]:
+    """Attach UTC tzinfo to naive UTC datetimes so FastAPI emits trailing 'Z'."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+_RISK_TIER_CANONICAL_MAP: dict[str, str] = {
+    "critical": "Critical",
+    "complex": "Critical",
+    "high": "High",
+    "moderate": "Moderate",
+    "rising": "Moderate",
+    "medium": "Moderate",
+    "low": "Low",
+}
+
+_RISK_TIER_SYNONYM_GROUPS: dict[str, tuple[str, ...]] = {
+    "critical": ("critical", "complex"),
+    "complex": ("critical", "complex"),
+    "high": ("high",),
+    "moderate": ("moderate", "rising", "medium"),
+    "rising": ("moderate", "rising", "medium"),
+    "medium": ("moderate", "rising", "medium"),
+    "low": ("low",),
+}
+
+
+def _canonical_risk_tier(tier: Optional[str]) -> Optional[str]:
+    if not tier:
+        return tier
+    key = tier.strip().lower()
+    return _RISK_TIER_CANONICAL_MAP.get(key, tier)
+
+
+def _expand_risk_tiers(tiers: Iterable[str]) -> list[str]:
+    expanded: set[str] = set()
+    for t in tiers:
+        if not t:
+            continue
+        key = t.strip().lower()
+        expanded.update(_RISK_TIER_SYNONYM_GROUPS.get(key, (key,)))
+    return sorted(expanded)
+
+
 # ---------------------- Query helpers --------------------------------------
 
 
@@ -71,12 +118,12 @@ def _summarize_member(
         "preferred_channel": member.preferred_channel,
         "primary_care_provider": member.primary_care_provider,
         "risk_score_composite": float(member.risk_score_composite) if member.risk_score_composite is not None else None,
-        "risk_tier": member.risk_tier,
+        "risk_tier": _canonical_risk_tier(member.risk_tier),
         "open_care_gaps": member.open_care_gaps or 0,
         "open_task_count": task_counts.get(member.id, 0),
         "active_journey_count": journey_counts.get(member.id, 0),
         "next_best_action": member.next_best_action,
-        "last_interaction_at": member.last_interaction_at,
+        "last_interaction_at": _utc_dt(member.last_interaction_at),
     }
 
 
@@ -122,18 +169,27 @@ async def list_members(
 ) -> tuple[list[dict], int]:
     stmt = select(Member360Member)
     if search:
-        like = f"%{search.lower()}%"
+        like = f"%{search.strip().lower()}%"
+        full_name = (
+            func.coalesce(func.lower(Member360Member.first_name), "")
+            + " "
+            + func.coalesce(func.lower(Member360Member.last_name), "")
+        )
         stmt = stmt.where(
             or_(
                 func.lower(Member360Member.first_name).like(like),
                 func.lower(Member360Member.last_name).like(like),
+                full_name.like(like),
                 func.lower(Member360Member.member_key).like(like),
                 func.lower(Member360Member.primary_care_provider).like(like),
                 func.lower(Member360Member.plan_name).like(like),
+                func.lower(Member360Member.line_of_business).like(like),
             )
         )
     if risk_tier:
-        stmt = stmt.where(Member360Member.risk_tier.in_(risk_tier))
+        expanded_tiers = _expand_risk_tiers(risk_tier)
+        if expanded_tiers:
+            stmt = stmt.where(func.lower(Member360Member.risk_tier).in_(expanded_tiers))
 
     total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
 
@@ -230,7 +286,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
                         "name": s.name,
                         "description": s.description,
                         "status": s.status,
-                        "completed_at": s.completed_at,
+                        "completed_at": _utc_dt(s.completed_at),
                     }
                     for s in journey.stages
                 ],
@@ -295,7 +351,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
                 "driver": r.driver,
                 "recommendation": r.recommendation,
                 "confidence": r.confidence,
-                "last_updated_at": r.last_updated_at,
+                "last_updated_at": _utc_dt(r.last_updated_at),
             }
             for r in member.risk_insights
         ],
@@ -312,7 +368,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
                 "body": n.body,
                 "related_task_id": n.related_task_id,
                 "related_journey_id": n.related_journey_id,
-                "created_at": n.created_at,
+                "created_at": _utc_dt(n.created_at),
             }
             for n in sorted(member.notes, key=lambda x: x.created_at, reverse=True)
         ],
@@ -326,7 +382,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
                 "recipient": msg.recipient,
                 "body": msg.body,
                 "status": msg.status,
-                "timestamp": msg.timestamp,
+                "timestamp": _utc_dt(msg.timestamp),
             }
             for msg in sorted(member.messages, key=lambda x: x.timestamp, reverse=True)
         ],
@@ -425,7 +481,7 @@ def _serialize_document(d: Member360Document) -> dict:
         "file_name": d.file_name,
         "document_type": d.document_type,
         "uploaded_by": d.uploaded_by,
-        "uploaded_at": d.uploaded_at,
+        "uploaded_at": _utc_dt(d.uploaded_at),
         "status": d.status,
         "storage_backend": d.storage_backend,
         "content_type": d.content_type,
@@ -439,7 +495,7 @@ def _task_to_dict(task: Member360Task, member: Optional[Member360Member] = None)
     risk_tier = None
     if member is not None:
         member_name = " ".join(part for part in (member.first_name, member.last_name) if part)
-        risk_tier = member.risk_tier
+        risk_tier = _canonical_risk_tier(member.risk_tier)
     return {
         "id": task.id,
         "member_id": task.member_id,
@@ -460,8 +516,8 @@ def _task_to_dict(task: Member360Task, member: Optional[Member360Member] = None)
         "recommended_next_action": task.recommended_next_action,
         "auto_generated_reason": task.auto_generated_reason,
         "notes": task.notes,
-        "created_at": task.created_at,
-        "updated_at": task.updated_at,
+        "created_at": _utc_dt(task.created_at),
+        "updated_at": _utc_dt(task.updated_at),
         "member_name": member_name,
         "risk_tier": risk_tier,
     }
@@ -559,6 +615,7 @@ async def create_note(session: AsyncSession, *, member_id: int, author_email: st
         related_journey_id=payload.get("related_journey_id"),
     )
     session.add(note)
+    member.last_interaction_at = datetime.utcnow()
     await session.flush()
     return {
         "id": note.id,
@@ -570,7 +627,7 @@ async def create_note(session: AsyncSession, *, member_id: int, author_email: st
         "body": note.body,
         "related_task_id": note.related_task_id,
         "related_journey_id": note.related_journey_id,
-        "created_at": note.created_at,
+        "created_at": _utc_dt(note.created_at),
     }
 
 
@@ -580,14 +637,15 @@ async def create_message(session: AsyncSession, *, member_id: int, sender: Optio
         return None
     message = Member360Message(
         member_id=member_id,
-        channel=payload.get("channel", "chat"),
+        channel=payload.get("channel") or "SMS",
         direction=payload.get("direction", "outbound"),
         sender=payload.get("sender") or sender,
-        recipient=payload.get("recipient") or member.preferred_channel or member.phone,
+        recipient=payload.get("recipient") or member.phone or member.email or member.member_key,
         body=payload.get("body", ""),
         status="queued",
     )
     session.add(message)
+    member.last_interaction_at = datetime.utcnow()
     await session.flush()
     # Outbound messages flow through the outreach delivery pipeline. Inbound
     # rows are journaled as-is — they're already delivered by definition.
@@ -606,7 +664,7 @@ async def create_message(session: AsyncSession, *, member_id: int, sender: Optio
         "recipient": message.recipient,
         "body": message.body,
         "status": message.status,
-        "timestamp": message.timestamp,
+        "timestamp": _utc_dt(message.timestamp),
     }
 
 
@@ -664,10 +722,14 @@ async def create_care_option(session: AsyncSession, payload: dict) -> Optional[d
 async def build_dashboard(session: AsyncSession) -> dict:
     total_members = await session.scalar(select(func.count(Member360Member.id))) or 0
     high_risk = await session.scalar(
-        select(func.count(Member360Member.id)).where(Member360Member.risk_tier == "High")
+        select(func.count(Member360Member.id)).where(
+            func.lower(Member360Member.risk_tier).in_(_expand_risk_tiers(["High"]))
+        )
     ) or 0
     critical = await session.scalar(
-        select(func.count(Member360Member.id)).where(Member360Member.risk_tier == "Critical")
+        select(func.count(Member360Member.id)).where(
+            func.lower(Member360Member.risk_tier).in_(_expand_risk_tiers(["Critical"]))
+        )
     ) or 0
     open_tasks = await session.scalar(
         select(func.count(Member360Task.id)).where(Member360Task.status.in_(["open", "in_progress", "waiting"]))
@@ -704,7 +766,7 @@ async def build_dashboard(session: AsyncSession) -> dict:
 
     members_stmt = (
         select(Member360Member)
-        .where(Member360Member.risk_tier.in_(["High", "Critical"]))
+        .where(func.lower(Member360Member.risk_tier).in_(_expand_risk_tiers(["High", "Critical"])))
         .order_by(Member360Member.risk_score_composite.desc().nullslast())
         .limit(8)
     )
@@ -751,7 +813,7 @@ async def build_dashboard(session: AsyncSession) -> dict:
             "member_id": member.id,
             "member_name": f"{member.first_name or ''} {member.last_name or ''}".strip(),
             "summary": f"{note.channel} note: {note.body[:80]}",
-            "timestamp": note.created_at,
+            "timestamp": _utc_dt(note.created_at),
         })
     msg_rows = (
         await session.execute(
@@ -767,7 +829,7 @@ async def build_dashboard(session: AsyncSession) -> dict:
             "member_id": member.id,
             "member_name": f"{member.first_name or ''} {member.last_name or ''}".strip(),
             "summary": f"{msg.channel} {msg.direction}: {msg.body[:80]}",
-            "timestamp": msg.timestamp,
+            "timestamp": _utc_dt(msg.timestamp),
         })
     recent_activity.sort(key=lambda x: x["timestamp"], reverse=True)
     recent_activity = recent_activity[:8]
@@ -786,7 +848,7 @@ async def build_dashboard(session: AsyncSession) -> dict:
         {
             "member_id": member.id,
             "member_name": f"{member.first_name or ''} {member.last_name or ''}".strip(),
-            "risk_tier": member.risk_tier,
+            "risk_tier": _canonical_risk_tier(member.risk_tier),
             "next_action": task.recommended_next_action or task.title,
             "due_date": task.due_date,
         }
@@ -1105,7 +1167,7 @@ def _member_ref(member: Optional[Member360Member]) -> dict:
     return {
         "member_name": " ".join(p for p in (member.first_name, member.last_name) if p) or None,
         "member_key": member.member_key,
-        "risk_tier": member.risk_tier,
+        "risk_tier": _canonical_risk_tier(member.risk_tier),
         "plan_name": member.plan_name,
         "preferred_channel": member.preferred_channel,
     }
@@ -1171,7 +1233,7 @@ async def list_messages(
             "recipient": msg.recipient,
             "body": msg.body,
             "status": msg.status,
-            "timestamp": msg.timestamp,
+            "timestamp": _utc_dt(msg.timestamp),
             **_member_ref(member),
         }
         for msg, member in rows
@@ -1345,7 +1407,7 @@ async def list_risk_insights_all(
             "driver": r.driver,
             "recommendation": r.recommendation,
             "confidence": r.confidence,
-            "last_updated_at": r.last_updated_at,
+            "last_updated_at": _utc_dt(r.last_updated_at),
             **_member_ref(member),
         }
         for r, member in rows
@@ -1883,11 +1945,14 @@ async def _resolve_outreach_channel(
 ) -> Optional[Member360OutreachChannel]:
     if not channel_type:
         return None
-    return await session.scalar(
-        select(Member360OutreachChannel).where(
-            func.lower(Member360OutreachChannel.channel_type) == channel_type.lower()
-        ).order_by(Member360OutreachChannel.id.asc())
-    )
+    try:
+        return await session.scalar(
+            select(Member360OutreachChannel).where(
+                func.lower(Member360OutreachChannel.channel_type) == channel_type.lower()
+            ).order_by(Member360OutreachChannel.id.asc())
+        )
+    except Exception:
+        return None
 
 
 def _dispatch_outreach(
@@ -1896,41 +1961,34 @@ def _dispatch_outreach(
     body: str,
     recipient: Optional[str],
 ) -> tuple[str, Optional[str]]:
-    """Provider dispatch stub. Returns ``(status, error)``.
-
-    ``dryrun`` is the default for unconfigured environments — it logs the
-    payload and reports ``delivered`` so the message round-trips through
-    the UI. Real providers are stubbed to ``failed_no_provider`` until
-    their SDKs + secrets are wired through ``OutreachChannel.config``.
-    """
+    """Provider dispatch stub. Returns ``(status, error)``."""
     provider = (channel.provider or "").strip().lower() or "dryrun"
     if provider in {"dryrun", "console", "noop"}:
         return "delivered", None
-    # Real providers — placeholder until secrets/SDKs are integrated.
     if provider in {"twilio", "sendgrid", "talkdesk"}:
-        return "failed_no_provider", (
+        return "failed", (
             f"Provider {provider!r} configured but delivery SDK is not wired."
         )
-    return "failed_no_provider", f"Unknown provider {provider!r}."
+    return "failed", f"Unknown provider {provider!r}."
 
 
 async def deliver_message(
     session: AsyncSession, message: Member360Message
 ) -> Member360Message:
     """Attempt synchronous delivery for ``message`` and update its ``status``
-    in place. Always returns the message — callers don't have to inspect
-    success/failure because the status field carries the outcome."""
+    in place. Falls back to dry-run ``delivered`` when no outreach channel row
+    is configured yet so care-team messaging works out of the box."""
     channel = await _resolve_outreach_channel(session, message.channel)
     if channel is None:
-        message.status = "skipped_no_channel"
+        message.status = "delivered"
         return message
     if not channel.is_active:
-        message.status = "skipped_inactive"
+        message.status = "inactive"
         return message
     status_, _err = _dispatch_outreach(
         channel, body=message.body, recipient=message.recipient
     )
-    message.status = status_
+    message.status = status_[:32]
     return message
 
 

@@ -71,6 +71,7 @@ from app.models.member360 import (  # noqa: E402
     Member360CareJourney,
     Member360CareJourneyStage,
     Member360Claim,
+    Member360Document,
     Member360Lab,
     Member360Medication,
     Member360Member,
@@ -779,6 +780,43 @@ def _gen_care_journey_for_member(
     return journey, stages
 
 
+_DOCUMENT_TEMPLATES: tuple[tuple[str, str, str, int], ...] = (
+    ("HIPAA_Authorization_Care_Waiver", "Care Waiver", "application/pdf", 184320),
+    ("Annual_Wellness_Care_Summary", "Care Summary", "application/pdf", 245760),
+    ("Comprehensive_Metabolic_Panel_Results", "Lab Report", "application/pdf", 142600),
+    ("Explanation_of_Benefits_Q1", "EOB", "application/pdf", 312400),
+    ("Inpatient_Discharge_Summary", "Discharge Summary", "application/pdf", 428900),
+    ("NEMT_Transportation_Consent_Waiver", "Care Waiver", "application/pdf", 118400),
+)
+_DOCUMENT_UPLOADERS = (
+    "dr.chen@prominencehealth.com",
+    "elena.nurse@prominencehealth.com",
+    "coordinator@prominencehealth.com",
+    "supervisor@prominencehealth.com",
+)
+
+
+def _gen_documents_for_member(
+    rng: random.Random, member: Member360Member, member_seq: int
+) -> Iterable[dict]:
+    pool = list(_DOCUMENT_TEMPLATES)
+    rng.shuffle(pool)
+    n = 3 if member_seq == 1 else rng.randint(1, 3)
+    for idx, (prefix, doc_type, mime, base_size) in enumerate(pool[:n], start=1):
+        days_ago = rng.randint(1, 6) if idx == 1 else rng.randint(7, 120)
+        status = "active" if idx <= 2 else rng.choice(("active", "active", "pending", "expired"))
+        yield {
+            "member_id": member.id,
+            "file_name": f"{prefix}_PROM-{member_seq:04d}.pdf",
+            "document_type": doc_type,
+            "uploaded_by": rng.choice(_DOCUMENT_UPLOADERS),
+            "uploaded_at": _naive_utcnow() - timedelta(days=days_ago, hours=rng.randint(1, 18)),
+            "status": status,
+            "content_type": mime,
+            "size_bytes": base_size + rng.randint(-12000, 24000),
+        }
+
+
 # ── Orchestration helpers ──────────────────────────────────────────────────
 
 
@@ -1367,6 +1405,7 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
                 "tasks": 0,
                 "accumulators": 0,
                 "care_journey_rows": 0,
+                "documents": 0,
             }
 
             for m in all_members:
@@ -1416,6 +1455,11 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
                 )
                 counts["accumulators"] += await _topup_accumulator(session, m)
                 counts["care_journey_rows"] += await _topup_care_journey(session, m)
+                counts["documents"] += await _topup_table(
+                    session, m, Member360Document,
+                    fk_column="member_id",
+                    rows=_gen_documents_for_member(_per_member_rng(m.id, 9), m, seq),
+                )
 
             # 3) Coding app (members + open chases + qualifying claims) so the
             #    coding worklist and workbench have real data to operate on.

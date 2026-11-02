@@ -59,6 +59,8 @@ export const createMemberSummary = (raw) => {
   const assignedCoderIds = raw.assigned_coder_ids ?? raw.assignedCoderIds ?? [];
   const assignedCoderEmails = raw.assigned_coder_emails ?? raw.assignedCoderEmails ?? [];
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim() || null;
+  const planName = raw.plan_name ?? raw.planName ?? null;
+  const riskTier = raw.risk_tier ?? raw.riskTier ?? null;
 
   const mapped = {
     id,
@@ -74,6 +76,10 @@ export const createMemberSummary = (raw) => {
     dateOfBirth: dob,
     date_of_birth: dob,
     status: raw.status || "unknown",
+    planName,
+    plan_name: planName,
+    riskTier,
+    risk_tier: riskTier,
     lineOfBusiness: raw.line_of_business ?? raw.lineOfBusiness ?? null,
     line_of_business: raw.line_of_business ?? raw.lineOfBusiness ?? null,
     riskScore: toNumberOrNull(riskScore),

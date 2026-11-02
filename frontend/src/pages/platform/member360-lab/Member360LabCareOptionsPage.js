@@ -120,7 +120,7 @@ const Member360LabCareOptionsPage = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title="Care options"
       subtitle="Every steerage opportunity surfaced across the population, with potential savings."
       navItems={PORTAL_NAV_ITEMS}

@@ -28,6 +28,7 @@ import {
   updateTemplate,
 } from '../../../services/member360AdminService';
 import { LabSubNav } from './components';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 // Each section: how to render rows + which form schema drives the editor +
 // which service functions handle CRUD. Keeping these co-located makes it
@@ -588,6 +589,7 @@ const SectionPanel = ({ section, data, loading, error, onAdd, onEdit, onDelete }
 
 const Member360LabAdminPage = () => {
   const { token, tenant } = useContext(AuthContext) || {};
+  const { isAdmin } = usePermissions();
   const [sectionData, setSectionData] = useState({});
   const [sectionLoading, setSectionLoading] = useState({});
   const [sectionError, setSectionError] = useState({});
@@ -630,9 +632,10 @@ const Member360LabAdminPage = () => {
   }, [token, tenant]);
 
   useEffect(() => {
+    if (!isAdmin) return;
     loadAllSections();
     loadAudit();
-  }, [loadAllSections, loadAudit]);
+  }, [isAdmin, loadAllSections, loadAudit]);
 
   const handleDelete = async (section, item) => {
     const confirmed = window.confirm(
@@ -648,9 +651,32 @@ const Member360LabAdminPage = () => {
     }
   };
 
+  if (!isAdmin) {
+    return (
+      <PortalPageLayout
+        eyebrow="Arc-8 Member360"
+        title="Admin Settings"
+        subtitle="Access restricted to platform and tenant administrators."
+        navItems={PORTAL_NAV_ITEMS}
+        currentNav="member360-lab"
+        navProps={{ align: 'center', tone: 'surface' }}
+        align="left"
+        maxWidthClassName="max-w-7xl"
+        mainClassName="space-y-4"
+      >
+        <LabSubNav />
+        <AlertShell
+          tone="critical"
+          title="Administrative Access Restricted"
+          description="Your current role does not have authorization to view or configure Member 360 administrative templates, routing queues, or risk rules. Please switch to an Administrator persona or contact your supervisor."
+        />
+      </PortalPageLayout>
+    );
+  }
+
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title="Admin"
       subtitle="Configure templates, risk rules, queues, channels, and care option policies. All edits are tenant-scoped and audited."
       navItems={PORTAL_NAV_ITEMS}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { DEFAULT_APPLICATIONS } from "../context/AuthContext";
 import { createPortalOverview } from "../viewModels/common";
+import { API_BASE } from "../utils/apiBase";
 
 const DEFAULT_ERROR_MESSAGE =
   "We could not reach the portal services. Showing the latest synced data.";
@@ -94,8 +95,8 @@ export const buildFallbackOverview = (apps, user) => {
   return {
     applications: apps,
     profile: {
-      email: user?.email || "guest@nexoralab.test",
-      tenant: user?.tenant || "Nexora Lab Tenant",
+      email: user?.email || "guest@arc8.test",
+      tenant: user?.tenant || "Arc-8 Tenant",
       role: user?.role || "user",
       lastLogin: new Date(now - 6 * 60 * 60 * 1000).toISOString(),
     },
@@ -110,7 +111,7 @@ export const usePortalOverview = ({
   availableApplications = [],
   purchasedApplications = [],
   appCatalog = [],
-  apiBaseUrl = process.env.REACT_APP_API_BASE || process.env.REACT_APP_API_URL || "http://localhost:8000",
+  apiBaseUrl = API_BASE,
   token,
   tenant,
   fallbackBuilder = buildFallbackOverview,

@@ -121,7 +121,7 @@ const Products = () => {
       </div>
 
       <footer className={styles.productFooter}>
-        <p className="ds-text-muted mb-0">© 2025 Nexora Lab. All rights reserved.</p>
+        <p className="ds-text-muted mb-0">© 2025 Arc-8. All rights reserved.</p>
         <div className={styles.productFooterLinks}>
           <a href="/privacy" className="ds-link">Privacy</a>
           <a href="/terms" className="ds-link">Terms</a>

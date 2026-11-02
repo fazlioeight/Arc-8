@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import secrets
@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     PHI_RATE_LIMIT_PER_MINUTE: int = 30      # per authenticated user, PHI routes
 
     REQUIRE_ADMIN_MFA: bool = True
-    MFA_ISSUER: str = "Nexora Lab"
+    MFA_ISSUER: str = "Arc-8"
 
     # ── Member-facing portal (Feature 1+) ─────────────────────────────────
     # Public base URL of the white-labeled member portal SPA, used to build
@@ -91,7 +91,12 @@ class Settings(BaseSettings):
 
     FIELD_ENCRYPTION_KEY: Optional[str] = None
 
-    ALLOWED_TENANT_HOSTS: Dict[str, str] = {}
+    ALLOWED_TENANT_HOSTS: Dict[str, str] = {
+        "arc8-mvp.site": "prominencehealth",
+        "www.arc8-mvp.site": "prominencehealth",
+        "dev.arc8-mvp.site": "prominencehealth",
+        "test.arc8-mvp.site": "prominencehealth",
+    }
     CANONICAL_HOST_DOMAIN: Optional[str] = None
 
     AUDIT_LOG_PATH: str = "logs/audit.log"
@@ -117,17 +122,21 @@ class Settings(BaseSettings):
     MEMBER360_STORAGE_ROOT: str = "data/member360"
     MEMBER360_STORAGE_MAX_UPLOAD_MB: int = 25
 
-    # Azure Blob backend. Auth is via DefaultAzureCredential (managed
-    # identity in prod; az login / VS Code / env vars for dev) — no
-    # connection string or account key needed. Account name is provided
-    # per deployment (e.g. ``nexorachatstor53684``).
+    # AWS S3 Document Storage (Target AWS Architecture)
+    AWS_REGION: str = "us-east-1"
+    AWS_S3_BUCKET: Optional[str] = None
+    AWS_S3_PREFIX: str = "m360/"
+    AWS_S3_KMS_KEY_ID: Optional[str] = None
+    AWS_S3_ENDPOINT_URL: Optional[str] = None  # For LocalStack or custom endpoints
+
+    # Azure Blob backend (legacy/optional). Auth is via DefaultAzureCredential.
     AZURE_STORAGE_ACCOUNT_NAME: Optional[str] = None
     AZURE_STORAGE_CONTAINER_PREFIX: str = "m360-"
 
     FEATURE_FLAG_DEFAULTS: Dict[str, bool] = {"analytics": True}
 
     PORTAL_APPLICATIONS: Dict[str, Dict[str, str]] = {
-        "portal": {"label": "Nexora Lab", "description": "Metrics & insights"},
+        "portal": {"label": "Arc-8", "description": "Metrics & insights"},
         "coding": {"label": "Coding Worklists", "description": "Member reviews"},
         "member360": {"label": "Member 360", "description": "Unified member search"},
         "ride_booking": {"label": "Ride Booking", "description": "Transportation"},
@@ -136,7 +145,7 @@ class Settings(BaseSettings):
         "docs": {"label": "Docs Library", "description": "Knowledge base"},
         "settings": {"label": "Settings", "description": "Preferences"},
         "admin_console": {"label": "Master Admin", "description": "Roles & access"},
-        "chat": {"label": "Nexora Chat", "description": "Claude-powered assistant"},
+        "chat": {"label": "Arc-8 Chat", "description": "Claude-powered assistant"},
     }
 
     ANTHROPIC_API_KEY: Optional[str] = None
@@ -207,6 +216,37 @@ class Settings(BaseSettings):
     AZURE_CLIENT_SECRET: Optional[str] = None
     AZURE_AUTHORITY_HOST: str = "https://login.microsoftonline.com"
     AZURE_AUTH_SCOPES: str = "openid profile email"
+
+    # ── OIDC / SSO Configuration (AWS Cognito / Standard OIDC) ──────────────
+    OIDC_AUTH_ENABLED: bool = True
+    OIDC_ISSUER_URL: Optional[str] = None  # e.g. "https://cognito-idp.us-east-1.amazonaws.com/{user_pool_id}"
+    OIDC_CLIENT_ID: Optional[str] = None
+    OIDC_CLIENT_SECRET: Optional[str] = None
+    OIDC_JWKS_URL: Optional[str] = None
+    OIDC_ALGORITHMS: List[str] = ["RS256"]
+    OIDC_AUDIENCE: Optional[str] = None
+    OIDC_GROUPS_CLAIM: str = "cognito:groups"
+    OIDC_SCOPES: str = "openid profile email"
+
+    # Canonical IdP group to role mapping for deny-by-default access control
+    IDP_GROUP_ROLE_MAPPING: Dict[str, str] = {
+        "Prominence_Care_Coordinators": "coordinator",
+        "Prominence_Clinical_Supervisors": "supervisor",
+        "Prominence_Business_Admins": "business_admin",
+        "Prominence_Compliance_Auditors": "compliance_auditor",
+        "Prominence_Administrators": "admin",
+        "Care_Coordinators": "coordinator",
+        "Clinical_Supervisors": "supervisor",
+        "Business_Admins": "business_admin",
+        "Compliance_Auditors": "compliance_auditor",
+        "Administrators": "admin",
+        "coordinators": "coordinator",
+        "supervisors": "supervisor",
+        "business_admins": "business_admin",
+        "compliance_auditors": "compliance_auditor",
+        "administrators": "admin",
+        "admin": "admin",
+    }
 
     # Allowed values for Tenant.data_residency. HIPAA BAAs and EU sovereignty
     # requirements forbid moving PHI across geographies, so this is the

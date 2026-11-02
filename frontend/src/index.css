@@ -254,3 +254,40 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
 /* ─── Coding empty state ─────────────────────────────────────────────────── */
 .coding-empty { display: grid; gap: 8px; justify-items: center; }
 .coding-empty p { margin-bottom: 0; }
+
+/* ─── Modern Enterprise Scrollbar System ─────────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Subtle, sleek dark/light scrollbars across the application */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+

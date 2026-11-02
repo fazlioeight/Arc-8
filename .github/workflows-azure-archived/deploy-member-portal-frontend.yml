@@ -1,0 +1,61 @@
+name: Deploy member portal frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend-member/**"
+      - ".github/workflows/deploy-member-portal-frontend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-member-portal-frontend
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend-member
+    env:
+      SWA_TOKEN: ${{ secrets.AZURE_MEMBER_PORTAL_SWA_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend-member/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build production bundle
+        env:
+          # Member SPA talks to the Front Door member hostname (same-origin;
+          # Front Door routes /api/member/* to the edge). No CORS needed.
+          REACT_APP_API_BASE: ${{ vars.MEMBER_PORTAL_API_BASE }}
+          REACT_APP_TENANT_KEY: ${{ vars.MEMBER_PORTAL_TENANT_KEY }}
+          REACT_APP_BRAND_NAME: ${{ vars.MEMBER_PORTAL_BRAND_NAME }}
+          REACT_APP_BRAND_PRIMARY: ${{ vars.MEMBER_PORTAL_BRAND_PRIMARY }}
+          CI: "false"
+        run: npm run build
+
+      # Skip (green) until the member SWA exists and its deploy token is set as
+      # the AZURE_MEMBER_PORTAL_SWA_TOKEN secret ΓÇö avoids failing every push.
+      - name: Deploy to Azure Static Web Apps
+        if: env.SWA_TOKEN != ''
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_MEMBER_PORTAL_SWA_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: frontend-member/build
+          skip_app_build: true
+          output_location: ""

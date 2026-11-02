@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { resolveApiBase } from '../utils/apiBase';
 
 export const AuthContext = createContext();
 
@@ -186,9 +187,6 @@ export const AuthProvider = ({ children }) => {
   const persistTimerRef = useRef(null);
   const lastSerializedRef = useRef(null);
   const lastTouchRef = useRef(0);
-  // Latest auth state for event handlers/timers that must read it without
-  // re-subscribing, plus a single-flight guard so concurrent 401s (or a 401
-  // racing the proactive timer) don't double-spend the rotating refresh token.
   const authStateRef = useRef(authState);
   const refreshInFlightRef = useRef(null);
 
@@ -279,8 +277,10 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback((sessionData) => {
     if (!sessionData) return;
+    const effectiveToken = sessionData.token || authStateRef.current?.token;
     const base = normalizeState({
       ...sessionData,
+      token: effectiveToken,
       availableTenants: sessionData.tenants || sessionData.availableTenants,
     });
     if (!base) return;
@@ -295,7 +295,7 @@ export const AuthProvider = ({ children }) => {
     const token = authState?.token;
     const tenant = authState?.tenant;
     if (token) {
-      const apiBase = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+      const apiBase = resolveApiBase();
       // Best-effort revocation; ignore failures so logout is never blocked.
       fetch(`${apiBase}/api/logout`, {
         method: 'POST',
@@ -326,7 +326,7 @@ export const AuthProvider = ({ children }) => {
     if (!refreshToken) return false;
 
     const run = (async () => {
-      const apiBase = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+      const apiBase = resolveApiBase();
       let res;
       try {
         res = await fetch(`${apiBase}/api/auth/refresh`, {
@@ -734,7 +734,7 @@ export const AuthProvider = ({ children }) => {
     touchSession,
     unlockSession,
     clearMustChangePassword,
-    // Nexora platform-staff surface
+    // Arc-8 platform-staff surface
     staffSession,
     isStaffAuthenticated: Boolean(staffSession?.token),
     isStaffActor: Boolean(staffSession?.token && authState?.staffActor),

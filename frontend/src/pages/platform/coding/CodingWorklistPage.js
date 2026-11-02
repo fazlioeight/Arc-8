@@ -6,10 +6,12 @@ import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { fetchCodingWorklist } from '../../../services/codingService';
+import AlertShell from '../../../components/ui/AlertShell';
 import FilterDropdown from '../../../components/ui/FilterDropdown';
 import KpiTile from '../../../components/ui/KpiTile';
 import SavedViewsBar from '../../../components/ui/SavedViewsBar';
 import SearchInput from '../../../components/ui/SearchInput';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { CHASE_STATUS, CHASE_STATUS_OPTIONS } from '../../../constants/codingStatus';
 
 const STATUSES = CHASE_STATUS_OPTIONS;
@@ -77,7 +79,14 @@ export default function CodingWorklistPage() {
     setOverdueOnly(Boolean(view?.overdueOnly));
   };
 
+  const { can, isAdmin, hasRole } = usePermissions();
+  const isAuthorized = isAdmin || hasRole('coder') || can('menu:coding_worklist');
+
   useEffect(() => {
+    if (!token || !tenant || !isAuthorized) {
+      if (!isAuthorized) setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     fetchCodingWorklist(token, tenant, {
@@ -99,7 +108,7 @@ export default function CodingWorklistPage() {
       .catch((err) => { if (!cancelled) setError(err.message || String(err)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [token, tenant, search, statuses, priorities, assigned, overdueOnly]);
+  }, [token, tenant, search, statuses, priorities, assigned, overdueOnly, isAuthorized]);
 
   const toggleStatus = (key) =>
     setStatuses((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -118,6 +127,27 @@ export default function CodingWorklistPage() {
     if (assigned === userEmail) return 'Me';
     return assigned.split('@')[0];
   }, [assigned, userEmail]);
+
+  if (!isAuthorized) {
+    return (
+      <PortalPageLayout
+        eyebrow="Coding"
+        title="Coding Worklist"
+        subtitle="Chases ready for coder review across PHA, PCF, and PCPE programs."
+        navItems={PORTAL_NAV_ITEMS}
+        currentNav="coding"
+        navProps={{ align: 'center', tone: 'surface' }}
+        maxWidthClassName="max-w-7xl"
+        mainClassName="space-y-4"
+      >
+        <AlertShell
+          tone="critical"
+          title="Coding Worklist Access Restricted"
+          description="Access to the Risk Adjustment Coding Worklist is restricted to certified risk adjustment coders (CPC/CRC) and administrators. Please switch to Marcus Vance (Coder) or an Administrator persona."
+        />
+      </PortalPageLayout>
+    );
+  }
 
   return (
     <PortalPageLayout

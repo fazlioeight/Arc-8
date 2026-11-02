@@ -16,10 +16,11 @@ prefix; either way ``tenant_key`` is the first path segment.
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Optional, Protocol
 
 
 class DocumentStorageError(RuntimeError):
@@ -355,6 +356,196 @@ def _identity_summary_from_token(jwt_token: str) -> dict:
     return {"identity": oid, "identity_type": "unknown", "tenant_id": tid}
 
 
+class S3Backend:
+    """Amazon S3 document storage backend.
+
+    Auth: Standard AWS credential chain (IAM Task Role on ECS Fargate in prod;
+    AWS_ACCESS_KEY_ID / ~/.aws/credentials / SSO for local dev). No credentials
+    are hard-coded in the application.
+
+    Tenant isolation: S3 keys are strictly prefixed with:
+        {optional_prefix}{safe_tenant_key}/m360/documents/{member_id}/{doc_id}_{safe_filename}
+    Reads, deletes, and URL generation assert that the requested key matches the
+    tenant's prefix, preventing any cross-tenant data access.
+
+    HIPAA Security: Uploads enforce Server-Side Encryption (SSE-S3 AES256 by
+    default, or SSE-KMS when AWS_S3_KMS_KEY_ID is specified).
+    """
+
+    name = "s3"
+
+    def __init__(
+        self,
+        bucket_name: str,
+        region_name: str = "us-east-1",
+        prefix: str = "m360/",
+        kms_key_id: Optional[str] = None,
+        endpoint_url: Optional[str] = None,
+    ) -> None:
+        if not bucket_name:
+            raise DocumentStorageError("AWS_S3_BUCKET is required for the s3 backend.")
+        try:
+            import boto3
+            from botocore.config import Config
+            from botocore.exceptions import ClientError
+        except ImportError as exc:  # pragma: no cover
+            raise DocumentStorageError(
+                "boto3 must be installed to use MEMBER360_STORAGE_BACKEND=s3. "
+                "Add it to requirements.txt."
+            ) from exc
+
+        self._bucket_name = bucket_name
+        self._region_name = region_name or "us-east-1"
+        self._prefix = prefix.strip("/") + "/" if prefix and prefix.strip("/") else ""
+        self._kms_key_id = kms_key_id
+        self._endpoint_url = endpoint_url
+        self._client_error_cls = ClientError
+
+        client_kwargs: dict[str, Any] = {
+            "service_name": "s3",
+            "region_name": self._region_name,
+            "config": Config(signature_version="s3v4", retries={"max_attempts": 3, "mode": "standard"}),
+        }
+        if endpoint_url:
+            client_kwargs["endpoint_url"] = endpoint_url
+
+        self._client = boto3.client(**client_kwargs)
+
+    def _safe_tenant(self, tenant_key: str) -> str:
+        return re.sub(r"[^A-Za-z0-9._-]+", "_", tenant_key.strip()) or "unknown"
+
+    def _tenant_prefix(self, tenant_key: str) -> str:
+        safe_tenant = self._safe_tenant(tenant_key)
+        return f"{self._prefix}{safe_tenant}/m360/documents/"
+
+    def _object_key(self, tenant_key: str, member_id: int, doc_id: int, file_name: str) -> str:
+        safe_name = _sanitize_filename(file_name)
+        prefix = self._tenant_prefix(tenant_key)
+        return f"{prefix}{int(member_id)}/{int(doc_id)}_{safe_name}"
+
+    def _validate_tenant_scope(self, tenant_key: str, storage_path: str) -> None:
+        expected_prefix = self._tenant_prefix(tenant_key)
+        fallback_prefix = f"{self._safe_tenant(tenant_key)}/m360/documents/"
+        if not storage_path.startswith(expected_prefix) and not storage_path.startswith(fallback_prefix):
+            raise DocumentStorageError(
+                f"Refusing to access S3 key outside tenant scope: {storage_path!r}"
+            )
+
+    async def write(
+        self,
+        *,
+        tenant_key: str,
+        member_id: int,
+        doc_id: int,
+        file_name: str,
+        body: bytes,
+    ) -> str:
+        key = self._object_key(tenant_key, member_id, doc_id, file_name)
+        extra_args: dict[str, Any] = {}
+        if self._kms_key_id:
+            extra_args["ServerSideEncryption"] = "aws:kms"
+            extra_args["SSEKMSKeyId"] = self._kms_key_id
+        else:
+            extra_args["ServerSideEncryption"] = "AES256"
+
+        def _sync_put() -> None:
+            self._client.put_object(
+                Bucket=self._bucket_name,
+                Key=key,
+                Body=body,
+                **extra_args,
+            )
+
+        try:
+            await asyncio.to_thread(_sync_put)
+        except Exception as exc:  # noqa: BLE001
+            raise DocumentStorageError(f"S3 upload failed: {exc}") from exc
+        return key
+
+    async def read(self, *, tenant_key: str, storage_path: str) -> bytes:
+        self._validate_tenant_scope(tenant_key, storage_path)
+
+        def _sync_get() -> bytes:
+            try:
+                response = self._client.get_object(
+                    Bucket=self._bucket_name,
+                    Key=storage_path,
+                )
+                return response["Body"].read()
+            except self._client_error_cls as client_err:
+                code = client_err.response.get("Error", {}).get("Code")
+                if code in {"NoSuchKey", "404"}:
+                    raise DocumentStorageError(f"Document not found in S3: {storage_path!r}") from client_err
+                raise
+
+        try:
+            return await asyncio.to_thread(_sync_get)
+        except DocumentStorageError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise DocumentStorageError(f"S3 download failed: {exc}") from exc
+
+    async def delete(self, *, tenant_key: str, storage_path: str) -> None:
+        try:
+            self._validate_tenant_scope(tenant_key, storage_path)
+        except DocumentStorageError:
+            return
+
+        def _sync_delete() -> None:
+            self._client.delete_object(
+                Bucket=self._bucket_name,
+                Key=storage_path,
+            )
+
+        try:
+            await asyncio.to_thread(_sync_delete)
+        except Exception:
+            return
+
+    async def generate_presigned_url(
+        self,
+        *,
+        tenant_key: str,
+        storage_path: str,
+        expires_in: int = 300,
+    ) -> str:
+        self._validate_tenant_scope(tenant_key, storage_path)
+
+        def _sync_gen() -> str:
+            return self._client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self._bucket_name, "Key": storage_path},
+                ExpiresIn=expires_in,
+            )
+
+        try:
+            return await asyncio.to_thread(_sync_gen)
+        except Exception as exc:  # noqa: BLE001
+            raise DocumentStorageError(f"Failed to generate presigned S3 URL: {exc}") from exc
+
+    async def close(self) -> None:
+        pass
+
+    async def probe(self) -> dict:
+        result: dict = {
+            "backend": self.name,
+            "bucket": self._bucket_name,
+            "region": self._region_name,
+            "ok": False,
+            "error": None,
+        }
+
+        def _sync_head() -> None:
+            self._client.head_bucket(Bucket=self._bucket_name)
+
+        try:
+            await asyncio.to_thread(_sync_head)
+            result["ok"] = True
+        except Exception as exc:  # noqa: BLE001
+            result["error"] = f"head_bucket failed: {exc}"
+        return result
+
+
 _BACKEND_SINGLETON: DocumentBackend | None = None
 
 
@@ -375,16 +566,25 @@ def get_document_backend() -> DocumentBackend:
     if name == "local":
         _BACKEND_SINGLETON = LocalFilesystemBackend(settings.MEMBER360_STORAGE_ROOT)
         return _BACKEND_SINGLETON
+    if name == "s3":
+        _BACKEND_SINGLETON = S3Backend(
+            bucket_name=settings.AWS_S3_BUCKET or "",
+            region_name=settings.AWS_REGION or "us-east-1",
+            prefix=settings.AWS_S3_PREFIX or "m360/",
+            kms_key_id=settings.AWS_S3_KMS_KEY_ID,
+            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
+        )
+        return _BACKEND_SINGLETON
     if name == "azure":
         _BACKEND_SINGLETON = AzureBlobBackend(
             account_name=settings.AZURE_STORAGE_ACCOUNT_NAME or "",
             container_prefix=settings.AZURE_STORAGE_CONTAINER_PREFIX or "m360-",
         )
         return _BACKEND_SINGLETON
-    if name in {"s3", "gcs"}:
+    if name in {"gcs"}:
         raise DocumentStorageError(
             f"Storage backend {name!r} is reserved but not yet implemented. "
-            "Use 'local' or 'azure'."
+            "Use 'local', 's3', or 'azure'."
         )
     raise DocumentStorageError(f"Unknown storage backend {name!r}")
 

@@ -90,7 +90,7 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({ memberId, onClose, 
     void ask();
   };
 
-  const resolvedTitle = title ?? (memberId ? `Ask about this member` : `Ask Nexora`);
+  const resolvedTitle = title ?? (memberId ? `Ask about this member` : `Ask Arc-8`);
 
   const answerBody = useMemo(() => {
     if (!result) return null;

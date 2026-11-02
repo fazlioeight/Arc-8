@@ -186,10 +186,10 @@ def _safe_filename_part(value: str) -> str:
     final filename stays well under common 255-byte filesystem limits.
     """
     if not value:
-        return "nexora-chat-transcript"
+        return "arc8-chat-transcript"
     cleaned = "".join(c if c.isalnum() or c in {"-", "_"} else "-" for c in value.strip())
     cleaned = "-".join(filter(None, cleaned.split("-")))  # collapse repeats
-    return (cleaned or "nexora-chat-transcript")[:64]
+    return (cleaned or "arc8-chat-transcript")[:64]
 
 
 @router.post("/export")
@@ -297,7 +297,7 @@ async def export_conversation(
         # Audit failures don't take down the export, but log loudly.
         logger.exception("chat_export_audit_failed", extra={"request_id": rid})
 
-    filename = f"{_safe_filename_part(body.title or 'nexora-chat-transcript')}.{_EXPORT_EXTENSIONS[body.format]}"
+    filename = f"{_safe_filename_part(body.title or 'arc8-chat-transcript')}.{_EXPORT_EXTENSIONS[body.format]}"
     return Response(
         content=blob,
         media_type=_EXPORT_CONTENT_TYPES[body.format],

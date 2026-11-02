@@ -26,9 +26,10 @@ function renderLoginToString() {
   );
 }
 
-test("renders login form heading", () => {
+test("renders enterprise login form and OIDC SSO elements", () => {
   const html = renderLoginToString();
-  expect(html).toContain("Sign in");
-  expect(html).toContain("Workspace");
-  expect(html).toContain("Sign in with Microsoft");
+  expect(html).toContain("Enterprise Sign In");
+  expect(html).toContain("Enterprise OIDC / Cognito Sign-In");
+  expect(html).toContain("Sign In to Platform");
+  expect(html).toContain("Instant Demo Role Logins");
 });

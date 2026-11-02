@@ -119,7 +119,7 @@ const Member360LabRiskIntelligencePage = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title="Risk intelligence"
       subtitle="Drivers behind composite risk scores, rolled up across your population."
       navItems={PORTAL_NAV_ITEMS}

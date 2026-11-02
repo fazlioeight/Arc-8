@@ -1,4 +1,4 @@
-# Security Overview — Nexora Platform
+# Security Overview ΓÇö Arc-8 Platform
 
 This document summarises the application-level security controls implemented in
 this repository, maps them to the HIPAA-aligned requirements they satisfy, and
@@ -34,7 +34,7 @@ wired in [backend/app/main.py](backend/app/main.py), sets on every response:
 
 > The CSP is `'none'` (not `'self'`) and the Permissions-Policy is a superset of
 > the requested directives. These were **kept** because the backend is JSON-only
-> (the SPA ships from Azure Static Web Apps with its own CSP) — `'none'` is the
+> (the SPA ships from Azure Static Web Apps with its own CSP) ΓÇö `'none'` is the
 > correct, stronger choice and weakening it was explicitly avoided. HSTS is
 > emitted only in production because TLS termination is guaranteed there.
 
@@ -67,7 +67,7 @@ wired in [backend/app/main.py](backend/app/main.py), sets on every response:
   is wired onto the member360 router; it is governed by `REQUIRE_PHI_MFA` (see
   follow-ups).
 
-### Token storage — deliberate deviation
+### Token storage ΓÇö deliberate deviation
 The spec calls for HttpOnly/Secure/SameSite cookies and "never localStorage".
 This platform uses **bearer tokens** (`OAuth2PasswordBearer`) consumed by the
 SPA and a staff-impersonation flow. Migrating to cookies is a large, breaking
@@ -87,10 +87,10 @@ done now (decision recorded with the maintainer). Tokens were instead hardened
   `platform_admin`) and `ROLE_ALIASES` mapping the spec's clinical vocabulary
   (PATIENT/CLINICIAN/NURSE/BILLING) onto them, so callers can use spec language
   without forking the schema.
-- `require_role(*roles)` — dependency; `platform_admin` is a superuser that
+- `require_role(*roles)` ΓÇö dependency; `platform_admin` is a superuser that
   satisfies any requirement.
-- `require_ownership(resource_type)` and `authorize_access(...)` — see §5.
-- **All failures return 403 with a single generic `"Access denied"`** — never
+- `require_ownership(resource_type)` and `authorize_access(...)` ΓÇö see ┬º5.
+- **All failures return 403 with a single generic `"Access denied"`** ΓÇö never
   404, never an existence hint.
 
 Pre-existing complementary gates: `require_admin`, `require_platform_admin`,
@@ -108,7 +108,7 @@ Pre-existing complementary gates: `require_admin`, `require_platform_admin`,
 - **Parameterized queries.** All data access goes through async SQLAlchemy ORM /
   Core constructs (bound parameters). An audit for raw string interpolation
   found only **internal, sanitized identifiers** (schema/table names) in
-  `SET search_path` / DuckDB workbook setup — these interpolate `"`-escaped
+  `SET search_path` / DuckDB workbook setup ΓÇö these interpolate `"`-escaped
   schema names ([tenant_manager.py](backend/app/db/tenant_manager.py)) and
   server-generated table names, never raw user input. No SQL is built from
   untrusted request data.
@@ -122,7 +122,7 @@ Pre-existing complementary gates: `require_admin`, `require_platform_admin`,
 `authorize_access(session, user, tenant, resource_id, resource_type)`
 ([rbac.py](backend/app/utils/rbac.py)):
 
-- Fetches the resource **scoped to the caller's tenant** (`AND tenant_id = …`) —
+- Fetches the resource **scoped to the caller's tenant** (`AND tenant_id = ΓÇª`) ΓÇö
   a row in another tenant is indistinguishable from a non-existent one.
 - Enforces per-resource ownership for non-privileged roles via a
   `ResourcePolicy` registry (owner column + value); admins/`platform_admin` may
@@ -144,11 +144,11 @@ explicit and reusable. Tests: [test_rbac.py](backend/tests/test_rbac.py)
 Two complementary trails:
 
 1. **Business audit (queryable):** `record_audit_event`
-   ([audit_logger.py](backend/app/utils/audit_logger.py)) → `tenant_audit_events`
+   ([audit_logger.py](backend/app/utils/audit_logger.py)) ΓåÆ `tenant_audit_events`
    DB table, for in-app review.
 2. **Immutable PHI access trail (system of record):** `phi_audit` /
    `record_phi_access` ([phi_audit.py](backend/app/utils/phi_audit.py)) writes
-   one JSON line per PHI read/write/delete — on **success and failure** — to a
+   one JSON line per PHI read/write/delete ΓÇö on **success and failure** ΓÇö to a
    dedicated **append-only** logger (`phi_audit`, `propagate=False`) backed by a
    separate file (`PHI_AUDIT_LOG_PATH`), **never an editable DB table**. Exact
    schema: `event, userId, patientId, recordType, action, ipAddress, userAgent,
@@ -160,7 +160,7 @@ Wired onto member360 PHI endpoints (`get_member`, `update_member`). Tests:
 > **Infra requirement:** in production, `PHI_AUDIT_LOG_PATH` must point at a
 > WORM / immutable-blob mount and be shipped to Azure Monitor / a SIEM. The
 > append-only file alone is tamper-*evident* only with OS/storage-level
-> immutability — see follow-ups.
+> immutability ΓÇö see follow-ups.
 
 ---
 
@@ -209,9 +209,9 @@ Tests: [test_rate_limit.py](backend/tests/test_rate_limit.py).
 [.github/workflows/security-audit.yml](.github/workflows/security-audit.yml)
 runs on every PR, on pushes to `main`, and weekly:
 
-- **`pip-audit`** on `backend/requirements.txt` — **blocking** on HIGH/CRITICAL.
+- **`pip-audit`** on `backend/requirements.txt` ΓÇö **blocking** on HIGH/CRITICAL.
   Current result: **no known vulnerabilities**.
-- **`npm audit`** on the frontend — reports all advisories; **blocks only on
+- **`npm audit`** on the frontend ΓÇö reports all advisories; **blocks only on
   CRITICAL advisories outside the known CRA build toolchain**.
 
 > **Frontend findings (documented, accepted with mitigation):** Create React App
@@ -241,7 +241,7 @@ runs on every PR, on pushes to `main`, and weekly:
   [session.py](backend/app/db/session.py): `pool_size=20, max_overflow=40,
   pool_recycle=3600, pool_pre_ping=True` for Postgres (SQLite dev/test paths
   skip sizing). Tune `pool_size`/`max_overflow` to the Container App replica
-  count × Postgres `max_connections` budget.
+  count ├ù Postgres `max_connections` budget.
 
 ---
 
@@ -249,35 +249,35 @@ runs on every PR, on pushes to `main`, and weekly:
 
 These are out of scope for application code and must be handled by ops / legal:
 
-1. **Cookie-based session migration** — move bearer tokens to HttpOnly/Secure/
+1. **Cookie-based session migration** ΓÇö move bearer tokens to HttpOnly/Secure/
    SameSite=Strict cookies across SPA + backend + staff impersonation (deferred,
    tracked).
 2. **Enable `REQUIRE_PHI_MFA=true`** once every PHI user has completed MFA
    enrollment. It defaults `false` so existing non-enrolled users aren't locked
    out; the enforcement code path is already wired.
-3. **Immutable audit storage** — back `PHI_AUDIT_LOG_PATH` with WORM /
+3. **Immutable audit storage** ΓÇö back `PHI_AUDIT_LOG_PATH` with WORM /
    immutable-blob storage and forward to Azure Monitor / a SIEM with alerting.
-4. **WAF** — front the Container App / Static Web App with Azure Front Door +
+4. **WAF** ΓÇö front the Container App / Static Web App with Azure Front Door +
    WAF (OWASP rule set, bot protection, IP allow/deny).
-5. **KMS / key management** — store `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, and DB
+5. **KMS / key management** ΓÇö store `SECRET_KEY`, `FIELD_ENCRYPTION_KEY`, and DB
    credentials in Azure Key Vault; enable automated rotation. Configure TDE /
    CMK on Postgres and storage accounts.
-6. **TLS everywhere** — enforce HTTPS-only + `?ssl=require` on all DB URLs;
+6. **TLS everywhere** ΓÇö enforce HTTPS-only + `?ssl=require` on all DB URLs;
    verify HSTS preload eligibility.
-7. **Run the least-privilege DB script** (§10) against the control DB and every
+7. **Run the least-privilege DB script** (┬º10) against the control DB and every
    tenant DB/schema, and confirm the app's runtime connection string uses the
    restricted role, not an admin role.
-8. **BAA agreements** — execute Business Associate Agreements with every
+8. **BAA agreements** ΓÇö execute Business Associate Agreements with every
    subprocessor that can touch PHI (Azure/Microsoft, Anthropic, any email
    sender, SIEM vendor) before enabling those paths in production.
-9. **Penetration testing & periodic risk assessment** — independent pen test +
-   HIPAA §164.308(a)(1)(ii)(A) risk analysis before go-live and annually.
-10. **Frontend CRA → Vite migration** to clear the build-toolchain advisories
-    (§9).
-11. **Email delivery for password reset** — currently stubbed; wire a
+9. **Penetration testing & periodic risk assessment** ΓÇö independent pen test +
+   HIPAA ┬º164.308(a)(1)(ii)(A) risk analysis before go-live and annually.
+10. **Frontend CRA ΓåÆ Vite migration** to clear the build-toolchain advisories
+    (┬º9).
+11. **Email delivery for password reset** ΓÇö currently stubbed; wire a
     BAA-eligible sender (Azure Communication Services / SendGrid + BAA) before
     relying on self-serve reset in production.
-12. **Log/PHI retention enforcement** — `AUDIT_LOG_RETENTION_DAYS` documents the
+12. **Log/PHI retention enforcement** ΓÇö `AUDIT_LOG_RETENTION_DAYS` documents the
     6-year HIPAA retention; enforce it with storage lifecycle policies.
 
 ---

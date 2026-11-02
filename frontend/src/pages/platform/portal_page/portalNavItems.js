@@ -9,7 +9,7 @@ export const PORTAL_NAV_ITEMS = [
   },
   {
     key: "member360-lab",
-    label: "Nexora Lab Member360",
+    label: "Arc-8 Member360",
     href: ROUTES.MEMBER360_LAB.DASHBOARD,
     match: (path) =>
       path === ROUTES.MEMBER360_LAB.DASHBOARD ||
@@ -45,11 +45,5 @@ export const PORTAL_NAV_ITEMS = [
     match: (path) =>
       path === ROUTES.RIDE_BOOKING ||
       path.startsWith(`${ROUTES.RIDE_BOOKING}/`),
-  },
-  {
-    key: "chat",
-    label: "Nexora Chat",
-    href: ROUTES.CHAT,
-    match: (path) => path === ROUTES.CHAT,
   },
 ];

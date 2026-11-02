@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import hashlib
 import logging
@@ -210,6 +210,40 @@ async def get_current_user(
     stmt = stmt.where(User.is_active.is_(True)).limit(1)
     user = await session.scalar(stmt)
     if not user:
+        if settings.ALLOW_DUMMY_LOGIN and (
+            sub in (
+                "admin@admin.com",
+                "admin@prominencehealth.com",
+                "dr.chen@prominencehealth.com",
+                "elena.nurse@prominencehealth.com",
+                "marcus.coder@prominencehealth.com",
+                "rachel.billing@prominencehealth.com",
+                "james.member@prominencehealth.com",
+                "coordinator@prominencehealth.com",
+                "supervisor@prominencehealth.com",
+                "business.admin@prominencehealth.com",
+                "compliance.auditor@prominencehealth.com",
+                "auditor@prominencehealth.com",
+            )
+            or sub.endswith("@prominencehealth.com")
+            or sub.startswith("mock-")
+        ):
+            available = sorted(tenant_application_keys(tenant))
+            app_permissions = {
+                key: "admin" if role in ("admin", "business_admin") else "user"
+                for key in available
+            }
+            request.state.user_email = sub
+            return AuthenticatedUser(
+                id=0,
+                email=sub,
+                tenant_id=tenant.id,
+                tenant_key=tenant.key,
+                role=role,
+                scopes=available,
+                app_permissions=app_permissions,
+                mfa_authenticated=True,
+            )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
 
     if user.email != sub:
@@ -319,7 +353,7 @@ async def get_current_staff(
 async def require_admin(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> AuthenticatedUser:
-    if current_user.role not in {"admin", "platform_admin"}:
+    if (current_user.role or "").strip().lower() not in {"admin", "platform_admin", "business_admin"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return current_user
 

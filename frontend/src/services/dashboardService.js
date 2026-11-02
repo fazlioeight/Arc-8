@@ -7,10 +7,12 @@ import {
   __private,
 } from "./dashboardTransforms";
 
+import { API_BASE } from "../utils/apiBase";
+
 const EXPORT_ALLOWED_ROLES = new Set(["risk_ops", "coding_mgr", "admin"]);
 
 const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE || "",
+  baseURL: API_BASE,
   timeout: 15000,
 });
 

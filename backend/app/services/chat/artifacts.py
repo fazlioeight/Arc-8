@@ -160,10 +160,10 @@ def _safe_filename_slug(value: Optional[str]) -> str:
     """Reduce ``value`` to a filename-safe slug. Mirrors the chat export
     sanitizer — kept independent so this module doesn't depend on routes."""
     if not value:
-        return "nexora-artifact"
+        return "arc8-artifact"
     cleaned = "".join(c if c.isalnum() or c in {"-", "_"} else "-" for c in value.strip())
     cleaned = "-".join(filter(None, cleaned.split("-")))
-    return (cleaned or "nexora-artifact")[:64]
+    return (cleaned or "arc8-artifact")[:64]
 
 
 # ── Quota + cleanup ─────────────────────────────────────────────────────────
@@ -438,7 +438,7 @@ def render_thumbnail_png(
     slide_count: int,
     chart_count: int,
     primary_color: tuple[int, int, int] = (0xD9, 0x77, 0x06),
-    eyebrow: str = "NEXORA",
+    eyebrow: str = "ARC-8",
 ) -> Optional[bytes]:
     """Compose a small preview tile for the chat artifact card.
 

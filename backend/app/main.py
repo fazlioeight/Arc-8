@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime, timezone
 
@@ -49,6 +49,13 @@ from .routes import workbench as workbench_router
 from .routes import utilization as utilization_router
 from .schemas.types import NormalizedEmail
 from .services.azure_auth import exchange_code_for_id_token, resolve_email_from_claims, validate_id_token
+from .services.oidc_auth import (
+    exchange_oidc_code,
+    extract_claims_info,
+    is_oidc_configured,
+    resolve_role_from_groups,
+    validate_oidc_token,
+)
 from .utils.audit_logger import record_audit_event
 from .utils.auth_throttle import clear_failures, client_ip, is_locked_out, record_failure
 from .utils.security import (
@@ -73,7 +80,7 @@ setup_logging()
 assert_required_settings(settings)
 
 
-app = FastAPI(title="Nexora Lab API", version="2.0.0")
+app = FastAPI(title="Arc-8 API", version="2.0.0")
 
 app.add_middleware(RequestLoggingMiddleware)
 # Reject /api/member/* requests that didn't come through the member edge (when
@@ -92,6 +99,23 @@ for origin in settings.CORS_ORIGINS:
     origin_str = str(origin).rstrip('/')
     cors_origins.append(origin_str)
     cors_origins.append(f"{origin_str}/")
+
+for extra in [
+    "http://localhost:7777",
+    "http://localhost:7778",
+    "http://localhost:7779",
+    "http://127.0.0.1:7777",
+    "http://127.0.0.1:7778",
+    "http://127.0.0.1:7779",
+    "http://localhost:3000",
+    "https://arc8-mvp.site",
+    "https://www.arc8-mvp.site",
+    "https://dev.arc8-mvp.site",
+    "https://test.arc8-mvp.site",
+]:
+    if extra not in cors_origins:
+        cors_origins.append(extra)
+        cors_origins.append(f"{extra}/")
 
 app.add_middleware(SecurityHeadersMiddleware)
 # Global per-IP rate limit. Added before CORS so CORS remains the outermost
@@ -128,14 +152,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 async def probe_member360_storage() -> None:
     """Verify the document storage backend can talk to its target on boot.
 
-    For the Azure backend, this logs which identity (managed identity,
-    service principal, or az-login user) actually won the credential
-    chain — saves a lot of "is the right principal making the call"
-    detective work later. Non-fatal: a failure logs an error but doesn't
-    block startup, because the rest of the app shouldn't go dark over a
-    misconfigured optional subsystem.
+    For S3 and Azure backends, this tests bucket/container reachability.
+    Non-fatal: a failure logs an error but doesn't block startup, so the
+    rest of the app shouldn't go dark over a misconfigured optional subsystem.
     """
-    if (settings.MEMBER360_STORAGE_BACKEND or "local").lower() != "azure":
+    backend_name = (settings.MEMBER360_STORAGE_BACKEND or "local").lower()
+    if backend_name not in {"azure", "s3"}:
         return
     import logging
 
@@ -151,9 +173,9 @@ async def probe_member360_storage() -> None:
         if result.get("ok"):
             log.info("member360_storage_ready", extra={"probe": result})
         else:
-            log.error("member360_storage_probe_failed", extra={"probe": result})
+            log.warning("member360_storage_probe_unreachable", extra={"probe": result})
     except Exception as exc:  # noqa: BLE001
-        log.error("member360_storage_probe_exception", extra={"error": str(exc)})
+        log.warning("member360_storage_probe_exception", extra={"error": str(exc)})
 
 
 @app.on_event("shutdown")
@@ -171,6 +193,14 @@ class LoginRequest(BaseModel):
 class AzureAuthCodeRequest(BaseModel):
     code: str
     code_verifier: str
+    redirect_uri: str
+    nonce: str | None = None
+    tenant: str | None = None
+
+
+class OidcAuthCodeRequest(BaseModel):
+    code: str
+    code_verifier: str | None = None
     redirect_uri: str
     nonce: str | None = None
     tenant: str | None = None
@@ -209,7 +239,7 @@ def _build_login_response(user: User, tenant: TenantContext) -> dict:
 
 @app.get("/")
 async def read_root():
-    return {"message": "Nexora Lab Backend"}
+    return {"message": "Arc-8 Backend"}
 
 
 @app.get("/health/live", tags=["health"])
@@ -251,18 +281,63 @@ async def login(
             detail="Too many failed attempts. Try again later.",
         )
 
-    if settings.ALLOW_DUMMY_LOGIN and credentials.email == "admin@admin.com" and credentials.password == "admin":
+    ROLE_DEFAULT_APPS = {
+        "admin": {"admin_console": "admin", "chat": "admin", "coding": "admin", "dashboard": "admin", "docs": "admin", "job_center": "admin", "member360": "admin", "portal": "admin", "ride_booking": "admin", "settings": "admin", "providers": "admin"},
+        "clinician": {"member360": "user", "providers": "user", "portal": "user", "chat": "user", "docs": "user", "dashboard": "user", "coding": "user"},
+        "nurse": {"member360": "user", "ride_booking": "user", "portal": "user", "chat": "user", "docs": "user", "dashboard": "user", "providers": "user"},
+        "coder": {"coding": "user", "member360": "user", "portal": "user", "dashboard": "user", "docs": "user"},
+        "billing": {"dashboard": "user", "portal": "user", "docs": "user", "member360": "user"},
+        "patient": {"portal": "user", "ride_booking": "user"},
+        "coordinator": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "providers": "user"},
+        "supervisor": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user", "dashboard": "user", "settings": "user", "providers": "user"},
+        "business_admin": {"member360": "user", "admin_console": "admin", "portal": "user", "docs": "user", "settings": "admin", "job_center": "admin"},
+        "compliance_auditor": {"member360": "user", "portal": "user", "docs": "user"},
+    }
+    DUMMY_ROLES = {
+        "admin@admin.com": ("admin", list(ROLE_DEFAULT_APPS["admin"].keys())),
+        "admin@prominencehealth.com": ("admin", list(ROLE_DEFAULT_APPS["admin"].keys())),
+        "dr.chen@prominencehealth.com": ("clinician", list(ROLE_DEFAULT_APPS["clinician"].keys())),
+        "elena.nurse@prominencehealth.com": ("nurse", list(ROLE_DEFAULT_APPS["nurse"].keys())),
+        "marcus.coder@prominencehealth.com": ("coder", list(ROLE_DEFAULT_APPS["coder"].keys())),
+        "rachel.billing@prominencehealth.com": ("billing", list(ROLE_DEFAULT_APPS["billing"].keys())),
+        "james.member@prominencehealth.com": ("patient", list(ROLE_DEFAULT_APPS["patient"].keys())),
+        "coordinator@prominencehealth.com": ("coordinator", list(ROLE_DEFAULT_APPS["coordinator"].keys())),
+        "supervisor@prominencehealth.com": ("supervisor", list(ROLE_DEFAULT_APPS["supervisor"].keys())),
+        "business.admin@prominencehealth.com": ("business_admin", list(ROLE_DEFAULT_APPS["business_admin"].keys())),
+        "compliance.auditor@prominencehealth.com": ("compliance_auditor", list(ROLE_DEFAULT_APPS["compliance_auditor"].keys())),
+        "auditor@prominencehealth.com": ("compliance_auditor", list(ROLE_DEFAULT_APPS["compliance_auditor"].keys())),
+    }
+    if settings.ALLOW_DUMMY_LOGIN and credentials.email in DUMMY_ROLES and credentials.password in ("admin", "demo123", "password", "Password123!"):
+        demo_role, demo_apps = DUMMY_ROLES[credentials.email]
+        canonical_perms = dict(ROLE_DEFAULT_APPS.get(demo_role, {k: "user" for k in demo_apps}))
+        user_in_db = await session.scalar(
+            select(User).where(User.email == credentials.email, User.tenant_id == tenant.id).limit(1)
+        )
+        if user_in_db:
+            if user_in_db.role != demo_role or user_in_db.app_permissions != canonical_perms:
+                user_in_db.role = demo_role
+                user_in_db.app_permissions = canonical_perms
+            user_in_db.last_login_at = datetime.now(timezone.utc)
+            await session.commit()
+        user_id = user_in_db.id if user_in_db else None
         available_app_keys = tenant_application_keys(tenant)
-        applications = {key: "admin" for key in available_app_keys}
+        applications = filter_application_permissions(canonical_perms, tenant)
         purchased_applications = sorted(
             key for key, enabled in (tenant.purchased_applications or {}).items() if enabled
         )
-        token = create_access_token({"sub": credentials.email, "tid": tenant.key, "role": "admin", "scp": sorted(applications.keys())})
+        token = create_access_token({
+            "sub": credentials.email,
+            "tid": tenant.key,
+            "uid": user_id,
+            "role": demo_role,
+            "scp": sorted(applications.keys()),
+            "mfa": True,
+        })
         return {
             "token": token,
             "email": credentials.email,
             "tenant": tenant.key,
-            "role": "admin",
+            "role": demo_role,
             "applications": applications,
             "purchased_applications": purchased_applications,
             "available_applications": sorted(available_app_keys),
@@ -459,6 +534,122 @@ async def deactivate_account(
     return None
 
 
+@app.get("/api/auth/oidc/config")
+async def oidc_auth_config():
+    return {
+        "enabled": settings.OIDC_AUTH_ENABLED,
+        "configured": is_oidc_configured(),
+        "issuer_url": settings.OIDC_ISSUER_URL,
+        "client_id": settings.OIDC_CLIENT_ID,
+        "scopes": settings.OIDC_SCOPES,
+        "groups_claim": settings.OIDC_GROUPS_CLAIM,
+        "group_mappings": settings.IDP_GROUP_ROLE_MAPPING,
+    }
+
+
+@app.post("/api/auth/oidc/exchange")
+async def oidc_auth_exchange(
+    payload: OidcAuthCodeRequest,
+    request: Request,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_control_session),
+):
+    if payload.tenant and payload.tenant != tenant.key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tenant mismatch")
+
+    ip = client_ip(request)
+    user_agent = request.headers.get("user-agent", "")
+
+    id_token = await exchange_oidc_code(
+        code=payload.code,
+        code_verifier=payload.code_verifier,
+        redirect_uri=payload.redirect_uri,
+    )
+    claims = validate_oidc_token(id_token, nonce=payload.nonce)
+    claims_info = extract_claims_info(claims)
+    email = claims_info["email"]
+    groups = claims_info["groups"]
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="OIDC login did not include an email address",
+        )
+
+    # Deny-by-default role resolution
+    mapped_role = resolve_role_from_groups(groups)
+    if not mapped_role:
+        await record_audit_event(
+            session,
+            tenant_id=tenant.id,
+            actor=email,
+            event_type="login.oidc.denied",
+            payload={
+                "tenant": tenant.key,
+                "ip": ip,
+                "user_agent": user_agent,
+                "groups": groups,
+                "reason": "unmapped_groups_deny_by_default",
+            },
+        )
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: No authorized role mapped for user groups",
+        )
+
+    oidc_role_apps = {
+        "admin": {"admin_console": "admin", "chat": "admin", "coding": "admin", "dashboard": "admin", "docs": "admin", "job_center": "admin", "member360": "admin", "portal": "admin", "ride_booking": "admin", "settings": "admin", "providers": "admin"},
+        "platform_admin": {"admin_console": "admin", "chat": "admin", "coding": "admin", "dashboard": "admin", "docs": "admin", "job_center": "admin", "member360": "admin", "portal": "admin", "ride_booking": "admin", "settings": "admin", "providers": "admin"},
+        "coordinator": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "providers": "user"},
+        "supervisor": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user", "dashboard": "user", "settings": "user", "providers": "user"},
+        "business_admin": {"member360": "user", "admin_console": "admin", "portal": "user", "docs": "user", "settings": "admin", "job_center": "admin"},
+        "compliance_auditor": {"member360": "user", "portal": "user", "docs": "user"},
+    }
+    default_perms_for_role = dict(oidc_role_apps.get(mapped_role, {"member360": "user", "portal": "user"}))
+
+    user_stmt = select(User).where(User.email == email, User.tenant_id == tenant.id).limit(1)
+    user = await session.scalar(user_stmt)
+    if not user:
+        user = User(
+            email=email,
+            password_hash="[OIDC_EXTERNAL_IDENTITY]",
+            tenant_id=tenant.id,
+            role=mapped_role,
+            is_active=True,
+            app_permissions=default_perms_for_role,
+        )
+        session.add(user)
+        await session.flush()
+    else:
+        user.role = mapped_role
+        user.app_permissions = default_perms_for_role
+        user.last_login_at = datetime.now(timezone.utc)
+
+    await record_audit_event(
+        session,
+        tenant_id=tenant.id,
+        actor=email,
+        event_type="login.oidc.success",
+        payload={
+            "tenant": tenant.key,
+            "role": mapped_role,
+            "groups": groups,
+            "sub": claims_info["sub"],
+            "ip": ip,
+            "user_agent": user_agent,
+        },
+    )
+    refresh_token = await issue_refresh_token(session, tenant_id=tenant.id, user_id=user.id, ip=ip)
+    await session.commit()
+
+    response = _build_login_response(user, tenant)
+    response["refresh_token"] = refresh_token
+    response["expires_in"] = settings.ACCESS_TOKEN_EXPIRES_MINUTES * 60
+    response["groups"] = groups
+    return response
+
+
 @app.get("/api/auth/azure/config")
 async def azure_auth_config():
     return {
@@ -599,6 +790,7 @@ async def tenant_self(
 app.include_router(admin_router.router)
 app.include_router(auth_router.router)
 app.include_router(analytics_router.router)
+app.include_router(coding_router.providers_router)
 app.include_router(coding_router.router)
 app.include_router(coding_dashboards_router.router)
 app.include_router(dashboard_router.router)
@@ -608,6 +800,7 @@ app.include_router(terminology_router.router)
 app.include_router(member_cost_router.router)
 app.include_router(utilization_router.router)
 app.include_router(member_risk_router.router)
+app.include_router(member360_router.documents_router)
 app.include_router(member360_router.router)
 app.include_router(member360_admin_router.router)
 app.include_router(member_portal_router.router)

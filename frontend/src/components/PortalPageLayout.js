@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import PortalUtilityBar from './PortalUtilityBar';
+import PortalSidebar from './PortalSidebar';
 import PortalNav from './PortalNav';
 
 const ALIGNMENT = {
@@ -19,81 +20,110 @@ const PortalPageLayout = ({
   align = 'left',
   headerTone = 'default',
   backgroundClassName = '',
-  maxWidthClassName = 'max-w-6xl',
-  paddingClassName = 'px-4',
+  maxWidthClassName = 'max-w-7xl',
+  paddingClassName = 'px-6',
   headerContent = null,
   mainClassName = 'space-y-6',
   utilityBar = true,
   hideHeader = false,
+  showTopNav = false, // Primary navigation now lives in the left sidebar menu
   children,
 }) => {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('arc8_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('arc8_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const alignment = useMemo(() => ALIGNMENT[align] || ALIGNMENT.left, [align]);
   const { className: navClassName = '', ...restNavProps } = navProps || {};
   const isInvertedHeader = headerTone === 'inverted';
-  const eyebrowClass = isInvertedHeader ? 'text-slate-200' : 'coding-text-muted';
+  const eyebrowClass = isInvertedHeader ? 'text-slate-300' : 'text-sky-600 dark:text-sky-400 font-semibold';
   const titleClass = isInvertedHeader
-    ? 'text-3xl font-semibold leading-tight text-white'
-    : 'text-3xl font-semibold leading-tight coding-text-strong';
+    ? 'text-2xl md:text-3xl font-bold tracking-tight text-white'
+    : 'text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100';
   const subtitleClass = isInvertedHeader
-    ? 'text-base text-slate-200'
-    : 'text-base coding-text-soft';
+    ? 'text-sm text-slate-300'
+    : 'text-sm text-slate-600 dark:text-slate-400';
 
   const header = headerContent ?? (
-    <div className={['flex flex-col gap-3', alignment.stack].join(' ')}>
+    <div className={['flex flex-col gap-2', alignment.stack].join(' ')}>
       {eyebrow ? (
-        <p className={['text-[11px] font-semibold uppercase tracking-[0.28em]', eyebrowClass].join(' ')}>
+        <p className={['text-[11px] font-bold uppercase tracking-[0.2em]', eyebrowClass].join(' ')}>
           {eyebrow}
         </p>
       ) : null}
-      {title ? (
-        <h1 className={[titleClass, alignment.text].join(' ')}>
-          {title}
-        </h1>
-      ) : null}
-      {subtitle ? (
-        <p className={[subtitleClass, alignment.text].join(' ')}>
-          {subtitle}
-        </p>
-      ) : null}
-      {actions ? (
-        <div className={['flex flex-wrap items-center gap-2', alignment.actions].join(' ')}>
-          {actions}
+      <div className="flex flex-wrap items-center justify-between gap-4 w-full">
+        <div>
+          {title ? (
+            <h1 className={[titleClass, alignment.text].join(' ')}>
+              {title}
+            </h1>
+          ) : null}
+          {subtitle ? (
+            <p className={[subtitleClass, 'mt-1', alignment.text].join(' ')}>
+              {subtitle}
+            </p>
+          ) : null}
         </div>
-      ) : null}
+        {actions ? (
+          <div className={['flex flex-wrap items-center gap-2', alignment.actions].join(' ')}>
+            {actions}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 
   return (
-    <div className={['coding-member-workspace portal-theme min-h-screen', backgroundClassName].filter(Boolean).join(' ')}>
-      {utilityBar ? <PortalUtilityBar /> : null}
-      <div className={['mx-auto w-full', maxWidthClassName, paddingClassName, 'pb-10'].join(' ')}>
-        {hideHeader ? (
-          navItems.length ? (
-            <div className="pt-6">
-              <PortalNav
-                items={navItems}
-                currentKey={currentNav}
-                className={navClassName}
-                {...restNavProps}
-              />
-            </div>
-          ) : null
-        ) : (
-          <header className="pt-6 space-y-4">
-            {header}
-            {navItems.length ? (
-              <PortalNav
-                items={navItems}
-                currentKey={currentNav}
-                className={['mt-1', navClassName].join(' ')}
-                {...restNavProps}
-              />
-            ) : null}
-          </header>
-        )}
-        <main className={['pt-6', mainClassName].join(' ')}>
-          {children}
-        </main>
+    <div className="portal-theme flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-[#070b14] dark:text-slate-100 font-sans antialiased">
+      {/* ── Professional Left Sidebar Menu ────────────────── */}
+      <PortalSidebar collapsed={collapsed} onToggle={toggleCollapsed} />
+
+      {/* ── Main Workspace Viewport ───────────────────────── */}
+      <div className="flex flex-1 flex-col h-full min-h-0 overflow-hidden bg-slate-50 dark:bg-[#0a0f1d]">
+        {/* Top Utility Bar */}
+        {utilityBar ? (
+          <PortalUtilityBar
+            onToggleSidebar={toggleCollapsed}
+            sidebarCollapsed={collapsed}
+          />
+        ) : null}
+
+        {/* Scrollable Content Viewport */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+          <div className={['mx-auto w-full py-6', maxWidthClassName, paddingClassName, 'pb-16'].join(' ')}>
+            {!hideHeader && (
+              <header className="mb-6 space-y-4">
+                {header}
+                {showTopNav && navItems.length ? (
+                  <PortalNav
+                    items={navItems}
+                    currentKey={currentNav}
+                    className={['mt-2', navClassName].join(' ')}
+                    {...restNavProps}
+                  />
+                ) : null}
+              </header>
+            )}
+
+            <main className={mainClassName}>
+              {children}
+            </main>
+          </div>
+        </div>
       </div>
     </div>
   );

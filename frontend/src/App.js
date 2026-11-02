@@ -71,7 +71,7 @@ const RouteFallback = () => (
   <div className="py-12">
     <LoadingState
       title="Loading"
-      description="Preparing your Nexora Lab workspace..."
+      description="Preparing your Arc-8 workspace..."
       className="mx-auto max-w-md"
     />
   </div>
@@ -122,6 +122,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
     ROUTES.CHAT,
     ROUTES.CODING.WORKLIST,
     "/staff",
+    "/login",
   ];
   const hideNavbar = hideNavbarOn.some((p) => location.pathname.startsWith(p));
 
@@ -148,7 +149,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path="/portalPage" element={<Navigate to={ROUTES.PORTAL.LANDING} replace />} />
           <Route path={ROUTES.MEMBER_360.LANDING} element={<Member360LandingPage />} />
           <Route path={ROUTES.MEMBER360_LAB.DASHBOARD} element={(
-            <ErrorBoundary title="Nexora Lab Member360 failed to load" description="Try again to reload the care intelligence workspace.">
+            <ErrorBoundary title="Arc-8 Member360 failed to load" description="Try again to reload the care intelligence workspace.">
               <Member360LabDashboard />
             </ErrorBoundary>
           )} />
@@ -268,13 +269,12 @@ const Shell = ({ themePreference, setThemePreference }) => {
 function App() {
   const [themePreference, setThemePreference] = useState(() => {
     const saved = localStorage.getItem('themePreference');
-    return saved || 'system';
+    return saved || 'dark';
   });
 
   const handleThemeToggle = useCallback(() => {
     setThemePreference((prev) => {
       if (prev === 'dark') return 'light';
-      if (prev === 'light') return 'system';
       return 'dark';
     });
   }, []);
@@ -285,7 +285,8 @@ function App() {
     const mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
     const applyTheme = (pref) => {
-      const useDark = pref === 'dark' || (pref === 'system' && Boolean(mql?.matches));
+      const systemDark = mql ? mql.matches : true;
+      const useDark = pref === 'dark' || (pref === 'system' && systemDark);
       const resolvedTheme = useDark ? 'dark' : 'light';
 
       root.classList.toggle('dark-mode', useDark);
@@ -296,6 +297,7 @@ function App() {
       if (document.body) {
         document.body.classList.toggle('dark-mode', useDark);
         document.body.classList.toggle('light-mode', !useDark);
+        document.body.classList.toggle('dark', useDark);
         document.body.dataset.theme = resolvedTheme;
       }
     };

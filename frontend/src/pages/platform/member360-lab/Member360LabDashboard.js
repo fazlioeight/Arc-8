@@ -53,7 +53,7 @@ const Member360LabDashboard = () => {
 
   return (
     <PortalPageLayout
-      eyebrow="Nexora Lab Member360"
+      eyebrow="Arc-8 Member360"
       title="Care intelligence dashboard"
       subtitle="Risk, tasks, journeys, and savings — surfaced before nurses and coordinators ask."
       navItems={PORTAL_NAV_ITEMS}

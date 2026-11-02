@@ -258,7 +258,7 @@ class Member360Message(TenantDataBase):
     sender: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     recipient: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     body: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(16), default="sent")
+    status: Mapped[str] = mapped_column(String(32), default="sent")
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
 
     member: Mapped[Member360Member] = relationship(back_populates="messages")

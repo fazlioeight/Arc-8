@@ -459,9 +459,21 @@ const filteredUsers = useMemo(() => {
               Manage users, roles, and application access for the {user?.tenant || tenant} tenant.
             </p>
           </div>
-          <button className={GHOST_BTN} onClick={resetFormForCreate} disabled={saving}>
-            + New User
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3.5 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-100 dark:border-sky-700 dark:bg-sky-950/50 dark:text-sky-300"
+              onClick={() => navigate(`${ROUTES.SETTINGS}#privileges`)}
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
+              </svg>
+              Role Privileges Matrix
+            </button>
+            <button className={GHOST_BTN} onClick={resetFormForCreate} disabled={saving}>
+              + New User
+            </button>
+          </div>
         </header>
 
         <section className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -626,7 +638,7 @@ const filteredUsers = useMemo(() => {
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Application catalog</p>
                       <span className="text-xs text-slate-500 dark:text-slate-400">{apps.length} apps</span>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Contact Nexora Lab to adjust your subscription.</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Contact Arc-8 to adjust your subscription.</p>
                     <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                       {apps.map((app) => {
                         const isPurchased = purchaseSelections.has(app.key);
@@ -708,9 +720,14 @@ const filteredUsers = useMemo(() => {
                         onChange={(e) => handleFieldChange("role", e.target.value)}
                         className={INPUT}
                       >
-                        <option value="user">Non admin user</option>
-                        <option value="admin">Administration</option>
-                        {isPlatformAdmin && <option value="platform_admin">Platform administration</option>}
+                        <option value="clinician">Clinician / Physician (MD/DO)</option>
+                        <option value="nurse">Care Coordinator / Nurse (RN)</option>
+                        <option value="coder">Risk Adjustment Coder (CPC/CRC)</option>
+                        <option value="billing">Billing & Capitation Specialist</option>
+                        <option value="patient">Member / Patient</option>
+                        <option value="admin">Tenant Administrator / Supervisor</option>
+                        {isPlatformAdmin && <option value="platform_admin">Platform Administrator</option>}
+                        <option value="user">General Staff User</option>
                       </select>
                     </label>
 

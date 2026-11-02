@@ -1,4 +1,4 @@
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
+import { API_BASE } from '../utils/apiBase';
 
 const buildHeaders = (token, tenant) => {
   const headers = {

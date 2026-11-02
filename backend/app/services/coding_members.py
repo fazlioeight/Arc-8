@@ -47,13 +47,20 @@ async def list_members(
     if lobs:
         filters.append(CodingMember.line_of_business.in_(lobs))
     if search:
-        like = f"%{search.lower()}%"
+        like = f"%{search.strip().lower()}%"
+        full_name = (
+            func.coalesce(func.lower(CodingMember.first_name), "")
+            + " "
+            + func.coalesce(func.lower(CodingMember.last_name), "")
+        )
         filters.append(
             or_(
                 func.lower(CodingMember.first_name).like(like),
                 func.lower(CodingMember.last_name).like(like),
+                full_name.like(like),
                 func.lower(CodingMember.member_key).like(like),
                 func.lower(CodingMember.pcp_name).like(like),
+                func.lower(CodingMember.line_of_business).like(like),
             )
         )
 
