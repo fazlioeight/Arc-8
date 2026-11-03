@@ -51,6 +51,28 @@ html:focus-within { scroll-behavior: smooth; }
   --accent:    var(--lm-accent);
   --input-bg:  var(--lm-bg-light);
 
+  /* Global SFDC & Canvas compatibility tokens (ensures modals/overlays/sheets
+     work on every route even before lazy-loaded portal styles mount) */
+  --sfdc-bg:             var(--bg);
+  --sfdc-card:           var(--bg-card);
+  --sfdc-surface:        var(--bg-card);
+  --sfdc-surface-alt:    var(--input-bg);
+  --sfdc-text:           var(--text);
+  --sfdc-muted:          var(--text-muted);
+  --sfdc-text-muted:     var(--text-muted);
+  --sfdc-border:         var(--border);
+  --sfdc-shadow:         var(--shadow-md);
+  --sfdc-shadow-lg:      var(--shadow-lg);
+  --sfdc-brand:          #0a66c2;
+  --sfdc-brand-dark:     #004182;
+  --sfdc-primary:        #0284c7;
+  --sfdc-brand-contrast: #ffffff;
+  --canvas-panel:        var(--bg-card);
+  --canvas-soft:         var(--bg);
+  --canvas-ink:          var(--text);
+  --canvas-muted:        var(--text-muted);
+  --canvas-border:       var(--border);
+
   /* Brand */
   --brand-primary:    #0a66c2;
   --brand-accent:     #22c55e;
@@ -123,18 +145,18 @@ html:focus-within { scroll-behavior: smooth; }
 /* Both .dark-mode (legacy) and .dark (Tailwind) trigger dark tokens */
 .dark-mode,
 .dark {
-  --bg:        var(--dm-bg);
-  --bg-light:  var(--dm-bg-light);
-  --bg-card:   var(--dm-bg-card);
-  --text:      var(--dm-text);
-  --text-muted:#a8b3bd;
-  --border:    var(--dm-border);
+  --bg:        #0a0f1d;
+  --bg-light:  #0f172a;
+  --bg-card:   #0f172a;
+  --text:      #f1f5f9;
+  --text-muted:#94a3b8;
+  --border:    #1e293b;
   --shadow:    var(--dm-shadow);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.45);
   --shadow-md: 0 16px 36px rgba(0,0,0,0.45);
   --shadow-lg: 0 28px 56px rgba(0,0,0,0.58);
-  --accent:    var(--dm-accent);
-  --input-bg:  var(--dm-input);
+  --accent:    #1e293b;
+  --input-bg:  #1e293b;
   --focus-ring:0 0 0 3px rgba(112, 181, 249, 0.45);
   color-scheme: dark;
 }
@@ -290,4 +312,3 @@ h3 { font-size: clamp(1.25rem, 0.9rem + 1vw, 1.5rem); }
   width: 0;
   height: 0;
 }
-

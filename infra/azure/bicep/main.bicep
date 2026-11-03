@@ -1,4 +1,4 @@
-// Nexora — AI semantic layer (RAG MVP) Bicep orchestrator.
+// Arc-8 — AI semantic layer (RAG MVP) Bicep orchestrator.
 //
 // Provisions the additive resources that the existing PowerShell foundation
 // script (00-provision-foundation.ps1) does NOT create:
@@ -28,18 +28,18 @@
 //
 // Usage (CI deploy):
 //   az deployment group create \
-//     --resource-group rg-nexora-prod \
+//     --resource-group rg-arc8-prod \
 //     --template-file infra/azure/bicep/main.bicep \
 //     --parameters @infra/azure/bicep/parameters/prod.json
 //
 // Validate before applying:
-//   az deployment group what-if -g rg-nexora-prod -f main.bicep -p @prod.json
+//   az deployment group what-if -g rg-arc8-prod -f main.bicep -p @prod.json
 
 targetScope = 'resourceGroup'
 
 // ── Parameters ──────────────────────────────────────────────────────────────
 
-@description('Naming prefix, e.g. "nexora-prod". Service-specific suffixes are appended.')
+@description('Naming prefix, e.g. "arc8-prod". Service-specific suffixes are appended.')
 param namePrefix string
 
 @description('Azure region. Must support all four services (Cosmos, AI Search, Event Hub, Azure OpenAI). eastus and westus3 are both safe.')
@@ -56,7 +56,7 @@ param containerAppPrincipalId string
 
 @description('Tags to apply to all created resources.')
 param tags object = {
-  'app': 'nexora'
+  'app': 'arc8'
   'managed-by': 'bicep'
   'compliance': 'hipaa'
 }

@@ -2,6 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../../context/AuthContext';
 import { ROUTES } from '../../../constants/routes';
+import ThemeToggleButton from '../../../components/ThemeToggleButton';
 import {
   createStaffUser,
   deleteStaffUser,
@@ -119,12 +120,15 @@ const StaffUsers = () => {
               Manage staff
             </h1>
           </div>
-          <Link
-            to={ROUTES.STAFF.CONSOLE}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-          >
-            ← Tenants
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggleButton />
+            <Link
+              to={ROUTES.STAFF.CONSOLE}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              ← Tenants
+            </Link>
+          </div>
         </div>
       </header>
 

@@ -44,7 +44,7 @@ from ..services.ai.embeddings import EmbeddingError, get_embedder
 from ..services.ai.search import SearchError, get_search_client
 
 
-log = logging.getLogger("nexora.workers.event_processor")
+log = logging.getLogger("arc8.workers.event_processor")
 
 
 # ── State extraction ────────────────────────────────────────────────────────
@@ -283,7 +283,7 @@ async def _consume(dry_run: bool) -> None:
 
 def main() -> None:
     setup_logging()
-    parser = argparse.ArgumentParser(description="Nexora Event Hub processor for RAG indexing")
+    parser = argparse.ArgumentParser(description="Arc-8 Event Hub processor for RAG indexing")
     parser.add_argument(
         "--dry-run",
         action="store_true",

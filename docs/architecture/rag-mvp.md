@@ -1,6 +1,6 @@
 # Minimum Viable RAG Pipeline — Implementation Plan
 
-This is the thin end-to-end slice that proves the AI semantic layer for Nexora.
+This is the thin end-to-end slice that proves the AI semantic layer for Arc-8.
 It will land in week 1 (this engagement) and is the foundation for week 5's
 inline AI insights and Claim360 explainability.
 

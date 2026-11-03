@@ -79,8 +79,8 @@ Because RBAC Admin is sensitive, the recommended pattern is:
 
 ```powershell
 $sub = "<subscription id>"
-$rg  = "nexora-chat-rg"
-$kv  = "nexora-chat-kv"
+$rg  = "arc8-chat-rg"
+$kv  = "arc8-chat-kv"
 $spId = "<service principal object id>"   # NOT the app id; the SP's objectId
 
 az role assignment create `

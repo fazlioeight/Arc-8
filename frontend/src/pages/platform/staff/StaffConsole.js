@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../../context/AuthContext';
 import { ROUTES } from '../../../constants/routes';
+import ThemeToggleButton from '../../../components/ThemeToggleButton';
 import {
   fetchStaffTenants,
   impersonateTenant,
@@ -107,6 +108,7 @@ const StaffConsole = () => {
                 {staffSession?.email}
               </div>
             </div>
+            <ThemeToggleButton />
             <Link
               to={ROUTES.STAFF.USERS}
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"

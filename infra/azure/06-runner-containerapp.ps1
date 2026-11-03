@@ -1,16 +1,16 @@
 param(
     [string]$SubscriptionId    = $env:AZURE_SUBSCRIPTION_ID,
-    [string]$ResourceGroup     = "nexora-chat-rg",
-    [string]$AcrName           = "nexorachatacr65700",
-    [string]$KeyVaultName      = "nexora-chat-kv",
-    [string]$ContainerEnvName  = "nexora-chat-env-v2",
+    [string]$ResourceGroup     = "arc8-chat-rg",
+    [string]$AcrName           = "arc8chatacr65700",
+    [string]$KeyVaultName      = "arc8-chat-kv",
+    [string]$ContainerEnvName  = "arc8-chat-env-v2",
 
-    [string]$RunnerAppName     = "nexora-runner",
-    [string]$ImageRepo         = "nexora-runner",
+    [string]$RunnerAppName     = "arc8-runner",
+    [string]$ImageRepo         = "arc8-runner",
     [string]$ImageTag,                                     # default: timestamp
-    [string]$GitHubRepo        = "Nexora-Lab-Co/nexora-platform",
-    [string]$RunnerLabels      = "self-hosted,linux,nexora-vnet",
-    [string]$RunnerName        = "nexora-runner-aca",
+    [string]$GitHubRepo        = "Arc-8/arc8-platform",
+    [string]$RunnerLabels      = "self-hosted,linux,arc8-vnet",
+    [string]$RunnerName        = "arc8-runner-aca",
     [string]$KvPatSecretName   = "github-runner-pat",
 
     [decimal]$Cpu              = 0.5,
@@ -18,8 +18,8 @@ param(
     [switch]$SkipImageBuild
 )
 
-# Provisions a Nexora self-hosted GitHub Actions runner as a Container App
-# in the existing nexora-chat-env. The runner reaches nexora-chat-kv via
+# Provisions a Arc-8 self-hosted GitHub Actions runner as a Container App
+# in the existing arc8-chat-env. The runner reaches arc8-chat-kv via
 # the same private endpoint the chat workload uses; no new networking is
 # required.
 #
@@ -292,8 +292,8 @@ Write-Host ""
 if ($script:NeedsPatBackfill) {
     Write-Host "NEXT STEPS:" -ForegroundColor Yellow
     Write-Host "  1. Create a fine-grained PAT at https://github.com/settings/personal-access-tokens/new"
-    Write-Host "     - Resource owner: Nexora-Lab-Co"
-    Write-Host "     - Repository: nexora-platform"
+    Write-Host "     - Resource owner: Arc-8"
+    Write-Host "     - Repository: arc8-platform"
     Write-Host "     - Permissions: Administration (Read and write)"
     Write-Host "  2. Store it in Key Vault:"
     Write-Host "     az keyvault secret set --vault-name $KeyVaultName --name $KvPatSecretName --value <PAT>"

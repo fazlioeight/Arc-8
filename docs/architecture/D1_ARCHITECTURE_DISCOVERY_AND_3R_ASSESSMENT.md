@@ -14,13 +14,13 @@
 
 ## 1. Executive Summary
 
-**Deliverable D1** establishes the technical baseline for the **Arc-8 (Member 360)** platform for **Prominence Health First Inc.** Following a comprehensive walkthrough of the inherited `Nexora Lab` monorepo and alignment with Prominence Health's operational leadership (Daniel Silva, 58-minute live system walkthrough), the architecture team audited the repository across backend services, frontend SPAs, database schemas, and infrastructure scripts.
+**Deliverable D1** establishes the technical baseline for the **Arc-8 (Member 360)** platform for **Prominence Health First Inc.** Following a comprehensive walkthrough of the inherited prototype monorepo and alignment with Prominence Health's operational leadership (Daniel Silva, 58-minute live system walkthrough), the architecture team audited the repository across backend services, frontend SPAs, database schemas, and infrastructure scripts.
 
 ### Key Findings & Strategic Decisions
 1. **Operational Positioning ("Single Pane of Glass"):** Arc-8 is positioned strictly as the internal **Member 360 Care Advocacy & Care Coordination Command Center** (NOC) for Prominence Health's call center advocates (~60,000 claim-status calls/month), nurses, and supervisors. External member/provider portals remain in **AaNeel**.
 2. **The 3R Disposition (`40% Reuse / 35% Refactor / 25% Rebuild`):**
    - **Reuse (~40%):** FastAPI Member 360 domain routes (`backend/app/routes/member360.py`), SQLAlchemy `m360_*` relational models (`backend/app/models/member360.py`), multi-tenant context resolution (`backend/app/middleware/tenant.py`), and the React portal shell (`frontend/src/pages/platform/member360-lab/`).
-   - **Refactor (~35%):** Decouple runtime configuration (`backend/app/core/config.py`) from Azure Key Vault/Blob/Entra ID; standardize authentication on OIDC/JWT + RBAC (`backend/app/utils/rbac.py`); bring `m360_*` tables under formal PostgreSQL Alembic migrations; consolidate Member 360 UI into 8 role-gated operational tabs; rebrand `Nexora Lab` to `Arc-8`.
+   - **Refactor (~35%):** Decouple runtime configuration (`backend/app/core/config.py`) from Azure Key Vault/Blob/Entra ID; standardize authentication on OIDC/JWT + RBAC (`backend/app/utils/rbac.py`); bring `m360_*` tables under formal PostgreSQL Alembic migrations; consolidate Member 360 UI into 8 role-gated operational tabs; standardize platform branding as `Arc-8`.
    - **Rebuild (~25%):** Replace legacy Azure Bicep/PowerShell scripts (`infra/azure/`) with HIPAA-eligible **AWS Infrastructure** (Amazon S3 + CloudFront, EC2/ECS compute, RDS PostgreSQL 16, ElastiCache Redis 7, AWS Secrets Manager, CloudWatch WORM logs) and build automated SFTP/batch ETL & 10-year CMS cold archival pipelines.
 
 ---

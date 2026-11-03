@@ -1,4 +1,4 @@
-"""Per-tenant SQLAlchemy models for the Nexora Lab Member360 module.
+"""Per-tenant SQLAlchemy models for the Arc-8 Member360 module.
 
 These tables back the care management workspace: members, risk insights,
 care journeys (and their stages/templates), tasks with SBAR, notes,

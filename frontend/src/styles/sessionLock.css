@@ -1,56 +1,140 @@
-﻿.session-lock {
+.session-lock {
   position: fixed;
   inset: 0;
   z-index: 1600;
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(8px);
 }
 
+.dark .session-lock,
+.dark-mode .session-lock {
+  background: rgba(2, 6, 23, 0.75);
+}
+
 .session-lock__panel {
-  max-width: 420px;
+  max-width: 440px;
   width: 100%;
-  background: var(--sfdc-card);
-  border: 1px solid var(--sfdc-border);
-  border-radius: 16px;
-  padding: 28px 24px;
-  box-shadow: var(--sfdc-shadow);
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 32px 28px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(15, 23, 42, 0.05);
   display: grid;
-  gap: 18px;
+  gap: 16px;
   text-align: center;
+}
+
+.dark .session-lock__panel,
+.dark-mode .session-lock__panel {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: #1e293b;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.session-lock__icon {
+  margin: 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0f2fe;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
+}
+
+.session-lock__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.dark .session-lock__icon,
+.dark-mode .session-lock__icon {
+  background: rgba(2, 132, 199, 0.16);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.3);
 }
 
 .session-lock__panel h2 {
   margin: 0;
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: inherit;
+}
+
+.session-lock__desc {
+  margin: 0;
+  font-size: 0.925rem;
+  line-height: 1.5;
+  color: #475569;
+}
+
+.dark .session-lock__desc,
+.dark-mode .session-lock__desc {
+  color: #94a3b8;
 }
 
 .session-lock__meta {
-  display: flex;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 12px;
-  font-size: 0.9rem;
-  color: var(--sfdc-muted);
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.dark .session-lock__meta,
+.dark-mode .session-lock__meta {
+  color: #94a3b8;
+  background: rgba(30, 41, 59, 0.65);
+  border-color: #334155;
 }
 
 .session-lock__meta strong {
-  color: var(--sfdc-text);
+  color: #0f172a;
+  font-weight: 700;
+  word-break: break-all;
+}
+
+.dark .session-lock__meta strong,
+.dark-mode .session-lock__meta strong {
+  color: #f1f5f9;
 }
 
 .session-lock__actions {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .session-lock__primary {
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px 16px;
   background: linear-gradient(135deg, #0284c7, #0ea5e9);
-  color: #fff;
-  font-weight: 600;
+  color: #ffffff;
+  font-size: 0.925rem;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+  transition: filter 0.15s ease, transform 0.15s ease;
   cursor: pointer;
+}
+
+.session-lock__primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
 }
 
 .session-lock__primary:disabled {
@@ -59,20 +143,44 @@
 }
 
 .session-lock__secondary {
-  border: 1px solid var(--sfdc-border);
-  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
   padding: 10px 16px;
-  background: transparent;
-  color: var(--sfdc-text);
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.9rem;
   font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   cursor: pointer;
 }
 
 .session-lock__secondary:hover {
-  border-color: rgba(14, 165, 233, 0.4);
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.dark .session-lock__secondary,
+.dark-mode .session-lock__secondary {
+  border-color: #334155;
+  background: rgba(30, 41, 59, 0.6);
+  color: #cbd5e1;
+}
+
+.dark .session-lock__secondary:hover,
+.dark-mode .session-lock__secondary:hover {
+  background: #1e293b;
+  border-color: #475569;
+  color: #ffffff;
 }
 
 .session-lock__hint {
-  font-size: 0.8rem;
-  color: var(--sfdc-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.dark .session-lock__hint,
+.dark-mode .session-lock__hint {
+  color: #94a3b8;
 }

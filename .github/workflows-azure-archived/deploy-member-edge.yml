@@ -43,7 +43,7 @@ jobs:
     needs: test
     # Self-hosted runner inside the VNet (same as backend) so the edge image
     # build + Container App update run against in-VNet ACR/ACA.
-    runs-on: [self-hosted, linux, nexora-vnet]
+    runs-on: [self-hosted, linux, arc8-vnet]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

@@ -10,7 +10,7 @@ from ..core.redis import get_redis_client
 
 logger = logging.getLogger(__name__)
 
-_KEY_PREFIX = "nexora:login:fail:"
+_KEY_PREFIX = "arc8:login:fail:"
 
 
 def client_ip(request: Request) -> str:

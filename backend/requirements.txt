@@ -39,7 +39,7 @@ pytest
 pytest-asyncio
 requests_mock
 
-# ── Chat module (merged from nexora-chat) ─────────────────────────────────────
+# ── Chat module (merged from arc8-chat) ─────────────────────────────────────
 anthropic
 python-multipart
 slowapi

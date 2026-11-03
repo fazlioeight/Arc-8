@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "namePrefix": {
-      "value": "nexora-prod"
+      "value": "arc8-prod"
     },
     "location": {
       "value": "eastus"

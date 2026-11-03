@@ -1,10 +1,10 @@
 param(
     [string]$SubscriptionId = $env:AZURE_SUBSCRIPTION_ID,
-    [string]$ResourceGroup = "rg-nexora-prod",
+    [string]$ResourceGroup = "rg-arc8-prod",
     [string]$Location = "eastus2",
-    [string]$NamePrefix = "nexora",
-    [string]$PostgresAdminUser = "nexoraadmin",
-    [string]$PostgresAdminPassword = $env:NEXORA_POSTGRES_ADMIN_PASSWORD,
+    [string]$NamePrefix = "arc8",
+    [string]$PostgresAdminUser = "arc8admin",
+    [string]$PostgresAdminPassword = $env:ARC8_POSTGRES_ADMIN_PASSWORD,
     [string]$PostgresSku = "Standard_D2ds_v5",
     [string]$RedisSku = "Balanced_B0",
     [string]$OutputPath = "$PSScriptRoot\azure-foundation.outputs.json"
@@ -31,7 +31,7 @@ if ($SubscriptionId) {
 }
 
 if (-not $PostgresAdminPassword) {
-    throw "Set NEXORA_POSTGRES_ADMIN_PASSWORD or pass -PostgresAdminPassword. Do not commit this value."
+    throw "Set ARC8_POSTGRES_ADMIN_PASSWORD or pass -PostgresAdminPassword. Do not commit this value."
 }
 
 $suffix = New-Suffix
@@ -55,7 +55,7 @@ $serviceBusQueue = "customer-ingestion"
 az extension add --name containerapp --upgrade --only-show-errors
 az extension add --name redisenterprise --upgrade --only-show-errors
 
-az group create --name $ResourceGroup --location $Location --tags app=nexora env=prod
+az group create --name $ResourceGroup --location $Location --tags app=arc8 env=prod
 
 az network vnet create `
     --resource-group $ResourceGroup `
@@ -169,7 +169,7 @@ az postgres flexible-server create `
     --public-access None `
     --yes
 
-foreach ($dbName in @("nexora_control", "nexora_tenant")) {
+foreach ($dbName in @("arc8_control", "arc8_tenant")) {
     az postgres flexible-server db create `
         --resource-group $ResourceGroup `
         --server-name $postgresServer `
@@ -203,8 +203,8 @@ if (-not $redisDatabaseExists) {
 }
 
 $pgHost = "$postgresServer.postgres.database.azure.com"
-$controlDbUrl = "postgresql+asyncpg://${PostgresAdminUser}:${PostgresAdminPassword}@${pgHost}:5432/nexora_control?ssl=require"
-$tenantDbUrl = "postgresql+asyncpg://${PostgresAdminUser}:${PostgresAdminPassword}@${pgHost}:5432/nexora_tenant?ssl=require"
+$controlDbUrl = "postgresql+asyncpg://${PostgresAdminUser}:${PostgresAdminPassword}@${pgHost}:5432/arc8_control?ssl=require"
+$tenantDbUrl = "postgresql+asyncpg://${PostgresAdminUser}:${PostgresAdminPassword}@${pgHost}:5432/arc8_tenant?ssl=require"
 $secretBytes = New-Object byte[] 48
 $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
 $rng.GetBytes($secretBytes)

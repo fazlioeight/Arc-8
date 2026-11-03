@@ -110,7 +110,8 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const navigate = useNavigate();
   const { user, role, tenant, tenantInfo, logout, login } = useContext(AuthContext) || {};
   const { currentRole, activeRoleConfig, can } = usePermissions();
-  const { t } = useUserPreferences();
+  const { t: rawT } = useUserPreferences();
+  const t = typeof rawT === 'function' ? rawT : (_key, fallback) => fallback ?? _key;
   const [showPersonaModal, setShowPersonaModal] = useState(false);
 
   const currentPath = location.pathname;
@@ -282,17 +283,17 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   return (
     <aside
       className={[
-        'flex flex-col h-full bg-[#0a0f1d] border-r border-slate-800/80 select-none z-30 transition-all duration-300',
+        'flex flex-col h-full bg-white text-slate-800 border-r border-slate-200 dark:bg-[#0a0f1d] dark:text-slate-200 dark:border-slate-800/80 select-none z-30 transition-all duration-300',
         collapsed ? 'w-20' : 'w-64',
       ].join(' ')}
     >
       {/* ── Brand Header ────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800/70">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-slate-200 dark:border-slate-800/70">
         <Link to={ROUTES.MEMBER360_LAB.DASHBOARD} className="group flex items-center gap-3 overflow-hidden">
           <img
             src="/images/arc8-logo.png"
             alt="Arc-8 logo"
-            className="h-9 w-auto shrink-0 rounded-lg object-contain shadow-md shadow-sky-500/20 transition-transform duration-200 group-hover:scale-105"
+            className="h-9 w-auto shrink-0 rounded-lg object-contain shadow-sm dark:shadow-md dark:shadow-sky-500/20 transition-transform duration-200 group-hover:scale-105"
           />
           {!collapsed && (
             <div className="flex flex-col min-w-0">
@@ -301,13 +302,13 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                   className="flex items-baseline text-[19px] font-extrabold leading-none"
                   style={{ fontFamily: "'Outfit', 'Space Grotesk', 'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.03em' }}
                 >
-                  <span className="bg-gradient-to-r from-white via-slate-100 to-sky-100 bg-clip-text text-transparent">Arc</span>
-                  <span className="mx-0.5 font-bold text-sky-400">-</span>
-                  <span className="bg-gradient-to-br from-sky-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">8</span>
+                  <span className="text-slate-900 dark:bg-gradient-to-r dark:from-white dark:via-slate-100 dark:to-sky-100 dark:bg-clip-text dark:text-transparent">Arc</span>
+                  <span className="mx-0.5 font-bold text-sky-600 dark:text-sky-400">-</span>
+                  <span className="bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 dark:from-sky-400 dark:via-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">8</span>
                 </span>
-                <span className="text-[10px] font-semibold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-400/20">OS</span>
+                <span className="text-[10px] font-semibold text-sky-700 bg-sky-50 border-sky-200 dark:text-sky-400 dark:bg-sky-500/10 px-1.5 py-0.5 rounded border dark:border-sky-400/20">OS</span>
               </span>
-              <span className="text-[11px] text-slate-400 truncate mt-0.5">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
                 {tenantInfo?.name || tenant || 'Prominence Health'}
               </span>
             </div>
@@ -317,7 +318,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
           type="button"
           onClick={onToggle}
           title={collapsed ? 'Expand menu' : 'Collapse menu'}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition"
+          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60 transition"
         >
           <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
             {collapsed ? (
@@ -331,9 +332,9 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
 
       {/* ── Organization / Security strip ────────────────────────── */}
       {!collapsed && (
-        <div className="px-4 py-2 bg-slate-900/60 border-b border-slate-800/40 flex items-center justify-between text-[11px]">
-          <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="px-4 py-2 bg-slate-50/90 border-b border-slate-200/80 dark:bg-slate-900/60 dark:border-slate-800/40 flex items-center justify-between text-[11px]">
+          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
             {t('sidebar.hipaa_compliant', 'HIPAA Compliant')}
           </span>
           <span className="text-slate-500 font-mono text-[10px]">SOC-2 TYPE II</span>
@@ -345,11 +346,11 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         {filteredNavGroups.map((group, gIdx) => (
           <div key={gIdx} className="space-y-1">
             {!collapsed ? (
-              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400/80">
+              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400/80">
                 {group.title}
               </div>
             ) : (
-              <div className="h-px bg-slate-800/60 my-2 mx-2" />
+              <div className="h-px bg-slate-200 dark:bg-slate-800/60 my-2 mx-2" />
             )}
             <div className="space-y-0.5">
               {group.items.map((item) => {
@@ -364,13 +365,13 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                       className={[
                         'group flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all relative',
                         active
-                          ? 'bg-sky-500/15 text-sky-300 font-semibold shadow-sm shadow-sky-500/5'
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/50',
+                          ? 'bg-sky-50 text-sky-700 font-semibold shadow-xs ring-1 ring-sky-200/70 dark:ring-0 dark:bg-sky-500/15 dark:text-sky-300 dark:shadow-sm dark:shadow-sky-500/5'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50',
                         collapsed ? 'justify-center px-0' : '',
                       ].join(' ')}
                     >
                       {active && (
-                        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-sky-400 shadow-sm shadow-sky-400" />
+                        <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-sky-600 shadow-sm shadow-sky-600/30 dark:bg-sky-400 dark:shadow-sky-400" />
                       )}
                       <Link
                         to={item.href}
@@ -380,7 +381,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                         <span
                           className={[
                             'transition-colors',
-                            active ? 'text-sky-400' : 'text-slate-400 group-hover:text-slate-200',
+                            active ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200',
                           ].join(' ')}
                         >
                           <IconComponent />
@@ -395,10 +396,10 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                           className={[
                             'text-[10px] px-1.5 py-0.2 rounded-full font-semibold tabular-nums shrink-0',
                             item.badgeTone === 'critical'
-                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30'
                               : item.badgeTone === 'success'
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                              : 'bg-slate-800 text-slate-300 border border-slate-700/60',
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60',
                           ].join(' ')}
                         >
                           {item.badge}
@@ -410,11 +411,11 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                           type="button"
                           onClick={(e) => toggleExpand(item.href, e)}
                           title={isExpanded ? 'Collapse sub-menus' : 'Expand sub-menus'}
-                          className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-700/50 transition shrink-0"
+                          className="p-1 rounded text-slate-400 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50 transition shrink-0"
                         >
                           <svg
                             className={`h-3 w-3 transition-transform duration-200 ${
-                              isExpanded ? 'rotate-90 text-sky-400' : ''
+                              isExpanded ? 'rotate-90 text-sky-600 dark:text-sky-400' : ''
                             }`}
                             fill="none"
                             viewBox="0 0 24 24"
@@ -428,7 +429,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
 
                     {/* Sub-Items Tree */}
                     {!collapsed && hasSubs && isExpanded && (
-                      <div className="ml-5 pl-2.5 border-l border-slate-800/80 my-1 space-y-0.5 animate-fadeIn">
+                      <div className="ml-5 pl-2.5 border-l border-slate-200 dark:border-slate-800/80 my-1 space-y-0.5 animate-fadeIn">
                         {item.subItems.map((sub) => {
                           const subActive = isSubActive(sub.href, sub.exact);
                           return (
@@ -438,20 +439,20 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                               className={[
                                 'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all',
                                 subActive
-                                  ? 'bg-sky-500/15 text-sky-300 font-semibold shadow-xs'
-                                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40',
+                                  ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 font-semibold shadow-xs'
+                                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/40',
                               ].join(' ')}
                             >
                               <div className="flex items-center gap-2 truncate">
                                 <span
                                   className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                                    subActive ? 'bg-sky-400 ring-2 ring-sky-400/30' : 'bg-slate-600'
+                                    subActive ? 'bg-sky-600 ring-2 ring-sky-600/25 dark:bg-sky-400 dark:ring-sky-400/30' : 'bg-slate-300 dark:bg-slate-600'
                                   }`}
                                 />
                                 <span className="truncate">{sub.label}</span>
                               </div>
                               {sub.supervisorOnly && (
-                                <span className="text-[9px] font-bold text-amber-400/90 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20 shrink-0">
+                                <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-400/90 dark:bg-amber-500/10 px-1 py-0.2 rounded border dark:border-amber-500/20 shrink-0">
                                   Admin
                                 </span>
                               )}
@@ -469,10 +470,10 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
       </div>
 
       {/* ── Active User / Persona Footer ─────────────────────────── */}
-      <div className="p-3 border-t border-slate-800/80 bg-slate-900/40">
+      <div className="p-3 border-t border-slate-200 bg-slate-50/70 dark:border-slate-800/80 dark:bg-slate-900/40">
         {!collapsed ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-slate-800/40 border border-slate-800/80">
+            <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-white border border-slate-200 shadow-xs dark:shadow-none dark:bg-slate-800/40 dark:border-slate-800/80">
               <div
                 className={`h-8 w-8 shrink-0 rounded-full bg-gradient-to-tr ${currentPersona.color} flex items-center justify-center text-xs font-bold text-white shadow-sm`}
               >
@@ -484,9 +485,9 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                   .toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-white truncate">{currentPersona.name}</div>
-                <div className="text-[10px] text-sky-400 font-medium truncate flex items-center gap-1">
-                  <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{currentPersona.name}</div>
+                <div className="text-[10px] text-sky-600 dark:text-sky-400 font-medium truncate flex items-center gap-1">
+                  <span className="h-1 w-1 rounded-full bg-emerald-500 dark:bg-emerald-400" />
                   {currentPersona.title}
                 </div>
               </div>
@@ -496,7 +497,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
               <button
                 type="button"
                 onClick={() => setShowPersonaModal(true)}
-                className="flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/20 hover:bg-sky-500/20 transition text-center"
+                className="flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20 dark:hover:bg-sky-500/20 transition text-center"
               >
                 {t('sidebar.switch_role', 'Switch Role ▾')}
               </button>
@@ -507,7 +508,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                   navigate('/login');
                 }}
                 title="Log out"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -537,24 +538,24 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
       {/* ── Quick Persona Switcher Modal ─────────────────────────── */}
       {showPersonaModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm p-4"
           onClick={() => setShowPersonaModal(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl p-5 space-y-4"
+            className="w-full max-w-md rounded-2xl bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-700/80 shadow-2xl p-5 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-base font-bold text-white">{t('sidebar.switch_persona_title', 'Switch Clinical Persona')}</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">{t('sidebar.switch_persona_title', 'Switch Clinical Persona')}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   {t('sidebar.switch_persona_desc', 'Select a persona to immediately preview role-specific clinical permissions.')}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowPersonaModal(false)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-1"
               >
                 ✕
               </button>
@@ -571,8 +572,8 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                     className={[
                       'flex items-center gap-3 p-3 rounded-xl border text-left transition',
                       isSelected
-                        ? 'border-sky-500/60 bg-sky-500/10 ring-1 ring-sky-500/30'
-                        : 'border-slate-800 bg-slate-800/40 hover:bg-slate-800 hover:border-slate-700',
+                        ? 'border-sky-500 bg-sky-50/80 ring-1 ring-sky-500/20 dark:border-sky-500/60 dark:bg-sky-500/10 dark:ring-sky-500/30'
+                        : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-800/40 dark:hover:bg-slate-800 dark:hover:border-slate-700',
                     ].join(' ')}
                   >
                     <div
@@ -586,25 +587,25 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-white truncate">{p.name}</span>
+                        <span className="text-xs font-semibold text-slate-900 dark:text-white truncate">{p.name}</span>
                         {isSelected && (
-                          <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">
+                          <span className="text-[10px] text-sky-600 dark:text-sky-400 font-bold uppercase tracking-wider">
                             Active
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-400">{p.title}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">{p.title}</div>
                     </div>
                   </button>
                 );
               })}
             </div>
 
-            <div className="pt-2 border-t border-slate-800 flex justify-end">
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowPersonaModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800 transition"
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition"
               >
                 {t('sidebar.cancel', 'Cancel')}
               </button>

@@ -1,4 +1,4 @@
-// Greenfield-deployable Bicep for the Nexora chat stack.
+// Greenfield-deployable Bicep for the Arc-8 chat stack.
 //
 // Given a fresh resource group and the required @secure() parameters, this
 // template provisions everything the chat workload needs:
@@ -13,7 +13,7 @@
 //   * Postgres Flexible Server — VNet-injected (no public endpoint at all),
 //     with a private DNS zone for its FQDN
 //   * Container Apps environment, VNet-integrated on aca-subnet
-//   * Storage definition + Container App `nexora-chat` with system-assigned
+//   * Storage definition + Container App `arc8-chat` with system-assigned
 //     MI, KV-ref secrets, AzureFile volume mount, ACR pull via MI
 //   * 4 Container Apps Jobs (ddl, migrations, path2-ddl, tenant-provision)
 //     all on the same env, using KV-ref secrets via system-assigned MI
@@ -22,8 +22,8 @@
 //
 // This deliberately differs from the *current live state* in two ways:
 //
-//   1. Live chat uses the dev VNet (`rg-nexora-dev/nexora-dev-vnet`); this
-//      template creates its own `nexora-chat-vnet` for full isolation.
+//   1. Live chat uses the dev VNet (`rg-arc8-dev/arc8-dev-vnet`); this
+//      template creates its own `arc8-chat-vnet` for full isolation.
 //   2. Live Postgres uses a public-access server with a Private Endpoint
 //      attached. This template uses VNet injection on a delegated subnet,
 //      so the server has no public listener at all. VNet injection is the
@@ -36,11 +36,11 @@
 //     -g <rg> \
 //     -f infra/azure/bicep/chat.bicep \
 //     -p @parameters/chat.json \
-//     -p postgresAdminPassword=$env:NEXORA_POSTGRES_ADMIN_PASSWORD \
-//     -p platformSecretKey=$env:NEXORA_PLATFORM_SECRET_KEY \
-//     -p platformFieldEncryptionKey=$env:NEXORA_FIELD_ENCRYPTION_KEY \
-//     -p anthropicApiKey=$env:NEXORA_ANTHROPIC_API_KEY \
-//     -p initialAdminPassword=$env:NEXORA_INITIAL_ADMIN_PASSWORD
+//     -p postgresAdminPassword=$env:ARC8_POSTGRES_ADMIN_PASSWORD \
+//     -p platformSecretKey=$env:ARC8_PLATFORM_SECRET_KEY \
+//     -p platformFieldEncryptionKey=$env:ARC8_FIELD_ENCRYPTION_KEY \
+//     -p anthropicApiKey=$env:ARC8_ANTHROPIC_API_KEY \
+//     -p initialAdminPassword=$env:ARC8_INITIAL_ADMIN_PASSWORD
 
 targetScope = 'resourceGroup'
 
@@ -49,14 +49,14 @@ targetScope = 'resourceGroup'
 @description('Naming prefix; suffixes are added per resource type.')
 @minLength(5)
 @maxLength(20)
-param namePrefix string = 'nexora-chat'
+param namePrefix string = 'arc8-chat'
 
 @description('Region for all resources except cross-region exceptions.')
 param location string = resourceGroup().location
 
 @description('Tags applied to every resource.')
 param tags object = {
-  app: 'nexora'
+  app: 'arc8'
   workload: 'chat'
   'managed-by': 'bicep'
 }
@@ -74,10 +74,10 @@ param postgresSubnetPrefix string = '10.30.2.0/24'
 param peSubnetPrefix string = '10.30.4.0/24'
 
 @description('Image tag the container app and jobs run.')
-param containerImage string = 'nexorachatacr.azurecr.io/nexora-platform:latest'
+param containerImage string = 'arc8chatacr.azurecr.io/arc8-platform:latest'
 
 @description('Postgres admin user.')
-param postgresAdminUser string = 'nexoraadmin'
+param postgresAdminUser string = 'arc8admin'
 
 @description('Postgres admin password.')
 @secure()
@@ -90,10 +90,10 @@ param postgresSkuName string = 'Standard_D2ds_v5'
 param postgresStorageGB int = 128
 
 @description('Tenant database name (created in addition to control).')
-param tenantDatabaseName string = 'nexora_tenant_prominencehealth'
+param tenantDatabaseName string = 'arc8_tenant_prominencehealth'
 
 @description('Control database name.')
-param controlDatabaseName string = 'nexora_control'
+param controlDatabaseName string = 'arc8_control'
 
 @description('Platform secret key (FastAPI session signing).')
 @secure()
@@ -131,7 +131,7 @@ param anthropicModel string = 'claude-opus-4-7'
 param initialTenantKey string = 'prominencehealth'
 
 @description('Initial admin email passed to provision job.')
-param initialAdminEmail string = 'admin@nexora.local'
+param initialAdminEmail string = 'admin@arc8.local'
 
 // ── Networking ─────────────────────────────────────────────────────────────
 
@@ -729,9 +729,9 @@ resource path2DdlJob 'Microsoft.App/jobs@2024-03-01' = {
 
 resource tenantProvisionJob 'Microsoft.App/jobs@2024-03-01' = {
   // Shortened name: `${namePrefix}-tenant-provision` would blow the 32-char
-  // job-name cap when namePrefix='nexora-chat'. Hardcoded prefix `nexora`
+  // job-name cap when namePrefix='arc8-chat'. Hardcoded prefix `arc8`
   // keeps it under the limit regardless of namePrefix.
-  name: 'nexora-tenant-provision'
+  name: 'arc8-tenant-provision'
   location: location
   tags: tags
   identity: { type: 'SystemAssigned' }

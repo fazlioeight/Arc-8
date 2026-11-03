@@ -38,7 +38,7 @@ from ...core.config import settings
 from ...models.chat import ChatWorkbook
 
 
-logger = logging.getLogger("nexora.chat.workbooks")
+logger = logging.getLogger("arc8.chat.workbooks")
 
 
 STATUS_PENDING   = "pending"
@@ -398,7 +398,7 @@ def _ingest_xlsx_sync(xlsx_path: Path, duckdb_path: Path) -> dict:
     import tempfile
     import shutil
 
-    with tempfile.TemporaryDirectory(prefix="nexora-ingest-") as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix="arc8-ingest-") as tmp_dir:
         local_path = Path(tmp_dir) / "workbook.duckdb"
         result = _ingest_to_path(xlsx_path, local_path)
         shutil.move(str(local_path), str(duckdb_path), copy_function=shutil.copyfile)
@@ -498,7 +498,7 @@ def _ingest_sheet(con, ws, table_name: str) -> tuple[list[dict], int]:
     import tempfile
 
     inserted = 0
-    csv_fd, csv_path = tempfile.mkstemp(prefix="nexora-sheet-", suffix=".csv")
+    csv_fd, csv_path = tempfile.mkstemp(prefix="arc8-sheet-", suffix=".csv")
     try:
         with os.fdopen(csv_fd, "w", encoding="utf-8", newline="") as csv_f:
             writer = csv.writer(csv_f, quoting=csv.QUOTE_MINIMAL)

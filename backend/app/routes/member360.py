@@ -1,4 +1,4 @@
-"""FastAPI routes for Nexora Lab Member360.
+"""FastAPI routes for Arc-8 Member360.
 
 Mounted at ``/api/member360``. All routes require an authenticated user
 within the active tenant. Tenant tables and helper PG functions are

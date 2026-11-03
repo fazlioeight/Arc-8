@@ -10,8 +10,8 @@ internal/staff backend is untouched and keeps serving staff as before.
 ```
 Internet → Azure Front Door + WAF (member hostname)
               ├─ /*            → Member SPA  (Static Web App: frontend-member)   [no secrets]
-              └─ /api/member/* → Member Edge Container App (nexora-member-portal) [NO DB creds, NO SECRET_KEY]
-                                    └─(private, in-environment)→ backend (nexora-chat-v2) [DB creds stay here]
+              └─ /api/member/* → Member Edge Container App (arc8-member-portal) [NO DB creds, NO SECRET_KEY]
+                                    └─(private, in-environment)→ backend (arc8-chat-v2) [DB creds stay here]
 ```
 
 The edge (`edge/member-portal/`) is a path-allowlisted reverse proxy: it forwards
@@ -57,7 +57,7 @@ backend, which is never the direct public path for member traffic.
    `./infra/azure/08-create-member-static-web-app.ps1 -ResourceGroup <rg> -RepositoryUrl <url> -MemberApiBase <placeholder-or-fd-host>`
 
 4. **Provision Front Door + WAF** and wire both routes:
-   `az deployment group create -g <rg> -f infra/azure/bicep/modules/front-door.bicep -p namePrefix=nexora spaHostName=<swa-host> edgeHostName=<edge-fqdn>`
+   `az deployment group create -g <rg> -f infra/azure/bicep/modules/front-door.bicep -p namePrefix=arc8 spaHostName=<swa-host> edgeHostName=<edge-fqdn>`
    Capture the `frontDoorId` output → set `EXPECTED_FRONT_DOOR_ID` on the edge app
    (rerun step 2 with it) so the edge rejects non-Front-Door traffic. Set
    `MEMBER_PORTAL_API_BASE` to the Front Door endpoint host and rebuild the SPA.

@@ -1,4 +1,4 @@
-"""Nexora platform-staff endpoints.
+"""Arc-8 platform-staff endpoints.
 
 Staff identities live in `staff_users` on the control plane — they are not
 tied to any tenant. The login flow returns an identity-only JWT (`typ=staff`);
@@ -42,7 +42,7 @@ from ..utils.security import (
 )
 
 router = APIRouter(prefix="/api/staff", tags=["staff"])
-logger = logging.getLogger("nexora.staff")
+logger = logging.getLogger("arc8.staff")
 
 _STAFF_LOCKOUT_TENANT_KEY = "__staff__"
 _MIN_PASSWORD_LENGTH = 12
@@ -568,7 +568,7 @@ async def impersonate_tenant(
 
 
 # ---------------------------------------------------------------------------
-# Staff CRUD (manage other Nexora employees)
+# Staff CRUD (manage other Arc-8 employees)
 # ---------------------------------------------------------------------------
 
 

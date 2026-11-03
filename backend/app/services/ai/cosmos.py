@@ -27,7 +27,7 @@ from typing import Any, Optional
 from ...core.config import get_settings
 
 
-log = logging.getLogger("nexora.ai.cosmos")
+log = logging.getLogger("arc8.ai.cosmos")
 
 
 class CosmosError(RuntimeError):

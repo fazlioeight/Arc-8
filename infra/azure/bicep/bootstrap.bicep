@@ -21,21 +21,21 @@
 //
 // Run once per environment:
 //   az deployment group create \
-//     -g rg-nexora-dev \
+//     -g rg-arc8-dev \
 //     -f bootstrap.bicep \
-//     -p namePrefix=nexora-dev
+//     -p namePrefix=arc8-dev
 
 targetScope = 'resourceGroup'
 
-@description('Naming prefix, e.g. "nexora-dev". Service-specific suffixes are appended.')
-param namePrefix string = 'nexora-dev'
+@description('Naming prefix, e.g. "arc8-dev". Service-specific suffixes are appended.')
+param namePrefix string = 'arc8-dev'
 
 @description('Region. Must support Container Apps + Azure OpenAI (westus3 or eastus).')
 param location string = resourceGroup().location
 
 @description('Tags applied to every resource.')
 param tags object = {
-  app: 'nexora'
+  app: 'arc8'
   'managed-by': 'bicep'
   environment: 'dev'
   purpose: 'rag-mvp-bootstrap'

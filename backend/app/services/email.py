@@ -18,7 +18,7 @@ import httpx
 
 from ..core.config import settings
 
-logger = logging.getLogger("nexora.email")
+logger = logging.getLogger("arc8.email")
 
 SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
 

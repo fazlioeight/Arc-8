@@ -1,4 +1,4 @@
-# Nexora Bicep — AI Semantic Layer
+# Arc-8 Bicep — AI Semantic Layer
 
 Bicep modules for the resources added by the RAG MVP (week 1 of the
 [roadmap](../../../docs/architecture/roadmap.md)). These are **additive** to
@@ -19,7 +19,7 @@ the foundation provisioned by `infra/azure/00-provision-foundation.ps1`.
 
 These must already exist (created by `00-provision-foundation.ps1`):
 
-1. **Resource group** — `rg-nexora-{env}`.
+1. **Resource group** — `rg-arc8-{env}`.
 2. **VNet** with a dedicated private-endpoint subnet (`pe-subnet`, 10.20.4.0/24).
    The subnet must have `privateEndpointNetworkPolicies = Disabled`.
 3. **Container App** with system-assigned managed identity. Capture its
@@ -30,19 +30,19 @@ These must already exist (created by `00-provision-foundation.ps1`):
 ```bash
 # Validate the template first — surfaces missing parameters or RBAC issues.
 az deployment group validate \
-  --resource-group rg-nexora-dev \
+  --resource-group rg-arc8-dev \
   --template-file main.bicep \
   --parameters @parameters/dev.json
 
 # Preview changes.
 az deployment group what-if \
-  --resource-group rg-nexora-dev \
+  --resource-group rg-arc8-dev \
   --template-file main.bicep \
   --parameters @parameters/dev.json
 
 # Apply.
 az deployment group create \
-  --resource-group rg-nexora-dev \
+  --resource-group rg-arc8-dev \
   --template-file main.bicep \
   --parameters @parameters/dev.json
 ```
@@ -53,7 +53,7 @@ The deployment outputs the FQDNs the application needs:
 
 ```bash
 az deployment group show \
-  --resource-group rg-nexora-dev \
+  --resource-group rg-arc8-dev \
   --name main \
   --query properties.outputs
 ```

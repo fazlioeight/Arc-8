@@ -3,7 +3,7 @@
 Last reviewed: 2026-05-16
 
 All long-lived secrets for the platform live in the resource-group Key Vault
-(`nexora-chat-kv` by default) and are surfaced to the Container App as
+(`arc8-chat-kv` by default) and are surfaced to the Container App as
 `secretref:` env vars. This runbook covers the rotation procedure for each.
 
 The general rotation principle is **canary + drain**:
@@ -28,7 +28,7 @@ need to bump the secret value beforehand.
 become invalid and users must re-login.
 
 ```powershell
-$rg = "nexora-chat-rg"; $kv = "nexora-chat-kv"; $app = "nexora-chat"
+$rg = "arc8-chat-rg"; $kv = "arc8-chat-kv"; $app = "arc8-chat"
 
 # 1. Generate and store a new 48-byte key.
 $bytes = New-Object byte[] 48
@@ -57,7 +57,7 @@ This one supports graceful rotation because the application accepts
 try every key. Follow this order:
 
 ```powershell
-$rg = "nexora-chat-rg"; $kv = "nexora-chat-kv"; $app = "nexora-chat"
+$rg = "arc8-chat-rg"; $kv = "arc8-chat-kv"; $app = "arc8-chat"
 
 # 1. Generate the new key.
 $fkBytes = New-Object byte[] 32
@@ -96,8 +96,8 @@ rotation event.
 until the env var refreshes. Has to be done in a maintenance window.
 
 ```powershell
-$rg = "nexora-chat-rg"; $kv = "nexora-chat-kv"
-$server = "nexora-chat-pg"; $user = "<admin-user>"
+$rg = "arc8-chat-rg"; $kv = "arc8-chat-kv"
+$server = "arc8-chat-pg"; $user = "<admin-user>"
 
 # 1. Generate a new password.
 $bytes = New-Object byte[] 24
@@ -129,14 +129,14 @@ Already wired as a Key Vault reference (`keyvaultref:...`), so the rotation
 is simply:
 
 ```powershell
-$kv = "nexora-chat-kv"
+$kv = "arc8-chat-kv"
 
 # 1. Get a fresh key from the Anthropic console.
 az keyvault secret set --vault-name $kv --name "anthropic-api-key" --value "<new-key>" --output none
 
 # 2. The Container App reads via secretref so it picks up the new value on
 #    its next replica restart. To force an immediate refresh:
-az containerapp revision restart -n nexora-chat -g nexora-chat-rg --revision $(az containerapp show -n nexora-chat -g nexora-chat-rg --query "properties.latestRevisionName" -o tsv)
+az containerapp revision restart -n arc8-chat -g arc8-chat-rg --revision $(az containerapp show -n arc8-chat -g arc8-chat-rg --query "properties.latestRevisionName" -o tsv)
 ```
 
 ---
@@ -158,5 +158,5 @@ for that email in `tenant_audit_events`.
   for us. Currently locked to HS256.
 - **`MFA_ISSUER`** — only cosmetic in the authenticator app, but changing it
   causes the QR codes to render the entry as a new account. Plan an
-  announcement; users will see "Nexora Lab (old)" and "Nexora Lab (new)" in
+  announcement; users will see "Arc-8 (old)" and "Arc-8 (new)" in
   their authenticator until they delete the old one.

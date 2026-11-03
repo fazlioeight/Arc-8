@@ -1,12 +1,12 @@
-# 🪟 Windows 11 Setup Guide: Installing Docker & Nexora Platform
+# 🪟 Windows 11 Setup Guide: Installing Docker & Arc-8 Platform
 
-This document is the official step-by-step installation guide for team members running **Windows 11**. It covers installing **Docker Desktop** from scratch and deploying the complete **Nexora Platform** (PostgreSQL, Redis, FastAPI Backend API, and Staff Portal) using **Docker Compose**.
+This document is the official step-by-step installation guide for team members running **Windows 11**. It covers installing **Docker Desktop** from scratch and deploying the complete **Arc-8 Platform** (PostgreSQL, Redis, FastAPI Backend API, and Staff Portal) using **Docker Compose**.
 
 ---
 
 ## 🏗️ System Architecture
 
-The entire Nexora system runs containerized inside Docker Desktop:
+The entire Arc-8 system runs containerized inside Docker Desktop:
 
 ```mermaid
 graph TD
@@ -20,7 +20,7 @@ graph TD
 |---|---|---|---|
 | `arc8-frontend` | React 18 / Nginx | `7777` | Staff Portal UI (Operational dashboards, coding workbench) |
 | `arc8-backend` | Python 3.11 / FastAPI | `8989` | Core Control Plane & Multi-tenant API (Auto-seeds DB on startup) |
-| `arc8-postgres` | PostgreSQL 16 Alpine | `5432` | Multi-tenant database engine (`nexora_control`, `prominence_tenant`) |
+| `arc8-postgres` | PostgreSQL 16 Alpine | `5432` | Multi-tenant database engine (`arc8_control`, `prominence_tenant`) |
 | `arc8-redis` | Redis 7 Alpine | `6379` | Rate-limiting cache & background queue engine |
 
 ---
@@ -90,17 +90,17 @@ If Git is not already installed on your system:
 
 ---
 
-## Step 5: Clone & Deploy Nexora via Docker Compose
+## Step 5: Clone & Deploy Arc-8 via Docker Compose
 
 ### 5.1 Clone the Repository
 Open **PowerShell** or **Git Bash** and run:
 ```powershell
-git clone https://github.com/fazlioeight/nexora-platform.git
-cd nexora-platform
+git clone https://github.com/fazlioeight/Arc-8.git
+cd Arc-8
 ```
 
 ### 5.2 Build & Start All Containers
-Run Docker Compose from the root `nexora-platform` directory:
+Run Docker Compose from the root `Arc-8` directory:
 ```powershell
 docker compose up --build -d
 ```
@@ -116,7 +116,7 @@ You should see:
 - `arc8-backend` (Status: `Up`)
 - `arc8-frontend` (Status: `Up`)
 
-> ℹ️ **Automatic Database Seeding**: The `arc8-backend` container automatically initializes PostgreSQL, creates required control & tenant databases (`nexora_control`, `prominence_tenant`), runs database schema migrations, and provisions the default administrator account (`admin@prominencehealth.com`).
+> ℹ️ **Automatic Database Seeding**: The `arc8-backend` container automatically initializes PostgreSQL, creates required control & tenant databases (`arc8_control`, `prominence_tenant`), runs database schema migrations, and provisions the default administrator account (`admin@prominencehealth.com`).
 
 ---
 
@@ -124,7 +124,7 @@ You should see:
 
 Once Docker containers are running, open your web browser to access the system:
 
-### 1. Nexora Staff Portal
+### 1. Arc-8 Staff Portal
 - **URL**: `http://localhost:7777`
 - **Default Admin Email**: `admin@prominencehealth.com`
 - **Default Password**: `admin`

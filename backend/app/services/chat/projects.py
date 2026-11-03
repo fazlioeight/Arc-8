@@ -52,7 +52,7 @@ from ...models.chat_projects import (
 from . import history as history_svc
 
 
-log = logging.getLogger("nexora.chat.projects")
+log = logging.getLogger("arc8.chat.projects")
 
 
 # ── Exceptions ─────────────────────────────────────────────────────────────

@@ -266,7 +266,7 @@ async def ensure_seed_data(session: AsyncSession) -> None:
                 chase_code="PH-CH-1001",
                 status="open",
                 priority="high",
-                assigned_coder_email="coder@nexora.test",
+                assigned_coder_email="coder@arc8.test",
                 icd10_code="E11.9",
                 hcc_code="HCC18",
             ),
@@ -275,7 +275,7 @@ async def ensure_seed_data(session: AsyncSession) -> None:
                 chase_code="PH-CH-1002",
                 status="pending_review",
                 priority="normal",
-                assigned_coder_email="reviewer@nexora.test",
+                assigned_coder_email="reviewer@arc8.test",
                 icd10_code="I10",
                 hcc_code="HCC161",
             ),
@@ -303,7 +303,7 @@ async def ensure_seed_data(session: AsyncSession) -> None:
     session.add(
         CodingMemberNote(
             member_id=seed_member.id,
-            author_email="coder@nexora.test",
+            author_email="coder@arc8.test",
             author_name="Prominence Coder",
             body="Initial chart review completed for ProminenceHealth.",
         )

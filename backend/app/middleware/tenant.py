@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import Optional
 
@@ -34,7 +34,7 @@ class TenantMiddleware(BaseHTTPMiddleware):
         # they're invoked directly by the browser via <img> / anchor click,
         # so no X-Tenant-Key header is attached and the middleware would
         # otherwise 404 every download.
-        # /api/staff/* is the Nexora platform-staff surface — its identity
+        # /api/staff/* is the Arc-8 platform-staff surface — its identity
         # tokens are not tenant-bound, and the impersonate route resolves the
         # tenant itself via path param + tenant_registry.
         # /api/contact is the public marketing contact form — unauthenticated

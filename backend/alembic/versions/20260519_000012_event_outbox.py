@@ -11,7 +11,7 @@ Why a trigger and not just application code? Defense in depth. A bug, a
 runaway migration, or a DB admin with the wrong intention could otherwise
 rewrite history; the trigger makes that a hard error at the DB level.
 
-Why a per-tenant table and not a global one? The rest of Nexora's per-tenant
+Why a per-tenant table and not a global one? The rest of Arc-8's per-tenant
 data (members, claims, ...) lives in the tenant schema. Keeping outbox there
 means it inherits the same connection-scoping and (once added in week 2) the
 same RLS policies, so a misrouted query can't pull another tenant's event

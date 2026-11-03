@@ -1,9 +1,9 @@
-# Nexora Platform — Azure-Native Target Gap Analysis
+# Arc-8 Platform — Azure-Native Target Gap Analysis
 
 Status: 2026-05-19
 Owner: Platform Architecture
 
-This document captures the delta between the current Nexora codebase and the
+This document captures the delta between the current Arc-8 codebase and the
 target Azure-native, HIPAA-aligned architecture. It is the input to the
 roadmap, the MVP RAG plan, and the GitHub issue list under this folder.
 

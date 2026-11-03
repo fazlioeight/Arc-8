@@ -34,12 +34,12 @@ class _FakeAsyncClient:
 
 async def test_send_email_uses_sendgrid(monkeypatch):
     monkeypatch.setattr(settings, "SENDGRID_API_KEY", "SG.test-key")
-    monkeypatch.setattr(settings, "EMAIL_FROM", "no-reply@nexoralab.co")
+    monkeypatch.setattr(settings, "EMAIL_FROM", "no-reply@arc8-mvp.site")
     _FakeAsyncClient.status_code = 202
     monkeypatch.setattr(email_module.httpx, "AsyncClient", _FakeAsyncClient)
 
     sent = await email_module.send_email(
-        to="contact@nexoralab.co",
+        to="contact@arc8-mvp.site",
         subject="Demo request",
         body="Body text",
         reply_to="jane@example.com",
@@ -49,8 +49,8 @@ async def test_send_email_uses_sendgrid(monkeypatch):
     cap = _FakeAsyncClient.captured
     assert cap["url"] == email_module.SENDGRID_API_URL
     assert cap["headers"]["Authorization"] == "Bearer SG.test-key"
-    assert cap["json"]["from"] == {"email": "no-reply@nexoralab.co"}
-    assert cap["json"]["personalizations"][0]["to"] == [{"email": "contact@nexoralab.co"}]
+    assert cap["json"]["from"] == {"email": "no-reply@arc8-mvp.site"}
+    assert cap["json"]["personalizations"][0]["to"] == [{"email": "contact@arc8-mvp.site"}]
     assert cap["json"]["reply_to"] == {"email": "jane@example.com"}
     assert cap["json"]["subject"] == "Demo request"
     assert cap["json"]["content"][0]["value"] == "Body text"
@@ -58,7 +58,7 @@ async def test_send_email_uses_sendgrid(monkeypatch):
 
 async def test_send_email_sendgrid_failure_raises(monkeypatch):
     monkeypatch.setattr(settings, "SENDGRID_API_KEY", "SG.test-key")
-    monkeypatch.setattr(settings, "EMAIL_FROM", "no-reply@nexoralab.co")
+    monkeypatch.setattr(settings, "EMAIL_FROM", "no-reply@arc8-mvp.site")
     _FakeAsyncClient.status_code = 403
     monkeypatch.setattr(email_module.httpx, "AsyncClient", _FakeAsyncClient)
 

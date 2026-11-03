@@ -22,7 +22,7 @@ param location string
 param tags object = {}
 
 @description('Members topic name. Suffixed .v1 — bump to .v2 on breaking schema changes.')
-param membersTopicName string = 'nexora.member.changed.v1'
+param membersTopicName string = 'arc8.member.changed.v1'
 
 @description('Consumer group used by the RAG event processor.')
 param ragConsumerGroupName string = 'rag-processor'

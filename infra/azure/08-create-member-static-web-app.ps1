@@ -12,9 +12,9 @@
 param(
     [string]$SubscriptionId = $env:AZURE_SUBSCRIPTION_ID,
     [Parameter(Mandatory = $true)][string]$ResourceGroup,
-    [string]$StaticWebAppName = "nexora-member-portal-spa",
+    [string]$StaticWebAppName = "arc8-member-portal-spa",
     [Parameter(Mandatory = $true)][string]$RepositoryUrl,
-    [Parameter(Mandatory = $true)][string]$MemberApiBase,   # e.g. https://nexora-member.<hash>.azurefd.net
+    [Parameter(Mandatory = $true)][string]$MemberApiBase,   # e.g. https://arc8-member.<hash>.azurefd.net
     [string]$TenantKey = "prominencehealth",
     [string]$Location = "eastus2",
     [string]$Branch = "main",

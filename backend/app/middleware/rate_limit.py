@@ -66,7 +66,7 @@ async def _redis_check(redis, key: str, limit: int, window_seconds: int) -> Tupl
     # Fixed-window counter keyed by the current window bucket. INCR is atomic;
     # the first hit in a window sets the TTL so the key self-expires.
     bucket = int(time.time() // window_seconds)
-    redis_key = f"nexora:rl:{key}:{bucket}"
+    redis_key = f"arc8:rl:{key}:{bucket}"
     try:
         count = await redis.incr(redis_key)
         if count == 1:

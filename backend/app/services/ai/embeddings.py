@@ -27,7 +27,7 @@ from typing import Iterable, Optional
 from ...core.config import get_settings
 
 
-log = logging.getLogger("nexora.ai.embeddings")
+log = logging.getLogger("arc8.ai.embeddings")
 
 
 class EmbeddingError(RuntimeError):

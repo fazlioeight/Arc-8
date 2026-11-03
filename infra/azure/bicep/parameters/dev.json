@@ -3,16 +3,16 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "namePrefix": {
-      "value": "nexora-dev"
+      "value": "arc8-dev"
     },
     "location": {
       "value": "westus3"
     },
     "vnetId": {
-      "value": "/subscriptions/c6ae45b3-8336-440f-a851-edbf7effa486/resourceGroups/rg-nexora-dev/providers/Microsoft.Network/virtualNetworks/nexora-dev-vnet"
+      "value": "/subscriptions/c6ae45b3-8336-440f-a851-edbf7effa486/resourceGroups/rg-arc8-dev/providers/Microsoft.Network/virtualNetworks/arc8-dev-vnet"
     },
     "privateEndpointSubnetId": {
-      "value": "/subscriptions/c6ae45b3-8336-440f-a851-edbf7effa486/resourceGroups/rg-nexora-dev/providers/Microsoft.Network/virtualNetworks/nexora-dev-vnet/subnets/pe-subnet"
+      "value": "/subscriptions/c6ae45b3-8336-440f-a851-edbf7effa486/resourceGroups/rg-arc8-dev/providers/Microsoft.Network/virtualNetworks/arc8-dev-vnet/subnets/pe-subnet"
     },
     "containerAppPrincipalId": {
       "value": "d3ebec55-45ed-4962-97ba-e5a67e63224d"

@@ -1,24 +1,24 @@
 param(
     [string]$SubscriptionId = $env:AZURE_SUBSCRIPTION_ID,
-    [string]$ResourceGroup = "rg-nexora-prod",
+    [string]$ResourceGroup = "rg-arc8-prod",
     [string]$Location = "eastus2",
-    [string]$NamePrefix = "nexora",
+    [string]$NamePrefix = "arc8",
     [Parameter(Mandatory = $true)][string]$RepositoryUrl,
     [string]$Branch = "main",
-    [string]$StaticWebAppName = "nexora-portal",
-    [string]$BackendAppName = "nexora-api",
+    [string]$StaticWebAppName = "arc8-portal",
+    [string]$BackendAppName = "arc8-api",
     [string]$ImageTag = "prod-001",
-    [string]$PostgresAdminUser = "nexoraadmin",
-    [string]$PostgresAdminPassword = $env:NEXORA_POSTGRES_ADMIN_PASSWORD,
+    [string]$PostgresAdminUser = "arc8admin",
+    [string]$PostgresAdminPassword = $env:ARC8_POSTGRES_ADMIN_PASSWORD,
     [string]$TenantKey = "prominencehealth",
     [string]$TenantName = "ProminenceHealth",
     [string]$InitialAdminEmail = "",
-    [string]$InitialAdminPassword = $env:NEXORA_INITIAL_ADMIN_PASSWORD,
-    [string]$AzureTenantId = $env:NEXORA_AZURE_TENANT_ID,
-    [string]$AzureClientId = $env:NEXORA_AZURE_CLIENT_ID,
-    [string]$AzureClientSecret = $env:NEXORA_AZURE_CLIENT_SECRET,
+    [string]$InitialAdminPassword = $env:ARC8_INITIAL_ADMIN_PASSWORD,
+    [string]$AzureTenantId = $env:ARC8_AZURE_TENANT_ID,
+    [string]$AzureClientId = $env:ARC8_AZURE_CLIENT_ID,
+    [string]$AzureClientSecret = $env:ARC8_AZURE_CLIENT_SECRET,
     [string]$AzureAuthScopes = "openid profile email",
-    [string]$AzureAuthEnabled = $(if ($env:NEXORA_AZURE_AUTH_ENABLED) { $env:NEXORA_AZURE_AUTH_ENABLED } elseif ($env:NEXORA_AZURE_TENANT_ID -and $env:NEXORA_AZURE_CLIENT_ID -and $env:NEXORA_AZURE_CLIENT_SECRET) { "true" } else { "false" }),
+    [string]$AzureAuthEnabled = $(if ($env:ARC8_AZURE_AUTH_ENABLED) { $env:ARC8_AZURE_AUTH_ENABLED } elseif ($env:ARC8_AZURE_TENANT_ID -and $env:ARC8_AZURE_CLIENT_ID -and $env:ARC8_AZURE_CLIENT_SECRET) { "true" } else { "false" }),
     [string]$OutputDirectory = "$PSScriptRoot"
 )
 
@@ -30,7 +30,7 @@ if ($SubscriptionId) {
 }
 
 if (-not $PostgresAdminPassword) {
-    throw "Set NEXORA_POSTGRES_ADMIN_PASSWORD or pass -PostgresAdminPassword."
+    throw "Set ARC8_POSTGRES_ADMIN_PASSWORD or pass -PostgresAdminPassword."
 }
 
 $foundationOutput = Join-Path $OutputDirectory "azure-foundation.outputs.json"

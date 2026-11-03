@@ -32,9 +32,9 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: Annotated[List[AnyHttpUrl], NoDecode] = ["http://localhost:3000"]
 
-    CONTROL_DATABASE_URL: str = "postgresql+asyncpg://nexora_control:nexora_control@localhost:5432/nexora_control"
+    CONTROL_DATABASE_URL: str = "postgresql+asyncpg://arc8_control:arc8_control@localhost:5432/arc8_control"
     TENANT_DATABASE_URL_TEMPLATE: Optional[str] = None
-    DEFAULT_TENANT_DATABASE_URL: Optional[str] = "postgresql+asyncpg://nexora_control:nexora_control@localhost:5432/prominence_tenant"
+    DEFAULT_TENANT_DATABASE_URL: Optional[str] = "postgresql+asyncpg://arc8_control:arc8_control@localhost:5432/prominence_tenant"
     TENANT_DATABASE_SCHEMA_TEMPLATE: Optional[str] = None
     TENANT_CONNECTION_CACHE_SIZE: int = 32
 
@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     # date of creation or last effective use. We treat audit events the same.
     AUDIT_LOG_RETENTION_DAYS: int = 365 * 6
     LOG_LEVEL: str = "INFO"
-    METRICS_NAMESPACE: str = "nexora"
+    METRICS_NAMESPACE: str = "arc8"
 
     S3_BUCKET_PREFIX: Optional[str] = None
     BACKGROUND_QUEUE_URL: Optional[str] = None
@@ -205,7 +205,7 @@ class Settings(BaseSettings):
     # From address for outbound mail. Falls back to SMTP_USERNAME when unset.
     EMAIL_FROM: Optional[str] = None
     # Destination inbox for marketing contact-form submissions.
-    CONTACT_INBOX_EMAIL: str = "contact@nexoralab.co"
+    CONTACT_INBOX_EMAIL: str = "contact@arc8-mvp.site"
 
     HIPAA_MODE: bool = True
     ALLOW_DUMMY_LOGIN: bool = False
@@ -264,7 +264,7 @@ class Settings(BaseSettings):
     # continues to use Anthropic by default (per architecture decision
     # 2026-05-19) but the embeddings path is non-negotiable Azure OpenAI
     # because AI Search vectorization integrations expect it.
-    AZURE_OPENAI_ENDPOINT: Optional[str] = None  # e.g. "https://nexora-oai.openai.azure.com"
+    AZURE_OPENAI_ENDPOINT: Optional[str] = None  # e.g. "https://arc8-oai.openai.azure.com"
     AZURE_OPENAI_API_VERSION: str = "2024-10-21"
     AZURE_OPENAI_EMBEDDING_DEPLOYMENT: str = "text-embedding-3-large"
     AZURE_OPENAI_EMBEDDING_DIMENSIONS: int = 3072
@@ -274,21 +274,21 @@ class Settings(BaseSettings):
     AZURE_OPENAI_EMBEDDING_TPM_BUDGET: int = 250_000
 
     # Azure AI Search: hybrid (BM25 + vector) retrieval.
-    AZURE_SEARCH_ENDPOINT: Optional[str] = None  # e.g. "https://nexora-search.search.windows.net"
+    AZURE_SEARCH_ENDPOINT: Optional[str] = None  # e.g. "https://arc8-search.search.windows.net"
     AZURE_SEARCH_MEMBERS_INDEX: str = "idx-members-v1"
     AZURE_SEARCH_DOCUMENTS_INDEX: str = "idx-documents-v1"
     AZURE_SEARCH_DEFAULT_TOP_K: int = 8
 
     # Cosmos DB: event snapshots, computed features, semantic objects.
-    AZURE_COSMOS_ENDPOINT: Optional[str] = None  # e.g. "https://nexora-cosmos.documents.azure.com:443/"
-    AZURE_COSMOS_DATABASE: str = "nexora"
+    AZURE_COSMOS_ENDPOINT: Optional[str] = None  # e.g. "https://arc8-cosmos.documents.azure.com:443/"
+    AZURE_COSMOS_DATABASE: str = "arc8"
     AZURE_COSMOS_SNAPSHOTS_CONTAINER: str = "event_snapshots"
     AZURE_COSMOS_SEMANTIC_MEMBER_CONTAINER: str = "semantic_member"
     AZURE_COSMOS_RAG_CHUNKS_CONTAINER: str = "rag_chunks"
 
     # Event Hub: CDC + domain events fan-out.
-    AZURE_EVENT_HUB_NAMESPACE: Optional[str] = None  # FQDN, e.g. "nexora-eh.servicebus.windows.net"
-    AZURE_EVENT_HUB_MEMBERS_TOPIC: str = "nexora.member.changed.v1"
+    AZURE_EVENT_HUB_NAMESPACE: Optional[str] = None  # FQDN, e.g. "arc8-eh.servicebus.windows.net"
+    AZURE_EVENT_HUB_MEMBERS_TOPIC: str = "arc8.member.changed.v1"
     AZURE_EVENT_HUB_CONSUMER_GROUP_RAG: str = "rag-processor"
     # Outbox publisher polling cadence + batch size. A 1s poll keeps p99 lag
     # under 2s for low-traffic tenants; high-traffic tenants typically have
@@ -488,7 +488,7 @@ def assert_required_settings(s: Optional[Settings] = None) -> None:
             "Missing required environment variables in production: " + ", ".join(sorted(missing))
         )
 
-    log = logging.getLogger("nexora.config")
+    log = logging.getLogger("arc8.config")
     for name in _RECOMMENDED_IN_PRODUCTION:
         if not getattr(s, name, None):
             log.warning(

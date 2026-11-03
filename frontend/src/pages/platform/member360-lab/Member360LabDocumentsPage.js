@@ -308,7 +308,7 @@ const Member360LabDocumentsPage = () => {
                   className="w-full rounded-lg border coding-border bg-transparent px-3 py-2 text-xs coding-text-strong"
                 >
                   {memberRoster.map((m) => (
-                    <option key={m.id} value={m.id} className="bg-slate-900 text-white">
+                    <option key={m.id} value={m.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
                       {m.first_name} {m.last_name} ({m.member_key})
                     </option>
                   ))}
@@ -322,7 +322,7 @@ const Member360LabDocumentsPage = () => {
                   className="w-full rounded-lg border coding-border bg-transparent px-3 py-2 text-xs coding-text-strong"
                 >
                   {DEFAULT_DOCUMENT_TYPES.map((dt) => (
-                    <option key={dt} value={dt} className="bg-slate-900 text-white">
+                    <option key={dt} value={dt} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
                       {dt}
                     </option>
                   ))}

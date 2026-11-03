@@ -1,4 +1,4 @@
-# Roadmap — Nexora to Azure-Native Target (8 weeks)
+# Roadmap — Arc-8 to Azure-Native Target (8 weeks)
 
 This is a sequenced rollout. Items grouped per week are sized to be parallelisable
 across two backend engineers + one frontend engineer + one infra engineer. Each
@@ -9,7 +9,7 @@ Status legend: ◻ not started · ◧ in progress · ◼ done
 ## Week 0 — Decisions and prework
 
 - ◻ Confirm Azure subscription, target region, BAA coverage (Azure + Anthropic)
-- ◻ Reserve resource names: `nexora-{env}-{region}-rg`, `nexora-{env}-cosmos`, etc.
+- ◻ Reserve resource names: `arc8-{env}-{region}-rg`, `arc8-{env}-cosmos`, etc.
 - ◻ Inventory existing managed identities, decide on user-assigned MI for shared services
 - ◻ Pick a single environment to bootstrap first (recommended: `dev`)
 

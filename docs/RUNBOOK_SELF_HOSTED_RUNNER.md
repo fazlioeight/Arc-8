@@ -3,10 +3,10 @@
 Last reviewed: 2026-06-11
 
 The `deploy-backend.yml` workflow's `deploy` job runs on a self-hosted
-runner because `nexora-chat-kv` has public network access disabled. The
-runner lives in the existing `nexora-chat-env-v2` Container Apps environment,
+runner because `arc8-chat-kv` has public network access disabled. The
+runner lives in the existing `arc8-chat-env-v2` Container Apps environment,
 which is VNet-integrated, so the runner reaches the vault through the
-same `nexora-chat-kv-pe` private endpoint the chat workload uses.
+same `arc8-chat-kv-pe` private endpoint the chat workload uses.
 
 A VM-based runner was attempted first but rejected by Azure's quota
 auto-approval (the subscription has never hosted IaaS VMs in westus3).
@@ -19,13 +19,13 @@ on `ubuntu-latest` (Static Web Apps deploy token, no VNet dependency).
 ## Topology
 
 ```
-nexora-chat-rg (westus3)
-  nexora-chat-env-v2  (Container Apps env, VNet-injected into chat-aca-subnet)
-    nexora-chat    (the workload itself)
-    nexora-runner  <-- this runbook
+arc8-chat-rg (westus3)
+  arc8-chat-env-v2  (Container Apps env, VNet-injected into chat-aca-subnet)
+    arc8-chat    (the workload itself)
+    arc8-runner  <-- this runbook
 
-nexora-chat-kv  (public access Disabled; PE in pe-subnet/nexora-dev-vnet)
-nexora-chat-pg  (public access Disabled; PE in pe-subnet/nexora-dev-vnet)
+arc8-chat-kv  (public access Disabled; PE in pe-subnet/arc8-dev-vnet)
+arc8-chat-pg  (public access Disabled; PE in pe-subnet/arc8-dev-vnet)
 ```
 
 The Container Apps env is already linked to `privatelink.vaultcore.azure.net`
@@ -36,13 +36,13 @@ the runner inherits VNet DNS automatically.
 
 | Resource | Name | RG |
 |---|---|---|
-| Container App | `nexora-runner` | nexora-chat-rg |
-| Image | `nexorachatacr65700.azurecr.io/nexora-runner:latest` | nexora-chat-rg |
-| KV secret | `github-runner-pat` | nexora-chat-rg / nexora-chat-kv |
+| Container App | `arc8-runner` | arc8-chat-rg |
+| Image | `arc8chatacr65700.azurecr.io/arc8-runner:latest` | arc8-chat-rg |
+| KV secret | `github-runner-pat` | arc8-chat-rg / arc8-chat-kv |
 
 The Container App has a system-assigned managed identity. It is granted:
-- `AcrPull` on `nexorachatacr65700` (so the env can pull the image)
-- `Key Vault Secrets User` on `nexora-chat-kv` (so it can read the PAT secret)
+- `AcrPull` on `arc8chatacr65700` (so the env can pull the image)
+- `Key Vault Secrets User` on `arc8-chat-kv` (so it can read the PAT secret)
 
 The MI is *only* used by the container itself to fetch its image and PAT.
 The deploy workflow that *runs on* the runner authenticates to Azure via
@@ -58,27 +58,27 @@ RBAC documented in [RUNBOOK_CI_IAM.md](RUNBOOK_CI_IAM.md) is unchanged.
 
 # 2. Create a fine-grained GitHub PAT
 #    https://github.com/settings/personal-access-tokens/new
-#    Resource owner:  Nexora-Lab-Co
-#    Repository access: Only select repositories -> nexora-platform
+#    Resource owner:  Arc-8
+#    Repository access: Only select repositories -> arc8-platform
 #    Repository permissions:
 #      Administration: Read and write   (needed to mint registration tokens)
 #    Expiration: up to 1 year (rotate before then)
 
 # 3. Store the PAT in Key Vault.
 az keyvault secret set `
-  --vault-name nexora-chat-kv `
+  --vault-name arc8-chat-kv `
   --name github-runner-pat `
   --value "<paste-PAT-here>"
 
 # 4. Restart the runner so the new value is picked up. Env-var-mounted
 #    secrets are only re-read on container start.
-$rev = az containerapp show -n nexora-runner -g nexora-chat-rg --query 'properties.latestRevisionName' -o tsv
-az containerapp revision restart -n nexora-runner -g nexora-chat-rg --revision $rev
+$rev = az containerapp show -n arc8-runner -g arc8-chat-rg --query 'properties.latestRevisionName' -o tsv
+az containerapp revision restart -n arc8-runner -g arc8-chat-rg --revision $rev
 ```
 
 Confirm the runner shows up at
-https://github.com/Nexora-Lab-Co/nexora-platform/settings/actions/runners
-with labels `self-hosted, linux, nexora-vnet` and status Idle.
+https://github.com/Arc-8/arc8-platform/settings/actions/runners
+with labels `self-hosted, linux, arc8-vnet` and status Idle.
 
 ## Image lifecycle
 
@@ -92,9 +92,9 @@ To rebuild *only* the image without touching the Container App:
 
 ```powershell
 az acr build `
-  --registry nexorachatacr65700 `
-  --image "nexora-runner:latest" `
-  --image "nexora-runner:$(Get-Date -Format yyyyMMdd-HHmmss)" `
+  --registry arc8chatacr65700 `
+  --image "arc8-runner:latest" `
+  --image "arc8-runner:$(Get-Date -Format yyyyMMdd-HHmmss)" `
   --file infra/azure/runner/Dockerfile `
   infra/azure/runner
 ```
@@ -102,8 +102,8 @@ az acr build `
 Then restart the Container App to pick up the new image:
 
 ```powershell
-$rev = az containerapp show -n nexora-runner -g nexora-chat-rg --query 'properties.latestRevisionName' -o tsv
-az containerapp revision restart -n nexora-runner -g nexora-chat-rg --revision $rev
+$rev = az containerapp show -n arc8-runner -g arc8-chat-rg --query 'properties.latestRevisionName' -o tsv
+az containerapp revision restart -n arc8-runner -g arc8-chat-rg --revision $rev
 ```
 
 ## Day-to-day operations
@@ -111,20 +111,20 @@ az containerapp revision restart -n nexora-runner -g nexora-chat-rg --revision $
 ### Tail runner logs
 
 ```powershell
-az containerapp logs show -n nexora-runner -g nexora-chat-rg --tail 200
+az containerapp logs show -n arc8-runner -g arc8-chat-rg --tail 200
 ```
 
 Live follow:
 
 ```powershell
-az containerapp logs show -n nexora-runner -g nexora-chat-rg --follow
+az containerapp logs show -n arc8-runner -g arc8-chat-rg --follow
 ```
 
 ### Restart the runner
 
 ```powershell
-$rev = az containerapp show -n nexora-runner -g nexora-chat-rg --query 'properties.latestRevisionName' -o tsv
-az containerapp revision restart -n nexora-runner -g nexora-chat-rg --revision $rev
+$rev = az containerapp show -n arc8-runner -g arc8-chat-rg --query 'properties.latestRevisionName' -o tsv
+az containerapp revision restart -n arc8-runner -g arc8-chat-rg --revision $rev
 ```
 
 The runner agent traps SIGTERM in its entrypoint and de-registers itself
@@ -137,12 +137,12 @@ repo settings UI.
 # 1. Create a new PAT in GitHub with the same scopes.
 # 2. Overwrite the KV secret. The new value becomes a new secret version.
 az keyvault secret set `
-  --vault-name nexora-chat-kv `
+  --vault-name arc8-chat-kv `
   --name github-runner-pat `
   --value "<new-PAT>"
 # 3. Restart the runner. The container reads the new value on start.
-$rev = az containerapp show -n nexora-runner -g nexora-chat-rg --query 'properties.latestRevisionName' -o tsv
-az containerapp revision restart -n nexora-runner -g nexora-chat-rg --revision $rev
+$rev = az containerapp show -n arc8-runner -g arc8-chat-rg --query 'properties.latestRevisionName' -o tsv
+az containerapp revision restart -n arc8-runner -g arc8-chat-rg --revision $rev
 # 4. Revoke the old PAT in https://github.com/settings/personal-access-tokens
 ```
 
@@ -151,7 +151,7 @@ az containerapp revision restart -n nexora-runner -g nexora-chat-rg --revision $
 ```powershell
 # 1. Delete the Container App (this triggers the SIGTERM cleanup that
 #    de-registers the runner from GitHub).
-az containerapp delete -n nexora-runner -g nexora-chat-rg --yes
+az containerapp delete -n arc8-runner -g arc8-chat-rg --yes
 
 # 2. Remove the role assignments. The MI itself dies with the app, but the
 #    role-assignment records linger and become "Unknown" entries unless
@@ -160,7 +160,7 @@ az role assignment list --assignee <runner-MI-objectId> -o tsv --query "[].id" |
   ForEach-Object { az role assignment delete --ids $_ }
 
 # 3. (Optional) Delete the PAT secret in KV and revoke it in GitHub.
-az keyvault secret delete --vault-name nexora-chat-kv --name github-runner-pat
+az keyvault secret delete --vault-name arc8-chat-kv --name github-runner-pat
 ```
 
 ## Identity model
@@ -188,7 +188,7 @@ That principal already has the roles documented in
 - **Image**: based on `ubuntu:22.04`; rebuild monthly to pick up CVE
   fixes. The image build runs server-side with `az acr build`.
 - **Repo visibility**: this design assumes
-  `Nexora-Lab-Co/nexora-platform` is *private*. Do not point a
+  `Arc-8/arc8-platform` is *private*. Do not point a
   self-hosted runner at a public repo -- forks can submit PRs that
   execute on the runner.
 
@@ -200,13 +200,13 @@ The runner may be offline or labels don't match.
 
 ```powershell
 # Is the container running?
-az containerapp replica list -n nexora-runner -g nexora-chat-rg -o table
+az containerapp replica list -n arc8-runner -g arc8-chat-rg -o table
 
 # What does the runner say about itself?
-az containerapp logs show -n nexora-runner -g nexora-chat-rg --tail 200
+az containerapp logs show -n arc8-runner -g arc8-chat-rg --tail 200
 
 # Does GitHub see it as online?
-gh api repos/Nexora-Lab-Co/nexora-platform/actions/runners `
+gh api repos/Arc-8/arc8-platform/actions/runners `
   --jq '.runners[] | {name, status, labels: [.labels[].name]}'
 ```
 
@@ -214,7 +214,7 @@ Common causes:
 - PAT is missing or invalid -> container logs show "Failed to mint
   registration token"
 - KV secret still has the placeholder `REPLACE_ME_WITH_REAL_PAT`
-- Image pull failed -> `az containerapp revision list -n nexora-runner -g nexora-chat-rg` shows unhealthy revision; check for AcrPull role grant
+- Image pull failed -> `az containerapp revision list -n arc8-runner -g arc8-chat-rg` shows unhealthy revision; check for AcrPull role grant
 
 ### `ForbiddenByConnection` on Key Vault reads from the deploy job
 
@@ -222,14 +222,14 @@ The runner is hitting the public KV endpoint, which is blocked.
 Confirm DNS in the container resolves to the private IP:
 
 ```powershell
-az containerapp exec -n nexora-runner -g nexora-chat-rg --command "bash -lc 'getent hosts nexora-chat-kv.vault.azure.net'"
+az containerapp exec -n arc8-runner -g arc8-chat-rg --command "bash -lc 'getent hosts arc8-chat-kv.vault.azure.net'"
 ```
 
 The address should fall inside `10.20.4.0/24` (pe-subnet in
-nexora-dev-vnet). If it resolves to a public IP, the VNet link on the
+arc8-dev-vnet). If it resolves to a public IP, the VNet link on the
 `privatelink.vaultcore.azure.net` zone is broken -- inspect with:
 
 ```powershell
-az network private-dns link vnet list -g rg-nexora-dev `
+az network private-dns link vnet list -g rg-arc8-dev `
   --zone-name privatelink.vaultcore.azure.net -o table
 ```

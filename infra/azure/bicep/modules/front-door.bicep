@@ -13,12 +13,12 @@
 // path to /api/member/* is through this WAF.
 //
 //   az deployment group create -g <rg> -f modules/front-door.bicep \
-//     -p namePrefix=nexora spaHostName=<swa-host> edgeHostName=<edge-aca-fqdn>
+//     -p namePrefix=arc8 spaHostName=<swa-host> edgeHostName=<edge-aca-fqdn>
 
 targetScope = 'resourceGroup'
 
-@description('Naming prefix, e.g. "nexora".')
-param namePrefix string = 'nexora'
+@description('Naming prefix, e.g. "arc8".')
+param namePrefix string = 'arc8'
 
 @description('Default origin hostname — the member SPA Static Web App default host.')
 param spaHostName string
@@ -30,7 +30,7 @@ param edgeHostName string
 param rateLimitThreshold int = 600
 
 param tags object = {
-  app: 'nexora'
+  app: 'arc8'
   'managed-by': 'bicep'
   component: 'member-portal-edge'
 }

@@ -1,4 +1,4 @@
-"""Integration tests for the Nexora Lab Member360 routes.
+"""Integration tests for the Arc-8 Member360 routes.
 
 Coverage strategy:
 - Negative-path auth tests (missing token, missing application permission)
@@ -1382,7 +1382,7 @@ def test_get_document_backend_dispatches_azure(monkeypatch):
 
     settings = get_settings()
     monkeypatch.setattr(settings, "MEMBER360_STORAGE_BACKEND", "azure")
-    monkeypatch.setattr(settings, "AZURE_STORAGE_ACCOUNT_NAME", "nexorachatstor53684")
+    monkeypatch.setattr(settings, "AZURE_STORAGE_ACCOUNT_NAME", "arc8chatstor53684")
     monkeypatch.setattr(settings, "AZURE_STORAGE_CONTAINER_PREFIX", "m360-")
     member360_storage.reset_document_backend()
     try:

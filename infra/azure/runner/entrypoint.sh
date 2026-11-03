@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Entrypoint for the Nexora self-hosted GitHub Actions runner container.
+# Entrypoint for the Arc-8 self-hosted GitHub Actions runner container.
 #
 # Registration tokens have a 1-hour TTL, so we don't bake one in. Instead
 # the container is given a long-lived PAT via $GH_PAT (sourced from Key
@@ -8,9 +8,9 @@
 # token and de-register, so dead runners don't accumulate in GitHub.
 #
 # Required env vars (set by the Container App):
-#   RUNNER_REPO_URL   e.g. https://github.com/Nexora-Lab-Co/nexora-platform
+#   RUNNER_REPO_URL   e.g. https://github.com/Arc-8/arc8-platform
 #   RUNNER_NAME       runner name shown in GitHub (max 64 chars)
-#   RUNNER_LABELS     comma-separated, e.g. self-hosted,linux,nexora-vnet
+#   RUNNER_LABELS     comma-separated, e.g. self-hosted,linux,arc8-vnet
 #   GH_PAT            classic or fine-grained PAT with `repo` + `workflow` scopes
 #
 # Optional:

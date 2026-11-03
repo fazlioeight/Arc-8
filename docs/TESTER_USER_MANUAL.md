@@ -1,4 +1,4 @@
-﻿# Arc-8 (Member 360) – Tester User Manual
+# Arc-8 (Member 360) – Tester User Manual
 **Environments:** Development (`:7777`) and Testing (`:7778`) on the AWS-hosted server | **Audience:** QA testers | **Version:** 1.1
 
 > Credentials are sent separately (never paste them into tickets or chat channels). Values in `<angle brackets>` are filled in by the Project Lead/DevOps.
@@ -42,7 +42,7 @@ Testers do not need to change anything on the server. Do not restart services or
 ## 4. Step 2 - Log in
 **Hosted Dev environment:**
 1. Open https://dmp0wwecjzzmr.cloudfront.net/login
-2. Enter **Workspace** `nexora`, then the email and password from the credentials file.
+2. Enter **Workspace** `prominencehealth`, then the email and password from the credentials file.
 3. If asked, change your password on first login.
 
 **Server environments:** open `http://localhost:7778` (via tunnel) and use the email/password from the credentials file (workspace `prominencehealth`).

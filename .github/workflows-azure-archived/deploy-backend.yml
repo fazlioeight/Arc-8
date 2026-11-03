@@ -57,10 +57,10 @@ jobs:
 
   deploy:
     needs: test
-    # Runs on the self-hosted runner that sits inside nexora-dev-vnet, so
-    # deploy-to-azure.ps1 can reach nexora-chat-kv through its private
+    # Runs on the self-hosted runner that sits inside arc8-dev-vnet, so
+    # deploy-to-azure.ps1 can reach arc8-chat-kv through its private
     # endpoint. See docs/RUNBOOK_SELF_HOSTED_RUNNER.md.
-    runs-on: [self-hosted, linux, nexora-vnet]
+    runs-on: [self-hosted, linux, arc8-vnet]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4

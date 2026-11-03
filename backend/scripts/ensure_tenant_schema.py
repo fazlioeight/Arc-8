@@ -12,7 +12,7 @@ needs to catch up without re-provisioning the tenant from scratch.
 Run as a Container App Job:
 
     az containerapp job create \\
-        --resource-group <rg> --name nexora-tenant-schema-sync \\
+        --resource-group <rg> --name arc8-tenant-schema-sync \\
         --environment <env> --image <api-image> \\
         --trigger-type Manual --replica-timeout 600 --replica-retry-limit 1 \\
         --system-assigned --registry-server <acr>.azurecr.io --registry-identity system \\
@@ -20,7 +20,7 @@ Run as a Container App Job:
         --env-vars "DEFAULT_TENANT_DATABASE_URL=secretref:tenant-db-url" \\
         --command "python" --args "scripts/ensure_tenant_schema.py"
 
-    az containerapp job start --resource-group <rg> --name nexora-tenant-schema-sync
+    az containerapp job start --resource-group <rg> --name arc8-tenant-schema-sync
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def _resolve_uri() -> str:
     for key in (
         "DEFAULT_TENANT_DATABASE_URL",
         "TENANT_DATABASE_URL",
-        "NEXORA_TENANT_DATABASE_URL",
+        "ARC8_TENANT_DATABASE_URL",
     ):
         value = os.environ.get(key)
         if value:

@@ -1,6 +1,6 @@
-# Self-hosted GitHub Actions runner image for the Nexora chat workload.
-# Runs inside the nexora-chat-env Container Apps environment so the
-# deploy-backend.yml workflow can reach nexora-chat-kv through its
+# Self-hosted GitHub Actions runner image for the Arc-8 chat workload.
+# Runs inside the arc8-chat-env Container Apps environment so the
+# deploy-backend.yml workflow can reach arc8-chat-kv through its
 # private endpoint. See docs/RUNBOOK_SELF_HOSTED_RUNNER.md.
 #
 # The image bundles every tool deploy-to-azure.ps1 invokes from the

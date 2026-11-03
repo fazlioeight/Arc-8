@@ -26,7 +26,7 @@ from typing import Any, Optional
 from ...core.config import get_settings
 
 
-log = logging.getLogger("nexora.ai.search")
+log = logging.getLogger("arc8.ai.search")
 
 
 class SearchError(RuntimeError):

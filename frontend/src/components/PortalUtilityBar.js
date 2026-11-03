@@ -7,6 +7,7 @@ import { useUserPreferences } from '../context/UserPreferencesContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { ROUTES } from '../constants/routes';
 import Icon from './ui/Icon';
+import ThemeToggleButton from './ThemeToggleButton';
 
 const ROUTE_LABELS = {
   '/': 'Home',
@@ -85,7 +86,8 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
   } = useContext(AuthContext) || {};
 
   const { openPalette } = useCommandPalette();
-  const { favorites, toggleFavorite, isFavorite, isNavItemEnabled, t } = useUserPreferences();
+  const { favorites, toggleFavorite, isFavorite, isNavItemEnabled, t: rawT } = useUserPreferences();
+  const t = typeof rawT === 'function' ? rawT : (_key, fallback) => fallback ?? _key;
   const { currentRole, can } = usePermissions();
   const effectiveRoleLabel = (currentRole || role || 'user').replace(/_/g, ' ');
 
@@ -332,6 +334,9 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
 
           {/* ── Right cluster ───────────────────────── */}
           <div className="flex items-center gap-1.5">
+            {/* Theme toggle icon */}
+            <ThemeToggleButton className={iconBtn} />
+
             {/* Jobs */}
             {hasApplicationAccess?.('job_center') && (
               <button

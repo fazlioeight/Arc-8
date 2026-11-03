@@ -45,7 +45,7 @@ import matplotlib
 matplotlib.use("Agg")  # headless backend, must be set before pyplot import
 from matplotlib.figure import Figure  # noqa: E402
 
-logger = logging.getLogger("nexora.chat.chart_renderer")
+logger = logging.getLogger("arc8.chat.chart_renderer")
 
 
 # ── Palette ─────────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ logger = logging.getLogger("nexora.chat.chart_renderer")
 # to the brand orange on white slides. Override via ``palette=`` to apply
 # per-tenant branding.
 DEFAULT_PALETTE: tuple[str, ...] = (
-    "#D97706",  # Nexora orange
+    "#D97706",  # Arc-8 orange
     "#1F2937",  # near-black slate
     "#0EA5E9",  # cool blue
     "#10B981",  # emerald

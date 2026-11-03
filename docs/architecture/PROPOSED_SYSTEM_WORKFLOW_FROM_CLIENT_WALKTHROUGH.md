@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary: Core Business Problem & Strategic Vision
 
-From Daniel Silva's 58-minute live system walkthrough, **Arc-8** (rebranded from `Nexora Lab Member 360`) is positioned as the **NOC / Command Center ("Single Pane of Glass")** for Prominence Health's **Care Advocates (Call Center Team — Jimmy's team)**, **Care Coordinators**, and **Operations/Supervisors**.
+From Daniel Silva's 58-minute live system walkthrough, **Arc-8** (`Member 360`) is positioned as the **NOC / Command Center ("Single Pane of Glass")** for Prominence Health's **Care Advocates (Call Center Team — Jimmy's team)**, **Care Coordinators**, and **Operations/Supervisors**.
 
 ### Why Prominence Health Needs This Workflow Urgently
 1. **Disconnected Call Center Experience (Talkdesk + QNXT Gap):** When a sick or elderly member calls Prominence Health via **Talkdesk** and speaks to a nurse or Care Advocate, and then calls back an hour later with a follow-up question, the next Care Advocate has **zero visibility** into the prior conversation. Today, agents must search **QNXT** (a read-only claims adjudication system that only shows yesterday's batch data) and spend ~15 minutes hunting down who spoke to the member.
@@ -104,7 +104,7 @@ flowchart LR
 ## 4. Module-by-Module Proposed Workflow & Changes
 
 ### 4.1. Global Branding, Landing & Admin Console
-* **Rebrand `Nexora Lab` $\rightarrow$ `Arc-8`:** Global find-and-replace across UI headers and labels (`NexoraLab Member360` becomes `Arc-8`).
+* **Unified `Arc-8` Branding:** Consistent `Arc-8` branding across all UI headers, labels, and documents.
 * **Two-Tier Admin Architecture:**
   1. **Vendor / Master Admin Console (408 / Platform Owner):** Controls which modules a tenant has purchased (`Member 360`, `Coding Worklists`, `Ride Booking`, etc.) all backed by the same Common Data Model (where Member 360 provides ~90% of the foundational data).
   2. **Tenant Admin Console (Prominence Health Bosses/Admins):** Manages users, roles, and RBAC tab permissions.

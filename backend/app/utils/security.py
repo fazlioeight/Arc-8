@@ -24,7 +24,7 @@ from ..dependencies.tenant import get_tenant_context
 from ..models.tables import RefreshToken, StaffUser, User
 
 _revocation_logger = logging.getLogger(__name__)
-_REVOCATION_KEY_PREFIX = "nexora:jwt:revoked:"
+_REVOCATION_KEY_PREFIX = "arc8:jwt:revoked:"
 
 
 async def hash_password(password: str) -> str:
@@ -170,7 +170,7 @@ async def get_current_user(
     if await is_jti_revoked(jti):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token revoked")
 
-    # Nexora staff impersonation token: the actor is a row in `staff_users`,
+    # Arc-8 staff impersonation token: the actor is a row in `staff_users`,
     # not in `users`. We don't materialize a shadow user inside the tenant DB
     # — instead we synthesize an AuthenticatedUser with platform_admin role
     # and full application access for the target tenant. All existing
@@ -266,7 +266,7 @@ async def get_current_user(
 
 
 # ---------------------------------------------------------------------------
-# Nexora platform staff authentication
+# Arc-8 platform staff authentication
 # ---------------------------------------------------------------------------
 
 @dataclass(slots=True)

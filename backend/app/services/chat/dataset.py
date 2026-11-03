@@ -30,7 +30,7 @@ from ...core.config import settings
 from .dataset_registry import DATASET_TABLES
 
 
-logger = logging.getLogger("nexora.chat.dataset")
+logger = logging.getLogger("arc8.chat.dataset")
 
 
 class DatasetError(Exception):

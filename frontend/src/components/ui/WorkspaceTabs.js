@@ -39,6 +39,7 @@ const getTabIcon = (key) => {
         </svg>
       );
     case 'medications':
+    case 'medications_labs':
       return (
         <svg {...iconProps}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.942A4.5 4.5 0 0115.89 17H8.11a4.5 4.5 0 01-2.34-.758L4.2 15.3m15.6 0a3.75 3.75 0 01-.6 2.052A3.75 3.75 0 0115.89 19H8.11a3.75 3.75 0 01-3.31-1.648 3.75 3.75 0 01-.6-2.052" />
@@ -55,13 +56,6 @@ const getTabIcon = (key) => {
       return (
         <svg {...iconProps}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-        </svg>
-      );
-    case 'medications':
-    case 'medications_labs':
-      return (
-        <svg {...iconProps}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.942A4.5 4.5 0 0115.89 17H8.11a4.5 4.5 0 01-2.34-.758L4.2 15.3m15.6 0a3.75 3.75 0 01-.6 2.052A3.75 3.75 0 0115.89 19H8.11a3.75 3.75 0 01-3.31-1.648 3.75 3.75 0 01-.6-2.052" />
         </svg>
       );
     case 'claims':
@@ -128,11 +122,11 @@ const getTabIcon = (key) => {
 
 /**
  * Enterprise EHR Clinical Tab Navigation
- * 
+ *
  * Features:
- * - Seamless card integration (matches background, zero dark block clashing)
- * - Clean clinical underline indicators (no crammed pill buttons)
- * - Smart "More ▾" dropdown for large tab collections (eliminating ugly horizontal scrollbars & cutoffs)
+ * - Seamless card integration (supports both light & dark themes cleanly)
+ * - Clean clinical underline indicators
+ * - Smart "More ▾" dropdown for large tab collections
  * - Automatic active tab indication inside dropdown
  * - EHR-standard micro-icons and tabular badges
  */
@@ -182,7 +176,7 @@ export default function WorkspaceTabs({
   return (
     <div
       className={joinClassNames(
-        'relative border-b border-slate-800/80 bg-slate-900/60 rounded-t-2xl px-3 pt-2 select-none transition-colors flex items-center justify-between gap-2',
+        'relative border-b border-slate-200 bg-slate-50/80 dark:border-slate-800/80 dark:bg-slate-900/60 rounded-t-2xl px-3 pt-2 select-none transition-colors flex items-center justify-between gap-2',
         className
       )}
     >
@@ -208,8 +202,8 @@ export default function WorkspaceTabs({
                 className={joinClassNames(
                   'group relative inline-flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-lg transition-all duration-150 whitespace-nowrap shrink-0',
                   active
-                    ? 'text-sky-400 font-bold bg-slate-800 shadow-sm border border-slate-700/80'
-                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border border-slate-800/40',
+                    ? 'text-sky-700 bg-white border border-slate-200 shadow-xs font-bold dark:text-sky-400 dark:bg-slate-800 dark:shadow-sm dark:border-slate-700/80'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 border border-transparent dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/60 dark:border-slate-800/40',
                   t.disabled && 'opacity-40 cursor-not-allowed'
                 )}
               >
@@ -218,8 +212,8 @@ export default function WorkspaceTabs({
                     className={joinClassNames(
                       'transition-colors',
                       active
-                        ? 'text-sky-400'
-                        : 'text-slate-500 group-hover:text-slate-300'
+                        ? 'text-sky-600 dark:text-sky-400'
+                        : 'text-slate-400 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300'
                     )}
                     aria-hidden
                   >
@@ -232,8 +226,8 @@ export default function WorkspaceTabs({
                     className={joinClassNames(
                       'inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1.5 rounded-full text-[10px] font-bold tabular-nums transition-colors',
                       active
-                        ? 'bg-sky-500 text-white'
-                        : 'bg-slate-800 text-slate-400 border border-slate-700/60'
+                        ? 'bg-sky-600 text-white dark:bg-sky-500'
+                        : 'bg-slate-200/80 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700/60'
                     )}
                   >
                     {t.badge}
@@ -242,7 +236,7 @@ export default function WorkspaceTabs({
                 {/* Active bottom accent bar */}
                 {active && (
                   <span
-                    className="absolute -bottom-[9px] left-3 right-3 h-[2.5px] bg-sky-400 rounded-full shadow-xs shadow-sky-400/50"
+                    className="absolute -bottom-[9px] left-3 right-3 h-[2.5px] bg-sky-600 dark:bg-sky-400 rounded-full shadow-xs shadow-sky-500/40"
                     aria-hidden
                   />
                 )}
@@ -263,13 +257,13 @@ export default function WorkspaceTabs({
             className={joinClassNames(
               'group relative inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold rounded-lg transition-all duration-150 whitespace-nowrap',
               activeOverflowTab
-                ? 'text-sky-400 font-bold bg-slate-800 shadow-sm border border-slate-700/80'
-                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border border-slate-800/40'
+                ? 'text-sky-700 bg-white border border-slate-200 shadow-xs font-bold dark:text-sky-400 dark:bg-slate-800 dark:shadow-sm dark:border-slate-700/80'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 border border-transparent dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800/60 dark:border-slate-800/40'
             )}
           >
             {activeOverflowTab ? (
               <>
-                <span className="text-sky-400" aria-hidden>
+                <span className="text-sky-600 dark:text-sky-400" aria-hidden>
                   {activeOverflowTab.icon || getTabIcon(activeOverflowTab.key)}
                 </span>
                 <span>{activeOverflowTab.label}</span>
@@ -281,7 +275,7 @@ export default function WorkspaceTabs({
               className={joinClassNames(
                 'h-3.5 w-3.5 transition-transform duration-150',
                 dropdownOpen && 'rotate-180',
-                activeOverflowTab ? 'text-sky-400' : 'text-slate-500 group-hover:text-slate-300'
+                activeOverflowTab ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300'
               )}
               fill="none"
               viewBox="0 0 24 24"
@@ -292,7 +286,7 @@ export default function WorkspaceTabs({
             </svg>
             {activeOverflowTab && (
               <span
-                className="absolute -bottom-[9px] left-3 right-3 h-[2.5px] bg-sky-400 rounded-full shadow-xs shadow-sky-400/50"
+                className="absolute -bottom-[9px] left-3 right-3 h-[2.5px] bg-sky-600 dark:bg-sky-400 rounded-full shadow-xs shadow-sky-500/40"
                 aria-hidden
               />
             )}
@@ -302,9 +296,9 @@ export default function WorkspaceTabs({
           {dropdownOpen && (
             <div
               role="menu"
-              className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-700/80 bg-slate-900 shadow-2xl shadow-black/80 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+              className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-2xl dark:shadow-black/80 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
             >
-              <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 mb-1">
+              <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 mb-1">
                 Additional Sections
               </div>
               {overflowTabs.map((t) => {
@@ -326,8 +320,8 @@ export default function WorkspaceTabs({
                     className={joinClassNames(
                       'w-full flex items-center justify-between px-2.5 py-2 text-xs font-semibold rounded-lg transition-colors text-left',
                       active
-                        ? 'bg-sky-950/60 text-sky-400 font-bold border border-sky-800/40'
-                        : 'text-slate-300 hover:bg-slate-800/80 hover:text-white',
+                        ? 'bg-sky-50 text-sky-700 border border-sky-200 font-bold dark:bg-sky-950/60 dark:text-sky-400 dark:border-sky-800/40'
+                        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white',
                       t.disabled && 'opacity-40 cursor-not-allowed'
                     )}
                   >
@@ -336,7 +330,7 @@ export default function WorkspaceTabs({
                         <span
                           className={joinClassNames(
                             'shrink-0',
-                            active ? 'text-sky-400' : 'text-slate-500'
+                            active ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'
                           )}
                           aria-hidden
                         >
@@ -351,15 +345,15 @@ export default function WorkspaceTabs({
                           className={joinClassNames(
                             'inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1.5 rounded-full text-[10px] font-bold tabular-nums',
                             active
-                              ? 'bg-sky-500 text-white'
-                              : 'bg-slate-800 text-slate-400'
+                              ? 'bg-sky-600 text-white dark:bg-sky-500'
+                              : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                           )}
                         >
                           {t.badge}
                         </span>
                       )}
                       {active && (
-                        <svg className="h-3.5 w-3.5 text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <svg className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                         </svg>
                       )}

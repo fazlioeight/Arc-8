@@ -30,7 +30,7 @@ COLUMN_ADDS = (
     ("users", "mfa_enrolled_at", "TIMESTAMP WITH TIME ZONE"),
     # Chat artifact export theming. Stored as JSON on the tenant row;
     # consumed by services/chat/export.py::theme_from_branding. Defaults
-    # to an empty object so existing tenants keep the Nexora look until
+    # to an empty object so existing tenants keep the Arc-8 look until
     # they configure their own palette + caption.
     ("tenants", "branding", "JSON NOT NULL DEFAULT '{}'"),
 )

@@ -37,7 +37,7 @@ export function LabSubNav() {
   });
 
   return (
-    <nav className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-900/80 border border-slate-800/80 shadow-sm mb-4">
+    <nav className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white border border-slate-200 dark:bg-slate-900/80 dark:border-slate-800/80 shadow-sm mb-4">
       {visibleItems.map((item) => {
         const active = item.exact
           ? pathname === item.href
@@ -50,8 +50,8 @@ export function LabSubNav() {
             className={joinClass(
               'rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
               active
-                ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                ? 'bg-sky-600 dark:bg-sky-500 text-white shadow-sm shadow-sky-500/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/60'
             )}
           >
             {item.label}

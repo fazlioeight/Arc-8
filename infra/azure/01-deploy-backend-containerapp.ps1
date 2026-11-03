@@ -4,20 +4,20 @@ param(
     [Parameter(Mandatory = $true)][string]$AcrName,
     [Parameter(Mandatory = $true)][string]$ContainerAppEnvironment,
     [Parameter(Mandatory = $true)][string]$KeyVaultName,
-    [string]$BackendAppName = "nexora-api",
-    [string]$MigrationJobName = "nexora-control-migrations",
-    [string]$TenantProvisionJobName = "nexora-initial-tenant",
+    [string]$BackendAppName = "arc8-api",
+    [string]$MigrationJobName = "arc8-control-migrations",
+    [string]$TenantProvisionJobName = "arc8-initial-tenant",
     [string]$ImageTag = "latest",
     [string]$CorsOrigin = "",
     [string]$TenantKey = "prominencehealth",
     [string]$TenantName = "ProminenceHealth",
     [string]$InitialAdminEmail = "",
-    [string]$InitialAdminPassword = $env:NEXORA_INITIAL_ADMIN_PASSWORD,
-    [string]$AzureTenantId = $env:NEXORA_AZURE_TENANT_ID,
-    [string]$AzureClientId = $env:NEXORA_AZURE_CLIENT_ID,
-    [string]$AzureClientSecret = $env:NEXORA_AZURE_CLIENT_SECRET,
+    [string]$InitialAdminPassword = $env:ARC8_INITIAL_ADMIN_PASSWORD,
+    [string]$AzureTenantId = $env:ARC8_AZURE_TENANT_ID,
+    [string]$AzureClientId = $env:ARC8_AZURE_CLIENT_ID,
+    [string]$AzureClientSecret = $env:ARC8_AZURE_CLIENT_SECRET,
     [string]$AzureAuthScopes = "openid profile email",
-    [string]$AzureAuthEnabled = $(if ($env:NEXORA_AZURE_AUTH_ENABLED) { $env:NEXORA_AZURE_AUTH_ENABLED } elseif ($env:NEXORA_AZURE_TENANT_ID -and $env:NEXORA_AZURE_CLIENT_ID -and $env:NEXORA_AZURE_CLIENT_SECRET) { "true" } else { "false" }),
+    [string]$AzureAuthEnabled = $(if ($env:ARC8_AZURE_AUTH_ENABLED) { $env:ARC8_AZURE_AUTH_ENABLED } elseif ($env:ARC8_AZURE_TENANT_ID -and $env:ARC8_AZURE_CLIENT_ID -and $env:ARC8_AZURE_CLIENT_SECRET) { "true" } else { "false" }),
     [string]$OutputPath = "$PSScriptRoot\azure-backend.outputs.json"
 )
 
@@ -31,11 +31,11 @@ if ($SubscriptionId) {
 az extension add --name containerapp --upgrade --only-show-errors
 
 $acrLoginServer = az acr show --resource-group $ResourceGroup --name $AcrName --query loginServer -o tsv
-$image = "${acrLoginServer}/nexora-api:${ImageTag}"
+$image = "${acrLoginServer}/arc8-api:${ImageTag}"
 
 Push-Location "$PSScriptRoot\..\..\backend"
 try {
-    az acr build --registry $AcrName --image "nexora-api:${ImageTag}" .
+    az acr build --registry $AcrName --image "arc8-api:${ImageTag}" .
 }
 finally {
     Pop-Location

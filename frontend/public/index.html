@@ -1,10 +1,38 @@
 <!DOCTYPE html>
-<html lang="en" class="dark dark-mode">
+<html lang="en" class="light-mode" data-theme="light" data-bs-theme="light">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Arc-8</title>
+  <script>
+    (function () {
+      try {
+        if (!localStorage.getItem('arc8_theme_v2_bright_default')) {
+          localStorage.setItem('arc8_theme_v2_bright_default', '1');
+          localStorage.setItem('themePreference', 'light');
+          var raw = localStorage.getItem('liSettings');
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+              parsed.theme = 'light';
+              localStorage.setItem('liSettings', JSON.stringify(parsed));
+            }
+          }
+        }
+        var pref = localStorage.getItem('themePreference') || 'light';
+        var sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = pref === 'dark' || (pref === 'system' && sysDark);
+        var resolved = isDark ? 'dark' : 'light';
+        var root = document.documentElement;
+        root.classList.toggle('dark', isDark);
+        root.classList.toggle('dark-mode', isDark);
+        root.classList.toggle('light-mode', !isDark);
+        root.dataset.theme = resolved;
+        root.setAttribute('data-bs-theme', resolved);
+      } catch (e) {}
+    })();
+  </script>
   <!-- Preconnect and fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,7 +49,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </head>
 
-<body class="dark dark-mode">
+<body class="light-mode" data-theme="light">
   <div id="root"></div>
 </body>
 

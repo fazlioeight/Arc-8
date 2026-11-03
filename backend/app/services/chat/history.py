@@ -29,7 +29,7 @@ from sqlalchemy.orm import selectinload
 from ...models.chat_history import ChatConversation, ChatHistoryMessage
 
 
-log = logging.getLogger("nexora.chat.history")
+log = logging.getLogger("arc8.chat.history")
 
 
 class ConversationNotFound(LookupError):

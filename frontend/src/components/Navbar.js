@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useContext } from "rea
 import { NavLink } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import { ROUTES } from "../constants/routes";
+import ThemeToggleButton from "./ThemeToggleButton";
 
 const NAVIGATION = [
   {
@@ -193,6 +194,7 @@ const Navbar = () => {
 
         {/* ── Desktop CTA ───────────────────────────────────── */}
         <div className="hidden items-center gap-3 lg:flex">
+          <ThemeToggleButton />
           {isAuthenticated ? (
             <div className="flex items-center gap-2.5">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-2.5 py-1 text-xs font-semibold text-sky-700 dark:text-sky-300">
@@ -225,14 +227,17 @@ const Navbar = () => {
         </div>
 
         {/* ── Mobile toggle ─────────────────────────────────── */}
-        <button
-          className="inline-flex items-center justify-center rounded-lg p-2 text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 lg:hidden"
-          onClick={() => setMobileOpen((v) => !v)}
-          aria-label="Toggle menu"
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? <XIcon /> : <MenuIcon />}
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          <ThemeToggleButton />
+          <button
+            className="inline-flex items-center justify-center rounded-lg p-2 text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-label="Toggle menu"
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <XIcon /> : <MenuIcon />}
+          </button>
+        </div>
       </nav>
 
       {/* ── Mobile menu ───────────────────────────────────── */}

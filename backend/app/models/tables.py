@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -90,7 +90,7 @@ class User(ControlBase):
 
 
 class StaffUser(ControlBase):
-    """Nexora platform employees. Live on the control plane, outside any tenant."""
+    """Arc-8 platform employees. Live on the control plane, outside any tenant."""
 
     __tablename__ = "staff_users"
 

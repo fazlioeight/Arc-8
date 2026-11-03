@@ -2,7 +2,7 @@
 //
 // Why a dedicated account (not piggy-backing on a shared one)?
 //
-//   * Per-tenant cost attribution — each Nexora deployment gets its own
+//   * Per-tenant cost attribution — each Arc-8 deployment gets its own
 //     metering surface.
 //   * BAA scoping — Microsoft's BAA covers Azure OpenAI calls but the
 //     auditable scope is per resource. A dedicated account makes the

@@ -38,7 +38,7 @@ from typing import Iterable, Optional, Sequence
 from . import chart_renderer
 
 
-log = logging.getLogger("nexora.chat.export")
+log = logging.getLogger("arc8.chat.export")
 
 
 # ── Theming ─────────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ class ExportTheme:
 
     Carries per-tenant branding (palette + accent colour + optional caption)
     and the structural template selector. Defaults reproduce the original
-    Nexora orange look so call sites that don't pass a theme keep working
+    Arc-8 orange look so call sites that don't pass a theme keep working
     unchanged.
 
     ``template`` controls *structural* variations (cover slide layout, slide
@@ -91,7 +91,7 @@ def theme_from_branding(branding: Optional[dict], *, template: str = "default") 
     ``branding`` is the JSON payload stored on the Tenant row — keys:
     ``primary_color`` (hex), ``secondary_color`` (hex), ``palette`` (list of
     hex), ``caption`` (str), ``eyebrow`` (str). Missing or malformed keys
-    fall through to the Nexora defaults so a partial config can't crash the
+    fall through to the Arc-8 defaults so a partial config can't crash the
     export.
     """
     if not isinstance(branding, dict):
@@ -419,7 +419,7 @@ def export_to_pdf(
 # We replace them with a sentinel comment so we can find them again post-parse
 # without confusing the markdown's own code-fence handling.
 _CHART_BLOCK_RE = re.compile(r"```chart\s*([\s\S]*?)```", re.MULTILINE)
-_CHART_SENTINEL = "<!--NEXORA_CHART_BLOCK_{idx}-->"
+_CHART_SENTINEL = "<!--ARC8_CHART_BLOCK_{idx}-->"
 
 
 def _extract_chart_blocks(markdown_src: str) -> tuple[str, list[dict]]:
@@ -680,7 +680,7 @@ def _docx_render_table(doc, table_node, Pt) -> None:
                         r.font.size = Pt(10)
 
 
-_CHART_SENTINEL_RE = re.compile(r"NEXORA_CHART_BLOCK_(\d+)")
+_CHART_SENTINEL_RE = re.compile(r"ARC8_CHART_BLOCK_(\d+)")
 
 
 def _find_chart_sentinel(paragraph_node) -> Optional[int]:
@@ -994,9 +994,9 @@ def _pdf_render_table(story, table_node, inch, colors, Paragraph, Table, TableSt
 # a Blank layout + manual shapes so the same brand applies across PowerPoint
 # versions (placeholder behaviour varies between Office 2016 / 365 / online).
 
-# Nexora brand palette. The chat UI uses #d97706 as the AI/assistant accent,
+# Arc-8 brand palette. The chat UI uses #d97706 as the AI/assistant accent,
 # so we carry that through to the deck.
-_PPTX_BRAND_PRIMARY = (0xD9, 0x77, 0x06)        # Nexora orange
+_PPTX_BRAND_PRIMARY = (0xD9, 0x77, 0x06)        # Arc-8 orange
 _PPTX_BRAND_PRIMARY_DARK = (0xB4, 0x53, 0x09)   # darker orange for hover/border
 _PPTX_TEXT_PRIMARY = (0x11, 0x18, 0x27)         # near-black slate
 _PPTX_TEXT_SECONDARY = (0x4B, 0x55, 0x63)       # medium slate

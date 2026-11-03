@@ -81,7 +81,7 @@ from ..db.session import control_session, get_control_session
 from ..utils.security import AuthenticatedUser, get_current_user
 
 
-logger = logging.getLogger("nexora.chat")
+logger = logging.getLogger("arc8.chat")
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 

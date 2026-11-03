@@ -46,7 +46,7 @@ _PHI_LOGGER_NAME = "phi_audit"
 _phi_logger = logging.getLogger(_PHI_LOGGER_NAME)
 # Sentinel attribute so we configure the dedicated file handler exactly once,
 # even if setup_logging() and the first phi_audit() call race.
-_CONFIGURED_FLAG = "_nexora_phi_configured"
+_CONFIGURED_FLAG = "_arc8_phi_configured"
 
 
 class PhiEvent(str, enum.Enum):

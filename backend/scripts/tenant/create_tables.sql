@@ -318,7 +318,7 @@ CREATE INDEX IF NOT EXISTS ix_ride_payment_events_source   ON ride_payment_event
 CREATE INDEX IF NOT EXISTS ix_ride_payment_events_event_at ON ride_payment_events(event_at);
 
 -- ─────────────────────────────────────────────
--- Chat module (merged from nexora-chat)
+-- Chat module (merged from arc8-chat)
 -- ─────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS chat_workbooks (
@@ -477,7 +477,7 @@ CREATE INDEX IF NOT EXISTS ix_medication_adherence_member_id    ON medication_ad
 CREATE INDEX IF NOT EXISTS ix_medication_adherence_measure_year ON medication_adherence(measure_year);
 
 -- ─────────────────────────────────────────────
--- Nexora Lab Member360 domain
+-- Arc-8 Member360 domain
 -- ─────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS m360_members (

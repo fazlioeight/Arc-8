@@ -70,7 +70,7 @@ const Settings = ({ themePreference, setThemePreference }) => {
   const [prefs, setPrefs] = useState(() => {
     const saved = localStorage.getItem("liSettings");
     const basePrefs = {
-      theme: themePreference || "system",
+      theme: themePreference || "light",
       language: language || "English",
       chatHistory: true,
       training: true,
@@ -249,7 +249,7 @@ const Settings = ({ themePreference, setThemePreference }) => {
         <KpiTile label={t("Role")} value={(currentRole || menuRole || 'User').replace(/_/g, ' ')} hint="Access level" small />
         <KpiTile label={t("Sections")} value={navSections.length} hint="Available" />
         <KpiTile label={t("Memories")} value={memories.length} hint="Saved" />
-        <KpiTile label={t("Theme")} value={prefs.theme || 'system'} hint="Current" small />
+        <KpiTile label={t("Theme")} value={prefs.theme || 'light'} hint="Current" small />
       </section>
 
       <div className="grid gap-4 sm:grid-cols-[240px_1fr]">

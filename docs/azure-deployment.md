@@ -1,6 +1,6 @@
 # Azure Deployment Runbook
 
-This runbook deploys Nexora Lab with:
+This runbook deploys Arc-8 with:
 
 - React frontend on Azure Static Web Apps
 - FastAPI backend on Azure Container Apps
@@ -19,17 +19,17 @@ The scripts are PowerShell and assume Azure CLI is installed and authenticated.
 az login
 az account set --subscription "<subscription-id>"
 $env:AZURE_SUBSCRIPTION_ID = "<subscription-id>"
-$env:NEXORA_POSTGRES_ADMIN_PASSWORD = "<strong-db-password>"
-$env:NEXORA_INITIAL_ADMIN_PASSWORD = "<strong-initial-admin-password>"
-$env:NEXORA_AZURE_TENANT_ID = "<entra-tenant-id>"
-$env:NEXORA_AZURE_CLIENT_ID = "<app-registration-client-id>"
-$env:NEXORA_AZURE_CLIENT_SECRET = "<app-registration-client-secret>"
+$env:ARC8_POSTGRES_ADMIN_PASSWORD = "<strong-db-password>"
+$env:ARC8_INITIAL_ADMIN_PASSWORD = "<strong-initial-admin-password>"
+$env:ARC8_AZURE_TENANT_ID = "<entra-tenant-id>"
+$env:ARC8_AZURE_CLIENT_ID = "<app-registration-client-id>"
+$env:ARC8_AZURE_CLIENT_SECRET = "<app-registration-client-secret>"
 ```
 
 Use a real GitHub repository URL for Static Web Apps. The script creates the
 GitHub Actions workflow for the React build.
 
-Create a Microsoft Entra ID app registration for Nexora Lab sign-in before
+Create a Microsoft Entra ID app registration for Arc-8 sign-in before
 deploying the frontend:
 
 - Add `https://<static-web-app-host>/login` as a redirect URI.
@@ -37,7 +37,7 @@ deploying the frontend:
   secret for the backend container app.
 - Set the supported account type to the customer directory you want to allow.
 - Make sure every Entra user that should sign in already has a matching active
-  Nexora Lab user record for the tenant; the backend maps by email.
+  Arc-8 user record for the tenant; the backend maps by email.
 
 ## 2. Provision Azure Foundation
 
@@ -45,9 +45,9 @@ From the repo root:
 
 ```powershell
 .\infra\azure\00-provision-foundation.ps1 `
-  -ResourceGroup "rg-nexora-prod" `
+  -ResourceGroup "rg-arc8-prod" `
   -Location "eastus2" `
-  -NamePrefix "nexora"
+  -NamePrefix "arc8"
 ```
 
 Copy the JSON output. You will need `acrName`, `containerAppEnvironment`,
@@ -60,7 +60,7 @@ What this creates:
 - Azure Container Apps environment
 - Azure Container Registry
 - PostgreSQL Flexible Server with private network access and two databases:
-  `nexora_control` and `nexora_tenant`
+  `arc8_control` and `arc8_tenant`
 - Storage account with `raw-ingest`, `processed-ingest`, and `documents`
   containers
 - Service Bus namespace and `customer-ingestion` queue
@@ -70,11 +70,11 @@ What this creates:
 
 ```powershell
 .\infra\azure\01-deploy-backend-containerapp.ps1 `
-  -ResourceGroup "rg-nexora-prod" `
+  -ResourceGroup "rg-arc8-prod" `
   -AcrName "<acrName-from-step-2>" `
   -ContainerAppEnvironment "<containerAppEnvironment-from-step-2>" `
   -KeyVaultName "<keyVaultName-from-step-2>" `
-  -BackendAppName "nexora-api" `
+  -BackendAppName "arc8-api" `
   -ImageTag "prod-001" `
   -TenantKey "prominencehealth" `
   -TenantName "ProminenceHealth" `
@@ -96,8 +96,8 @@ delete existing tenants.
 
 ```powershell
 .\infra\azure\02-create-static-web-app.ps1 `
-  -ResourceGroup "rg-nexora-prod" `
-  -StaticWebAppName "nexora-portal" `
+  -ResourceGroup "rg-arc8-prod" `
+  -StaticWebAppName "arc8-portal" `
   -RepositoryUrl "https://github.com/<org>/<repo>" `
   -BackendApiBase "https://<backend-url-from-step-3>" `
   -Branch "main"
@@ -128,11 +128,11 @@ After the Static Web App exists, redeploy the backend with CORS enabled:
 
 ```powershell
 .\infra\azure\01-deploy-backend-containerapp.ps1 `
-  -ResourceGroup "rg-nexora-prod" `
+  -ResourceGroup "rg-arc8-prod" `
   -AcrName "<acrName>" `
   -ContainerAppEnvironment "<containerAppEnvironment>" `
   -KeyVaultName "<keyVaultName>" `
-  -BackendAppName "nexora-api" `
+  -BackendAppName "arc8-api" `
   -ImageTag "prod-002" `
   -CorsOrigin "https://<static-web-app-host>"
 ```

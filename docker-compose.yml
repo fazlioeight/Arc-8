@@ -58,7 +58,7 @@ services:
       REFRESH_TOKEN_IDLE_MINUTES: "120"
       REFRESH_TOKEN_MAX_LIFETIME_MINUTES: "720"
       FIELD_ENCRYPTION_KEY: "H1tD7Cz4kcO8-B76P9zLVID2dhfkoG52Q5pZGzDzP94="
-      CONTROL_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/nexora_control"
+      CONTROL_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/arc8_control"
       DEFAULT_TENANT_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/prominence_tenant"
       TENANT_DATABASE_URL_TEMPLATE: "postgresql+asyncpg://postgres:postgres@postgres:5432/{tenant_key}"
       REDIS_URL: "redis://redis:6379/0"

@@ -2,11 +2,11 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "namePrefix": { "value": "nexora-chat" },
+    "namePrefix": { "value": "arc8-chat" },
     "location": { "value": "westus3" },
     "tags": {
       "value": {
-        "app": "nexora",
+        "app": "arc8",
         "workload": "chat",
         "environment": "prod",
         "managed-by": "bicep"
@@ -16,13 +16,13 @@
     "acaSubnetPrefix": { "value": "10.30.0.0/23" },
     "postgresSubnetPrefix": { "value": "10.30.2.0/24" },
     "peSubnetPrefix": { "value": "10.30.4.0/24" },
-    "containerImage": { "value": "nexorachatacr.azurecr.io/nexora-platform:latest" },
+    "containerImage": { "value": "arc8chatacr.azurecr.io/arc8-platform:latest" },
     "postgresSkuName": { "value": "Standard_D2ds_v5" },
     "postgresStorageGB": { "value": 128 },
-    "controlDatabaseName": { "value": "nexora_control" },
-    "tenantDatabaseName": { "value": "nexora_tenant_prominencehealth" },
+    "controlDatabaseName": { "value": "arc8_control" },
+    "tenantDatabaseName": { "value": "arc8_tenant_prominencehealth" },
     "initialTenantKey": { "value": "prominencehealth" },
-    "initialAdminEmail": { "value": "admin@nexora.local" },
+    "initialAdminEmail": { "value": "admin@arc8.local" },
     "claudeModel": { "value": "claude-sonnet-4-6" },
     "anthropicModel": { "value": "claude-opus-4-7" },
     "allowedEmails": { "value": "" },

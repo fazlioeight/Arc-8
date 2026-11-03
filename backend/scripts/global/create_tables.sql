@@ -1,4 +1,4 @@
--- Nexora Lab control-plane (global) tables
+-- Arc-8 control-plane (global) tables
 -- Run once against the shared control database.
 
 -- ─────────────────────────────────────────────

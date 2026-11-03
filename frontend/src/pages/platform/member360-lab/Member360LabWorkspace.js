@@ -465,14 +465,14 @@ const Member360LabWorkspace = () => {
       case 'clinical_gaps':
         return (
           <div className="space-y-4">
-            <div className="flex items-center gap-1.5 p-1 bg-slate-900/60 rounded-xl border border-slate-800/80 w-fit">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800/80 w-fit">
               <button
                 type="button"
                 onClick={() => setClinicalSubTab('problems')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
                   clinicalSubTab === 'problems'
-                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white text-sky-700 border border-slate-200 shadow-xs dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/40'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
                 }`}
               >
                 ⚠️ Diagnosed Conditions & HCC ({detail?.diagnoses?.length || 0})
@@ -482,8 +482,8 @@ const Member360LabWorkspace = () => {
                 onClick={() => setClinicalSubTab('gaps')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
                   clinicalSubTab === 'gaps'
-                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white text-sky-700 border border-slate-200 shadow-xs dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/40'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
                 }`}
               >
                 🛡️ Open Care Gaps ({missingHccCount || 0})
@@ -500,14 +500,14 @@ const Member360LabWorkspace = () => {
       case 'medications_labs':
         return (
           <div className="space-y-4">
-            <div className="flex items-center gap-1.5 p-1 bg-slate-900/60 rounded-xl border border-slate-800/80 w-fit">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800/80 w-fit">
               <button
                 type="button"
                 onClick={() => setMedsSubTab('medications')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
                   medsSubTab === 'medications'
-                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white text-sky-700 border border-slate-200 shadow-xs dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/40'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
                 }`}
               >
                 💊 Active Medications ({(detail?.medications || []).length})
@@ -517,8 +517,8 @@ const Member360LabWorkspace = () => {
                 onClick={() => setMedsSubTab('labs')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
                   medsSubTab === 'labs'
-                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-white text-sky-700 border border-slate-200 shadow-xs dark:bg-sky-500/20 dark:text-sky-300 dark:border-sky-500/40'
+                    : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
                 }`}
               >
                 🧪 Labs & Diagnostics ({(detail?.labs || []).length + (detail?.imaging || []).length})
@@ -540,27 +540,27 @@ const Member360LabWorkspace = () => {
           <div className="space-y-6">
             {/* Deductible & Out-of-pocket Accumulator summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="coding-surface-subtle rounded-xl p-4 border border-slate-800/60">
+              <div className="coding-surface-subtle rounded-xl p-4 border border-slate-200 dark:border-slate-800/60">
                 <div className="flex items-center justify-between text-sm">
                   <span className="coding-text-strong font-semibold flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-sky-400" />
+                    <span className="h-2 w-2 rounded-full bg-sky-500 dark:bg-sky-400" />
                     Annual Deductible
                   </span>
                   <span className="tabular-nums coding-text-muted">{currencyFmt.format(a.deductible_met || 0)} / {currencyFmt.format(a.deductible || 0)}</span>
                 </div>
-                <div className="mt-2.5 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
+                <div className="mt-2.5 h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800/80 overflow-hidden">
                   <div className="h-full bg-sky-500" style={{ width: `${dedPct}%` }} />
                 </div>
               </div>
-              <div className="coding-surface-subtle rounded-xl p-4 border border-slate-800/60">
+              <div className="coding-surface-subtle rounded-xl p-4 border border-slate-200 dark:border-slate-800/60">
                 <div className="flex items-center justify-between text-sm">
                   <span className="coding-text-strong font-semibold flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
                     Out-of-Pocket Maximum
                   </span>
                   <span className="tabular-nums coding-text-muted">{currencyFmt.format(a.out_of_pocket_met || 0)} / {currencyFmt.format(a.out_of_pocket_max || 0)}</span>
                 </div>
-                <div className="mt-2.5 h-2 w-full rounded-full bg-slate-800/80 overflow-hidden">
+                <div className="mt-2.5 h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800/80 overflow-hidden">
                   <div className="h-full bg-emerald-500" style={{ width: `${oopPct}%` }} />
                 </div>
               </div>
@@ -568,10 +568,10 @@ const Member360LabWorkspace = () => {
 
             {/* Claims History Table */}
             <div>
-              <h4 className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-2">Itemized Medical Claims</h4>
-              <div className="overflow-hidden rounded-xl border border-slate-800/80">
+              <h4 className="text-xs uppercase tracking-wider coding-text-muted font-bold mb-2">Itemized Medical Claims</h4>
+              <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800/80">
                 <table className="min-w-full text-sm">
-                  <thead className="coding-surface-subtle text-xs uppercase tracking-wide text-slate-400 border-b border-slate-800">
+                  <thead className="coding-surface-subtle text-xs uppercase tracking-wide coding-text-muted border-b border-slate-200 dark:border-slate-800">
                     <tr>
                       <th className="text-left px-3.5 py-2.5 font-semibold">Claim #</th>
                       <th className="text-left px-3.5 py-2.5 font-semibold">Service Date</th>
@@ -583,27 +583,27 @@ const Member360LabWorkspace = () => {
                       <th className="text-right px-3.5 py-2.5 font-semibold">Member Responsibility</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                     {(detail.claims || []).map((c) => (
-                      <tr key={c.id} className="hover:bg-slate-800/30 transition">
-                        <td className="px-3.5 py-2.5 font-mono text-xs text-sky-400">{c.claim_number}</td>
-                        <td className="px-3.5 py-2.5 text-slate-300">{c.service_date || '—'}</td>
-                        <td className="px-3.5 py-2.5 text-slate-200">{c.provider || '—'}</td>
-                        <td className="px-3.5 py-2.5 text-slate-300">{c.category || '—'}</td>
+                      <tr key={c.id} className="hover:bg-slate-100/70 dark:hover:bg-slate-800/30 transition">
+                        <td className="px-3.5 py-2.5 font-mono text-xs text-sky-600 dark:text-sky-400">{c.claim_number}</td>
+                        <td className="px-3.5 py-2.5 text-slate-600 dark:text-slate-300">{c.service_date || '—'}</td>
+                        <td className="px-3.5 py-2.5 text-slate-900 dark:text-slate-200">{c.provider || '—'}</td>
+                        <td className="px-3.5 py-2.5 text-slate-600 dark:text-slate-300">{c.category || '—'}</td>
                         <td className="px-3.5 py-2.5">
                           <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-semibold capitalize ${
-                            c.status === 'paid' ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40' : 'bg-slate-800 text-slate-300'
+                            c.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/40' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                           }`}>
                             {c.status}
                           </span>
                         </td>
-                        <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-400">{c.billed_amount != null ? currencyFmt.format(c.billed_amount) : '—'}</td>
-                        <td className="px-3.5 py-2.5 text-right tabular-nums text-emerald-400 font-semibold">{c.paid_amount != null ? currencyFmt.format(c.paid_amount) : '—'}</td>
-                        <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-300">{c.member_responsibility != null ? currencyFmt.format(c.member_responsibility) : '—'}</td>
+                        <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-500 dark:text-slate-400">{c.billed_amount != null ? currencyFmt.format(c.billed_amount) : '—'}</td>
+                        <td className="px-3.5 py-2.5 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-semibold">{c.paid_amount != null ? currencyFmt.format(c.paid_amount) : '—'}</td>
+                        <td className="px-3.5 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{c.member_responsibility != null ? currencyFmt.format(c.member_responsibility) : '—'}</td>
                       </tr>
                     ))}
                     {(detail.claims || []).length === 0 && (
-                      <tr><td colSpan={8} className="px-3.5 py-8 text-center text-xs text-slate-400">No medical claims on file for this plan year.</td></tr>
+                      <tr><td colSpan={8} className="px-3.5 py-8 text-center text-xs coding-text-muted">No medical claims on file for this plan year.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -671,9 +671,9 @@ const Member360LabWorkspace = () => {
       {isComplianceAuditor && (
         <div
           role="status"
-          className="flex items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-200"
+          className="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 px-4 py-3 text-xs dark:text-amber-200"
         >
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 font-bold">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-200/80 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400 font-bold">
             !
           </span>
           <div>

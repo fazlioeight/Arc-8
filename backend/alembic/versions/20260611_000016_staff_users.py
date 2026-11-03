@@ -1,10 +1,10 @@
-"""add staff_users table for Nexora platform staff
+"""add staff_users table for Arc-8 platform staff
 
 Revision ID: 20260611_000016
 Revises: 20260525_000015
 Create Date: 2026-06-11
 
-Nexora employees (platform staff) live on the control plane outside any
+Arc-8 employees (platform staff) live on the control plane outside any
 tenant. They authenticate against `staff_users`, then mint a short-lived
 tenant-scoped impersonation token that grants platform_admin access to a
 chosen tenant.

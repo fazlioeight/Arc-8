@@ -1,4 +1,4 @@
-﻿.command-palette {
+.command-palette {
   position: fixed;
   inset: 0;
   z-index: 1400;
@@ -21,6 +21,7 @@
   max-height: 70vh;
   background: var(--sfdc-surface, #ffffff);
   color: var(--sfdc-text, #0f172a);
+  border: 1px solid var(--sfdc-border, #e2e8f0);
   border-radius: 18px;
   box-shadow: 0 20px 40px -20px rgba(15, 23, 42, 0.45);
   display: flex;
@@ -58,6 +59,11 @@
   color: #0369a1;
   font-size: 0.75rem;
   font-weight: 500;
+}
+
+.dark .command-palette__badge,
+.dark-mode .command-palette__badge {
+  color: #38bdf8;
 }
 
 .command-palette__input {
@@ -127,7 +133,7 @@
 .command-palette__group li.active,
 .command-palette__group li[aria-selected="true"] {
   background: rgba(14, 165, 233, 0.12);
-  color: #0f172a;
+  color: var(--sfdc-text, #0f172a);
 }
 
 .command-palette__label {

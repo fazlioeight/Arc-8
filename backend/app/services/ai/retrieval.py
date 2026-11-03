@@ -40,7 +40,7 @@ from .embeddings import EmbeddingError, get_embedder
 from .search import SearchError, get_search_client
 
 
-log = logging.getLogger("nexora.ai.retrieval")
+log = logging.getLogger("arc8.ai.retrieval")
 
 
 class RetrievalError(RuntimeError):

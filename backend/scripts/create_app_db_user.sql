@@ -1,5 +1,5 @@
 -- ============================================================================
--- Least-privilege application database role for the Nexora Platform.
+-- Least-privilege application database role for the Arc-8 Platform.
 --
 -- The application connects as a role that can read/write row data but CANNOT
 -- alter schema, drop objects, or perform superuser actions. Schema changes are
@@ -12,8 +12,8 @@
 -- from your secret store — never hard-code it:
 --
 --   psql "$ADMIN_DATABASE_URL" \
---        -v app_user=nexora_app \
---        -v app_password="$NEXORA_APP_DB_PASSWORD" \
+--        -v app_user=arc8_app \
+--        -v app_password="$ARC8_APP_DB_PASSWORD" \
 --        -f scripts/create_app_db_user.sql
 --
 -- Re-runnable: creating the role is guarded; GRANTs are idempotent.

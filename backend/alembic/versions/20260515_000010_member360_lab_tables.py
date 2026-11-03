@@ -1,10 +1,10 @@
-"""nexora lab member360 tables
+"""arc8 lab member360 tables
 
 Revision ID: 20260515_000010
 Revises: 20260514_000009
 Create Date: 2026-05-15
 
-Creates the per-tenant tables backing the Nexora Lab Member360 module.
+Creates the per-tenant tables backing the Arc-8 Member360 module.
 All tables are prefixed with ``m360_`` to isolate them from the existing
 coding schema.
 """

@@ -70,10 +70,10 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
 // SQL database (logical grouping of containers).
 resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15' = {
   parent: account
-  name: 'nexora'
+  name: 'arc8'
   properties: {
     resource: {
-      id: 'nexora'
+      id: 'arc8'
     }
   }
 }

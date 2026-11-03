@@ -4,6 +4,7 @@ import { AuthContext } from "../../context/AuthContext";
 import { ROUTES } from "../../constants/routes";
 import { DEMO_PERSONAS } from "../../constants/permissions";
 import { API_BASE } from "../../utils/apiBase";
+import ThemeToggleButton from "../../components/ThemeToggleButton";
 
 const DEFAULT_TENANT = process.env.REACT_APP_DEFAULT_TENANT || "prominencehealth";
 
@@ -193,40 +194,41 @@ const Login = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-900 text-slate-100">
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
       {/* Top enterprise navigation header */}
-      <header className="flex h-16 items-center justify-between border-b border-slate-800 bg-slate-950/80 px-6 backdrop-blur-md">
+      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 dark:border-slate-800 dark:bg-slate-950/80 px-6 backdrop-blur-md">
         <NavLink to="/" className="group flex items-center gap-3">
           <img
             src="/images/arc8-logo.png"
             alt="Arc-8 logo"
-            className="h-9 w-auto rounded-lg object-contain shadow-md shadow-sky-500/20 transition-transform duration-200 group-hover:scale-105"
+            className="h-9 w-auto rounded-lg object-contain shadow-sm dark:shadow-md dark:shadow-sky-500/20 transition-transform duration-200 group-hover:scale-105"
           />
           <div className="flex items-center">
             <span
               className="flex items-baseline text-[21px] font-extrabold leading-none"
               style={{ fontFamily: "'Outfit', 'Space Grotesk', 'Plus Jakarta Sans', sans-serif", letterSpacing: "-0.03em" }}
             >
-              <span className="bg-gradient-to-r from-white via-slate-100 to-sky-100 bg-clip-text text-transparent">Arc</span>
-              <span className="mx-0.5 font-bold text-sky-400">-</span>
-              <span className="bg-gradient-to-br from-sky-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">8</span>
+              <span className="text-slate-900 dark:bg-gradient-to-r dark:from-white dark:via-slate-100 dark:to-sky-100 dark:bg-clip-text dark:text-transparent">Arc</span>
+              <span className="mx-0.5 font-bold text-sky-600 dark:text-sky-400">-</span>
+              <span className="bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 dark:from-sky-400 dark:via-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">8</span>
             </span>
-            <span className="ml-2.5 rounded-md bg-sky-950 px-2 py-0.5 text-[10px] font-semibold text-sky-400 border border-sky-800/60">
+            <span className="ml-2.5 rounded-md bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-950 px-2 py-0.5 text-[10px] font-semibold dark:text-sky-400 border dark:border-sky-800/60">
               Enterprise Health
             </span>
           </div>
         </NavLink>
 
-        <div className="flex items-center gap-4 text-xs">
-          <span className="hidden items-center gap-1.5 text-slate-400 md:inline-flex">
-            <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+        <div className="flex items-center gap-3 text-xs">
+          <span className="hidden items-center gap-1.5 text-slate-500 dark:text-slate-400 md:inline-flex">
+            <svg className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
             HIPAA & SOC-2 Type II Certified
           </span>
+          <ThemeToggleButton />
           <NavLink
             to="/"
-            className="rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 font-medium text-slate-300 transition hover:bg-slate-700 hover:text-white"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-700 shadow-xs transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
           >
             ← Back to Overview
           </NavLink>
@@ -235,65 +237,65 @@ const Login = () => {
 
       {/* Main split-screen container */}
       <main className="flex flex-1 items-center justify-center p-6 md:p-12">
-        <div className="w-full max-w-5xl rounded-3xl border border-slate-800 bg-slate-950/90 shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+        <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950/90 dark:shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
           
           {/* Left clinical banner panel */}
-          <div className="lg:col-span-5 bg-gradient-to-br from-sky-950/80 via-slate-900 to-slate-950 p-8 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-800">
+          <div className="lg:col-span-5 bg-gradient-to-br from-sky-50 via-slate-50 to-indigo-50/60 dark:from-sky-950/80 dark:via-slate-900 dark:to-slate-950 p-8 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-400">
-                <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/70 bg-sky-100/70 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 px-3 py-1 text-xs font-semibold dark:text-sky-400">
+                <span className="h-2 w-2 rounded-full bg-sky-500 dark:bg-sky-400 animate-pulse" />
                 Live Clinical Gateway
               </div>
 
-              <h2 className="mt-5 text-2xl font-black text-white leading-snug">
+              <h2 className="mt-5 text-2xl font-black text-slate-900 dark:text-white leading-snug">
                 Intelligent Care Delivery & Risk Adjustment
               </h2>
-              <p className="mt-2.5 text-sm text-slate-400 leading-relaxed">
+              <p className="mt-2.5 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Log in to coordinate member health journeys, validate suspect HCC codes, and optimize value-based capitation contracts.
               </p>
 
               <div className="mt-8 space-y-3.5">
-                <div className="flex items-start gap-3 rounded-xl border border-slate-800/80 bg-slate-900/60 p-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-500/20 text-sky-400">
+                <div className="flex items-start gap-3 rounded-xl border border-slate-200/80 bg-white/80 dark:border-slate-800/80 dark:bg-slate-900/60 p-3 shadow-xs dark:shadow-none">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400">
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     </svg>
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white">Full HIPAA & PHI Isolation</h4>
-                    <p className="text-[11px] text-slate-400">Tenant-isolated schemas with field encryption and automated access telemetry.</p>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">Full HIPAA & PHI Isolation</h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Tenant-isolated schemas with field encryption and automated access telemetry.</p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 rounded-xl border border-slate-800/80 bg-slate-900/60 p-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+                <div className="flex items-start gap-3 rounded-xl border border-slate-200/80 bg-white/80 dark:border-slate-800/80 dark:bg-slate-900/60 p-3 shadow-xs dark:shadow-none">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white">Role-Based Clinical Governance</h4>
-                    <p className="text-[11px] text-slate-400">Granular permissions protecting diagnoses, care orders, and financial analytics.</p>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">Role-Based Clinical Governance</h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">Granular permissions protecting diagnoses, care orders, and financial analytics.</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 pt-4 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-between">
-              <span>Tenant: <strong>Prominence Health Plan</strong></span>
-              <span className="text-sky-400">v28 Clinical Engine</span>
+            <div className="mt-8 pt-4 border-t border-slate-200/80 dark:border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-between">
+              <span>Tenant: <strong className="text-slate-700 dark:text-slate-300">Prominence Health Plan</strong></span>
+              <span className="text-sky-600 dark:text-sky-400 font-semibold">v28 Clinical Engine</span>
             </div>
           </div>
 
           {/* Right login & persona selection form */}
-          <div className="lg:col-span-7 p-8 sm:p-10 bg-slate-900/70 flex flex-col justify-between">
+          <div className="lg:col-span-7 p-8 sm:p-10 bg-white dark:bg-slate-900/70 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-bold text-white">Enterprise Sign In</h3>
-                  <p className="mt-0.5 text-xs text-slate-400">Enter your organizational credentials or choose a clinical role below.</p>
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white">Enterprise Sign In</h3>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Enter your organizational credentials or choose a clinical role below.</p>
                 </div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-800 text-sky-400 border border-slate-700">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 border border-sky-200 dark:bg-slate-800 dark:text-sky-400 dark:border-slate-700">
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0110 0v4" />
@@ -304,9 +306,9 @@ const Login = () => {
               {error && (
                 <div
                   role="alert"
-                  className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-xs text-rose-300 flex items-start gap-2.5"
+                  className="mt-4 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 px-4 py-3 text-xs dark:text-rose-300 flex items-start gap-2.5"
                 >
-                  <svg className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-4 w-4 shrink-0 text-rose-500 dark:text-rose-400 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                   <div>
@@ -317,31 +319,31 @@ const Login = () => {
               )}
 
               {/* Enterprise SSO (OIDC / Cognito) Card */}
-              <div className="mt-5 rounded-2xl border border-sky-800/60 bg-sky-950/30 p-4">
+              <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50/60 dark:border-sky-800/60 dark:bg-sky-950/30 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-600/30 text-sky-400 font-bold text-xs">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-600/30 dark:text-sky-400 font-bold text-xs">
                       SSO
                     </span>
                     <div>
-                      <h4 className="text-xs font-bold text-white">Enterprise OIDC / Cognito Sign-In</h4>
-                      <p className="text-[11px] text-slate-400">IdP Group-to-Role Mapping & Deny-by-Default</p>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">Enterprise OIDC / Cognito Sign-In</h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">IdP Group-to-Role Mapping & Deny-by-Default</p>
                     </div>
                   </div>
-                  <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
+                  <span className="rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold dark:text-sky-300">
                     OIDC Active
                   </span>
                 </div>
 
                 <div className="mt-3.5 space-y-2">
-                  <label className="block text-[11px] font-semibold uppercase text-slate-300">
+                  <label className="block text-[11px] font-semibold uppercase text-slate-700 dark:text-slate-300">
                     Simulate IdP User Group (Cognito / Okta / Entra):
                   </label>
                   <div className="flex gap-2">
                     <select
                       value={selectedIdpGroup}
                       onChange={(e) => setSelectedIdpGroup(e.target.value)}
-                      className="flex-1 rounded-xl border border-slate-700 bg-slate-800/90 px-3 py-2 text-xs text-white outline-none focus:border-sky-500"
+                      className="flex-1 rounded-xl border border-slate-300 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-800/90 px-3 py-2 text-xs dark:text-white outline-none focus:border-sky-500"
                     >
                       <option value="Prominence_Care_Coordinators">
                         Prominence_Care_Coordinators → Coordinator
@@ -373,11 +375,11 @@ const Login = () => {
               </div>
 
               <div className="my-5 flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-800" />
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
                   Or Sign In with Local Credentials
                 </span>
-                <div className="h-px flex-1 bg-slate-800" />
+                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-3.5">
@@ -435,12 +437,12 @@ const Login = () => {
               </form>
 
               {/* Instant One-Click Role Testing Personas */}
-              <div className="mt-6 border-t border-slate-800 pt-5">
+              <div className="mt-6 border-t border-slate-200 dark:border-slate-800 pt-5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Instant Demo Role Logins (Single-Click)
                   </span>
-                  <span className="text-[10px] text-sky-400">Click any role to test</span>
+                  <span className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold">Click any role to test</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -453,26 +455,26 @@ const Login = () => {
                         type="button"
                         onClick={() => handleSelectPersona(p)}
                         disabled={submitting}
-                        className="flex flex-col text-left rounded-xl border border-slate-800 bg-slate-950/60 p-2.5 transition hover:border-sky-500 hover:bg-sky-950/20 group"
+                        className="flex flex-col text-left rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-sky-50/60 dark:border-slate-800 dark:bg-slate-950/60 p-2.5 transition hover:border-sky-500 dark:hover:bg-sky-950/20 group"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-800 text-[10px] font-bold text-sky-400 group-hover:bg-sky-600 group-hover:text-white transition">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-100 text-sky-700 dark:bg-slate-800 text-[10px] font-bold dark:text-sky-400 group-hover:bg-sky-600 group-hover:text-white transition">
                             {p.avatar}
                           </span>
-                          <span className="text-[10px] font-semibold uppercase text-slate-500 group-hover:text-sky-400">
+                          <span className="text-[10px] font-semibold uppercase text-slate-500 group-hover:text-sky-600 dark:group-hover:text-sky-400">
                             {p.role}
                           </span>
                         </div>
                         <div className="mt-1.5">
-                          <div className="text-xs font-bold text-white group-hover:text-sky-300 truncate">
+                          <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-sky-700 dark:group-hover:text-sky-300 truncate">
                             {p.name}
                           </div>
-                          <div className="text-[10px] text-slate-400 truncate">
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                             {p.title}
                           </div>
                         </div>
                         {isSigningInThis && (
-                          <div className="mt-1 text-[10px] font-semibold text-sky-400 animate-pulse">
+                          <div className="mt-1 text-[10px] font-semibold text-sky-600 dark:text-sky-400 animate-pulse">
                             Signing in...
                           </div>
                         )}

@@ -1,4 +1,4 @@
-"""Pydantic schemas for the Nexora Lab Member360 module."""
+"""Pydantic schemas for the Arc-8 Member360 module."""
 from __future__ import annotations
 
 from datetime import date, datetime

@@ -9,7 +9,7 @@ from ..middleware.rate_limit import auth_rate_limit
 from ..schemas.contact import ContactRequest, ContactResponse
 from ..services.email import EmailNotConfigured, send_email
 
-logger = logging.getLogger("nexora.contact")
+logger = logging.getLogger("arc8.contact")
 
 router = APIRouter(prefix="/api", tags=["contact"])
 

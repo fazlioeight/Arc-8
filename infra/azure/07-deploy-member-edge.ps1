@@ -21,15 +21,15 @@
   Mirrors infra/azure/01-deploy-backend-containerapp.ps1 conventions. Idempotent.
 #>
 param(
-    [string]$ResourceGroup       = $(if ($env:AZURE_RESOURCE_GROUP) { $env:AZURE_RESOURCE_GROUP } else { "nexora-chat-rg" }),
-    [string]$ContainerAppEnvironment = "nexora-chat-env-v2",
+    [string]$ResourceGroup       = $(if ($env:AZURE_RESOURCE_GROUP) { $env:AZURE_RESOURCE_GROUP } else { "arc8-chat-rg" }),
+    [string]$ContainerAppEnvironment = "arc8-chat-env-v2",
     # Defaults to the project ACR (same as deploy-to-azure.ps1) so the pipeline
     # works without an AZURE_ACR_NAME repo var; override via param/env if needed.
-    [string]$AcrName             = $(if ($env:AZURE_ACR_NAME) { $env:AZURE_ACR_NAME } else { "nexorachatacr65700" }),
-    [string]$KeyVaultName        = "nexora-chat-kv",
-    [string]$EdgeAppName         = "nexora-member-portal",
-    [string]$BackendAppName      = "nexora-chat-v2",
-    [string]$ImageName           = "nexora-member-edge",
+    [string]$AcrName             = $(if ($env:AZURE_ACR_NAME) { $env:AZURE_ACR_NAME } else { "arc8chatacr65700" }),
+    [string]$KeyVaultName        = "arc8-chat-kv",
+    [string]$EdgeAppName         = "arc8-member-portal",
+    [string]$BackendAppName      = "arc8-chat-v2",
+    [string]$ImageName           = "arc8-member-edge",
     [string]$FrontDoorId         = "",   # set to lock the edge to our Front Door (X-Azure-FDID)
     [switch]$SkipBuild
 )

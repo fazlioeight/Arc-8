@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from azure.eventhub.aio import EventHubProducerClient
 
 
-log = logging.getLogger("nexora.events.publisher")
+log = logging.getLogger("arc8.events.publisher")
 
 
 class PublisherError(RuntimeError):

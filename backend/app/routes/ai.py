@@ -33,7 +33,7 @@ from ..utils.audit_logger import record_audit_event
 from ..utils.security import AuthenticatedUser, get_current_user
 
 
-log = logging.getLogger("nexora.routes.ai")
+log = logging.getLogger("arc8.routes.ai")
 
 router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 

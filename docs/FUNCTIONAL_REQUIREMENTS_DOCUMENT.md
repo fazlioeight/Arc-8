@@ -119,7 +119,7 @@ QNXT (eligibility, claims, providers), Project Titan/MRA (HCC gaps), Abarca PBM 
 |---|---|
 | FR-ADM-01 | The Master Admin console shall control which modules each tenant has purchased. |
 | FR-ADM-02 | The Tenant Admin console shall manage users, roles and tab-level permissions. |
-| FR-ADM-03 | The UI shall be branded "Arc-8" (all "Nexora Lab" references replaced). |
+| FR-ADM-03 | The UI shall be branded "Arc-8" across all portals, headers, navigation, and documents (all legacy prototype references removed). |
 
 ### 2.10 Audit and Compliance (RTM-08) — P1
 | ID | Requirement |

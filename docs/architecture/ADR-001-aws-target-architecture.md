@@ -11,7 +11,7 @@
 
 ## 1. Context & Problem Statement
 
-The inherited `Nexora Lab` prototype is a multi-product monorepo originally built and deployed against Microsoft Azure (`infra/azure`, Azure Static Web Apps, Azure Container Apps, Azure Key Vault, Azure Blob Storage, and Azure Entra ID). Additionally:
+The inherited prototype is a multi-product monorepo originally built and deployed against Microsoft Azure (`infra/azure`, Azure Static Web Apps, Azure Container Apps, Azure Key Vault, Azure Blob Storage, and Azure Entra ID). Additionally:
 1. It contains **10 modules / 27 FastAPI routers** and **two separate React SPAs** (`frontend/` for internal staff and `frontend-member/` + `edge/member-portal/` for external members), whereas Prominence Health's target ecosystem uses **AaNeel** for external member/provider portals and positions **Arc-8** strictly as the internal **Member 360** care coordination and call center workspace.
 2. Tenant-scoped tables (`m360_*`) are currently provisioned at runtime via `metadata.create_all` rather than formal Alembic migrations.
 
@@ -28,7 +28,7 @@ We will decouple all Azure-specific SDKs and infrastructure scripts and map the 
 | :--- | :--- | :--- | :--- |
 | **Frontend Hosting & CDN** | Azure Static Web Apps + Front Door | **Amazon S3 + CloudFront + AWS WAF** | Low-cost, globally cached static SPA delivery with TLS 1.3 and OWASP WAF protection. |
 | **Backend API Compute** | Azure Container Apps / Functions | **Amazon ECS Fargate** (behind ALB) | Runs the existing FastAPI + Gunicorn/Uvicorn Docker container with zero cold-start latency for Member 360 queries. |
-| **Relational Database** | Azure Database for PostgreSQL / SQLite | **Amazon RDS for PostgreSQL 16** (Encrypted with AWS KMS) | Preserves 100% compatibility with SQLAlchemy asyncpg and the `nexora_control` + `prominence_tenant` multi-tenant model. |
+| **Relational Database** | Azure Database for PostgreSQL / SQLite | **Amazon RDS for PostgreSQL 16** (Encrypted with AWS KMS) | Preserves 100% compatibility with SQLAlchemy asyncpg and the `arc8_control` + `prominence_tenant` multi-tenant model. |
 | **Cache & Token Revocation** | Azure Cache for Redis | **Amazon ElastiCache for Redis 7** | Supports existing JWT `jti` blacklist revocation and rate-limiting middleware (`middleware/rate_limit.py`). |
 | **Document / Object Storage** | Azure Blob Storage (`MEMBER360_STORAGE_BACKEND=azure`) | **Amazon S3** (SSE-KMS encrypted, private bucket) | Stores synthetic EOB PDFs and member attachments via pre-signed URLs. |
 | **Identity & SSO** | Azure Entra ID / MSAL | **Amazon Cognito (OIDC)** | Standard OIDC/JWKS token verification ready to federate with Prominence's corporate IdP. |

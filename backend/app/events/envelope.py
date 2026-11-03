@@ -47,7 +47,7 @@ class EventEnvelope(BaseModel):
 
     Required by every consumer:
       - ``event_id``       — uuid4, used for idempotency
-      - ``tenant_id``      — Nexora tenant integer id (NOT Entra tenant)
+      - ``tenant_id``      — Arc-8 tenant integer id (NOT Entra tenant)
       - ``tenant_key``     — slug, useful for log filtering
       - ``aggregate_type`` — see ``AggregateType``
       - ``aggregate_id``   — string-safe id (we cast ints to str on emit so

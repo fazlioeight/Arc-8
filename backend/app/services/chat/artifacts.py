@@ -41,7 +41,7 @@ import jwt
 from ...core.config import settings
 
 
-logger = logging.getLogger("nexora.chat.artifacts")
+logger = logging.getLogger("arc8.chat.artifacts")
 
 
 class ArtifactError(Exception):

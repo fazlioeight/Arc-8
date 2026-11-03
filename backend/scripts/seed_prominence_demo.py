@@ -30,15 +30,15 @@ Run locally:
       python scripts/seed_prominence_demo.py
 
 Run as a Container App job (azure-prod path):
-    az containerapp job create -g <rg> -n nexora-platform-seed-demo \\
-      --image <acr>/nexora-platform:<tag> \\
+    az containerapp job create -g <rg> -n arc8-platform-seed-demo \\
+      --image <acr>/arc8-platform:<tag> \\
       --environment <aca-env> \\
       --command python --args scripts/seed_prominence_demo.py \\
       --secrets tenant-db-url=<kv-uri> \\
       --env-vars ENVIRONMENT=production PYTHONPATH=/app \\
                  DEFAULT_TENANT_DATABASE_URL=secretref:tenant-db-url \\
       --trigger-type Manual --replica-timeout 600
-    az containerapp job start  -g <rg> -n nexora-platform-seed-demo
+    az containerapp job start  -g <rg> -n arc8-platform-seed-demo
 """
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Service layer for Nexora Lab Member360.
+"""Service layer for Arc-8 Member360.
 
 Responsibilities:
 - Query helpers used by route handlers.

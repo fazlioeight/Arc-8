@@ -14,7 +14,7 @@ intentionally open — a JSON object with keys consumed by
       "logo_png_base64":  "<base64 png>"   (optional, <=2 MB)
     }
 
-Empty object preserves the Nexora default look. Missing keys fall through
+Empty object preserves the Arc-8 default look. Missing keys fall through
 to defaults — partial configs are safe.
 
 Revision ID: 20260524_000014

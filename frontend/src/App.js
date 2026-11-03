@@ -1,10 +1,11 @@
-import React, { useContext, useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useContext, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { AuthContext, AuthProvider } from './context/AuthContext';
 import { CommandPaletteProvider } from './context/CommandPaletteContext';
 import { UserPreferencesProvider } from './context/UserPreferencesContext';
 import { GuidedTourProvider } from './context/GuidedTourContext';
 import { NotificationsProvider } from './context/NotificationsContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import './styles/commandPalette.css';
 import './styles/memberWorkspace.css';
 import Navbar from './components/Navbar';
@@ -103,7 +104,13 @@ const RedirectWhenLocked = () => {
   const location = useLocation();
   if (!sessionLocked) return null;
   if (location.pathname === '/login') return null;
-  return <Navigate to="/login" replace />;
+  return (
+    <Navigate
+      to="/login"
+      state={{ lockedFrom: `${location.pathname}${location.search}${location.hash}` }}
+      replace
+    />
+  );
 };
 
 const Shell = ({ themePreference, setThemePreference }) => {
@@ -266,77 +273,35 @@ const Shell = ({ themePreference, setThemePreference }) => {
   );
 };
 
-function App() {
-  const [themePreference, setThemePreference] = useState(() => {
-    const saved = localStorage.getItem('themePreference');
-    return saved || 'dark';
-  });
-
-  const handleThemeToggle = useCallback(() => {
-    setThemePreference((prev) => {
-      if (prev === 'dark') return 'light';
-      return 'dark';
-    });
-  }, []);
-
-  // Compute effective theme and apply class
-  useEffect(() => {
-    const root = document.documentElement;
-    const mql = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-
-    const applyTheme = (pref) => {
-      const systemDark = mql ? mql.matches : true;
-      const useDark = pref === 'dark' || (pref === 'system' && systemDark);
-      const resolvedTheme = useDark ? 'dark' : 'light';
-
-      root.classList.toggle('dark-mode', useDark);
-      root.classList.toggle('light-mode', !useDark);
-      root.classList.toggle('dark', useDark); // Tailwind dark mode
-      root.dataset.theme = resolvedTheme;
-
-      if (document.body) {
-        document.body.classList.toggle('dark-mode', useDark);
-        document.body.classList.toggle('light-mode', !useDark);
-        document.body.classList.toggle('dark', useDark);
-        document.body.dataset.theme = resolvedTheme;
-      }
-    };
-
-    applyTheme(themePreference);
-    localStorage.setItem('themePreference', themePreference);
-    // Listen to system changes when in system mode
-    const handler = () => {
-      if (themePreference === 'system') {
-        applyTheme('system');
-      }
-    };
-    if (mql && mql.addEventListener) mql.addEventListener('change', handler);
-    else if (mql && mql.addListener) mql.addListener(handler);
-    return () => {
-      if (mql && mql.removeEventListener) mql.removeEventListener('change', handler);
-      else if (mql && mql.removeListener) mql.removeListener(handler);
-    };
-  }, [themePreference]);
-
+const AppContent = () => {
+  const { themePreference, setThemePreference, toggleTheme } = useTheme();
   return (
-    <AuthProvider>
-      <UserPreferencesProvider>
-        <CommandPaletteProvider>
-          <GuidedTourProvider>
-            <NotificationsProvider>
-              <Router>
-                <RedirectWhenLocked />
-                <ForcePasswordRotation />
-                <Shell themePreference={themePreference} setThemePreference={setThemePreference} />
-                <CommandPalette onThemeToggle={handleThemeToggle} />
-                <GuidedTourOverlay />
-                <LoginOnlySessionLockOverlay />
-              </Router>
-            </NotificationsProvider>
-          </GuidedTourProvider>
-        </CommandPaletteProvider>
-      </UserPreferencesProvider>
-    </AuthProvider>
+    <Router>
+      <RedirectWhenLocked />
+      <ForcePasswordRotation />
+      <Shell themePreference={themePreference} setThemePreference={setThemePreference} />
+      <CommandPalette onThemeToggle={toggleTheme} />
+      <GuidedTourOverlay />
+      <LoginOnlySessionLockOverlay />
+    </Router>
+  );
+};
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <UserPreferencesProvider>
+          <CommandPaletteProvider>
+            <GuidedTourProvider>
+              <NotificationsProvider>
+                <AppContent />
+              </NotificationsProvider>
+            </GuidedTourProvider>
+          </CommandPaletteProvider>
+        </UserPreferencesProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

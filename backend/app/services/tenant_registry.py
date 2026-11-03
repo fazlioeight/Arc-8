@@ -15,7 +15,7 @@ from ..db.tenant_manager import TenantContext
 from ..models.tables import Tenant
 
 _CACHE_TTL_SECONDS = 120
-_REDIS_CACHE_PREFIX = 'nexora:tenant:context:'
+_REDIS_CACHE_PREFIX = 'arc8:tenant:context:'
 
 
 class TenantRegistry:
