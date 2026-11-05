@@ -68,12 +68,12 @@ const TABS = [
 ];
 
 const PRIMARY_ACTIONS = [
-  { key: 'create_task', label: 'Create Task', primary: true },
-  { key: 'add_note', label: 'Add Note' },
-  { key: 'start_journey', label: 'Start Journey' },
-  { key: 'send_message', label: 'Send Message' },
-  { key: 'recommend_care_option', label: 'Create Care Option' },
-  { key: 'escalate', label: 'Escalate' },
+  { key: 'create_task', label: 'Create Task', primary: true, permission: 'menu:tasks' },
+  { key: 'add_note', label: 'Add Note', permission: 'tab:notes' },
+  { key: 'start_journey', label: 'Start Journey', permission: 'menu:care_journeys' },
+  { key: 'send_message', label: 'Send Message', permission: 'menu:messages' },
+  { key: 'recommend_care_option', label: 'Create Care Option', permission: 'menu:care_options' },
+  { key: 'escalate', label: 'Escalate', permission: 'menu:tasks' },
 ];
 
 const currencyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -102,15 +102,16 @@ const Member360LabWorkspace = () => {
 
   const isComplianceAuditor = role === 'compliance_auditor';
   const isBusinessAdmin = role === 'business_admin';
+  const isBilling = role === 'billing';
 
-  // Role-based action authority (deny mutations for Compliance Auditor; deny clinical notes for Business Admin)
+  // Role-based action authority (deny mutations for Compliance Auditor & Billing; filter actions strictly by active role permissions)
   const availableActions = useMemo(() => {
-    if (isComplianceAuditor) return [];
+    if (isComplianceAuditor || isBilling) return [];
     if (isBusinessAdmin) {
       return PRIMARY_ACTIONS.filter((a) => a.key === 'escalate' || a.key === 'create_task');
     }
-    return PRIMARY_ACTIONS;
-  }, [isComplianceAuditor, isBusinessAdmin]);
+    return PRIMARY_ACTIONS.filter((a) => !a.permission || can(a.permission));
+  }, [isComplianceAuditor, isBusinessAdmin, isBilling, can]);
 
   // Filter tabs dynamically based on user role privileges authority
   const visibleTabs = useMemo(() => {
@@ -271,8 +272,12 @@ const Member360LabWorkspace = () => {
         });
         setActionMessage(`Task created: ${newTask.title}`);
       } else if (actionDialog.key === 'add_note') {
+        const noteBody = (data.body || '').trim();
+        if (!noteBody) {
+          throw new Error('Please enter note text before submitting.');
+        }
         const note = await createMember360Note(token, tenant, member.id, {
-          body: data.body || '',
+          body: noteBody,
           channel: data.channel || 'Internal',
           note_type: data.note_type || 'Outreach',
         });
@@ -291,18 +296,41 @@ const Member360LabWorkspace = () => {
         const recipientLabel = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.member_key;
         setActionMessage(`${msg.channel || selectedChannel} message sent to ${recipientLabel}.`);
       } else if (actionDialog.key === 'recommend_care_option') {
+        const serviceType = (data.service_type || '').trim();
+        if (!serviceType) {
+          throw new Error('Service type is required.');
+        }
+        if (serviceType.length > 128) {
+          throw new Error('Service type must be 128 characters or fewer.');
+        }
+        const rawCost = data.cost_estimate !== '' && data.cost_estimate != null ? Number(data.cost_estimate) : null;
+        if (rawCost != null && (Number.isNaN(rawCost) || rawCost < 0)) {
+          throw new Error('Cost estimate must be a valid positive number.');
+        }
+        const rawQuality = data.quality_score !== '' && data.quality_score != null ? Number(data.quality_score) : null;
+        if (rawQuality != null && (Number.isNaN(rawQuality) || rawQuality < 0 || rawQuality > 5)) {
+          throw new Error('Quality score must be a number between 0.0 and 5.0.');
+        }
+        const rawDistance = data.distance_miles !== '' && data.distance_miles != null ? Number(data.distance_miles) : null;
+        if (rawDistance != null && (Number.isNaN(rawDistance) || rawDistance < 0)) {
+          throw new Error('Distance must be a valid positive number.');
+        }
+        const rawSavings = data.potential_savings !== '' && data.potential_savings != null ? Number(data.potential_savings) : null;
+        if (rawSavings != null && (Number.isNaN(rawSavings) || rawSavings < 0)) {
+          throw new Error('Potential savings must be a valid positive number.');
+        }
         const opt = await createMember360CareOption(token, tenant, {
           member_id: member.id,
-          service_type: data.service_type || 'Care option',
-          recommended_provider: data.recommended_provider || null,
-          facility_name: data.facility_name || data.recommended_provider || null,
-          cost_estimate: Number(data.cost_estimate) || null,
-          quality_score: Number(data.quality_score) || null,
-          distance_miles: Number(data.distance_miles) || null,
+          service_type: serviceType,
+          recommended_provider: (data.recommended_provider || '').trim() || null,
+          facility_name: (data.facility_name || data.recommended_provider || '').trim() || null,
+          cost_estimate: rawCost,
+          quality_score: rawQuality,
+          distance_miles: rawDistance,
           network_status: data.network_status || 'In Network',
-          potential_savings: Number(data.potential_savings) || null,
-          rationale: data.rationale || null,
-          member_facing_explanation: data.member_facing_explanation || null,
+          potential_savings: rawSavings,
+          rationale: (data.rationale || '').trim() || null,
+          member_facing_explanation: (data.member_facing_explanation || '').trim() || null,
           status: 'recommended',
         });
         setActionMessage(`Care option created: ${opt.service_type}.`);
@@ -475,7 +503,7 @@ const Member360LabWorkspace = () => {
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
                 }`}
               >
-                ⚠️ Diagnosed Conditions & HCC ({detail?.diagnoses?.length || 0})
+                ⚠️ Diagnosed Conditions & HCC ({(detail?.problems?.length ?? detail?.diagnoses?.length ?? 0)})
               </button>
               <button
                 type="button"
@@ -907,6 +935,52 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
 
   const handleFormSubmit = async () => {
     setDialogError(null);
+    if (dialog.key === 'add_note') {
+      if (!form.body || !form.body.trim()) {
+        setDialogError('Please enter note text before submitting.');
+        return;
+      }
+    }
+    if (dialog.key === 'send_message') {
+      if (!form.body || !form.body.trim()) {
+        setDialogError('Please enter a message before submitting.');
+        return;
+      }
+    }
+    if (dialog.key === 'recommend_care_option') {
+      if (!form.service_type || !form.service_type.trim()) {
+        setDialogError('Service type is required.');
+        return;
+      }
+      if (form.cost_estimate !== '' && form.cost_estimate != null) {
+        const c = Number(form.cost_estimate);
+        if (Number.isNaN(c) || c < 0) {
+          setDialogError('Cost must be a valid positive number.');
+          return;
+        }
+      }
+      if (form.quality_score !== '' && form.quality_score != null) {
+        const q = Number(form.quality_score);
+        if (Number.isNaN(q) || q < 0 || q > 5) {
+          setDialogError('Quality score must be a number between 0.0 and 5.0.');
+          return;
+        }
+      }
+      if (form.distance_miles !== '' && form.distance_miles != null) {
+        const d = Number(form.distance_miles);
+        if (Number.isNaN(d) || d < 0) {
+          setDialogError('Distance must be a valid positive number.');
+          return;
+        }
+      }
+      if (form.potential_savings !== '' && form.potential_savings != null) {
+        const s = Number(form.potential_savings);
+        if (Number.isNaN(s) || s < 0) {
+          setDialogError('Potential savings must be a valid positive number.');
+          return;
+        }
+      }
+    }
     setSubmitting(true);
     try {
       await onSubmit(form);
@@ -997,10 +1071,10 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
             <Select label="Network status" value={form.network_status} onChange={(v) => update('network_status', v)} options={['In Network', 'Out of Network', 'Tier 1', 'Tier 2']} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Cost ($)" value={form.cost_estimate} onChange={(v) => update('cost_estimate', v)} placeholder="640" />
-            <Input label="Quality" value={form.quality_score} onChange={(v) => update('quality_score', v)} placeholder="4.7" />
-            <Input label="Distance (mi)" value={form.distance_miles} onChange={(v) => update('distance_miles', v)} placeholder="5.2" />
-            <Input label="Savings ($)" value={form.potential_savings} onChange={(v) => update('potential_savings', v)} placeholder="620" />
+            <Input type="number" min="0" step="any" label="Cost ($)" value={form.cost_estimate} onChange={(v) => update('cost_estimate', v)} placeholder="640" />
+            <Input type="number" min="0" max="5" step="0.1" label="Quality (0.0 - 5.0)" value={form.quality_score} onChange={(v) => update('quality_score', v)} placeholder="4.7" />
+            <Input type="number" min="0" step="any" label="Distance (mi)" value={form.distance_miles} onChange={(v) => update('distance_miles', v)} placeholder="5.2" />
+            <Input type="number" min="0" step="any" label="Savings ($)" value={form.potential_savings} onChange={(v) => update('potential_savings', v)} placeholder="620" />
           </div>
           <Textarea label="Rationale (internal)" value={form.rationale} onChange={(v) => update('rationale', v)} rows={3} />
           <Textarea label="Member-facing explanation" value={form.member_facing_explanation} onChange={(v) => update('member_facing_explanation', v)} rows={3} />
@@ -1062,7 +1136,7 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
   );
 }
 
-function Input({ label, value, onChange, type = 'text', placeholder }) {
+function Input({ label, value, onChange, type = 'text', placeholder, ...rest }) {
   return (
     <label className="block">
       <span className="block text-[11px] font-semibold coding-text-muted uppercase tracking-wider mb-1">{label}</span>
@@ -1072,6 +1146,7 @@ function Input({ label, value, onChange, type = 'text', placeholder }) {
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className="coding-input w-full rounded-md px-2 py-1.5 text-sm"
+        {...rest}
       />
     </label>
   );

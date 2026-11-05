@@ -323,6 +323,8 @@ async def create_note(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
+    if not payload.body or not payload.body.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Note body cannot be empty")
     note = await member360_service.create_note(
         session,
         member_id=member_id,
@@ -378,6 +380,8 @@ async def create_care_option(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
+    if not payload.service_type or not payload.service_type.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Service type is required")
     result = await member360_service.create_care_option(session, payload.model_dump())
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
@@ -507,7 +511,7 @@ async def list_tasks(
     member_id: Optional[int] = Query(default=None),
     status_filter: Optional[str] = Query(default=None, alias="status"),
     priority: Optional[str] = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
@@ -539,7 +543,7 @@ async def list_messages(
     member_id: Optional[int] = Query(default=None),
     channel: Optional[str] = Query(default=None),
     direction: Optional[str] = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
@@ -570,7 +574,7 @@ async def list_messages(
 async def list_care_options(
     member_id: Optional[int] = Query(default=None),
     status_filter: Optional[str] = Query(default=None, alias="status"),
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
@@ -600,7 +604,7 @@ async def list_care_options(
 async def list_documents(
     member_id: Optional[int] = Query(default=None),
     document_type: Optional[str] = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
@@ -643,7 +647,7 @@ async def list_documents(
 async def list_care_journeys(
     member_id: Optional[int] = Query(default=None),
     status_filter: Optional[str] = Query(default=None, alias="status"),
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
@@ -673,7 +677,7 @@ async def list_care_journeys(
 async def list_risk_insights(
     member_id: Optional[int] = Query(default=None),
     domain: Optional[str] = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),
@@ -934,7 +938,7 @@ async def upload_document(
 async def list_member_audit(
     member_id: int,
     event_type_prefix: Optional[str] = Query(default="member360."),
-    limit: int = Query(default=50, ge=1, le=500),
+    limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     tenant: TenantContext = Depends(get_tenant_context),
     session: AsyncSession = Depends(get_tenant_session),

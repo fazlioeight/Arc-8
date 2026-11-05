@@ -58,6 +58,7 @@ if ($GitPush) {
       & $gitExe branch -f testing HEAD
       & $gitExe push dev-repo development:main development:development
       & $gitExe push origin development:development main:main testing:testing
+      try { & $gitExe push oeight development:development } catch { Write-Warning "oeight push skipped: $($_.Exception.Message)" }
       Write-Host "  -> GitHub remotes updated." -ForegroundColor Green
     } finally {
       Pop-Location

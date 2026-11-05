@@ -113,6 +113,28 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const { t: rawT } = useUserPreferences();
   const t = typeof rawT === 'function' ? rawT : (_key, fallback) => fallback ?? _key;
   const [showPersonaModal, setShowPersonaModal] = useState(false);
+  const [taskBadgeCount, setTaskBadgeCount] = useState('89');
+  const [journeyBadgeCount, setJourneyBadgeCount] = useState('19');
+
+  useEffect(() => {
+    if (!token) return;
+    const apiBase = resolveApiBase();
+    fetch(`${apiBase}/api/member360/dashboard`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'X-Tenant-Key': tenant || 'prominencehealth',
+      },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        const aj = d.metrics?.find((m) => m.key === 'active_journeys')?.value;
+        const ot = d.metrics?.find((m) => m.key === 'open_tasks')?.value;
+        if (aj !== undefined) setJourneyBadgeCount(String(Math.round(aj)));
+        if (ot !== undefined) setTaskBadgeCount(String(Math.round(ot)));
+      })
+      .catch(() => {});
+  }, [token, tenant]);
 
   const currentPath = location.pathname;
   const currentHash = location.hash;
@@ -198,8 +220,8 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
           badge: '50',
           permission: 'menu:patient_roster',
         },
-        { label: t('nav.clinical_tasks', 'Clinical Tasks'), href: ROUTES.MEMBER360_LAB.TASKS, icon: SvgTasks, badge: '36', badgeTone: 'critical', permission: 'menu:tasks' },
-        { label: t('nav.care_journeys', 'Care Journeys'), href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS, icon: SvgJourney, badge: '18', permission: 'menu:care_journeys' },
+        { label: t('nav.clinical_tasks', 'Clinical Tasks'), href: ROUTES.MEMBER360_LAB.TASKS, icon: SvgTasks, badge: taskBadgeCount, badgeTone: 'critical', permission: 'menu:tasks' },
+        { label: t('nav.care_journeys', 'Care Journeys'), href: ROUTES.MEMBER360_LAB.CARE_JOURNEYS, icon: SvgJourney, badge: journeyBadgeCount, permission: 'menu:care_journeys' },
         { label: t('nav.risk_intelligence', 'Risk Intelligence'), href: ROUTES.MEMBER360_LAB.RISK_INTELLIGENCE, icon: SvgRisk, permission: 'menu:risk_intelligence' },
         { label: t('nav.care_options', 'Care Options'), href: ROUTES.MEMBER360_LAB.CARE_OPTIONS, icon: SvgCareOptions, permission: 'menu:care_options' },
         { label: t('nav.messages', 'Messages'), href: ROUTES.MEMBER360_LAB.MESSAGES, icon: SvgMessages, permission: 'menu:messages' },

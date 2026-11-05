@@ -25,6 +25,10 @@ class MemberSummary(BaseModel):
     active_journey_count: int = 0
     next_best_action: Optional[str] = None
     last_interaction_at: Optional[datetime] = None
+    clinical_risk_score: Optional[float] = None
+    utilization_risk_score: Optional[float] = None
+    cost_risk_score: Optional[float] = None
+    engagement_risk_score: Optional[float] = None
 
 
 class MemberDetail(MemberSummary):
@@ -216,14 +220,14 @@ class Note(BaseModel):
     author_name: Optional[str] = None
     channel: str
     note_type: Optional[str] = None
-    body: str
+    body: str = Field(..., min_length=1)
     related_task_id: Optional[int] = None
     related_journey_id: Optional[int] = None
     created_at: datetime
 
 
 class NoteCreate(BaseModel):
-    body: str
+    body: str = Field(..., min_length=1)
     channel: str = "internal"
     note_type: Optional[str] = None
     related_task_id: Optional[int] = None
@@ -237,7 +241,7 @@ class Message(BaseModel):
     direction: str
     sender: Optional[str] = None
     recipient: Optional[str] = None
-    body: str
+    body: str = Field(..., min_length=1)
     status: str
     timestamp: datetime
 
@@ -245,7 +249,7 @@ class Message(BaseModel):
 class MessageCreate(BaseModel):
     channel: str = "chat"
     direction: str = "outbound"
-    body: str
+    body: str = Field(..., min_length=1)
     sender: Optional[str] = None
     recipient: Optional[str] = None
 
@@ -276,11 +280,11 @@ class CareOption(BaseModel):
     service_type: str
     recommended_provider: Optional[str] = None
     facility_name: Optional[str] = None
-    cost_estimate: Optional[float] = None
-    quality_score: Optional[float] = None
-    distance_miles: Optional[float] = None
+    cost_estimate: Optional[float] = Field(None, ge=0.0)
+    quality_score: Optional[float] = Field(None, ge=0.0, le=5.0)
+    distance_miles: Optional[float] = Field(None, ge=0.0)
     network_status: Optional[str] = None
-    potential_savings: Optional[float] = None
+    potential_savings: Optional[float] = Field(None, ge=0.0)
     rationale: Optional[str] = None
     member_facing_explanation: Optional[str] = None
     status: str
@@ -291,11 +295,11 @@ class CareOptionCreate(BaseModel):
     service_type: str
     recommended_provider: Optional[str] = None
     facility_name: Optional[str] = None
-    cost_estimate: Optional[float] = None
-    quality_score: Optional[float] = None
-    distance_miles: Optional[float] = None
+    cost_estimate: Optional[float] = Field(None, ge=0.0)
+    quality_score: Optional[float] = Field(None, ge=0.0, le=5.0)
+    distance_miles: Optional[float] = Field(None, ge=0.0)
     network_status: Optional[str] = None
-    potential_savings: Optional[float] = None
+    potential_savings: Optional[float] = Field(None, ge=0.0)
     rationale: Optional[str] = None
     member_facing_explanation: Optional[str] = None
     status: str = "recommended"

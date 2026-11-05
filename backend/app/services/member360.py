@@ -124,6 +124,10 @@ def _summarize_member(
         "active_journey_count": journey_counts.get(member.id, 0),
         "next_best_action": member.next_best_action,
         "last_interaction_at": _utc_dt(member.last_interaction_at),
+        "clinical_risk_score": float(member.clinical_risk_score) if member.clinical_risk_score is not None else None,
+        "utilization_risk_score": float(member.utilization_risk_score) if member.utilization_risk_score is not None else None,
+        "cost_risk_score": float(member.cost_risk_score) if member.cost_risk_score is not None else None,
+        "engagement_risk_score": float(member.engagement_risk_score) if member.engagement_risk_score is not None else None,
     }
 
 

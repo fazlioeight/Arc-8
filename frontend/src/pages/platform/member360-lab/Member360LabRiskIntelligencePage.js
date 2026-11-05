@@ -72,15 +72,19 @@ const Member360LabRiskIntelligencePage = () => {
 
   const domainAverages = useMemo(() => {
     return DOMAINS.map((d) => {
-      const scores = members.map((m) => Number(m[`${d.toLowerCase()}_risk_score`])).filter((v) => Number.isFinite(v));
+      const dKey = d.toLowerCase();
+      let scores = members.map((m) => Number(m[`${dKey}_risk_score`])).filter((v) => Number.isFinite(v) && v > 0);
+      if (scores.length === 0) {
+        scores = insights.filter((i) => (i.domain || '').toLowerCase() === dKey).map((i) => Number(i.score)).filter((v) => Number.isFinite(v) && v > 0);
+      }
       const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-      const high = members.filter((m) => Number(m[`${d.toLowerCase()}_risk_score`]) >= 7).length;
+      const high = scores.filter((v) => v >= 1.5 || v >= 7).length;
       return { domain: d, average: avg, high };
     });
   }, [members]);
 
   const driverRollup = useMemo(() => {
-    const filtered = !domain ? insights : insights.filter((i) => i.domain === domain);
+    const filtered = !domain ? insights : insights.filter((i) => (i.domain || '').toLowerCase() === domain.toLowerCase());
     const map = new Map();
     filtered.forEach((i) => {
       const key = `${i.domain}|${i.driver}`;

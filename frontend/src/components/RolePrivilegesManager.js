@@ -837,8 +837,7 @@ const RolePrivilegesManager = () => {
                             {/* Module Header Bar */}
                             <div className="flex items-center justify-between p-3.5">
                               <div
-                                className="flex-1 cursor-pointer pr-3"
-                                onClick={() => toggleModuleWithSubs(mod)}
+                                className="flex-1 pr-3"
                               >
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-sm font-bold text-slate-900 dark:text-white">
@@ -924,9 +923,8 @@ const RolePrivilegesManager = () => {
                                     return (
                                       <div
                                         key={sub.key}
-                                        onClick={() => togglePermission(sub.key)}
                                         className={[
-                                          "flex items-start justify-between p-2.5 rounded-lg border cursor-pointer transition",
+                                          "flex items-start justify-between p-2.5 rounded-lg border transition",
                                           isSubGranted
                                         ? "border-sky-500/40 bg-white dark:bg-slate-900/80 shadow-xs"
                                         : "border-slate-200 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/20 opacity-70 hover:opacity-100",
@@ -950,9 +948,16 @@ const RolePrivilegesManager = () => {
                                     </div>
 
                                     <div className="pt-0.5 shrink-0">
-                                      <span
+                                      <button
+                                        type="button"
+                                        aria-label={`Toggle privilege ${sub.label}`}
+                                        disabled={!isModuleGranted}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          togglePermission(sub.key);
+                                        }}
                                         className={[
-                                          "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out",
+                                          "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed",
                                           isSubGranted ? "bg-sky-500" : "bg-slate-300 dark:bg-slate-700",
                                         ].join(" ")}
                                       >
@@ -962,7 +967,7 @@ const RolePrivilegesManager = () => {
                                             isSubGranted ? "translate-x-3" : "translate-x-0",
                                           ].join(" ")}
                                         />
-                                      </span>
+                                      </button>
                                     </div>
                                   </div>
                                 );
