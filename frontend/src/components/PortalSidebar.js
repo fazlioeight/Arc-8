@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
@@ -108,7 +108,7 @@ const SvgSettings = () => (
 export default function PortalSidebar({ collapsed = false, onToggle }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, role, tenant, tenantInfo, logout, login } = useContext(AuthContext) || {};
+  const { user, role, tenant, tenantInfo, logout, login, token } = useContext(AuthContext) || {};
   const { currentRole, activeRoleConfig, can } = usePermissions();
   const { t: rawT } = useUserPreferences();
   const t = typeof rawT === 'function' ? rawT : (_key, fallback) => fallback ?? _key;
