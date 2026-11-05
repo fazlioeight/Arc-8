@@ -280,11 +280,11 @@ class CareOption(BaseModel):
     service_type: str
     recommended_provider: Optional[str] = None
     facility_name: Optional[str] = None
-    cost_estimate: Optional[float] = Field(None, ge=0.0)
-    quality_score: Optional[float] = Field(None, ge=0.0, le=5.0)
-    distance_miles: Optional[float] = Field(None, ge=0.0)
+    cost_estimate: Optional[float] = None
+    quality_score: Optional[float] = None
+    distance_miles: Optional[float] = None
     network_status: Optional[str] = None
-    potential_savings: Optional[float] = Field(None, ge=0.0)
+    potential_savings: Optional[float] = None
     rationale: Optional[str] = None
     member_facing_explanation: Optional[str] = None
     status: str
