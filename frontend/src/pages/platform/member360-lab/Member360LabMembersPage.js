@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
 import { AuthContext } from '../../../context/AuthContext';
 import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
@@ -30,7 +30,8 @@ const SAVED_VIEWS = [
 const Member360LabMembersPage = () => {
   const navigate = useNavigate();
   const { token, tenant } = useContext(AuthContext) || {};
-  const [search, setSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get('search') || searchParams.get('q') || '');
   const [selectedTiers, setSelectedTiers] = useState([]);
   const [journeyFilter, setJourneyFilter] = useState('any');
   const [taskFilter, setTaskFilter] = useState('any');
@@ -55,6 +56,18 @@ const Member360LabMembersPage = () => {
     (selectedTiers.length > 0 ? 1 : 0) +
     (journeyFilter !== 'any' ? 1 : 0) +
     (taskFilter !== 'any' ? 1 : 0);
+
+  useEffect(() => {
+    const memberIdParam = searchParams.get('memberId') || searchParams.get('member_id');
+    if (memberIdParam) {
+      navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${memberIdParam}`, { replace: true });
+      return;
+    }
+    const q = searchParams.get('search') || searchParams.get('q');
+    if (q !== null && q !== undefined && q !== search) {
+      setSearch(q);
+    }
+  }, [searchParams, navigate]);
 
   // Reset to page 1 whenever the server-side filters change so the user always
   // lands on the first page of the new result set instead of, say, page 7 of
@@ -116,7 +129,7 @@ const Member360LabMembersPage = () => {
       <section className="coding-surface rounded-2xl shadow-sm">
         <div className="p-3 flex flex-col lg:flex-row gap-2 lg:items-center">
           <SearchInput
-            placeholder="Search name, member ID, PCP, or plan"
+            placeholder="Search name, member ID, phone, PCP, or plan"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

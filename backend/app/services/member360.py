@@ -173,23 +173,41 @@ async def list_members(
 ) -> tuple[list[dict], int]:
     stmt = select(Member360Member)
     if search:
-        like = f"%{search.strip().lower()}%"
+        search_clean = search.strip()
+        like = f"%{search_clean.lower()}%"
         full_name = (
             func.coalesce(func.lower(Member360Member.first_name), "")
             + " "
             + func.coalesce(func.lower(Member360Member.last_name), "")
         )
-        stmt = stmt.where(
-            or_(
-                func.lower(Member360Member.first_name).like(like),
-                func.lower(Member360Member.last_name).like(like),
-                full_name.like(like),
-                func.lower(Member360Member.member_key).like(like),
-                func.lower(Member360Member.primary_care_provider).like(like),
-                func.lower(Member360Member.plan_name).like(like),
-                func.lower(Member360Member.line_of_business).like(like),
+        conditions = [
+            func.lower(Member360Member.first_name).like(like),
+            func.lower(Member360Member.last_name).like(like),
+            full_name.like(like),
+            func.lower(Member360Member.member_key).like(like),
+            func.lower(Member360Member.primary_care_provider).like(like),
+            func.lower(Member360Member.plan_name).like(like),
+            func.lower(Member360Member.line_of_business).like(like),
+            func.lower(Member360Member.phone).like(like),
+        ]
+        digits = "".join(ch for ch in search_clean if ch.isdigit())
+        if len(digits) >= 3:
+            phone_stripped = func.replace(
+                func.replace(
+                    func.replace(
+                        func.replace(func.coalesce(Member360Member.phone, ""), "(", ""),
+                        ")",
+                        "",
+                    ),
+                    "-",
+                    "",
+                ),
+                " ",
+                "",
             )
-        )
+            conditions.append(phone_stripped.like(f"%{digits}%"))
+
+        stmt = stmt.where(or_(*conditions))
     if risk_tier:
         expanded_tiers = _expand_risk_tiers(risk_tier)
         if expanded_tiers:
