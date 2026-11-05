@@ -220,7 +220,7 @@ class Note(BaseModel):
     author_name: Optional[str] = None
     channel: str
     note_type: Optional[str] = None
-    body: str = Field(..., min_length=1)
+    body: str
     related_task_id: Optional[int] = None
     related_journey_id: Optional[int] = None
     created_at: datetime
@@ -241,7 +241,7 @@ class Message(BaseModel):
     direction: str
     sender: Optional[str] = None
     recipient: Optional[str] = None
-    body: str = Field(..., min_length=1)
+    body: str
     status: str
     timestamp: datetime
 
