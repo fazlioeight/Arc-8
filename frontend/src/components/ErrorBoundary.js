@@ -10,7 +10,7 @@ const isChunkLoadError = (error) => {
     name === 'ChunkLoadError' ||
     /Loading chunk \d+ failed/i.test(message) ||
     /Loading CSS chunk \d+ failed/i.test(message) ||
-    /Failed to fetch dynamically imported module/i.test(message)
+    /Failed to fetch dynamically imported module/i.test(message) || /Unexpected token '<'/i.test(message)
   );
 };
 

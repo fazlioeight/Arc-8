@@ -78,15 +78,19 @@ if (-not $SkipBuild) {
   Write-Host "`n[2/5] Building production frontend bundle..." -ForegroundColor Yellow
   if (Get-Command npm -ErrorAction SilentlyContinue) {
     Push-Location $FrontendDir
+    $prevApiBase = $env:REACT_APP_API_BASE
     try {
+      $env:REACT_APP_API_BASE = ""
+      $env:REACT_APP_DEFAULT_TENANT = "prominencehealth"
       npm run build
     } finally {
+      $env:REACT_APP_API_BASE = $prevApiBase
       Pop-Location
     }
   } else {
     Write-Host "  -> Local npm not found in PATH; building via Docker (node:20-alpine)..." -ForegroundColor DarkCyan
     $dockerPath = $FrontendDir.Replace('\', '/')
-    docker run --rm -v "${dockerPath}:/app" -w /app -e CI=false node:20-alpine npm run build
+    docker run --rm -v "${dockerPath}:/app" -w /app -e CI=false -e REACT_APP_API_BASE="" -e REACT_APP_DEFAULT_TENANT="prominencehealth" node:20-alpine npm run build
   }
   if ($LASTEXITCODE -ne 0) {
     throw "Frontend build failed with exit code $LASTEXITCODE"

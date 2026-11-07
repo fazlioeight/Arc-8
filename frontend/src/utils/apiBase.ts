@@ -29,6 +29,12 @@ export function resolveApiBase(): string {
     const isDirectContainerPort = DIRECT_CONTAINER_PORTS.has(port);
 
     if (isLocalHost) {
+      if (
+        (port === '7777' || port === '7778' || port === '7779') &&
+        (configured.endsWith(':8000') || !configured)
+      ) {
+        return `${protocol}//${hostname}:8989`;
+      }
       return configured || `${protocol}//${hostname}:8989`;
     }
 
