@@ -18,6 +18,7 @@ export const ROUTES = {
     CARE_OPTIONS: "/member360/care-options",
     MESSAGES: "/member360/messages",
     DOCUMENTS: "/member360/documents",
+    PLAN_PERFORMANCE: "/member360/plan-performance",
     ADMIN: "/member360/admin",
   },
   PROVIDERS: {

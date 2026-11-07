@@ -271,6 +271,16 @@ async def create_task(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
+    if not payload.title or not payload.title.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Task title is required.")
+    if payload.status == "escalated":
+        reason = ""
+        if payload.sbar and payload.sbar.situation:
+            reason = payload.sbar.situation.strip()
+        if not reason and payload.recommended_next_action:
+            reason = payload.recommended_next_action.strip()
+        if not reason:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reason for escalation is required.")
     try:
         task = await member360_service.create_task(session, payload.model_dump())
     except ValueError as exc:
@@ -405,6 +415,8 @@ async def create_care_journey(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
+    if not payload.template_id and (not payload.name or not payload.name.strip()):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Care journey name is required when no template is selected.")
     try:
         journey = await member360_service.create_care_journey(
             session,

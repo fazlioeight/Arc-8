@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
 import { AuthContext } from '../../../context/AuthContext';
@@ -8,14 +8,15 @@ import { ROUTES } from '../../../constants/routes';
 import {
   fetchMember360CareJourneys,
   fetchMember360JourneyTemplates,
+  updateMember360CareJourney,
+  updateMember360CareJourneyStage,
 } from '../../../services/member360LabService';
 import { CareJourneyCard, LabSubNav, Pagination, RiskBadge } from './components';
-
-const PAGE_SIZE = 100;
 import FilterDropdown from '../../../components/ui/FilterDropdown';
 import KpiTile from '../../../components/ui/KpiTile';
 import SearchInput from '../../../components/ui/SearchInput';
 
+const PAGE_SIZE = 100;
 const JOURNEY_STATUSES = [
   { key: 'active', label: 'Active' },
   { key: 'paused', label: 'Paused' },
@@ -33,6 +34,41 @@ const Member360LabCareJourneysPage = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState(null);
   const [statuses, setStatuses] = useState(['active']);
   const [search, setSearch] = useState('');
+  const [actionMessage, setActionMessage] = useState(null);
+
+  const handleJourneyTransition = useCallback(async (journey, nextStatus) => {
+    try {
+      await updateMember360CareJourney(token, tenant, journey.id, { status: nextStatus });
+      setJourneys((prev) =>
+        prev.map((item) => (item.id === journey.id ? { ...item, status: nextStatus } : item))
+      );
+      setActionMessage(`Journey "${journey.name}" marked as ${nextStatus}.`);
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err) {
+      console.error('Failed to update journey status:', err);
+      setActionMessage(`Could not update journey: ${err.message || err}`);
+    }
+  }, [token, tenant]);
+
+  const handleStageTransition = useCallback(async (journey, stage, nextStatus) => {
+    try {
+      await updateMember360CareJourneyStage(token, tenant, journey.id, stage.id, { status: nextStatus });
+      setJourneys((prev) =>
+        prev.map((item) => {
+          if (item.id !== journey.id) return item;
+          const updatedStages = (item.stages || []).map((s) =>
+            s.id === stage.id ? { ...s, status: nextStatus } : s
+          );
+          return { ...item, stages: updatedStages };
+        })
+      );
+      setActionMessage(`Stage "${stage.name}" updated to ${nextStatus.replace('_', ' ')}.`);
+      setTimeout(() => setActionMessage(null), 4000);
+    } catch (err) {
+      console.error('Failed to update stage status:', err);
+      setActionMessage(`Could not update stage: ${err.message || err}`);
+    }
+  }, [token, tenant]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -98,6 +134,13 @@ const Member360LabCareJourneysPage = () => {
     >
       <LabSubNav />
 
+      {actionMessage && (
+        <div role="status" className="rounded-lg bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 px-4 py-2.5 text-xs font-medium flex items-center justify-between">
+          <span>{actionMessage}</span>
+          <button type="button" onClick={() => setActionMessage(null)} className="text-emerald-600 dark:text-emerald-400 hover:opacity-75 font-bold ml-2">âœ•</button>
+        </div>
+      )}
+
       {loading && <LoadingState title="Loading journeys" />}
       {error && <ErrorState title="Care journeys unavailable" description={error} />}
 
@@ -157,7 +200,7 @@ const Member360LabCareJourneysPage = () => {
                 <section className="coding-surface rounded-2xl shadow-sm p-5">
                   <header className="mb-3">
                     <h3 className="text-base font-semibold coding-text-strong">{selectedTemplate.name}</h3>
-                    <p className="text-xs coding-text-soft">{selectedTemplate.category || 'General'} · Recommended for {selectedTemplate.recommended_for_risk_tier || 'all risk tiers'}</p>
+                    <p className="text-xs coding-text-soft">{selectedTemplate.category || 'General'} Â· Recommended for {selectedTemplate.recommended_for_risk_tier || 'all risk tiers'}</p>
                   </header>
                   <p className="text-sm coding-text-strong">{selectedTemplate.description}</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
@@ -193,7 +236,7 @@ const Member360LabCareJourneysPage = () => {
                     </div>
                   </div>
                   <p className="text-[11px] coding-text-muted mt-3">
-                    Editing templates from this surface is part of the Admin phase — for now this view documents the structure rendered into each member workspace.
+                    Editing templates from this surface is part of the Admin phase â€” for now this view documents the structure rendered into each member workspace.
                   </p>
                 </section>
               ) : (
@@ -244,7 +287,11 @@ const Member360LabCareJourneysPage = () => {
                         </button>
                         <RiskBadge tier={j.risk_tier} />
                       </div>
-                      <CareJourneyCard journey={j} />
+                      <CareJourneyCard
+                        journey={j}
+                        onStageTransition={handleStageTransition}
+                        onJourneyTransition={handleJourneyTransition}
+                      />
                     </div>
                   ))}
                   {filteredJourneys.length === 0 && (

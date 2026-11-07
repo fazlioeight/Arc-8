@@ -37,6 +37,7 @@ const Member360LabRiskIntelligencePage = lazy(() => import('./pages/platform/mem
 const Member360LabCareOptionsPage = lazy(() => import('./pages/platform/member360-lab/Member360LabCareOptionsPage'));
 const Member360LabMessagesPage = lazy(() => import('./pages/platform/member360-lab/Member360LabMessagesPage'));
 const Member360LabDocumentsPage = lazy(() => import('./pages/platform/member360-lab/Member360LabDocumentsPage'));
+const Member360LabPlanPerformancePage = lazy(() => import('./pages/platform/member360-lab/Member360LabPlanPerformancePage'));
 const Member360LabAdminPage = lazy(() => import('./pages/platform/member360-lab/Member360LabAdminPage'));
 const Settings = lazy(() => import('./pages/platform/settings/Settings'));
 const ChatPage = lazy(() => import('./pages/platform/chat/ChatPage'));
@@ -198,6 +199,11 @@ const Shell = ({ themePreference, setThemePreference }) => {
           <Route path={ROUTES.MEMBER360_LAB.DOCUMENTS} element={(
             <ErrorBoundary title="Documents failed to load">
               <Member360LabDocumentsPage />
+            </ErrorBoundary>
+          )} />
+          <Route path={ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE} element={(
+            <ErrorBoundary title="Plan Performance failed to load">
+              <Member360LabPlanPerformancePage />
             </ErrorBoundary>
           )} />
           <Route path={ROUTES.MEMBER360_LAB.ADMIN} element={(

@@ -253,11 +253,15 @@ const Member360LabWorkspace = () => {
     if (!actionDialog || !member) return;
     try {
       if (actionDialog.key === 'create_task') {
+        const taskTitle = (data.title || '').trim();
+        if (!taskTitle) {
+          throw new Error('Task title is required.');
+        }
         const recommendation = actionDialog.payload?.recommendation;
         const sbar = data.sbar || {};
         const newTask = await createMember360Task(token, tenant, {
           member_id: member.id,
-          title: data.title || 'New task',
+          title: taskTitle,
           priority: data.priority || 'medium',
           status: 'open',
           due_date: data.due_date || undefined,
@@ -335,40 +339,60 @@ const Member360LabWorkspace = () => {
         });
         setActionMessage(`Care option created: ${opt.service_type}.`);
       } else if (actionDialog.key === 'start_journey') {
+        const journeyName = (data.name || '').trim();
+        if (!journeyName) {
+          throw new Error('Journey name is required.');
+        }
+        if (!data.start_date) {
+          throw new Error('Please select a valid start date.');
+        }
+        const assignedTo = (data.assigned_to || '').trim();
+        if (!assignedTo) {
+          throw new Error('Assigned to (email) is required.');
+        }
+        if (data.target_completion_date && data.start_date && data.target_completion_date < data.start_date) {
+          throw new Error('Target completion date cannot be earlier than start date.');
+        }
         const recommendation = actionDialog.payload?.recommendation;
         const templateId = data.template_id ? Number(data.template_id) : null;
-        const template = templateId ? journeyTemplates.find((t) => t.id === templateId) : null;
         const journey = await createMember360CareJourney(token, tenant, {
           member_id: member.id,
           template_id: templateId || undefined,
-          name: data.name || template?.name || (recommendation?.summary?.slice(0, 80)) || 'Care journey',
-          description: data.description || recommendation?.summary || null,
-          assigned_to: data.assigned_to || null,
-          start_date: data.start_date || undefined,
+          name: journeyName,
+          description: (data.description || '').trim() || recommendation?.summary || null,
+          assigned_to: assignedTo,
+          start_date: data.start_date,
           target_completion_date: data.target_completion_date || undefined,
           source: recommendation ? 'guided_triage' : 'manual',
         });
         setActionMessage(`Care journey started: ${journey.name}.`);
       } else if (actionDialog.key === 'escalate') {
-        // Escalation is modeled as an urgent task with status='escalated'. The
-        // existing /tasks route already enforces member existence + SBAR.
-        const recommendation = actionDialog.payload?.recommendation;
-        const reason = data.reason || recommendation?.summary || 'Escalated by case manager';
+        const reason = (data.reason || '').trim();
+        if (!reason) {
+          throw new Error('Reason for escalation is required.');
+        }
+        if (!data.due_date) {
+          throw new Error('Please select a due date.');
+        }
+        const recommendation = (data.recommendation || '').trim();
+        if (!recommendation) {
+          throw new Error('Recommended next action is required.');
+        }
         const task = await createMember360Task(token, tenant, {
           member_id: member.id,
-          title: data.title || `Escalation: ${reason.slice(0, 60)}`,
+          title: (data.title || '').trim() || `Escalation: ${reason.slice(0, 60)}`,
           priority: data.priority || 'urgent',
           status: 'escalated',
           assigned_queue: data.assigned_queue || 'RN',
-          due_date: data.due_date || undefined,
+          due_date: data.due_date,
           sbar: {
             situation: reason,
             background: null,
             assessment: null,
-            recommendation: data.recommendation || reason,
+            recommendation: recommendation,
           },
-          recommended_next_action: data.recommendation || reason,
-          auto_generated_reason: recommendation ? 'Escalated from guided triage' : 'Manual escalation',
+          recommended_next_action: recommendation,
+          auto_generated_reason: actionDialog.payload?.recommendation ? 'Escalated from guided triage' : 'Manual escalation',
         });
         setActionMessage(`Escalation routed to ${task.assigned_queue || 'RN'} queue.`);
       }
@@ -947,6 +971,44 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
         return;
       }
     }
+    if (dialog.key === 'create_task') {
+      if (!form.title || !form.title.trim()) {
+        setDialogError('Task title is required.');
+        return;
+      }
+    }
+    if (dialog.key === 'start_journey') {
+      if (!form.name || !form.name.trim()) {
+        setDialogError('Journey name is required.');
+        return;
+      }
+      if (!form.start_date) {
+        setDialogError('Please select a valid start date.');
+        return;
+      }
+      if (!form.assigned_to || !form.assigned_to.trim()) {
+        setDialogError('Assigned to (email) is required.');
+        return;
+      }
+      if (form.target_completion_date && form.start_date && form.target_completion_date < form.start_date) {
+        setDialogError('Target completion date cannot be earlier than start date.');
+        return;
+      }
+    }
+    if (dialog.key === 'escalate') {
+      if (!form.reason || !form.reason.trim()) {
+        setDialogError('Reason for escalation is required.');
+        return;
+      }
+      if (!form.due_date) {
+        setDialogError('Please select a due date.');
+        return;
+      }
+      if (!form.recommendation || !form.recommendation.trim()) {
+        setDialogError('Recommended next action is required.');
+        return;
+      }
+    }
     if (dialog.key === 'recommend_care_option') {
       if (!form.service_type || !form.service_type.trim()) {
         setDialogError('Service type is required.');
@@ -1032,7 +1094,7 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
 
       {dialog.key === 'create_task' && (
         <div className="space-y-3">
-          <Input label="Title" value={form.title} onChange={(v) => update('title', v)} />
+          <Input label="Title *" value={form.title} onChange={(v) => update('title', v)} placeholder="e.g. Outreach call for post-discharge review" required />
           <div className="grid grid-cols-2 gap-3">
             <Select label="Priority" value={form.priority} onChange={(v) => update('priority', v)} options={['low', 'medium', 'high', 'urgent']} />
             <Input type="date" label="Due date" value={form.due_date} onChange={(v) => update('due_date', v)} />
@@ -1111,25 +1173,25 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
           ) : (
             <p className="text-[11px] coding-text-muted">No templates configured. Creating a freeform journey.</p>
           )}
-          <Input label="Name" value={form.name} onChange={(v) => update('name', v)} placeholder="Heart failure stabilization" />
+          <Input label="Name *" value={form.name} onChange={(v) => update('name', v)} placeholder="Heart failure stabilization" required />
           <Textarea label="Description" value={form.description} onChange={(v) => update('description', v)} rows={3} />
           <div className="grid grid-cols-2 gap-3">
-            <Input type="date" label="Start date" value={form.start_date} onChange={(v) => update('start_date', v)} />
+            <Input type="date" label="Start date *" value={form.start_date} onChange={(v) => update('start_date', v)} required />
             <Input type="date" label="Target completion" value={form.target_completion_date} onChange={(v) => update('target_completion_date', v)} />
           </div>
-          <Input label="Assigned to (email)" value={form.assigned_to} onChange={(v) => update('assigned_to', v)} placeholder="rn@plan.com" />
+          <Input label="Assigned to (email) *" value={form.assigned_to} onChange={(v) => update('assigned_to', v)} placeholder="rn@plan.com" required />
         </div>
       )}
 
       {dialog.key === 'escalate' && (
         <div className="space-y-3">
-          <Textarea label="Reason for escalation" value={form.reason} onChange={(v) => update('reason', v)} rows={3} />
+          <Textarea label="Reason for escalation *" value={form.reason} onChange={(v) => update('reason', v)} rows={3} placeholder="Describe clinical deterioration, urgent triage rationale, or escalation trigger..." required />
           <div className="grid grid-cols-2 gap-3">
             <Select label="Priority" value={form.priority} onChange={(v) => update('priority', v)} options={['urgent', 'high', 'medium']} />
             <Select label="Queue" value={form.assigned_queue} onChange={(v) => update('assigned_queue', v)} options={['RN', 'MD', 'Pharmacy', 'Behavioral Health', 'Care Management']} />
           </div>
-          <Input type="date" label="Due date" value={form.due_date} onChange={(v) => update('due_date', v)} />
-          <Textarea label="Recommended next action" value={form.recommendation} onChange={(v) => update('recommendation', v)} rows={2} />
+          <Input type="date" label="Due date *" value={form.due_date} onChange={(v) => update('due_date', v)} required />
+          <Textarea label="Recommended next action *" value={form.recommendation} onChange={(v) => update('recommendation', v)} rows={2} placeholder="e.g. Schedule emergency clinical review within 24 hours" required />
         </div>
       )}
     </WorkspaceDrawer>

@@ -23,6 +23,7 @@ export const LAB_SUB_NAV = [
   { key: 'care_options', label: 'Care Options', href: ROUTES.MEMBER360_LAB.CARE_OPTIONS, permission: 'menu:care_options' },
   { key: 'messages', label: 'Messages', href: ROUTES.MEMBER360_LAB.MESSAGES, permission: 'menu:messages' },
   { key: 'documents', label: 'Documents', href: ROUTES.MEMBER360_LAB.DOCUMENTS, permission: 'menu:documents' },
+  { key: 'plan_performance', label: 'Plan Performance', href: ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE, permission: 'sub:exec_financial' },
   { key: 'admin', label: 'Admin', href: ROUTES.MEMBER360_LAB.ADMIN, permission: 'menu:master_admin', adminOnly: true },
 ];
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class MemberSummary(BaseModel):
@@ -126,6 +126,21 @@ class CareJourneyCreate(BaseModel):
     start_date: Optional[date] = None
     target_completion_date: Optional[date] = None
 
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            s = v.strip()
+            return s if s else None
+        return None
+
+    @model_validator(mode="after")
+    def validate_journey(self) -> "CareJourneyCreate":
+        if self.start_date and self.target_completion_date:
+            if self.target_completion_date < self.start_date:
+                raise ValueError("Target completion date cannot be earlier than start date.")
+        return self
+
 
 class CareJourneyUpdate(BaseModel):
     """Partial update for a care journey. All fields optional."""
@@ -185,7 +200,7 @@ class Task(BaseModel):
 class TaskCreate(BaseModel):
     member_id: int
     journey_id: Optional[int] = None
-    title: str
+    title: str = Field(..., min_length=1)
     description: Optional[str] = None
     priority: str = "medium"
     status: str = "open"
@@ -196,6 +211,14 @@ class TaskCreate(BaseModel):
     recommended_next_action: Optional[str] = None
     auto_generated_reason: Optional[str] = None
     notes: Optional[str] = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, v: str) -> str:
+        s = (v or "").strip()
+        if not s:
+            raise ValueError("Task title is required.")
+        return s
 
 
 class TaskUpdate(BaseModel):

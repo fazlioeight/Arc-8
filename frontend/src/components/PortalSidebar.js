@@ -248,6 +248,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
           icon: SvgDashboard,
           permission: 'menu:executive_dashboards',
           subItems: [
+            { label: t('nav.sub.plan_performance', 'Plan Performance (Payer View)'), href: ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE, permission: 'sub:exec_financial' },
             { label: t('nav.sub.pmpm_financials', 'PMPM Financials'), href: `${ROUTES.DASHBOARD}#pmpm`, permission: 'sub:exec_financial' },
             { label: t('nav.sub.quality_star', 'Quality & Star Ratings'), href: `${ROUTES.DASHBOARD}#hedis`, permission: 'sub:exec_hedis' },
           ],
