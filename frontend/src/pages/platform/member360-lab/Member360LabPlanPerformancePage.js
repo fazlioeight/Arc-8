@@ -151,6 +151,63 @@ export default function Member360LabPlanPerformancePage() {
     });
   }, [consoleModel, activeTab, selectedMarket, selectedGroup, comparisonMode, cs, spec]);
 
+  // Compute dynamic brand header metadata reactive to filters, dataset scenarios, and baselines
+  const dynamicHeaderSubtitle = useMemo(() => {
+    // 1. Focus / Scope text
+    let scopeText = 'Provider Performance';
+    if (selectedGroup !== 'all') {
+      const grp = consoleModel?.E?.[selectedGroup];
+      scopeText = grp?.name || renderedConsole?.scopeName || 'Provider Group';
+    } else if (selectedMarket !== 'all') {
+      const mkt = MARKETS.find((m) => m.id === selectedMarket);
+      scopeText = mkt ? `${mkt.name} Performance` : 'Provider Performance';
+    }
+
+    // 2. Date range text
+    const months = consoleModel?.months || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'];
+    const startMonth = months[0] || 'Jan';
+    const endMonth = months[months.length - 1] || 'Aug';
+    const dateText = `Calendar 2026 year to date · ${startMonth}–${endMonth}`;
+
+    // 3. Markets text
+    let marketText = 'Northern Nevada · Florida · North TX · South TX';
+    if (selectedMarket !== 'all') {
+      const mkt = MARKETS.find((m) => m.id === selectedMarket);
+      marketText = mkt?.name?.replace('Texas', 'TX') || 'Selected Market';
+    } else if (selectedGroup !== 'all' && consoleModel?.E?.[selectedGroup]?.market) {
+      const mktId = consoleModel.E[selectedGroup].market;
+      const mkt = MARKETS.find((m) => m.id === mktId);
+      if (mkt) {
+        marketText = mkt.name.replace('Texas', 'TX');
+      }
+    }
+
+    // 4. Baseline & Scenario Dataset text
+    const activeDataset = datasetCatalog.find((d) => d.id === activeDatasetId);
+    let scenarioText = 'Sample data';
+    if (activeDataset && activeDataset.id !== 'baseline') {
+      scenarioText = activeDataset.name;
+    }
+    const baselineText = comparisonMode === 'budget' ? 'Budget (83% Goal)' : 'Prior Year (2025)';
+    const datasetBaselineText = `${scenarioText} · ${baselineText}`;
+
+    return {
+      scopeText,
+      dateText,
+      marketText,
+      datasetBaselineText,
+      scenarioText,
+    };
+  }, [
+    selectedGroup,
+    selectedMarket,
+    consoleModel,
+    renderedConsole,
+    activeDatasetId,
+    datasetCatalog,
+    comparisonMode,
+  ]);
+
   const handleMarketChange = (e) => {
     setSelectedMarket(e.target.value);
     setSelectedGroup('all');
@@ -340,20 +397,20 @@ export default function Member360LabPlanPerformancePage() {
               PROMINENCE <span className="text-[#00b5b0]">HEALTH</span>
             </span>
             <span className="text-slate-400">
-              Plan Performance Console · sample data
+              Plan Performance Console · {dynamicHeaderSubtitle.scenarioText.toLowerCase()}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-2.5 mb-1.5">
             Plan Performance Console
           </h1>
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#00b5b0]">
-            <span>Provider Performance</span>
+            <span>{dynamicHeaderSubtitle.scopeText}</span>
             <span className="opacity-40 text-slate-400">|</span>
-            <span>Calendar 2026 year to date · Jan–Aug</span>
+            <span>{dynamicHeaderSubtitle.dateText}</span>
             <span className="opacity-40 text-slate-400">|</span>
-            <span>Northern Nevada · Florida · North TX · South TX</span>
+            <span>{dynamicHeaderSubtitle.marketText}</span>
             <span className="opacity-40 text-slate-400">|</span>
-            <span>Sample data</span>
+            <span>{dynamicHeaderSubtitle.datasetBaselineText}</span>
           </div>
         </div>
 
