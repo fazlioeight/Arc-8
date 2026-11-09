@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
-import { LabSubNav } from './components';
 import { usePermissions } from '../../../hooks/usePermissions';
 import './planPerformanceConsole.css';
 import {
@@ -331,11 +330,9 @@ export default function Member360LabPlanPerformancePage() {
       activeNavId="member360"
       activeSubNavId="member360-plan-performance"
       navItems={PORTAL_NAV_ITEMS}
+      hideHeader
     >
       <div className="space-y-4 pb-12">
-        {/* Lab Sub Navigation */}
-        <LabSubNav currentPath={ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE} />
-
         {/* Global Toast Banner */}
         {toastMessage && (
           <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between shadow-sm animate-fade-in">

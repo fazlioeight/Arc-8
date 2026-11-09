@@ -37,6 +37,10 @@ export function LabSubNav() {
     return true;
   });
 
+  if (visibleItems.length <= 1) {
+    return null;
+  }
+
   return (
     <nav className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-white border border-slate-200 dark:bg-slate-900/80 dark:border-slate-800/80 shadow-sm mb-4">
       {visibleItems.map((item) => {
