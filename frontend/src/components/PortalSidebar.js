@@ -375,18 +375,18 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   return (
     <aside
       className={[
-        'flex flex-col h-full bg-white text-slate-800 border-r border-slate-200 dark:bg-[#0a0f1d] dark:text-slate-200 dark:border-slate-800/80 select-none z-30 transition-all duration-300',
+        'flex flex-col h-full bg-[#dde4ee] text-slate-800 border-r border-slate-300 shadow-[2px_0_10px_rgba(15,23,42,0.06)] dark:bg-[#0a0f1d] dark:text-slate-200 dark:border-slate-800/80 dark:shadow-none select-none z-30 transition-all duration-300',
         collapsed ? 'w-20' : 'w-64',
       ].join(' ')}
     >
       {/* ── Brand Header ────────────────────────────────────────── */}
       {collapsed ? (
-        <div className="flex items-center justify-center h-16 border-b border-slate-200 dark:border-slate-800/70">
+        <div className="flex items-center justify-center h-16 bg-[#d3dce9]/80 border-b border-slate-300 dark:bg-transparent dark:border-slate-800/70">
           <button
             type="button"
             onClick={onToggle}
             title={t('sidebar.expand_menu', 'Arc-8 OS — Click to expand')}
-            className="group flex items-center justify-center p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 transition focus:outline-none"
+            className="group flex items-center justify-center p-2 rounded-xl hover:bg-white/70 dark:hover:bg-slate-800/60 transition focus:outline-none"
           >
             <img
               src="/images/arc8-logo.png"
@@ -396,7 +396,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
           </button>
         </div>
       ) : (
-        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-200 dark:border-slate-800/70">
+        <div className="flex items-center justify-between h-16 px-4 bg-[#d3dce9]/80 border-b border-slate-300 dark:bg-transparent dark:border-slate-800/70">
           <Link to={ROUTES.MEMBER360_LAB.DASHBOARD} className="group flex items-center gap-3 overflow-hidden">
             <img
               src="/images/arc8-logo.png"
@@ -413,9 +413,9 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                   <span className="mx-0.5 font-bold text-sky-600 dark:text-sky-400">-</span>
                   <span className="bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-600 dark:from-sky-400 dark:via-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">8</span>
                 </span>
-                <span className="text-[10px] font-semibold text-sky-700 bg-sky-50 border-sky-200 dark:text-sky-400 dark:bg-sky-500/10 px-1.5 py-0.5 rounded border dark:border-sky-400/20">OS</span>
+                <span className="text-[10px] font-semibold text-sky-700 bg-white/90 border-sky-300 dark:text-sky-400 dark:bg-sky-500/10 px-1.5 py-0.5 rounded border dark:border-sky-400/20">OS</span>
               </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+              <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate mt-0.5 font-medium">
                 {tenantInfo?.name || tenant || 'Prominence Health'}
               </span>
             </div>
@@ -424,7 +424,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
             type="button"
             onClick={onToggle}
             title={t('sidebar.collapse_menu', 'Collapse menu')}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60 transition"
+            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white/70 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60 transition"
           >
             <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
               <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
@@ -435,12 +435,12 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
 
       {/* ── Organization / Security strip ────────────────────────── */}
       {!collapsed && (
-        <div className="px-4 py-2 bg-slate-50/90 border-b border-slate-200/80 dark:bg-slate-900/60 dark:border-slate-800/40 flex items-center justify-between text-[11px]">
-          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
+        <div className="px-4 py-2 bg-[#d6dfec] border-b border-slate-300/90 dark:bg-slate-900/60 dark:border-slate-800/40 flex items-center justify-between text-[11px]">
+          <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
             {t('sidebar.hipaa_compliant', 'HIPAA Compliant')}
           </span>
-          <span className="text-slate-500 font-mono text-[10px]">SOC-2 TYPE II</span>
+          <span className="text-slate-600 dark:text-slate-500 font-mono font-semibold text-[10px]">SOC-2 TYPE II</span>
         </div>
       )}
 
@@ -449,11 +449,11 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         {filteredNavGroups.map((group, gIdx) => (
           <div key={gIdx} className="space-y-1">
             {!collapsed ? (
-              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400/80">
+              <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400/80">
                 {group.title}
               </div>
             ) : (
-              <div className="h-px bg-slate-200 dark:bg-slate-800/60 my-2 mx-2" />
+              <div className="h-px bg-slate-300 dark:bg-slate-800/60 my-2 mx-2" />
             )}
             <div className="space-y-0.5">
               {group.items.map((item) => {
@@ -473,8 +473,8 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                       className={[
                         'group flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all relative',
                         active
-                          ? 'bg-sky-50 text-sky-700 font-semibold shadow-xs ring-1 ring-sky-200/70 dark:ring-0 dark:bg-sky-500/15 dark:text-sky-300 dark:shadow-sm dark:shadow-sky-500/5'
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50',
+                          ? 'bg-white text-sky-700 font-semibold shadow-sm ring-1 ring-sky-300/90 dark:ring-0 dark:bg-sky-500/15 dark:text-sky-300 dark:shadow-sm dark:shadow-sky-500/5'
+                          : 'text-slate-700 hover:text-slate-950 hover:bg-white/75 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/50',
                         collapsed ? 'justify-center px-0' : '',
                       ].join(' ')}
                     >
@@ -488,7 +488,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                         <span
                           className={[
                             'transition-colors',
-                            active ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200',
+                            active ? 'text-sky-600 dark:text-sky-400' : 'text-slate-500 group-hover:text-slate-800 dark:text-slate-400 dark:group-hover:text-slate-200',
                           ].join(' ')}
                         >
                           <IconComponent />
@@ -506,7 +506,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                               ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30'
                               : item.badgeTone === 'success'
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60',
+                              : 'bg-white/90 text-slate-700 border border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60',
                           ].join(' ')}
                         >
                           {item.badge}
@@ -518,7 +518,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                           type="button"
                           onClick={(e) => toggleExpand(item.href, e)}
                           title={isExpanded ? 'Collapse sub-menus' : 'Expand sub-menus'}
-                          className="p-1 rounded text-slate-400 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50 transition shrink-0"
+                          className="p-1 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-200/80 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700/50 transition shrink-0"
                         >
                           <svg
                             className={`h-3 w-3 transition-transform duration-200 ${
@@ -536,7 +536,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
 
                     {/* Sub-Items Tree */}
                     {!collapsed && hasSubs && isExpanded && (
-                      <div className="ml-5 pl-2.5 border-l border-slate-200 dark:border-slate-800/80 my-1 space-y-0.5 animate-fadeIn">
+                      <div className="ml-5 pl-2.5 border-l-2 border-slate-300 dark:border-l dark:border-slate-800/80 my-1 space-y-0.5 animate-fadeIn">
                         {item.subItems.map((sub) => {
                           const subActive = isSubActive(sub.href, sub.exact);
                           return (
@@ -546,14 +546,14 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                               className={[
                                 'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-all',
                                 subActive
-                                  ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 font-semibold shadow-xs'
-                                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/40',
+                                  ? 'bg-white text-sky-700 ring-1 ring-sky-200/90 dark:ring-0 dark:bg-sky-500/15 dark:text-sky-300 font-semibold shadow-xs'
+                                  : 'text-slate-600 hover:text-slate-950 hover:bg-white/70 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/40',
                               ].join(' ')}
                             >
                               <div className="flex items-center gap-2 truncate">
                                 <span
                                   className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-                                    subActive ? 'bg-sky-600 ring-2 ring-sky-600/25 dark:bg-sky-400 dark:ring-sky-400/30' : 'bg-slate-300 dark:bg-slate-600'
+                                    subActive ? 'bg-sky-600 ring-2 ring-sky-600/25 dark:bg-sky-400 dark:ring-sky-400/30' : 'bg-slate-400 dark:bg-slate-600'
                                   }`}
                                 />
                                 <span className="truncate">{sub.label}</span>
@@ -577,10 +577,10 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
       </div>
 
       {/* ── Active User / Persona Footer ─────────────────────────── */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50/70 dark:border-slate-800/80 dark:bg-slate-900/40">
+      <div className="p-3 border-t border-slate-300 bg-[#d3dce9]/70 dark:border-slate-800/80 dark:bg-slate-900/40">
         {!collapsed ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-white border border-slate-200 shadow-xs dark:shadow-none dark:bg-slate-800/40 dark:border-slate-800/80">
+            <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-white border border-slate-300 shadow-xs dark:shadow-none dark:bg-slate-800/40 dark:border-slate-800/80">
               <div
                 className={`h-8 w-8 shrink-0 rounded-full bg-gradient-to-tr ${currentPersona.color} flex items-center justify-center text-xs font-bold text-white shadow-sm`}
               >
@@ -605,7 +605,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                 <button
                   type="button"
                   onClick={() => setShowPersonaModal(true)}
-                  className="flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20 dark:hover:bg-sky-500/20 transition text-center"
+                  className="flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-white text-sky-700 border border-sky-300 shadow-xs hover:bg-sky-50 dark:shadow-none dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20 dark:hover:bg-sky-500/20 transition text-center"
                 >
                   {t('sidebar.switch_role', 'Switch Role ▾')}
                 </button>
@@ -619,8 +619,8 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                 title="Log out"
                 className={
                   isAdmin
-                    ? 'p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition'
-                    : 'flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50/70 border border-rose-200/80 hover:bg-rose-100 dark:text-rose-400 dark:bg-rose-500/10 dark:border-rose-500/20 dark:hover:bg-rose-500/20 transition'
+                    ? 'p-1.5 rounded-lg bg-white/80 border border-slate-300 text-slate-600 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-300 dark:bg-transparent dark:border-transparent dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition'
+                    : 'flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 bg-white border border-rose-300 shadow-xs hover:bg-rose-50 dark:shadow-none dark:text-rose-400 dark:bg-rose-500/10 dark:border-rose-500/20 dark:hover:bg-rose-500/20 transition'
                 }
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

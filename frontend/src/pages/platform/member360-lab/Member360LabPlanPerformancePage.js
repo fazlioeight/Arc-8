@@ -718,7 +718,7 @@ export default function Member360LabPlanPerformancePage() {
                         {candidateFilename ? candidateFilename : 'Click to select or drag & drop JSON file'}
                       </p>
                       <p className="text-[11px] text-slate-400 mt-1">
-                        Accepts standard Clarity/Jessica export format (.json)
+                        Accepts standard Plan Performance export format (.json)
                       </p>
                     </div>
 
@@ -732,7 +732,7 @@ export default function Member360LabPlanPerformancePage() {
                           type="text"
                           value={candidateScenarioName}
                           onChange={(e) => setCandidateScenarioName(e.target.value)}
-                          placeholder="e.g. Jessica Revised Q4 Forecast"
+                          placeholder="e.g. Revised Q4 Forecast"
                           className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-sky-500"
                         />
                       </div>

@@ -21,7 +21,7 @@ export const MARKETS = [
 export const BUILTIN_DATASETS = [
   {
     id: 'baseline',
-    name: "Jessica's Baseline Mock (Original)",
+    name: 'Baseline Mock (original)',
     filename: 'Plan_Performance_Console_Baseline.json',
     isBuiltIn: true,
     uploadedAt: null,

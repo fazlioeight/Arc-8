@@ -85,7 +85,7 @@ describe('System-wide bright default theme & header theme toggle', () => {
     // Sidebar uses bright surface with dark: variant classes
     const aside = container.querySelector('aside');
     expect(aside).toBeTruthy();
-    expect(aside.className).toContain('bg-white');
+    expect(aside.className).toContain('bg-[#dde4ee]');
     expect(aside.className).toContain('dark:bg-[#0a0f1d]');
   });
 

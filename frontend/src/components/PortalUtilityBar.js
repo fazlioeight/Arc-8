@@ -22,7 +22,7 @@ const ROUTE_LABELS = {
 
 /* ─── Icon buttons ─────────────────────────────────────────────────────── */
 const iconBtn =
-  'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition cursor-pointer coding-ghost-button';
+  'inline-flex items-center gap-1.5 rounded-lg border border-slate-300/90 bg-white/95 px-2 py-1.5 text-slate-700 shadow-xs transition cursor-pointer hover:bg-white hover:border-slate-400 hover:text-slate-950 dark:border-slate-700/80 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white coding-ghost-button';
 
 /* ─── Dropdown shell ───────────────────────────────────────────────────── */
 const DropdownShell = ({ children, alignRight = false, className = '' }) => (
@@ -198,7 +198,7 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
       {/* Bar */}
       <div
         ref={barRef}
-        className="relative z-40 border-b border-slate-200 bg-white/90 dark:border-slate-800/80 dark:bg-[#0a0f1d]/90 backdrop-blur-md"
+        className="relative z-40 border-b border-slate-300 bg-[#e6ecf4]/95 shadow-[0_2px_6px_rgba(15,23,42,0.05)] dark:border-slate-800/80 dark:bg-[#0a0f1d]/90 dark:shadow-none backdrop-blur-md"
       >
         <div className="flex w-full items-center justify-between gap-3 px-6 py-2.5">
 
@@ -293,7 +293,7 @@ const PortalUtilityBar = ({ onToggleSidebar, sidebarCollapsed = false }) => {
             {/* Tenant switcher */}
             <div className="relative">
               <button
-                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition coding-ghost-button"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300/90 bg-white/95 px-2.5 py-1.5 text-sm font-semibold text-slate-800 shadow-xs transition hover:bg-white hover:border-slate-400 dark:border-slate-700/80 dark:bg-slate-800/60 dark:text-slate-200 dark:hover:bg-slate-800 coding-ghost-button"
                 aria-haspopup="true"
                 aria-expanded={showTenantMenu}
                 onClick={(e) => { e.stopPropagation(); setShowTenantMenu((v) => !v); setShowWaffle(false); setShowNotif(false); setShowUser(false); }}
