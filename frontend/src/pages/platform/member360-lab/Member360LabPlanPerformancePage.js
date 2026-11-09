@@ -333,6 +333,30 @@ export default function Member360LabPlanPerformancePage() {
       hideHeader
     >
       <div className="space-y-4 pb-12">
+        {/* Plan Performance Console Brand Header Banner */}
+        <div className="rounded-2xl bg-[#131930] border border-slate-800 shadow-sm overflow-hidden border-b-2 border-b-[#00b5b0] p-5 sm:p-6">
+          <div className="flex items-center justify-between text-[11px] font-medium tracking-wide">
+            <span className="font-extrabold uppercase tracking-wider text-slate-200">
+              PROMINENCE <span className="text-[#00b5b0]">HEALTH</span>
+            </span>
+            <span className="text-slate-400">
+              Plan Performance Console · sample data
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-2.5 mb-1.5">
+            Plan Performance Console
+          </h1>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#00b5b0]">
+            <span>Provider Performance</span>
+            <span className="opacity-40 text-slate-400">|</span>
+            <span>Calendar 2026 year to date · Jan–Aug</span>
+            <span className="opacity-40 text-slate-400">|</span>
+            <span>Northern Nevada · Florida · North TX · South TX</span>
+            <span className="opacity-40 text-slate-400">|</span>
+            <span>Sample data</span>
+          </div>
+        </div>
+
         {/* Global Toast Banner */}
         {toastMessage && (
           <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between shadow-sm animate-fade-in">
