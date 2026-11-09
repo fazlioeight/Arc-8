@@ -1,75 +1,156 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { LabSubNav } from './components';
-import KpiTile from '../../../components/ui/KpiTile';
+import { usePermissions } from '../../../hooks/usePermissions';
+import './planPerformanceConsole.css';
+import {
+  CONSOLE_TABS,
+  buildConsoleModel,
+  renderConsoleTab,
+} from '../../../services/planPerformanceConsoleEngine';
 import {
   MARKETS,
   getProviderGroups,
-  getEntitySummary,
-  getMonthlyTrend,
-  getCostCategories,
-  getComparisonTableRows,
+  getCurrentData,
+  getDatasetCatalog,
+  getActiveDatasetId,
+  setActiveDatasetId,
+  saveDatasetToCatalog,
+  deleteDatasetFromCatalog,
+  renameDatasetInCatalog,
+  getDatasetDataById,
+  validateDataset,
 } from '../../../services/planPerformanceService';
 
-const currencyM = (v) => {
-  if (v === null || v === undefined) return '—';
-  return `$${Number(v).toFixed(1)}M`;
-};
-
-const currencyPMPM = (v) => {
-  if (v === null || v === undefined) return '—';
-  return `$${Math.round(Number(v)).toLocaleString()}`;
-};
-
-const pct = (v) => {
-  if (v === null || v === undefined) return '—';
-  return `${Number(v).toFixed(1)}%`;
-};
-
-const statusTone = (status) => {
-  const s = String(status || '').toLowerCase();
-  if (s.includes('track') || s.includes('good') || s.includes('fav')) return 'success';
-  if (s.includes('watch') || s.includes('warn')) return 'amber';
-  if (s.includes('crit') || s.includes('risk') || s.includes('bad')) return 'critical';
-  return 'neutral';
+const TAB_PERMISSIONS = {
+  overview: 'tab:pp_overview',
+  fin: 'tab:pp_financials',
+  cost: 'tab:pp_medical_cost',
+  mlr: 'tab:pp_mlr',
+  util: 'tab:pp_utilization',
+  qual: 'tab:pp_quality',
+  risk: 'tab:pp_risk',
+  defs: 'tab:pp_defs',
 };
 
 export default function Member360LabPlanPerformancePage() {
+  const { can, isAdmin, currentRole } = usePermissions();
+  const fileInputRef = useRef(null);
+
+  // Administrative authority to upload/manage datasets
+  const canManageDataset =
+    isAdmin ||
+    can('menu:master_admin') ||
+    can('sub:gov_tenant_config') ||
+    currentRole === 'platform_admin' ||
+    currentRole === 'admin' ||
+    currentRole === 'business_admin' ||
+    currentRole === 'payer_executive' ||
+    currentRole === 'billing';
+
+  // Available tabs filtered dynamically by user role and tab-level privileges
+  const authorizedTabs = useMemo(() => {
+    return CONSOLE_TABS.filter(([tabKey]) => {
+      // Platform and System Administrators have full authority over all tabs
+      if (
+        isAdmin ||
+        currentRole === 'platform_admin' ||
+        currentRole === 'admin'
+      ) {
+        return true;
+      }
+      const permKey = TAB_PERMISSIONS[tabKey];
+      return !permKey || can(permKey);
+    });
+  }, [can, isAdmin, currentRole]);
+
+  // Console Navigation & Filter State
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState('overview');
   const [selectedMarket, setSelectedMarket] = useState('all');
   const [selectedGroup, setSelectedGroup] = useState('all');
-  const [comparisonMode, setComparisonMode] = useState('budget'); // 'budget' | 'prior_year'
-  const [tableSearch, setTableSearch] = useState('');
+  const [comparisonMode, setComparisonMode] = useState('budget'); // 'budget' | 'prior'
+  const [cs, setCs] = useState('inst'); // 'inst' | 'prof'
+  const [spec, setSpec] = useState(null);
+  const [datasetVersion, setDatasetVersion] = useState(0);
+
+  // Sync tab with URL query parameter ?tab=
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && CONSOLE_TABS.some(([k]) => k === tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [location.search]);
+
+  // Auto-select first authorized tab if current tab is denied
+  useEffect(() => {
+    if (authorizedTabs.length > 0 && !authorizedTabs.some(([k]) => k === activeTab)) {
+      setActiveTab(authorizedTabs[0][0]);
+    }
+  }, [authorizedTabs, activeTab]);
+
+  // Dataset switching state
+  const [activeDatasetId, setActiveDatasetIdState] = useState(() => getActiveDatasetId());
+  const [datasetCatalog, setDatasetCatalog] = useState(() => getDatasetCatalog());
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalTab, setModalTab] = useState('list'); // 'list' | 'upload'
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState('');
+
+  // Upload fields
+  const [candidateJson, setCandidateJson] = useState(null);
+  const [candidateFilename, setCandidateFilename] = useState('');
+  const [candidateScenarioName, setCandidateScenarioName] = useState('');
+  const [validationResult, setValidationResult] = useState(null);
+  const [modalError, setModalError] = useState(null);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  // Sync catalog whenever version changes
+  useEffect(() => {
+    setDatasetCatalog(getDatasetCatalog());
+    setActiveDatasetIdState(getActiveDatasetId());
+  }, [datasetVersion]);
+
+  const switchDataset = (id) => {
+    setActiveDatasetId(id);
+    setActiveDatasetIdState(id);
+    setDatasetVersion((v) => v + 1);
+    const target = datasetCatalog.find((d) => d.id === id);
+    setToastMessage(`Switched active scenario to: "${target?.name || id}"`);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Build the complete analytical model from active dataset
+  const currentDataset = useMemo(() => {
+    return getCurrentData();
+  }, [datasetVersion, activeDatasetId]);
+
+  const consoleModel = useMemo(() => {
+    return buildConsoleModel(currentDataset);
+  }, [currentDataset]);
 
   // Dropdown options
-  const availableGroups = useMemo(() => getProviderGroups(selectedMarket), [selectedMarket]);
+  const availableGroups = useMemo(() => {
+    return getProviderGroups(selectedMarket);
+  }, [selectedMarket, datasetVersion]);
 
-  // Current entity focus
-  const entity = useMemo(
-    () => getEntitySummary(selectedMarket, selectedGroup),
-    [selectedMarket, selectedGroup]
-  );
-
-  // Monthly trends for current entity
-  const monthlyData = useMemo(
-    () => getMonthlyTrend(selectedMarket, selectedGroup),
-    [selectedMarket, selectedGroup]
-  );
-
-  // Cost categories for current entity
-  const costCategories = useMemo(
-    () => getCostCategories(selectedMarket, selectedGroup),
-    [selectedMarket, selectedGroup]
-  );
-
-  // Comparison table rows
-  const comparisonRows = useMemo(() => {
-    const raw = getComparisonTableRows(selectedMarket);
-    if (!tableSearch.trim()) return raw;
-    const q = tableSearch.toLowerCase();
-    return raw.filter((r) => r.entity_name.toLowerCase().includes(q));
-  }, [selectedMarket, tableSearch]);
+  // Render the active tab view from the engine
+  const renderedConsole = useMemo(() => {
+    return renderConsoleTab(consoleModel, {
+      tab: activeTab,
+      market: selectedMarket,
+      group: selectedGroup,
+      cmp: comparisonMode === 'budget' ? 'budget' : 'prior',
+      cs,
+      spec,
+    });
+  }, [consoleModel, activeTab, selectedMarket, selectedGroup, comparisonMode, cs, spec]);
 
   const handleMarketChange = (e) => {
     setSelectedMarket(e.target.value);
@@ -77,36 +158,222 @@ export default function Member360LabPlanPerformancePage() {
   };
 
   const handleGroupChange = (e) => {
-    setSelectedGroup(e.target.value);
+    const val = e.target.value;
+    setSelectedGroup(val);
+    if (val !== 'all' && consoleModel.E[val]?.market) {
+      setSelectedMarket(consoleModel.E[val].market);
+    }
   };
 
   const resetFilters = () => {
     setSelectedMarket('all');
     setSelectedGroup('all');
-    setTableSearch('');
+    setComparisonMode('budget');
+    setCs('inst');
+    setSpec(null);
   };
 
-  // Monthly chart max value for scaling
-  const maxMonthlyVal = useMemo(() => {
-    if (!monthlyData.length) return 200;
-    return Math.max(...monthlyData.map((m) => Math.max(m.premium_revenue_musd || 0, m.medical_cost_musd || 0))) * 1.15;
-  }, [monthlyData]);
+  // Handle interactive clicks inside the HTML console
+  const handleConsoleClick = (e) => {
+    const csBtn = e.target.closest('[data-cs]');
+    if (csBtn) {
+      setCs(csBtn.dataset.cs);
+      setSpec(null);
+      return;
+    }
+    const specRow = e.target.closest('[data-spec]');
+    if (specRow) {
+      setSpec(specRow.dataset.spec);
+      return;
+    }
+    const entRow = e.target.closest('tr[data-entity]');
+    if (entRow) {
+      const entId = entRow.dataset.entity;
+      if (entId === 'plan') {
+        setSelectedMarket('all');
+        setSelectedGroup('all');
+      } else if (['nnv', 'fl', 'ntx', 'stx'].includes(entId)) {
+        setSelectedMarket(entId);
+        setSelectedGroup('all');
+      } else {
+        const targetNode = consoleModel.E[entId];
+        if (targetNode) {
+          if (targetNode.market) setSelectedMarket(targetNode.market);
+          setSelectedGroup(entId);
+        }
+      }
+    }
+  };
+
+  // Open modal
+  const openModal = (tab = 'list') => {
+    setModalTab(tab);
+    setCandidateJson(null);
+    setCandidateFilename('');
+    setCandidateScenarioName('');
+    setValidationResult(null);
+    setModalError(null);
+    setEditingId(null);
+    setIsModalOpen(true);
+  };
+
+  // Handle file select in modal
+  const handleFileChange = (e) => {
+    setModalError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      setModalError('Please upload a valid .json file.');
+      return;
+    }
+
+    setCandidateFilename(file.name);
+    setCandidateScenarioName(file.name.replace(/\.json$/i, '').replace(/[_-]/g, ' '));
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result);
+        const check = validateDataset(parsed);
+        if (!check.valid) {
+          setModalError(check.error);
+          setValidationResult(null);
+          setCandidateJson(null);
+        } else {
+          setValidationResult(check.summary);
+          setCandidateJson(parsed);
+          setModalError(null);
+        }
+      } catch (err) {
+        setModalError(`JSON parse error: ${err.message}`);
+        setValidationResult(null);
+        setCandidateJson(null);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Commit uploaded dataset as a new scenario
+  const handleSaveUpload = () => {
+    if (!candidateJson) return;
+    try {
+      const newEntry = saveDatasetToCatalog(candidateJson, candidateScenarioName, candidateFilename);
+      setDatasetVersion((v) => v + 1);
+      setActiveDatasetIdState(newEntry.id);
+      setIsModalOpen(false);
+      setToastMessage(`Scenario "${newEntry.name}" added to list and activated.`);
+      setTimeout(() => setToastMessage(null), 5000);
+    } catch (err) {
+      setModalError(err.message || 'Failed to save dataset.');
+    }
+  };
+
+  // Start inline rename
+  const handleStartRename = (item) => {
+    setEditingId(item.id);
+    setEditingName(item.name);
+  };
+
+  // Save inline rename
+  const handleSaveRename = (id) => {
+    try {
+      renameDatasetInCatalog(id, editingName);
+      setDatasetVersion((v) => v + 1);
+      setEditingId(null);
+      setToastMessage('Scenario renamed successfully.');
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Delete a custom dataset
+  const handleDeleteDataset = (id, name) => {
+    if (window.confirm(`Are you sure you want to remove scenario "${name}"?`)) {
+      try {
+        deleteDatasetFromCatalog(id);
+        setDatasetVersion((v) => v + 1);
+        setToastMessage(`Removed scenario "${name}".`);
+        setTimeout(() => setToastMessage(null), 4000);
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+  };
+
+  // Export specific dataset
+  const handleExportDataset = (id, name) => {
+    const raw = getDatasetDataById(id);
+    if (!raw) {
+      alert('Could not retrieve dataset content.');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(raw, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name.replace(/\s+/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleFileChange({ target: { files: [file] } });
+    }
+  };
 
   return (
     <PortalPageLayout
+      activeNavId="member360"
+      activeSubNavId="member360-plan-performance"
       navItems={PORTAL_NAV_ITEMS}
-      activeHref={ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}
-      title="Plan Performance & Commercial Finance"
-      subtitle="Executive payer analytics, MLR benchmarks, and provider network performance."
     >
-      <div className="space-y-4">
-        {/* Top Member360 SubNav */}
-        <LabSubNav />
+      <div className="space-y-4 pb-12">
+        {/* Lab Sub Navigation */}
+        <LabSubNav currentPath={ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE} />
 
-        {/* Filter Strip & Scope Controls */}
+        {/* Global Toast Banner */}
+        {toastMessage && (
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between shadow-sm animate-fade-in">
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              {toastMessage}
+            </span>
+            <button type="button" onClick={() => setToastMessage(null)} className="text-emerald-600 hover:text-emerald-800">
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Top Header Filter Strip & Scope Controls */}
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3">
+              {/* Dataset Scenario Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                  Dataset Scenario
+                </label>
+                <select
+                  value={activeDatasetId}
+                  onChange={(e) => switchDataset(e.target.value)}
+                  className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-1.5 text-sm font-semibold focus:ring-2 focus:ring-sky-500"
+                >
+                  {datasetCatalog.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} {d.isBuiltIn ? '• (Built-in)' : '• (Custom)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Market Filter */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
                   Market Region
@@ -124,6 +391,7 @@ export default function Member360LabPlanPerformancePage() {
                 </select>
               </div>
 
+              {/* Provider Group Filter */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
                   Provider Group
@@ -131,7 +399,7 @@ export default function Member360LabPlanPerformancePage() {
                 <select
                   value={selectedGroup}
                   onChange={handleGroupChange}
-                  className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-1.5 text-sm focus:ring-2 focus:ring-sky-500 min-w-[200px]"
+                  className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-1.5 text-sm focus:ring-2 focus:ring-sky-500 min-w-[190px]"
                 >
                   <option value="all">All Groups ({availableGroups.length})</option>
                   {availableGroups.map((g) => (
@@ -142,6 +410,7 @@ export default function Member360LabPlanPerformancePage() {
                 </select>
               </div>
 
+              {/* Benchmark Baseline Mode */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
                   Benchmark Baseline
@@ -160,9 +429,9 @@ export default function Member360LabPlanPerformancePage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setComparisonMode('prior_year')}
+                    onClick={() => setComparisonMode('prior')}
                     className={`px-3 py-1 text-xs font-semibold rounded-md transition ${
-                      comparisonMode === 'prior_year'
+                      comparisonMode === 'prior'
                         ? 'bg-white dark:bg-sky-600 text-slate-900 dark:text-white shadow-sm'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                     }`}
@@ -173,298 +442,356 @@ export default function Member360LabPlanPerformancePage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Scope & The Single Manage Button */}
+            <div className="flex flex-wrap items-center gap-2.5">
               {(selectedMarket !== 'all' || selectedGroup !== 'all') && (
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 underline"
+                  className="text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 underline mr-1"
                 >
-                  Reset to Plan Total
+                  Reset Filter
                 </button>
               )}
+
+              {/* Scope Tag */}
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-                <span className="h-2 w-2 rounded-full bg-sky-500"></span>
-                Scope: {entity.entity_name}
+                <span className="h-2 w-2 rounded-full bg-sky-500" />
+                Scope: {renderedConsole.scopeName}
               </span>
+
+              {/* LOB Tag */}
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                LOB: Medicare Advantage (MA)
+              </span>
+
+              {/* The Single Manage Button */}
+              {canManageDataset && (
+                <div className="flex items-center pl-2 border-l border-slate-200 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => openModal('list')}
+                    className="inline-flex items-center gap-2 rounded-lg bg-sky-600 hover:bg-sky-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition"
+                    title="Manage, Edit, Delete, or Upload Datasets"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Manage Datasets
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>
 
-        {/* Top KPI Cards */}
-        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KpiTile
-            label="Premium Revenue"
-            value={currencyM(entity.premium_revenue_musd)}
-            subtext={`${currencyPMPM(entity.revenue_pmpm)} PMPM (${entity.revenue_pmpm_vs_prior_year_pct ? `+${entity.revenue_pmpm_vs_prior_year_pct}% YoY` : 'YTD'})`}
-            tone="info"
-          />
-          <KpiTile
-            label="Medical Cost"
-            value={currencyM(entity.medical_cost_musd)}
-            subtext={`${currencyPMPM(entity.medical_cost_pmpm)} PMPM (${entity.medical_cost_pmpm_vs_prior_year_pct ? `+${entity.medical_cost_pmpm_vs_prior_year_pct}% YoY` : 'YTD'})`}
-            tone="neutral"
-          />
-          <KpiTile
-            label="Headline MLR (Part A/B)"
-            value={pct(entity.mlr_part_ab_pct)}
-            subtext={`Goal: ${pct(entity.mlr_goal_pct)} · ${entity.mlr_status || 'Watch'}`}
-            tone={statusTone(entity.mlr_status)}
-          />
-          <KpiTile
-            label="SG&A Expenses"
-            value={currencyM(entity.sga_musd)}
-            subtext={`${pct(entity.ocr_pct)} OCR`}
-            tone="neutral"
-          />
-          <KpiTile
-            label="Net Margin (IOI)"
-            value={currencyM(entity.ioi_musd)}
-            subtext={comparisonMode === 'budget' ? `Budget: ${currencyM(entity.budget_ioi_musd)}` : `PY: ${currencyM(entity.prior_year_ioi_musd)}`}
-            tone={Number(entity.ioi_musd) >= 0 ? 'success' : 'amber'}
-          />
-          <KpiTile
-            label="Active Enrollment"
-            value={Number(entity.members_latest || 0).toLocaleString()}
-            subtext={`${Number(entity.member_months_ytd || 0).toLocaleString()} Member Months`}
-            tone="info"
-          />
-        </section>
-
-        {/* Visual Charts: Monthly Trend & Cost Categories */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Monthly Trend Chart (2 cols) */}
-          <section className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                  2026 YTD Financial Trend (Jan – Aug)
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Monthly Premium Revenue vs. Medical Cost ({entity.entity_name})
-                </p>
-              </div>
-              <div className="flex items-center gap-4 text-xs font-medium">
-                <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-                  <span className="h-3 w-3 rounded-sm bg-sky-500"></span>
-                  Revenue
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-                  <span className="h-3 w-3 rounded-sm bg-indigo-500"></span>
-                  Medical Cost
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
-                  <span className="h-1.5 w-4 rounded-full bg-emerald-500"></span>
-                  MLR %
-                </span>
-              </div>
-            </div>
-
-            {/* SVG Bar & Trend Chart */}
-            <div className="h-64 w-full flex items-end justify-between gap-2 pt-6 pb-2 px-2 border-b border-slate-100 dark:border-slate-800">
-              {monthlyData.map((m) => {
-                const revHeight = ((m.premium_revenue_musd || 0) / maxMonthlyVal) * 100;
-                const costHeight = ((m.medical_cost_musd || 0) / maxMonthlyVal) * 100;
-                return (
-                  <div key={m.month_seq || m.month_label} className="flex-1 flex flex-col items-center h-full justify-end group relative">
-                    {/* Tooltip */}
-                    <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition pointer-events-none z-10 bg-slate-900 text-white text-[11px] rounded-lg py-1 px-2 shadow-lg whitespace-nowrap">
-                      <div>Rev: {currencyM(m.premium_revenue_musd)}</div>
-                      <div>Cost: {currencyM(m.medical_cost_musd)}</div>
-                      <div>MLR: {pct(m.mlr_part_ab_pct)}</div>
-                    </div>
-
-                    <div className="w-full flex items-end justify-center gap-1 h-full pb-1">
-                      {/* Revenue Bar */}
-                      <div
-                        className="w-1/2 max-w-[28px] bg-sky-500 rounded-t-sm transition-all duration-300 group-hover:bg-sky-400"
-                        style={{ height: `${revHeight}%` }}
-                      ></div>
-                      {/* Cost Bar */}
-                      <div
-                        className="w-1/2 max-w-[28px] bg-indigo-500 rounded-t-sm transition-all duration-300 group-hover:bg-indigo-400"
-                        style={{ height: `${costHeight}%` }}
-                      ></div>
-                    </div>
-                    {/* Month Label */}
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 mt-1">
-                      {m.month_label}
-                    </span>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                      {pct(m.mlr_part_ab_pct)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-2 px-1">
-              <span>* Prior year benchmark MLR: 85.35%</span>
-              <span>Source: General Ledger & Closed Claims</span>
-            </div>
-          </section>
-
-          {/* Cost Categories Breakdown (1 col) */}
-          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-1">
-                Medical Cost Breakdown (PMPM)
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                Total Medical Cost: <strong>{currencyPMPM(costCategories.total_pmpm || 1317)}</strong> ({costCategories.yoy_change_pct ? `+${costCategories.yoy_change_pct}% YoY` : ''})
-              </p>
-
-              <div className="space-y-3.5">
-                {[
-                  { label: 'Part D Pharmacy', val: costCategories.part_d_pharmacy || 300, max: 400, color: 'bg-emerald-500' },
-                  { label: 'Institutional Inpatient', val: costCategories.inst_inpatient || 295, max: 400, color: 'bg-sky-500' },
-                  { label: 'Institutional Outpatient', val: costCategories.inst_outpatient || 240, max: 400, color: 'bg-indigo-500' },
-                  { label: 'Professional Services', val: costCategories.professional || 265, max: 400, color: 'bg-amber-500' },
-                  { label: 'Capitation', val: costCategories.capitation || 80, max: 400, color: 'bg-violet-500' },
-                  { label: 'Other Ancillary', val: costCategories.other || 137, max: 400, color: 'bg-slate-400' },
-                ].map((item) => {
-                  const sharePct = costCategories.total_pmpm ? ((item.val / costCategories.total_pmpm) * 100).toFixed(1) : 0;
-                  return (
-                    <div key={item.label}>
-                      <div className="flex justify-between text-xs font-medium mb-1">
-                        <span className="text-slate-700 dark:text-slate-300">{item.label}</span>
-                        <span className="text-slate-900 dark:text-white font-bold">
-                          {currencyPMPM(item.val)} <span className="text-slate-400 font-normal">({sharePct}%)</span>
-                        </span>
-                      </div>
-                      <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${item.color} rounded-full transition-all duration-300`}
-                          style={{ width: `${Math.min(100, (item.val / (costCategories.total_pmpm || 1317)) * 100 * 2.2)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-4 text-[11px] text-slate-400">
-              Allocated across 1,065,982 member months YTD.
-            </div>
-          </section>
+        {/* Console Navigation Tabs (Filtered by Role & Tab-Level Privileges) */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+          {authorizedTabs.map(([k, label]) => {
+            const isSelected = activeTab === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setActiveTab(k)}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition shadow-xs ${
+                  isSelected
+                    ? 'bg-[#1b2348] text-white border-b-2 border-[#00b5b0]'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Entity Comparison Hierarchy Table */}
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                Network Performance Comparison (Plan &gt; Markets &gt; Provider Groups)
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Click any row to filter top KPIs and monthly trends.
-              </p>
-            </div>
-            <div>
-              <input
-                type="text"
-                placeholder="Search network or group..."
-                value={tableSearch}
-                onChange={(e) => setTableSearch(e.target.value)}
-                className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-1.5 text-xs focus:ring-2 focus:ring-sky-500 w-64"
-              />
-            </div>
-          </div>
+        {/* Main Content Area (Matching Jessica's Dashboard 9) */}
+        <div className="pp-console" onClick={handleConsoleClick}>
+          <div dangerouslySetInnerHTML={{ __html: renderedConsole.html }} />
+        </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[11px]">
-                  <th className="py-2.5 px-3">Entity Name</th>
-                  <th className="py-2.5 px-3">Level</th>
-                  <th className="py-2.5 px-3 text-right">Active Members</th>
-                  <th className="py-2.5 px-3 text-right">Revenue (YTD)</th>
-                  <th className="py-2.5 px-3 text-right">Rev PMPM</th>
-                  <th className="py-2.5 px-3 text-right">Cost PMPM</th>
-                  <th className="py-2.5 px-3 text-right">Headline MLR</th>
-                  <th className="py-2.5 px-3 text-center">Status</th>
-                  <th className="py-2.5 px-3 text-right">Budget MLR Var</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {comparisonRows.map((r) => {
-                  const isSelected =
-                    (r.level === 'plan' && selectedMarket === 'all' && selectedGroup === 'all') ||
-                    (r.level === 'market' && selectedMarket === r.entity_id && selectedGroup === 'all') ||
-                    (r.level === 'provider_group' && selectedGroup === r.entity_id);
+        {/* POPUP MODAL: DATASET & SCENARIO MANAGER */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+            <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+              {/* Modal Header */}
+              <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      Dataset &amp; Scenario Manager
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Switch active scenarios, upload revised datasets, rename, or delete custom test files.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  ✕
+                </button>
+              </div>
 
-                  const indentClass =
-                    r.level === 'market' ? 'pl-6 font-semibold' : r.level === 'provider_group' ? 'pl-10 text-slate-600 dark:text-slate-300' : 'font-extrabold text-slate-900 dark:text-white';
+              {/* Modal Navigation Tabs */}
+              <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 px-5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalTab('list')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition ${
+                    modalTab === 'list'
+                      ? 'border-sky-600 text-sky-600 dark:text-sky-400'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  Saved Scenarios ({datasetCatalog.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModalTab('upload')}
+                  className={`px-4 py-2 text-xs font-bold border-b-2 transition ${
+                    modalTab === 'upload'
+                      ? 'border-sky-600 text-sky-600 dark:text-sky-400'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  + Upload New JSON
+                </button>
+              </div>
 
-                  const budgetVar = r.budget_mlr_part_ab_pct ? (r.mlr_part_ab_pct - r.budget_mlr_part_ab_pct).toFixed(2) : null;
+              {/* Modal Body */}
+              <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                {modalTab === 'list' ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-500">
+                      Click <strong>Activate</strong> to switch the active dataset immediately across the dashboard without reloading the page.
+                    </p>
 
-                  return (
-                    <tr
-                      key={r.entity_id}
-                      onClick={() => {
-                        if (r.level === 'plan') {
-                          setSelectedMarket('all');
-                          setSelectedGroup('all');
-                        } else if (r.level === 'market') {
-                          setSelectedMarket(r.entity_id);
-                          setSelectedGroup('all');
-                        } else if (r.level === 'provider_group') {
-                          setSelectedMarket(r.market_id);
-                          setSelectedGroup(r.entity_id);
-                        }
-                      }}
-                      className={`cursor-pointer transition hover:bg-slate-50 dark:hover:bg-slate-800/60 ${
-                        isSelected ? 'bg-sky-50 dark:bg-sky-950/40 border-l-4 border-sky-500' : ''
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                      {datasetCatalog.map((item) => {
+                        const isActive = item.id === activeDatasetId;
+                        const isEditing = editingId === item.id;
+
+                        return (
+                          <div
+                            key={item.id}
+                            className={`p-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition ${
+                              isActive ? 'bg-sky-50/60 dark:bg-sky-950/30' : 'bg-white dark:bg-slate-900'
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              {isEditing ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={editingName}
+                                    onChange={(e) => setEditingName(e.target.value)}
+                                    className="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveRename(item.id)}
+                                    className="px-2 py-1 rounded bg-sky-600 text-white text-xs font-semibold"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingId(null)}
+                                    className="px-2 py-1 rounded text-slate-500 text-xs"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                                    {item.name}
+                                  </span>
+                                  {item.isBuiltIn ? (
+                                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                      Built-in
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
+                                      Custom Upload
+                                    </span>
+                                  )}
+                                  {isActive && (
+                                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-sky-600 text-white">
+                                      Active
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              <div className="text-[11px] text-slate-400 mt-0.5 flex flex-wrap gap-x-3">
+                                <span>File: {item.filename || 'dataset.json'}</span>
+                                {item.summary && (
+                                  <span>
+                                    {item.summary.entityCount} entities · {item.summary.monthlyRows} monthly rows
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              {!isActive && (
+                                <button
+                                  type="button"
+                                  onClick={() => switchDataset(item.id)}
+                                  className="px-2.5 py-1 rounded-md text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white shadow-xs"
+                                >
+                                  Activate
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleExportDataset(item.id, item.name)}
+                                title="Download JSON"
+                                className="px-2 py-1 rounded text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                              >
+                                Export
+                              </button>
+                              {!item.isBuiltIn && !isEditing && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartRename(item)}
+                                    title="Rename Scenario"
+                                    className="px-2 py-1 rounded text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  >
+                                    Rename
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteDataset(item.id, item.name)}
+                                    title="Delete Scenario"
+                                    className="px-2 py-1 rounded text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                                  >
+                                    Delete
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Drag and Drop Zone */}
+                    <div
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition ${
+                        candidateJson
+                          ? 'border-emerald-400 bg-emerald-50/40 dark:bg-emerald-950/20'
+                          : 'border-slate-300 dark:border-slate-700 hover:border-sky-500 bg-slate-50 dark:bg-slate-800/50'
                       }`}
                     >
-                      <td className={`py-2.5 px-3 ${indentClass}`}>
-                        {r.level === 'market' && '↳ '}
-                        {r.level === 'provider_group' && '• '}
-                        {r.entity_name}
-                      </td>
-                      <td className="py-2.5 px-3 uppercase text-[10px] text-slate-400">
-                        {r.level.replace('_', ' ')}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-medium">
-                        {Number(r.members_latest || 0).toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-medium">
-                        {currencyM(r.premium_revenue_musd)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        {currencyPMPM(r.revenue_pmpm)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        {currencyPMPM(r.medical_cost_pmpm)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
-                        {pct(r.mlr_part_ab_pct)}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            statusTone(r.mlr_status) === 'success'
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400'
-                              : statusTone(r.mlr_status) === 'amber'
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400'
-                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400'
-                          }`}
-                        >
-                          {r.mlr_status || 'Watch'}
-                        </span>
-                      </td>
-                      <td className={`py-2.5 px-3 text-right font-semibold ${
-                        Number(budgetVar) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
-                      }`}>
-                        {budgetVar ? `${Number(budgetVar) > 0 ? '+' : ''}${budgetVar} pt` : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept=".json,application/json"
+                        className="hidden"
+                      />
+                      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-950/80 text-sky-600 dark:text-sky-400 mb-2">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {candidateFilename ? candidateFilename : 'Click to select or drag & drop JSON file'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Accepts standard Clarity/Jessica export format (.json)
+                      </p>
+                    </div>
+
+                    {/* Scenario Display Name Input */}
+                    {candidateJson && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          Scenario Display Name (shown in Combobox)
+                        </label>
+                        <input
+                          type="text"
+                          value={candidateScenarioName}
+                          onChange={(e) => setCandidateScenarioName(e.target.value)}
+                          placeholder="e.g. Jessica Revised Q4 Forecast"
+                          className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-xs font-medium focus:ring-2 focus:ring-sky-500"
+                        />
+                      </div>
+                    )}
+
+                    {/* Error Banner */}
+                    {modalError && (
+                      <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
+                        <strong>Validation Error:</strong> {modalError}
+                      </div>
+                    )}
+
+                    {/* Validation Preview Card */}
+                    {validationResult && (
+                      <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                          <span>✓ Valid Dataset Structure Detected</span>
+                          <span>Ready to Add to Catalog</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300">
+                          <div>• Total Entities: <strong>{validationResult.entityCount}</strong></div>
+                          <div>• Market Regions: <strong>{validationResult.marketCount}</strong></div>
+                          <div>• Provider Groups: <strong>{validationResult.providerGroupCount}</strong></div>
+                          <div>• Monthly Records: <strong>{validationResult.monthlyRows}</strong></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Close
+                </button>
+
+                {modalTab === 'upload' && (
+                  <button
+                    type="button"
+                    disabled={!candidateJson}
+                    onClick={handleSaveUpload}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold text-white shadow-sm transition ${
+                      candidateJson
+                        ? 'bg-sky-600 hover:bg-sky-700 cursor-pointer'
+                        : 'bg-slate-300 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                    }`}
+                  >
+                    Save Scenario &amp; Activate
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-        </section>
+        )}
       </div>
     </PortalPageLayout>
   );

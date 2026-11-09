@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { useUserPreferences } from '../context/UserPreferencesContext';
@@ -109,7 +109,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role, tenant, tenantInfo, logout, login, token } = useContext(AuthContext) || {};
-  const { currentRole, activeRoleConfig, can } = usePermissions();
+  const { currentRole, activeRoleConfig, can, isAdmin } = usePermissions();
   const { t: rawT } = useUserPreferences();
   const t = typeof rawT === 'function' ? rawT : (_key, fallback) => fallback ?? _key;
   const [showPersonaModal, setShowPersonaModal] = useState(false);
@@ -152,6 +152,62 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
     }));
   };
 
+  /* ─── Hover Flyout Menu for Collapsed Mode ─────────────────────── */
+  const [hoveredFlyout, setHoveredFlyout] = useState(null);
+  const flyoutTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!collapsed) {
+      setHoveredFlyout(null);
+    }
+  }, [collapsed]);
+
+  useEffect(() => {
+    return () => {
+      if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current);
+    };
+  }, []);
+
+  const handleItemMouseEnter = (item, e) => {
+    if (!collapsed) return;
+    if (flyoutTimerRef.current) {
+      clearTimeout(flyoutTimerRef.current);
+      flyoutTimerRef.current = null;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const estimatedHeight = item.subItems?.length ? 48 + item.subItems.length * 36 : 44;
+    let adjustedTop = rect.top;
+    if (adjustedTop + estimatedHeight > windowHeight - 16) {
+      adjustedTop = Math.max(16, windowHeight - estimatedHeight - 16);
+    }
+    setHoveredFlyout({
+      item,
+      top: adjustedTop,
+      left: rect.right + 6,
+    });
+  };
+
+  const handleItemMouseLeave = () => {
+    if (!collapsed) return;
+    flyoutTimerRef.current = setTimeout(() => {
+      setHoveredFlyout(null);
+    }, 180);
+  };
+
+  const handleFlyoutMouseEnter = () => {
+    if (flyoutTimerRef.current) {
+      clearTimeout(flyoutTimerRef.current);
+      flyoutTimerRef.current = null;
+    }
+  };
+
+  const handleFlyoutMouseLeave = () => {
+    flyoutTimerRef.current = setTimeout(() => {
+      setHoveredFlyout(null);
+    }, 150);
+  };
+
   const isActive = (href, matchExact = false) => {
     if (href.includes('#')) {
       const [pathPart, hashPart] = href.split('#');
@@ -167,7 +223,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
       const params = new URLSearchParams(queryPart);
       const tabParam = params.get('tab');
       const isPathMatch = currentPath === pathPart || currentPath.startsWith(`${pathPart}/`);
-      return isPathMatch && (location.search.includes(`tab=${tabParam}`) || (!location.search && tabParam === 'timeline'));
+      return isPathMatch && (location.search.includes(`tab=${tabParam}`) || (!location.search && (tabParam === 'timeline' || tabParam === 'overview')));
     }
     if (href.includes('#')) {
       const [pathPart, hashPart] = href.split('#');
@@ -178,6 +234,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   };
 
   const handleSwitchPersona = async (persona) => {
+    if (!isAdmin) return;
     try {
       setShowPersonaModal(false);
       const apiBase = resolveApiBase();
@@ -200,7 +257,13 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         login(data);
       }
       setTimeout(() => {
-        navigate(persona.role === 'patient' ? ROUTES.PORTAL.LANDING : ROUTES.MEMBER360_LAB.DASHBOARD);
+        if (persona.role === 'payer_executive' || (persona.email || '').toLowerCase().includes('jessica')) {
+          navigate(ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE);
+        } else if (persona.role === 'patient') {
+          navigate(ROUTES.PORTAL.LANDING);
+        } else {
+          navigate(ROUTES.MEMBER360_LAB.DASHBOARD);
+        }
       }, 50);
     } catch (e) {
       console.error('Failed to switch persona via real auth', e);
@@ -244,13 +307,19 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         },
         {
           label: t('nav.executive_dashboards', 'Executive Dashboards'),
-          href: ROUTES.DASHBOARD,
+          href: ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE,
           icon: SvgDashboard,
           permission: 'menu:executive_dashboards',
           subItems: [
-            { label: t('nav.sub.plan_performance', 'Plan Performance (Payer View)'), href: ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE, permission: 'sub:exec_financial' },
-            { label: t('nav.sub.pmpm_financials', 'PMPM Financials'), href: `${ROUTES.DASHBOARD}#pmpm`, permission: 'sub:exec_financial' },
-            { label: t('nav.sub.quality_star', 'Quality & Star Ratings'), href: `${ROUTES.DASHBOARD}#hedis`, permission: 'sub:exec_hedis' },
+            { label: t('nav.sub.pp_overview', 'Plan Overview'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=overview`, permission: 'tab:pp_overview' },
+            { label: t('nav.sub.pp_financials', 'Plan Financials (PMPM)'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=financials`, permission: 'tab:pp_financials' },
+            { label: t('nav.sub.pp_medical_cost', 'Medical Cost Analytics'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=cost`, permission: 'tab:pp_medical_cost' },
+            { label: t('nav.sub.pp_mlr', 'Provider MLR & Benchmarks'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=mlr`, permission: 'tab:pp_mlr' },
+            { label: t('nav.sub.pp_utilization', 'Utilization & Admits'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=util`, permission: 'tab:pp_utilization' },
+            { label: t('nav.sub.quality_star', 'Quality & Star Ratings'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=qual`, permission: 'tab:pp_quality' },
+            { label: t('nav.sub.pp_risk', 'Risk Adjustment (RAF)'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=risk`, permission: 'tab:pp_risk' },
+            { label: t('nav.sub.pp_defs', 'Definitions & Glossary'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=defs`, permission: 'tab:pp_defs' },
+            { label: t('nav.sub.exec_hedis_dashboard', 'HEDIS & Star Ratings'), href: `${ROUTES.DASHBOARD}#hedis`, permission: 'sub:exec_hedis' },
           ],
         },
         { label: t('nav.provider_directory', 'Provider Directory'), href: ROUTES.PROVIDERS.LANDING, icon: SvgProviders, permission: 'menu:provider_directory' },
@@ -311,14 +380,29 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
       ].join(' ')}
     >
       {/* ── Brand Header ────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-slate-200 dark:border-slate-800/70">
-        <Link to={ROUTES.MEMBER360_LAB.DASHBOARD} className="group flex items-center gap-3 overflow-hidden">
-          <img
-            src="/images/arc8-logo.png"
-            alt="Arc-8 logo"
-            className="h-9 w-auto shrink-0 rounded-lg object-contain shadow-sm dark:shadow-md dark:shadow-sky-500/20 transition-transform duration-200 group-hover:scale-105"
-          />
-          {!collapsed && (
+      {collapsed ? (
+        <div className="flex items-center justify-center h-16 border-b border-slate-200 dark:border-slate-800/70">
+          <button
+            type="button"
+            onClick={onToggle}
+            title={t('sidebar.expand_menu', 'Arc-8 OS — Click to expand')}
+            className="group flex items-center justify-center p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 transition focus:outline-none"
+          >
+            <img
+              src="/images/arc8-logo.png"
+              alt="Arc-8 logo"
+              className="h-9 w-9 shrink-0 rounded-lg object-contain shadow-sm dark:shadow-md dark:shadow-sky-500/20 transition-transform duration-200 group-hover:scale-110"
+            />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-200 dark:border-slate-800/70">
+          <Link to={ROUTES.MEMBER360_LAB.DASHBOARD} className="group flex items-center gap-3 overflow-hidden">
+            <img
+              src="/images/arc8-logo.png"
+              alt="Arc-8 logo"
+              className="h-9 w-auto shrink-0 rounded-lg object-contain shadow-sm dark:shadow-md dark:shadow-sky-500/20 transition-transform duration-200 group-hover:scale-105"
+            />
             <div className="flex flex-col min-w-0">
               <span className="flex items-center gap-2">
                 <span
@@ -335,23 +419,19 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                 {tenantInfo?.name || tenant || 'Prominence Health'}
               </span>
             </div>
-          )}
-        </Link>
-        <button
-          type="button"
-          onClick={onToggle}
-          title={collapsed ? 'Expand menu' : 'Collapse menu'}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60 transition"
-        >
-          <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
-            {collapsed ? (
-              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
-            ) : (
+          </Link>
+          <button
+            type="button"
+            onClick={onToggle}
+            title={t('sidebar.collapse_menu', 'Collapse menu')}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60 transition"
+          >
+            <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
               <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-            )}
-          </svg>
-        </button>
-      </div>
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* ── Organization / Security strip ────────────────────────── */}
       {!collapsed && (
@@ -383,7 +463,12 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                 const isExpanded = !!expandedMenuKeys[item.href];
 
                 return (
-                  <div key={item.href} className="space-y-0.5">
+                  <div
+                    key={item.href}
+                    className="space-y-0.5"
+                    onMouseEnter={(e) => handleItemMouseEnter(item, e)}
+                    onMouseLeave={handleItemMouseLeave}
+                  >
                     <div
                       className={[
                         'group flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all relative',
@@ -398,7 +483,6 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                       )}
                       <Link
                         to={item.href}
-                        title={collapsed ? item.label : undefined}
                         className="flex items-center gap-3 flex-1 min-w-0"
                       >
                         <span
@@ -517,13 +601,65 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
             </div>
 
             <div className="flex items-center gap-1.5 pt-1">
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowPersonaModal(true)}
+                  className="flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20 dark:hover:bg-sky-500/20 transition text-center"
+                >
+                  {t('sidebar.switch_role', 'Switch Role ▾')}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  logout?.();
+                  navigate('/login');
+                }}
+                title="Log out"
+                className={
+                  isAdmin
+                    ? 'p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-400 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 transition'
+                    : 'flex-1 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50/70 border border-rose-200/80 hover:bg-rose-100 dark:text-rose-400 dark:bg-rose-500/10 dark:border-rose-500/20 dark:hover:bg-rose-500/20 transition'
+                }
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                {!isAdmin && <span>{t('utility.log_out', 'Log out')}</span>}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            {isAdmin ? (
               <button
                 type="button"
                 onClick={() => setShowPersonaModal(true)}
-                className="flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20 dark:hover:bg-sky-500/20 transition text-center"
+                title={`Switch from ${currentPersona.name}`}
+                className={`h-9 w-9 rounded-full bg-gradient-to-tr ${currentPersona.color} flex items-center justify-center text-xs font-bold text-white shadow-sm ring-2 ring-sky-500/30 hover:scale-105 transition`}
               >
-                {t('sidebar.switch_role', 'Switch Role ▾')}
+                {currentPersona.name
+                  .split(' ')
+                  .map((w) => w[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()}
               </button>
+            ) : (
+              <div
+                title={currentPersona.name}
+                className={`h-9 w-9 rounded-full bg-gradient-to-tr ${currentPersona.color} flex items-center justify-center text-xs font-bold text-white shadow-sm`}
+              >
+                {currentPersona.name
+                  .split(' ')
+                  .map((w) => w[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </div>
+            )}
+            {!isAdmin && (
               <button
                 type="button"
                 onClick={() => {
@@ -537,29 +673,13 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
               </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowPersonaModal(true)}
-              title={`Switch from ${currentPersona.name}`}
-              className={`h-9 w-9 rounded-full bg-gradient-to-tr ${currentPersona.color} flex items-center justify-center text-xs font-bold text-white shadow-sm ring-2 ring-sky-500/30 hover:scale-105 transition`}
-            >
-              {currentPersona.name
-                .split(' ')
-                .map((w) => w[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase()}
-            </button>
+            )}
           </div>
         )}
       </div>
 
       {/* ── Quick Persona Switcher Modal ─────────────────────────── */}
-      {showPersonaModal && (
+      {showPersonaModal && isAdmin && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm p-4"
           onClick={() => setShowPersonaModal(false)}
@@ -634,6 +754,87 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* ── Hover Flyout Submenu in Collapsed Mode ─────────────────── */}
+      {collapsed && hoveredFlyout && (
+        <div
+          style={{
+            position: 'fixed',
+            top: `${hoveredFlyout.top}px`,
+            left: `${hoveredFlyout.left}px`,
+          }}
+          onMouseEnter={handleFlyoutMouseEnter}
+          onMouseLeave={handleFlyoutMouseLeave}
+          className="z-50 min-w-[210px] max-w-[290px] rounded-xl border border-slate-200/90 bg-white/95 p-2 shadow-2xl backdrop-blur-md dark:border-slate-800 dark:bg-[#0c1322]/95 before:absolute before:-left-3 before:top-0 before:bottom-0 before:w-3 before:content-['']"
+        >
+          {/* Main Item Header */}
+          <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
+            <Link
+              to={hoveredFlyout.item.href}
+              onClick={() => setHoveredFlyout(null)}
+              className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white hover:text-sky-600 dark:hover:text-sky-400 truncate flex-1"
+            >
+              {hoveredFlyout.item.icon && (
+                <span className="text-sky-600 dark:text-sky-400 shrink-0">
+                  <hoveredFlyout.item.icon />
+                </span>
+              )}
+              <span className="truncate">{hoveredFlyout.item.label}</span>
+            </Link>
+            {hoveredFlyout.item.badge && (
+              <span
+                className={[
+                  'text-[10px] px-1.5 py-0.2 rounded-full font-semibold tabular-nums shrink-0',
+                  hoveredFlyout.item.badgeTone === 'critical'
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30'
+                    : hoveredFlyout.item.badgeTone === 'success'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30'
+                    : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700/60',
+                ].join(' ')}
+              >
+                {hoveredFlyout.item.badge}
+              </span>
+            )}
+          </div>
+
+          {/* Submenu Items List if available */}
+          {hoveredFlyout.item.subItems && hoveredFlyout.item.subItems.length > 0 && (
+            <div className="mt-1 pt-1 border-t border-slate-100 dark:border-slate-800/80 space-y-0.5">
+              {hoveredFlyout.item.subItems.map((sub) => {
+                const subActive = isSubActive(sub.href, sub.exact);
+                return (
+                  <Link
+                    key={sub.href}
+                    to={sub.href}
+                    onClick={() => setHoveredFlyout(null)}
+                    className={[
+                      'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-all',
+                      subActive
+                        ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 font-semibold shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/50',
+                    ].join(' ')}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                          subActive
+                            ? 'bg-sky-600 ring-2 ring-sky-600/25 dark:bg-sky-400 dark:ring-sky-400/30'
+                            : 'bg-slate-300 dark:bg-slate-600'
+                        }`}
+                      />
+                      <span className="truncate">{sub.label}</span>
+                    </div>
+                    {sub.supervisorOnly && (
+                      <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-400/90 dark:bg-amber-500/10 px-1 py-0.2 rounded border dark:border-amber-500/20 shrink-0">
+                        Admin
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </aside>

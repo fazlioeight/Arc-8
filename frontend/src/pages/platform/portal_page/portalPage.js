@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import KpiTile from "../../../components/ui/KpiTile";
@@ -78,6 +78,12 @@ const PortalPage = () => {
   } = auth;
   const { currentRole, can } = usePermissions();
   const { t } = useUserPreferences();
+
+  useEffect(() => {
+    if (currentRole === 'payer_executive' || (user?.email || '').toLowerCase().includes('jessica')) {
+      navigate(ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE, { replace: true });
+    }
+  }, [currentRole, user?.email, navigate]);
   const canSearchMembers = currentRole !== "patient" && can("menu:patient_roster");
   const displayName = useMemo(
     () => user?.email?.split("@")[0] || "there",

@@ -8,6 +8,7 @@ export const ROLES = {
   PLATFORM_ADMIN: "platform_admin",
   ADMIN: "admin",
   BUSINESS_ADMIN: "business_admin",
+  PAYER_EXECUTIVE: "payer_executive",
   SUPERVISOR: "supervisor",
   COORDINATOR: "coordinator",
   COMPLIANCE_AUDITOR: "compliance_auditor",
@@ -39,6 +40,13 @@ export const ROLE_DEFINITIONS = [
     badgeTone: "blue",
     description: "Tenant & operational administration: Management of care templates, routing policies, risk rules, and user allotments. Denied direct clinical authoring.",
     icon: "ShieldCheck",
+  },
+  {
+    key: ROLES.PAYER_EXECUTIVE,
+    name: "Medicare Advantage & Payer Executive",
+    badgeTone: "emerald",
+    description: "Executive Medicare Advantage (MA) health plan leadership: Plan performance, MLR analytics, CMS Part C/D actuarial trends, network contract modeling, and financial dashboard administration.",
+    icon: "CurrencyDollar",
   },
   {
     key: ROLES.SUPERVISOR,
@@ -239,8 +247,56 @@ export const PERMISSION_CATEGORIES = [
         subPermissions: [
           {
             key: "sub:exec_financial",
-            label: "PMPM Financial Analytics",
-            description: "Capitation settlement, MLR analysis, and shared savings trends.",
+            label: "Plan Performance Console",
+            description: "Access the Medicare Advantage & Payer Plan Performance console.",
+            isSubMenu: true,
+          },
+          {
+            key: "tab:pp_overview",
+            label: "Plan Performance: Overview Tab",
+            description: "View executive summary KPIs, 4 goal dials, and variance tables.",
+            isSubMenu: true,
+          },
+          {
+            key: "tab:pp_financials",
+            label: "Plan Performance: Financials Tab",
+            description: "View PMPM revenue and medical cost monthly breakdown.",
+            isSubMenu: true,
+          },
+          {
+            key: "tab:pp_medical_cost",
+            label: "Plan Performance: Medical Cost Tab",
+            description: "View service category breakdown and institutional/professional drilldowns.",
+            isSubMenu: true,
+          },
+          {
+            key: "tab:pp_mlr",
+            label: "Plan Performance: Provider MLR Tab",
+            description: "View provider group MLR rankings and network benchmarks.",
+            isSubMenu: true,
+          },
+          {
+            key: "tab:pp_utilization",
+            label: "Plan Performance: Utilization Tab",
+            description: "View admits, ER, readmit, and SNF utilization metrics.",
+            isSubMenu: true,
+          },
+          {
+            key: "tab:pp_quality",
+            label: "Plan Performance: Quality Tab",
+            description: "View CMS star ratings, HEDIS measures, and care gap closure rates.",
+            isSubMenu: true,
+          },
+          {
+            key: "tab:pp_risk",
+            label: "Plan Performance: Risk Adjustment Tab",
+            description: "View RAF scores, eBUR/mBUR ratios, and HCC capture completeness.",
+            isSubMenu: true,
+          },
+          {
+            key: "tab:pp_defs",
+            label: "Plan Performance: Definitions Tab",
+            description: "View technical metric glossary and data dictionary.",
             isSubMenu: true,
           },
           {
@@ -384,6 +440,26 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "menu:executive_dashboards",
     "sub:exec_operational",
     "sub:exec_financial",
+    "tab:pp_overview",
+    "tab:pp_financials",
+    "tab:pp_medical_cost",
+    "tab:pp_mlr",
+    "tab:pp_utilization",
+    "tab:pp_quality",
+    "tab:pp_risk",
+    "tab:pp_defs",
+  ],
+  [ROLES.PAYER_EXECUTIVE]: [
+    "menu:executive_dashboards",
+    "sub:exec_financial",
+    "tab:pp_overview",
+    "tab:pp_financials",
+    "tab:pp_medical_cost",
+    "tab:pp_mlr",
+    "tab:pp_utilization",
+    "tab:pp_quality",
+    "tab:pp_risk",
+    "tab:pp_defs",
   ],
   [ROLES.COMPLIANCE_AUDITOR]: [
     "menu:patient_roster",
@@ -494,6 +570,43 @@ export const savePersistedRolePermissions = (matrix) => {
   }
 };
 
+const USER_OVERRIDE_STORAGE_KEY = "arc8_user_permissions_overrides_v1";
+
+export const getPersistedUserOverrides = () => {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(USER_OVERRIDE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+};
+
+export const savePersistedUserOverride = (email, permissionsList) => {
+  if (typeof window === "undefined" || !email) return;
+  try {
+    const current = getPersistedUserOverrides();
+    const key = email.toLowerCase();
+    if (permissionsList === null) {
+      delete current[key];
+    } else {
+      current[key] = permissionsList;
+    }
+    localStorage.setItem(USER_OVERRIDE_STORAGE_KEY, JSON.stringify(current));
+    window.dispatchEvent(
+      new CustomEvent("permissions:updated", {
+        detail: { userEmail: email, overrides: current },
+      })
+    );
+  } catch (e) {
+    console.warn("Failed to save user permission override", e);
+  }
+};
+
+export const resetPersistedUserOverride = (email) => {
+  savePersistedUserOverride(email, null);
+};
+
 /** Demo personas for instant one-click login testing */
 export const DEMO_PERSONAS = [
   {
@@ -540,6 +653,15 @@ export const DEMO_PERSONAS = [
     department: "Quality, Risk & Compliance",
     avatar: "DH",
     color: "from-amber-500 to-orange-600",
+  },
+  {
+    role: ROLES.PAYER_EXECUTIVE,
+    name: "Jessica Funiestas",
+    title: "VP, Medicare Advantage & Network Plan Performance",
+    email: "jessica.funiestas@prominencehealth.com",
+    department: "Executive Finance & Payer Analytics",
+    avatar: "JF",
+    color: "from-teal-600 to-emerald-700",
   },
   {
     role: ROLES.ADMIN,

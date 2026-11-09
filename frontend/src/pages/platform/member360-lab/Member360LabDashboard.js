@@ -8,6 +8,7 @@ import { ROUTES } from '../../../constants/routes';
 import { fetchMember360Dashboard } from '../../../services/member360LabService';
 import { LabSubNav, RiskBadge } from './components';
 import KpiTile from '../../../components/ui/KpiTile';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 const currencyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
@@ -35,9 +36,16 @@ const ACTIVITY_DOT_TONE = {
 const Member360LabDashboard = () => {
   const navigate = useNavigate();
   const { token, tenant } = useContext(AuthContext) || {};
+  const { currentRole, can } = usePermissions();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (currentRole === 'payer_executive' || !can('menu:care_intelligence')) {
+      navigate(ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE, { replace: true });
+    }
+  }, [currentRole, can, navigate]);
 
   useEffect(() => {
     let cancelled = false;

@@ -7,6 +7,9 @@ import {
   getPersistedRolePermissions,
   savePersistedRolePermissions,
   DEFAULT_ROLE_PERMISSIONS,
+  getPersistedUserOverrides,
+  savePersistedUserOverride,
+  resetPersistedUserOverride,
 } from "../constants/permissions";
 import { resolveApiBase } from "../utils/apiBase";
 
@@ -15,10 +18,12 @@ export const usePermissions = () => {
   const { user, role: authRole, isImpersonating, startImpersonation } = auth;
 
   const [matrix, setMatrix] = useState(() => getPersistedRolePermissions());
+  const [userOverrides, setUserOverrides] = useState(() => getPersistedUserOverrides());
 
   useEffect(() => {
-    const handleUpdate = (e) => {
-      if (e?.detail) setMatrix(e.detail);
+    const handleUpdate = () => {
+      setMatrix(getPersistedRolePermissions());
+      setUserOverrides(getPersistedUserOverrides());
     };
     window.addEventListener("permissions:updated", handleUpdate);
     return () => window.removeEventListener("permissions:updated", handleUpdate);
@@ -39,6 +44,7 @@ export const usePermissions = () => {
     if (r === "platform_admin") return ROLES.PLATFORM_ADMIN;
     if (r === "admin") return ROLES.ADMIN;
     if (r === "business_admin") return ROLES.BUSINESS_ADMIN;
+    if (r === "payer_executive" || r === "commercial_payer") return ROLES.PAYER_EXECUTIVE;
     if (r === "supervisor") return ROLES.SUPERVISOR;
     if (r === "coordinator") return ROLES.COORDINATOR;
     if (r === "compliance_auditor" || r === "auditor") return ROLES.COMPLIANCE_AUDITOR;
@@ -61,9 +67,13 @@ export const usePermissions = () => {
   }, [currentRole]);
 
   const activePermissions = useMemo(() => {
+    const emailLower = (user?.email || "").toLowerCase();
+    if (emailLower && Array.isArray(userOverrides[emailLower])) {
+      return new Set(userOverrides[emailLower]);
+    }
     const rolePerms = matrix[currentRole] || DEFAULT_ROLE_PERMISSIONS[currentRole] || [];
     return new Set(rolePerms);
-  }, [matrix, currentRole]);
+  }, [matrix, userOverrides, currentRole, user?.email]);
 
   const isPlatformAdmin = currentRole === ROLES.PLATFORM_ADMIN;
   const isAdmin = isPlatformAdmin || currentRole === ROLES.ADMIN;
@@ -114,6 +124,36 @@ export const usePermissions = () => {
     setMatrix(DEFAULT_ROLE_PERMISSIONS);
     savePersistedRolePermissions(DEFAULT_ROLE_PERMISSIONS);
   }, []);
+
+  const updateUserPermissions = useCallback((email, permissionsList) => {
+    savePersistedUserOverride(email, permissionsList);
+    setUserOverrides(getPersistedUserOverrides());
+  }, []);
+
+  const resetUserPermissions = useCallback((email) => {
+    resetPersistedUserOverride(email);
+    setUserOverrides(getPersistedUserOverrides());
+  }, []);
+
+  const getUserEffectivePermissions = useCallback(
+    (email, userRole) => {
+      const emailLower = (email || "").toLowerCase();
+      const overrides = getPersistedUserOverrides();
+      if (emailLower && Array.isArray(overrides[emailLower])) {
+        return {
+          permissions: overrides[emailLower],
+          isCustom: true,
+        };
+      }
+      const roleKey = userRole || currentRole;
+      const rolePerms = matrix[roleKey] || DEFAULT_ROLE_PERMISSIONS[roleKey] || [];
+      return {
+        permissions: rolePerms,
+        isCustom: false,
+      };
+    },
+    [matrix, currentRole]
+  );
 
   const switchRole = useCallback(
     async (newRole) => {
@@ -180,8 +220,12 @@ export const usePermissions = () => {
     hasAll,
     hasRole,
     matrix,
+    userOverrides,
     updateRolePermissions,
     resetPermissions,
+    updateUserPermissions,
+    resetUserPermissions,
+    getUserEffectivePermissions,
     switchRole,
   };
 };

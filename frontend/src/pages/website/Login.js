@@ -28,10 +28,19 @@ const Field = ({ id, label, type = "text", value, onChange, placeholder, require
   </div>
 );
 
+const getPostLoginRedirect = (data) => {
+  const role = data?.role;
+  const email = (data?.email || '').toLowerCase();
+  if (role === 'payer_executive' || email.includes('jessica')) {
+    return ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE;
+  }
+  return ROUTES.PORTAL.LANDING;
+};
+
 const Login = () => {
   const [formData, setFormData] = useState({
-    email: "admin@admin.com",
-    password: "admin",
+    email: "",
+    password: "",
     tenant: DEFAULT_TENANT,
   });
   const { login } = useContext(AuthContext);
@@ -85,7 +94,7 @@ const Login = () => {
 
       window.history.replaceState({}, document.title, "/login");
       login(data);
-      navigate(ROUTES.PORTAL.LANDING);
+      navigate(getPostLoginRedirect(data));
     } catch (err) {
       setError(err.message || "OIDC authentication failed.");
     } finally {
@@ -145,7 +154,7 @@ const Login = () => {
       }
 
       login(data);
-      navigate(ROUTES.PORTAL.LANDING);
+      navigate(getPostLoginRedirect(data));
     } catch (err) {
       setError(err.message || "OIDC authentication failed.");
     } finally {
@@ -168,7 +177,7 @@ const Login = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Authentication failed.");
       login(data);
-      navigate(ROUTES.PORTAL.LANDING);
+      navigate(getPostLoginRedirect(data));
     } catch (err) {
       setError(err.message || "An unexpected error occurred.");
     } finally {
@@ -318,71 +327,8 @@ const Login = () => {
                 </div>
               )}
 
-              {/* Enterprise SSO (OIDC / Cognito) Card */}
-              <div className="mt-5 rounded-2xl border border-sky-200 bg-sky-50/60 dark:border-sky-800/60 dark:bg-sky-950/30 p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-600/30 dark:text-sky-400 font-bold text-xs">
-                      SSO
-                    </span>
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">Enterprise OIDC / Cognito Sign-In</h4>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">IdP Group-to-Role Mapping & Deny-by-Default</p>
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold dark:text-sky-300">
-                    OIDC Active
-                  </span>
-                </div>
-
-                <div className="mt-3.5 space-y-2">
-                  <label className="block text-[11px] font-semibold uppercase text-slate-700 dark:text-slate-300">
-                    Simulate IdP User Group (Cognito / Okta / Entra):
-                  </label>
-                  <div className="flex gap-2">
-                    <select
-                      value={selectedIdpGroup}
-                      onChange={(e) => setSelectedIdpGroup(e.target.value)}
-                      className="flex-1 rounded-xl border border-slate-300 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-800/90 px-3 py-2 text-xs dark:text-white outline-none focus:border-sky-500"
-                    >
-                      <option value="Prominence_Care_Coordinators">
-                        Prominence_Care_Coordinators → Coordinator
-                      </option>
-                      <option value="Prominence_Clinical_Supervisors">
-                        Prominence_Clinical_Supervisors → Supervisor
-                      </option>
-                      <option value="Prominence_Business_Admins">
-                        Prominence_Business_Admins → Business Admin
-                      </option>
-                      <option value="Prominence_Compliance_Auditors">
-                        Prominence_Compliance_Auditors → Compliance Auditor
-                      </option>
-                      <option value="External_Contractors_Unmapped">
-                        External_Contractors_Unmapped (Deny-by-Default 403 Test)
-                      </option>
-                    </select>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOidcLogin(selectedIdpGroup)}
-                      disabled={submitting}
-                      className="rounded-xl bg-sky-600 hover:bg-sky-500 px-4 py-2 text-xs font-bold text-white shadow-md transition disabled:opacity-50"
-                    >
-                      Sign In with OIDC
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="my-5 flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
-                  Or Sign In with Local Credentials
-                </span>
-                <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-3.5">
+              {/* Secure Local Sign-In Form */}
+              <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field
                     id="tenant"
@@ -435,54 +381,6 @@ const Login = () => {
                   )}
                 </button>
               </form>
-
-              {/* Instant One-Click Role Testing Personas */}
-              <div className="mt-6 border-t border-slate-200 dark:border-slate-800 pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Instant Demo Role Logins (Single-Click)
-                  </span>
-                  <span className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold">Click any role to test</span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {DEMO_PERSONAS.map((p) => {
-                    const isSigningInThis = submitting && activePersonaEmail === p.email;
-
-                    return (
-                      <button
-                        key={p.role}
-                        type="button"
-                        onClick={() => handleSelectPersona(p)}
-                        disabled={submitting}
-                        className="flex flex-col text-left rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-sky-50/60 dark:border-slate-800 dark:bg-slate-950/60 p-2.5 transition hover:border-sky-500 dark:hover:bg-sky-950/20 group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-sky-100 text-sky-700 dark:bg-slate-800 text-[10px] font-bold dark:text-sky-400 group-hover:bg-sky-600 group-hover:text-white transition">
-                            {p.avatar}
-                          </span>
-                          <span className="text-[10px] font-semibold uppercase text-slate-500 group-hover:text-sky-600 dark:group-hover:text-sky-400">
-                            {p.role}
-                          </span>
-                        </div>
-                        <div className="mt-1.5">
-                          <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-sky-700 dark:group-hover:text-sky-300 truncate">
-                            {p.name}
-                          </div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                            {p.title}
-                          </div>
-                        </div>
-                        {isSigningInThis && (
-                          <div className="mt-1 text-[10px] font-semibold text-sky-600 dark:text-sky-400 animate-pulse">
-                            Signing in...
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
 
             <div className="mt-6 text-center text-[11px] text-slate-500">

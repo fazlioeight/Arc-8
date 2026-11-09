@@ -1,4 +1,7 @@
-import React, { useCallback, useContext, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ROUTES } from "../../../constants/routes";
+import { usePermissions } from "../../../hooks/usePermissions";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import AlertShell from "../../../components/ui/AlertShell";
 import { LoadingState, EmptyState } from "../../../components/ehr/Primitives";
@@ -29,7 +32,15 @@ const CardBody = ({ state, hasData, children, emptyTitle }) => {
 };
 
 const DashboardPage = () => {
+  const navigate = useNavigate();
+  const { currentRole } = usePermissions();
   const { token, tenant, isAuthenticated } = useContext(AuthContext) || {};
+
+  useEffect(() => {
+    if (currentRole === 'payer_executive') {
+      navigate(ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE, { replace: true });
+    }
+  }, [currentRole, navigate]);
   const canQuery = useMemo(() => Boolean(token && tenant), [token, tenant]);
   const year = new Date().getFullYear();
 

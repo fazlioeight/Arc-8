@@ -292,10 +292,13 @@ async def login(
         "supervisor": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user", "dashboard": "user", "settings": "user", "providers": "user"},
         "business_admin": {"member360": "user", "admin_console": "admin", "portal": "user", "docs": "user", "settings": "admin", "job_center": "admin"},
         "compliance_auditor": {"member360": "user", "portal": "user", "docs": "user"},
+        "payer_executive": {"member360": "admin", "dashboard": "admin", "portal": "admin", "docs": "admin", "settings": "user"},
     }
     DUMMY_ROLES = {
         "admin@admin.com": ("admin", list(ROLE_DEFAULT_APPS["admin"].keys())),
         "admin@prominencehealth.com": ("admin", list(ROLE_DEFAULT_APPS["admin"].keys())),
+        "jessica.funiestas@prominencehealth.com": ("payer_executive", list(ROLE_DEFAULT_APPS["payer_executive"].keys())),
+        "jessica.payer@prominencehealth.com": ("payer_executive", list(ROLE_DEFAULT_APPS["payer_executive"].keys())),
         "dr.chen@prominencehealth.com": ("clinician", list(ROLE_DEFAULT_APPS["clinician"].keys())),
         "elena.nurse@prominencehealth.com": ("nurse", list(ROLE_DEFAULT_APPS["nurse"].keys())),
         "marcus.coder@prominencehealth.com": ("coder", list(ROLE_DEFAULT_APPS["coder"].keys())),

@@ -1,0 +1,452 @@
+/* Scoped stylesheet for Plan Performance Console matching Jessica's Dashboard 9 */
+
+.pp-console {
+  --bg: #f2f4f9;
+  --surface: #ffffff;
+  --surface2: #f7f8fc;
+  --ink: #1b2348;
+  --ink2: #454e72;
+  --mute: #7a83a3;
+  --line: #e1e5ef;
+  --navy: #1b2348;
+  --teal: #00b5b0;
+  --tealink: #007a76;
+  --tealsoft: #e1f5f4;
+  --band-accent: #2fd1cc;
+  --fav: #007a76;
+  --unfav: #c0432d;
+  --warnbg: #fff3d1;
+  --badbg: #fddfda;
+  --okbg: #e3f6f5;
+  --c1: #1b2348;
+  --c2: #00b5b0;
+  --c3: #7686c9;
+  --c4: #e0a31b;
+  --c5: #8fdcd8;
+  --c6: #a9b1cc;
+  --grid: #e6e9f2;
+  --track: #e6e9f2;
+  --shadow: 0 1px 2px rgba(27, 35, 72, 0.06);
+  color: var(--ink);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Dark theme overrides */
+.dark .pp-console,
+[data-theme="dark"] .pp-console {
+  --bg: #0d1125;
+  --surface: #151b37;
+  --surface2: #1a2142;
+  --ink: #e9ecf7;
+  --ink2: #b4bad4;
+  --mute: #8790b3;
+  --line: #283054;
+  --tealink: #3fd6d1;
+  --tealsoft: #17353f;
+  --fav: #3fd6d1;
+  --unfav: #ff8f78;
+  --warnbg: #3b3318;
+  --badbg: #44222a;
+  --okbg: #143a40;
+  --c1: #c9d0f5;
+  --c2: #2fd1cc;
+  --c3: #8a9bea;
+  --c4: #f0b93a;
+  --c5: #1f7f7c;
+  --c6: #5b6592;
+  --grid: #262e52;
+  --track: #262e52;
+  --shadow: none;
+}
+
+.pp-console .num {
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-console .scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  margin: 0 0 14px;
+  color: var(--ink2);
+  font-size: 12px;
+}
+.pp-console .scope b {
+  font-size: 16px;
+  color: var(--ink);
+}
+
+/* KPI Strip */
+.pp-console .kpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.pp-console .kpis.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1200px) {
+  .pp-console .kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 768px) {
+  .pp-console .kpis,
+  .pp-console .kpis.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.pp-console .kpi {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px 8px;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.pp-console .kpi .l {
+  font-size: 11.5px;
+  color: var(--ink2);
+}
+.pp-console .kpi .v {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin: 1px 0 2px;
+  color: var(--ink);
+}
+.pp-console .kpi .d {
+  font-size: 11px;
+  color: var(--mute);
+}
+.pp-console .kpi .d b {
+  font-weight: 600;
+}
+.pp-console .fav {
+  color: var(--fav);
+}
+.pp-console .unfav {
+  color: var(--unfav);
+}
+.pp-console .kpi svg {
+  display: block;
+  width: 100%;
+  height: 24px;
+  margin-top: 4px;
+}
+
+.pp-console .kpi.roll {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+.pp-console .kpi.roll .l,
+.pp-console .kpi.roll .d {
+  color: #b9c1e6;
+}
+.pp-console .kpi.roll .d b {
+  color: #fff;
+}
+
+/* Grids & Cards */
+.pp-console .grid2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.pp-console .grid2e {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.pp-console .grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+@media (max-width: 1100px) {
+  .pp-console .grid2,
+  .pp-console .grid2e,
+  .pp-console .grid3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pp-console .card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  min-width: 0;
+  margin-bottom: 12px;
+}
+.pp-console .grid2 .card,
+.pp-console .grid2e .card,
+.pp-console .grid3 .card {
+  margin-bottom: 0;
+}
+
+.pp-console .card > h3 {
+  margin: 0;
+  background: var(--navy);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+.pp-console .card > h3 small {
+  font-weight: 400;
+  font-size: 11px;
+  color: #a9b2d9;
+  text-align: right;
+}
+.pp-console .card .in {
+  padding: 12px 14px;
+}
+.pp-console .foot {
+  font-size: 11px;
+  color: var(--mute);
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* Tables */
+.pp-console .tw {
+  overflow-x: auto;
+}
+.pp-console table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+}
+.pp-console th {
+  font-weight: 600;
+  color: var(--ink2);
+  text-align: right;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+.pp-console td {
+  padding: 7px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  color: var(--ink);
+}
+.pp-console th:first-child,
+.pp-console td:first-child {
+  text-align: left;
+}
+.pp-console td:first-child {
+  white-space: normal;
+  min-width: 130px;
+}
+.pp-console tr[data-spec],
+.pp-console tr[data-entity] {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.pp-console tr[data-spec]:hover td,
+.pp-console tr[data-entity]:hover td {
+  background: var(--tealsoft) !important;
+}
+.pp-console tr.tot td {
+  font-weight: 700;
+  background: var(--surface2);
+}
+.pp-console tr.sel td {
+  background: var(--tealsoft);
+  font-weight: 600;
+}
+.pp-console tr.ind td:first-child {
+  padding-left: 22px;
+}
+.pp-console td.warn {
+  background: var(--warnbg) !important;
+}
+.pp-console td.bad {
+  background: var(--badbg) !important;
+}
+.pp-console td.ok {
+  background: var(--okbg) !important;
+}
+
+/* Callouts */
+.pp-console .callouts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pp-console .callouts li {
+  padding-left: 16px;
+  position: relative;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.pp-console .callouts li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+}
+.pp-console .callouts b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* SVG Chart Elements */
+.pp-console svg text {
+  font-family: inherit;
+}
+.pp-console .chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.pp-console .bar {
+  display: inline-block;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--teal);
+  vertical-align: middle;
+}
+.pp-console .track {
+  display: inline-block;
+  width: 70px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--track);
+  vertical-align: middle;
+  margin-left: 6px;
+  position: relative;
+  overflow: hidden;
+}
+.pp-console .track .bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 7px;
+}
+
+/* Dials & Gauges */
+.pp-console .dials {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 14px;
+  padding: 14px;
+}
+@media (max-width: 1100px) {
+  .pp-console .dials {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.pp-console .dials .dl {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.pp-console .dial {
+  text-align: center;
+}
+.pp-console .dial svg {
+  width: 100%;
+  max-width: 210px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+.pp-console .dsub {
+  font-size: 11.5px;
+  color: var(--mute);
+  margin-top: -2px;
+}
+.pp-console .kpi.roll .dsub {
+  color: #b9c1e6;
+}
+.pp-console .kpi.roll .dsub b {
+  color: #fff;
+}
+
+/* Status Pills */
+.pp-console .pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.pp-console .pill.ok {
+  background: var(--okbg);
+  color: var(--fav);
+}
+.pp-console .pill.warn {
+  background: var(--warnbg);
+  color: #8a6200;
+}
+.pp-console .pill.bad {
+  background: var(--badbg);
+  color: var(--unfav);
+}
+.dark .pp-console .pill.warn,
+[data-theme="dark"] .pp-console .pill.warn {
+  color: #f0c35a;
+}
+
+/* Segmented Buttons */
+.pp-console .seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.pp-console .seg button {
+  border: 0;
+  background: transparent;
+  color: var(--ink2);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pp-console .seg button[aria-pressed="true"] {
+  background: var(--navy);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Definitions Table */
+.pp-console .defs td {
+  white-space: normal;
+  text-align: left;
+  vertical-align: top;
+}
+.pp-console .defs th {
+  text-align: left;
+}
