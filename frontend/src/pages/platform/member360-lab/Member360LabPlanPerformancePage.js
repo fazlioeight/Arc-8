@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useContext, useMemo, useState, useRef, useEffect } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
+import { AuthContext } from '../../../context/AuthContext';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { usePermissions } from '../../../hooks/usePermissions';
@@ -37,6 +38,7 @@ const TAB_PERMISSIONS = {
 };
 
 export default function Member360LabPlanPerformancePage() {
+  const { isAuthenticated } = useContext(AuthContext) || {};
   const { can, isAdmin, currentRole } = usePermissions();
   const fileInputRef = useRef(null);
 
@@ -383,6 +385,16 @@ export default function Member360LabPlanPerformancePage() {
       handleFileChange({ target: { files: [file] } });
     }
   };
+
+  if (!isAuthenticated) {
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: `${location.pathname}${location.search}${location.hash}` }}
+        replace
+      />
+    );
+  }
 
   const hasFinancialAccess =
     isAdmin ||

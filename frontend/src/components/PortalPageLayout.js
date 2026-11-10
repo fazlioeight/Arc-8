@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useContext, useMemo, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 import PortalUtilityBar from './PortalUtilityBar';
 import PortalSidebar from './PortalSidebar';
 import PortalNav from './PortalNav';
@@ -29,6 +31,8 @@ const PortalPageLayout = ({
   showTopNav = false, // Primary navigation now lives in the left sidebar menu
   children,
 }) => {
+  const auth = useContext(AuthContext);
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem('arc8_sidebar_collapsed') === 'true';
@@ -86,6 +90,16 @@ const PortalPageLayout = ({
       </div>
     </div>
   );
+
+  if (auth && auth.isAuthenticated === false) {
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: `${location.pathname}${location.search}${location.hash}` }}
+        replace
+      />
+    );
+  }
 
   return (
     <div className="portal-theme flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-[#070b14] dark:text-slate-100 font-sans antialiased">

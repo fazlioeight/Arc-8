@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../context/AuthContext";
 import { ROUTES } from "../../constants/routes";
 import { DEMO_PERSONAS } from "../../constants/permissions";
@@ -28,7 +28,10 @@ const Field = ({ id, label, type = "text", value, onChange, placeholder, require
   </div>
 );
 
-const getPostLoginRedirect = (data) => {
+const getPostLoginRedirect = (data, fromPath) => {
+  if (fromPath && typeof fromPath === "string" && fromPath.startsWith("/") && !fromPath.startsWith("/login")) {
+    return fromPath;
+  }
   const role = data?.role;
   const email = (data?.email || '').toLowerCase();
   if (role === 'payer_executive' || email.includes('jessica')) {
@@ -45,6 +48,8 @@ const Login = () => {
   });
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedFrom = location.state?.from || location.state?.lockedFrom || null;
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [activePersonaEmail, setActivePersonaEmail] = useState("");
@@ -94,13 +99,13 @@ const Login = () => {
 
       window.history.replaceState({}, document.title, "/login");
       login(data);
-      navigate(getPostLoginRedirect(data));
+      navigate(getPostLoginRedirect(data, requestedFrom), { replace: true });
     } catch (err) {
       setError(err.message || "OIDC authentication failed.");
     } finally {
       setSubmitting(false);
     }
-  }, [formData.tenant, login, navigate]);
+  }, [formData.tenant, login, navigate, requestedFrom]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -154,7 +159,7 @@ const Login = () => {
       }
 
       login(data);
-      navigate(getPostLoginRedirect(data));
+      navigate(getPostLoginRedirect(data, requestedFrom), { replace: true });
     } catch (err) {
       setError(err.message || "OIDC authentication failed.");
     } finally {
@@ -177,7 +182,7 @@ const Login = () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Authentication failed.");
       login(data);
-      navigate(getPostLoginRedirect(data));
+      navigate(getPostLoginRedirect(data, requestedFrom), { replace: true });
     } catch (err) {
       setError(err.message || "An unexpected error occurred.");
     } finally {

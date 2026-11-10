@@ -115,7 +115,29 @@ const RedirectWhenLocked = () => {
 };
 
 const Shell = ({ themePreference, setThemePreference }) => {
+  const { isAuthenticated } = useContext(AuthContext) || {};
   const location = useLocation();
+  const isPublicRoute =
+    location.pathname === "/" ||
+    location.pathname === "/login" ||
+    location.pathname === "/pricing" ||
+    location.pathname === ROUTES.DOCS ||
+    location.pathname.startsWith("/about") ||
+    location.pathname.startsWith("/products") ||
+    location.pathname.startsWith("/insights") ||
+    location.pathname.startsWith("/contact") ||
+    location.pathname.startsWith("/staff");
+
+  if (!isAuthenticated && !isPublicRoute) {
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: `${location.pathname}${location.search}${location.hash}` }}
+        replace
+      />
+    );
+  }
+
   const hideNavbarOn = [
     ROUTES.PORTAL.LANDING,
     "/portalPage",
@@ -273,6 +295,10 @@ const Shell = ({ themePreference, setThemePreference }) => {
               <WorkbenchPage />
             </ErrorBoundary>
           )} />
+          <Route
+            path="*"
+            element={<Navigate to={isAuthenticated ? ROUTES.PORTAL.LANDING : "/login"} replace />}
+          />
         </Routes>
       </Suspense>
     </div>
