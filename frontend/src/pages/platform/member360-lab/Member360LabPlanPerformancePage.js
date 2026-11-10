@@ -104,25 +104,30 @@ export default function Member360LabPlanPerformancePage() {
   const [datasetVersion, setDatasetVersion] = useState(0);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
-  // Sync tab & filters when URL query parameters change (e.g. from sidebar navigation or Command Palette)
+  const lastSyncedSearchRef = useRef(location.search);
+
+  // Sync tab & filters when URL query parameters change externally (e.g. from sidebar navigation or Command Palette)
   useEffect(() => {
+    if (location.search === lastSyncedSearchRef.current) return;
+    lastSyncedSearchRef.current = location.search;
+
     const params = new URLSearchParams(location.search);
     const rawTab = params.get('tab');
     const tabParam = rawTab === 'financials' ? 'fin' : rawTab;
-    if (tabParam && CONSOLE_TABS.some(([k]) => k === tabParam) && tabParam !== activeTab) {
-      setActiveTab(tabParam);
+    if (tabParam && CONSOLE_TABS.some(([k]) => k === tabParam)) {
+      setActiveTab((prev) => (prev !== tabParam ? tabParam : prev));
     }
     const mktParam = params.get('market');
-    if (mktParam && mktParam !== selectedMarket) {
-      setSelectedMarket(mktParam);
+    if (mktParam) {
+      setSelectedMarket((prev) => (prev !== mktParam ? mktParam : prev));
     }
     const grpParam = params.get('group');
-    if (grpParam && grpParam !== selectedGroup) {
-      setSelectedGroup(grpParam);
+    if (grpParam) {
+      setSelectedGroup((prev) => (prev !== grpParam ? grpParam : prev));
     }
     const cmpParam = params.get('cmp');
-    if ((cmpParam === 'budget' || cmpParam === 'prior') && cmpParam !== comparisonMode) {
-      setComparisonMode(cmpParam);
+    if (cmpParam === 'budget' || cmpParam === 'prior') {
+      setComparisonMode((prev) => (prev !== cmpParam ? cmpParam : prev));
     }
   }, [location.search]);
 
@@ -143,21 +148,20 @@ export default function Member360LabPlanPerformancePage() {
         );
       } catch (_) {}
     }
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set('tab', activeTab);
-        if (selectedMarket && selectedMarket !== 'all') next.set('market', selectedMarket);
-        else next.delete('market');
-        if (selectedGroup && selectedGroup !== 'all') next.set('group', selectedGroup);
-        else next.delete('group');
-        if (comparisonMode && comparisonMode !== 'budget') next.set('cmp', comparisonMode);
-        else next.delete('cmp');
-        return next;
-      },
-      { replace: true }
-    );
-  }, [activeTab, selectedMarket, selectedGroup, comparisonMode, cs, spec, setSearchParams]);
+
+    const next = new URLSearchParams();
+    next.set('tab', activeTab);
+    if (selectedMarket && selectedMarket !== 'all') next.set('market', selectedMarket);
+    if (selectedGroup && selectedGroup !== 'all') next.set('group', selectedGroup);
+    if (comparisonMode && comparisonMode !== 'budget') next.set('cmp', comparisonMode);
+
+    const nextSearch = `?${next.toString()}`;
+    if (nextSearch !== location.search) {
+      lastSyncedSearchRef.current = nextSearch;
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedMarket, selectedGroup, comparisonMode, cs, spec]);
 
   // Auto-select first authorized tab if current tab is denied
   useEffect(() => {

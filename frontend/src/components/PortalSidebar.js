@@ -320,7 +320,6 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
             { label: t('nav.sub.quality_star', 'Quality & Star Ratings'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=qual`, permission: 'tab:pp_quality', parentSub: 'sub:exec_financial' },
             { label: t('nav.sub.pp_risk', 'Risk Adjustment (RAF)'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=risk`, permission: 'tab:pp_risk', parentSub: 'sub:exec_financial' },
             { label: t('nav.sub.pp_defs', 'Definitions & Glossary'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=defs`, permission: 'tab:pp_defs', parentSub: 'sub:exec_financial' },
-            { label: t('nav.sub.exec_hedis_dashboard', 'HEDIS & Star Ratings'), href: `${ROUTES.DASHBOARD}#hedis`, permission: 'sub:exec_hedis' },
           ],
         },
         { label: t('nav.provider_directory', 'Provider Directory'), href: ROUTES.PROVIDERS.LANDING, icon: SvgProviders, permission: 'menu:provider_directory' },
