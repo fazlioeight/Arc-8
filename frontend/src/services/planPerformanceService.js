@@ -185,8 +185,8 @@ export const saveDatasetToCatalog = (jsonObj, displayName, filename = 'uploaded_
   }
 
   const catalog = getDatasetCatalog();
-  if (catalog.some((d) => (d.name || '').toLowerCase() === name.toLowerCase())) {
-    throw new Error(`A scenario named "${name}" already exists. Please choose a unique name.`);
+  if (catalog.some((d) => (d.name || '').trim().toLowerCase() === name.toLowerCase())) {
+    throw new Error('A scenario with this name already exists. Please choose a unique name.');
   }
 
   const id = `custom_${Date.now()}`;
@@ -260,6 +260,16 @@ export const renameDatasetInCatalog = (id, newName) => {
     throw new Error('Built-in baseline dataset names cannot be modified.');
   }
 
+  const trimmed = newName.trim();
+  const catalog = getDatasetCatalog();
+  if (
+    catalog.some(
+      (d) => d.id !== id && (d.name || '').trim().toLowerCase() === trimmed.toLowerCase()
+    )
+  ) {
+    throw new Error('A scenario with this name already exists. Please choose a unique name.');
+  }
+
   if (typeof window !== 'undefined' && window.localStorage) {
     let customList = [];
     try {
@@ -269,7 +279,7 @@ export const renameDatasetInCatalog = (id, newName) => {
 
     const idx = customList.findIndex((d) => d.id === id);
     if (idx !== -1) {
-      customList[idx].name = newName.trim();
+      customList[idx].name = trimmed;
       window.localStorage.setItem(CATALOG_KEY, JSON.stringify(customList));
       return customList[idx];
     }
