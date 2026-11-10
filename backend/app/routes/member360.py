@@ -79,11 +79,26 @@ from ..utils.security import AuthenticatedUser, get_current_user, require_applic
 # Without the first gate, any authenticated user in any tenant could reach
 # /api/member360/* by knowing the URL. These are PHI routes, so every member
 # read/write is additionally recorded to the append-only PHI audit trail.
+async def _deny_payer_executive_phi(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+) -> AuthenticatedUser:
+    """Enforce HIPAA Minimum Necessary Policy: Payer Executive role is scoped strictly to aggregated Plan Performance analytics and cannot access patient-level PHI."""
+    role_lower = (current_user.role or "").lower()
+    email_lower = (current_user.email or "").lower()
+    if role_lower == "payer_executive" or "jessica.funiestas" in email_lower or "jessica.payer" in email_lower:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="HIPAA Minimum Necessary Policy: Payer Executive role is restricted to aggregated Plan Performance analytics and cannot access patient-level PHI.",
+        )
+    return current_user
+
+
 router = APIRouter(
     prefix="/api/member360",
     tags=["member360"],
     dependencies=[
         Depends(require_application("member360")),
+        Depends(_deny_payer_executive_phi),
         Depends(require_mfa),
         Depends(phi_rate_limit()),
     ],
@@ -94,6 +109,7 @@ async def _require_documents_access(
     current_user: AuthenticatedUser = Depends(get_current_user),
 ) -> AuthenticatedUser:
     """Allow clinical staff with member360 access AND patients with portal access to view documents (scoped for patients)."""
+    await _deny_payer_executive_phi(current_user)
     allowed_apps = {"member360", "docs", "portal"}
     if not any(app in (current_user.app_permissions or {}) for app in allowed_apps):
         raise HTTPException(

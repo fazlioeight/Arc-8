@@ -80,26 +80,23 @@ export const usePermissions = () => {
 
   const can = useCallback(
     (permissionKey) => {
-      if (isPlatformAdmin) return true;
       return activePermissions.has(permissionKey);
     },
-    [isPlatformAdmin, activePermissions]
+    [activePermissions]
   );
 
   const hasAny = useCallback(
     (...permissionKeys) => {
-      if (isPlatformAdmin) return true;
       return permissionKeys.some((p) => activePermissions.has(p));
     },
-    [isPlatformAdmin, activePermissions]
+    [activePermissions]
   );
 
   const hasAll = useCallback(
     (...permissionKeys) => {
-      if (isPlatformAdmin) return true;
       return permissionKeys.every((p) => activePermissions.has(p));
     },
-    [isPlatformAdmin, activePermissions]
+    [activePermissions]
   );
 
   const hasRole = useCallback(

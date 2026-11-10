@@ -123,7 +123,7 @@ export const getCurrentData = () => {
  * Validates a candidate JSON dataset before saving.
  */
 export const validateDataset = (jsonObj) => {
-  if (!jsonObj || typeof jsonObj !== 'object') {
+  if (!jsonObj || typeof jsonObj !== 'object' || Array.isArray(jsonObj)) {
     return { valid: false, error: 'Uploaded file is not a valid JSON object.' };
   }
 
@@ -139,6 +139,16 @@ export const validateDataset = (jsonObj) => {
     return {
       valid: false,
       error: 'Invalid "fact_entity_summary" format. Each record must include "entity_id", "entity_name", and "level".',
+    };
+  }
+
+  const hasPlanRow = jsonObj.fact_entity_summary.some(
+    (r) => r.entity_id === 'plan' || r.level === 'plan'
+  );
+  if (!hasPlanRow) {
+    return {
+      valid: false,
+      error: 'Invalid dataset: "fact_entity_summary" must include a plan-level summary record (entity_id: "plan").',
     };
   }
 
@@ -169,8 +179,17 @@ export const saveDatasetToCatalog = (jsonObj, displayName, filename = 'uploaded_
     throw new Error(check.error);
   }
 
-  const id = `custom_${Date.now()}`;
   const name = displayName && displayName.trim() ? displayName.trim() : filename.replace(/\.json$/i, '');
+  if (!name) {
+    throw new Error('Scenario display name cannot be empty.');
+  }
+
+  const catalog = getDatasetCatalog();
+  if (catalog.some((d) => (d.name || '').toLowerCase() === name.toLowerCase())) {
+    throw new Error(`A scenario named "${name}" already exists. Please choose a unique name.`);
+  }
+
+  const id = `custom_${Date.now()}`;
 
   const newEntry = {
     id,

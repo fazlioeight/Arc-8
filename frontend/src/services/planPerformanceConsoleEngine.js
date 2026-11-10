@@ -321,7 +321,10 @@ export function buildConsoleModel(rawData) {
       revPM: row.revenue_pmpm || 1375,
       rxD: row.part_d_cost_pmpm || 300,
       pmpm: row.medical_cost_pmpm || 1317,
-      pmpmYoy: row.medical_cost_pmpm_vs_prior_year_pct || 1.8,
+      pmpmYoy:
+        costCatMap[id]?.yoy_change_pct ??
+        row.medical_cost_pmpm_vs_prior_year_pct ??
+        1.8,
       bRev: row.budget_revenue_musd || 0,
       bCost: row.budget_medical_cost_musd || 0,
       bSga: row.budget_sga_musd || 0,
@@ -740,7 +743,7 @@ export function renderConsoleTab(model, S) {
       const row = (s) => {
         const p = planServices.find((ps) => ps.service === s.service) || s;
         const diff = s.pmpm - p.pmpm;
-        return `<tr data-spec="${esc(s.service)}" tabindex="0" role="button" class="ind ${s.service === cur.service ? 'sel' : ''}"><td>${esc(s.service)}</td><td class="num"><b>${$$(s.pmpm)}</b>${cellBar(s.pmpm, 150, 'var(--c2)')}</td><td class="num">${((s.pmpm / (totI || 1)) * 100).toFixed(0)}%</td><td class="num">${s.utilization_per_1000 ? s.utilization_per_1000.toFixed(1) : '—'}</td><td class="num">${s.cost_per_unit_usd ? $$(s.cost_per_unit_usd) : '—'}</td><td class="num ${s.yoy_change_pct <= 2 ? 'fav' : 'unfav'}">${sP(s.yoy_change_pct)}</td><td class="num ${diff <= 0 ? 'fav' : 'unfav'}">${f === P ? '—' : (diff >= 0 ? '+' : '−') + '$' + Math.abs(diff).toFixed(0)}</td></tr>`;
+        return `<tr data-spec="${esc(s.service)}" tabindex="0" role="button" class="ind ${s.service === cur.service ? 'sel' : ''}"><td>${esc(s.service)}</td><td class="num"><b>${$$(s.pmpm)}</b>${cellBar(s.pmpm, 150, 'var(--c2)')}</td><td class="num">${((s.pmpm / (totI || 1)) * 100).toFixed(0)}%</td><td class="num">${s.utilization_per_1000 ? s.utilization_per_1000.toFixed(1) : '—'}</td><td class="num">${s.cost_per_unit_usd ? $$(s.cost_per_unit_usd) : '—'}</td><td class="num ${s.yoy_change_pct <= 0 ? 'fav' : 'unfav'}">${sP(s.yoy_change_pct)}</td><td class="num ${diff <= 0 ? 'fav' : 'unfav'}">${f === P ? '—' : (diff >= 0 ? '+' : '−') + '$' + Math.abs(diff).toFixed(0)}</td></tr>`;
       };
 
       const ipRows = services.filter((s) => (s.group || '').includes('inpatient'));
@@ -772,7 +775,7 @@ export function renderConsoleTab(model, S) {
       tbl = `<div class="tw"><table><thead><tr><th>Specialty</th><th>PMPM</th><th>Share</th><th>YoY</th><th>vs plan</th></tr></thead><tbody>${specs.map((s) => {
         const p = planSpecs.find((ps) => ps.specialty === s.specialty) || s;
         const diff = s.pmpm - p.pmpm;
-        return `<tr data-spec="${esc(s.specialty)}" tabindex="0" role="button" class="${s.specialty === cur.specialty ? 'sel' : ''}"><td>${esc(s.specialty)}</td><td class="num"><b>${$$(s.pmpm)}</b>${cellBar(s.pmpm, 50, 'var(--c2)')}</td><td class="num">${s.share_of_professional_pct}%</td><td class="num ${s.yoy_change_pct <= 2 ? 'fav' : 'unfav'}">${sP(s.yoy_change_pct)}</td><td class="num ${diff <= 0 ? 'fav' : 'unfav'}">${f === P ? '—' : (diff >= 0 ? '+' : '−') + '$' + Math.abs(diff).toFixed(0)}</td></tr>`;
+        return `<tr data-spec="${esc(s.specialty)}" tabindex="0" role="button" class="${s.specialty === cur.specialty ? 'sel' : ''}"><td>${esc(s.specialty)}</td><td class="num"><b>${$$(s.pmpm)}</b>${cellBar(s.pmpm, 50, 'var(--c2)')}</td><td class="num">${s.share_of_professional_pct}%</td><td class="num ${s.yoy_change_pct <= 0 ? 'fav' : 'unfav'}">${sP(s.yoy_change_pct)}</td><td class="num ${diff <= 0 ? 'fav' : 'unfav'}">${f === P ? '—' : (diff >= 0 ? '+' : '−') + '$' + Math.abs(diff).toFixed(0)}</td></tr>`;
       }).join('')}<tr class="tot"><td>Total professional</td><td class="num">${$$(f.pro)}</td><td class="num">100%</td><td></td><td></td></tr></tbody></table></div>`;
 
       const ents = rows().map((e) => {
@@ -785,7 +788,7 @@ export function renderConsoleTab(model, S) {
         { min: 0, max: Math.max(...ents.map((x) => x.v), pcur.pmpm) * 1.15, ref: pcur.pmpm, refLabel: $$(pcur.pmpm), fmt: (v) => $$(v), label: cur.specialty + ' PMPM', L: 158, rh: 24, w: 440 }
       );
 
-      const mini = `<div class="kpis" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px">${kpi(cur.specialty + ' PMPM', $$(cur.pmpm), f === P ? 'all markets' : `${dlt((cur.pmpm - pcur.pmpm >= 0 ? '+' : '−') + '$' + Math.abs(cur.pmpm - pcur.pmpm).toFixed(0), cur.pmpm <= pcur.pmpm)} vs plan`)}${kpi('Share of professional', (cur.share_of_professional_pct || 16) + '%', 'of professional cost')}${kpi('YoY', sP(cur.yoy_change_pct || 1.2), dlt(cur.yoy_change_pct <= 2 ? 'Within trend' : 'Above trend', cur.yoy_change_pct <= 2))}${kpi('Rank', '1 of ' + specs.length, 'by PMPM in scope')}</div>`;
+      const mini = `<div class="kpis" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px">${kpi(cur.specialty + ' PMPM', $$(cur.pmpm), f === P ? 'all markets' : `${dlt((cur.pmpm - pcur.pmpm >= 0 ? '+' : '−') + '$' + Math.abs(cur.pmpm - pcur.pmpm).toFixed(0), cur.pmpm <= pcur.pmpm)} vs plan`)}${kpi('Share of professional', (cur.share_of_professional_pct || 16) + '%', 'of professional cost')}${kpi('YoY', sP(cur.yoy_change_pct || 1.2), dlt(cur.yoy_change_pct <= 0 ? 'Cost reduction' : 'Cost increase', cur.yoy_change_pct <= 0))}${kpi('Rank', '1 of ' + specs.length, 'by PMPM in scope')}</div>`;
 
       drill = card('Drill-down: ' + cur.specialty, 'by ' + rowsLabel().toLowerCase(), inner(mini + bars), 'Teal means at or under plan PMPM for the specialty; amber means above.');
       foot = 'Professional cost by specialty.';
@@ -826,9 +829,9 @@ export function renderConsoleTab(model, S) {
     });
     g += '</svg>';
 
-    const tbl = `<div class="tw"><table><thead><tr><th>Entity</th><th>Part D</th><th>Inst. IP</th><th>Inst. OP</th><th>Professional</th><th>Capitation</th><th>Other</th><th>Total PMPM</th><th>YoY</th><th>vs plan avg</th></tr></thead><tbody>${list.map((e) => `<tr class="${e === P ? 'tot' : e.id === S.group ? 'sel' : ''}" data-entity="${esc(e.id)}" style="cursor:pointer"><td>${esc(e.name)}</td><td ${hcn(e.rxD, P.rxD, false)}>${$$(e.rxD)}</td><td class="num">${$$(e.ip)}</td><td class="num">${$$(e.op)}</td><td class="num">${$$(e.pro)}</td><td class="num">${$$(e.cap)}</td><td class="num">${$$(e.oth)}</td><td ${hcn(e.pmpm, PA, false)}><b>${$$(e.pmpm)}</b></td><td class="num ${e.pmpmYoy <= 2 ? 'fav' : 'unfav'}">${sP(e.pmpmYoy)}</td><td class="num ${e.pmpm <= PA ? 'fav' : 'unfav'}">${e === P ? '—' : (e.pmpm - PA >= 0 ? '+' : '−') + '$' + Math.abs(e.pmpm - PA).toFixed(0)}</td></tr>`).join('')}</tbody></table></div>`;
+    const tbl = `<div class="tw"><table><thead><tr><th>Entity</th><th>Part D</th><th>Inst. IP</th><th>Inst. OP</th><th>Professional</th><th>Capitation</th><th>Other</th><th>Total PMPM</th><th>YoY</th><th>vs plan avg</th></tr></thead><tbody>${list.map((e) => `<tr class="${e === P ? 'tot' : e.id === S.group ? 'sel' : ''}" data-entity="${esc(e.id)}" style="cursor:pointer"><td>${esc(e.name)}</td><td ${hcn(e.rxD, P.rxD, false)}>${$$(e.rxD)}</td><td class="num">${$$(e.ip)}</td><td class="num">${$$(e.op)}</td><td class="num">${$$(e.pro)}</td><td class="num">${$$(e.cap)}</td><td class="num">${$$(e.oth)}</td><td ${hcn(e.pmpm, PA, false)}><b>${$$(e.pmpm)}</b></td><td class="num ${e.pmpmYoy <= 0 ? 'fav' : 'unfav'}">${sP(e.pmpmYoy)}</td><td class="num ${e.pmpm <= PA ? 'fav' : 'unfav'}">${e === P ? '—' : (e.pmpm - PA >= 0 ? '+' : '−') + '$' + Math.abs(e.pmpm - PA).toFixed(0)}</td></tr>`).join('')}</tbody></table></div>`;
     const sh = (k) => `${(((f[k] || 0) / (f.pmpm || 1)) * 100).toFixed(0)}% of total`;
-    const tiles = `<div class="kpis">${kpi('Total medical cost PMPM', $$(f.pmpm), `${dlt(sP(f.pmpmYoy), f.pmpmYoy <= 2)} YoY · ${M(f.cost)} total`, monthly(f.id).costP)}${kpi('Part D PMPM', $$(f.rxD), `${sh('rxD')} · revenue ${$$(f.revD)}`)}${kpi('Inst. inpatient PMPM', $$(f.ip), sh('ip'))}${kpi('Inst. outpatient PMPM', $$(f.op), sh('op'))}${kpi('Professional PMPM', $$(f.pro), sh('pro'))}${kpi('Capitation PMPM', $$(f.cap), `${sh('cap')} · other ${$$(f.oth)}`)}</div>`;
+    const tiles = `<div class="kpis">${kpi('Total medical cost PMPM', $$(f.pmpm), `${dlt(sP(f.pmpmYoy), f.pmpmYoy <= 0)} YoY · ${M(f.cost)} total`, monthly(f.id).costP)}${kpi('Part D PMPM', $$(f.rxD), `${sh('rxD')} · revenue ${$$(f.revD)}`)}${kpi('Inst. inpatient PMPM', $$(f.ip), sh('ip'))}${kpi('Inst. outpatient PMPM', $$(f.op), sh('op'))}${kpi('Professional PMPM', $$(f.pro), sh('pro'))}${kpi('Capitation PMPM', $$(f.cap), `${sh('cap')} · other ${$$(f.oth)}`)}</div>`;
     const hc2 = `<div class="in"><div style="display:flex;gap:18px;flex-wrap:wrap"><div><div class="v num" style="font-size:26px;font-weight:700">${T.high_cost_member_share_pct || 1.2}%</div><div class="d" style="color:var(--mute)">of members are high-cost claimants (over ${$$(T.hcc_high_cost_claimant_threshold_usd || 50000)})</div></div><div><div class="v num" style="font-size:26px;font-weight:700">${T.high_cost_cost_share_pct || 18}%</div><div class="d" style="color:var(--mute)">of total medical cost</div></div></div><p style="color:var(--ink2);margin:10px 0 0">Plan-level figures. A small group of claimants drives close to a fifth of cost, so a handful of cases can move a group’s MLR.</p></div>`;
 
     return (
@@ -843,28 +846,86 @@ export function renderConsoleTab(model, S) {
   /* ---------- Tab 4: Provider MLR ---------- */
   function vMlr() {
     const f = focus();
-    const groups = allGroups().filter((g) => S.market === 'all' || g.market === S.market).sort((a, b) => b.mlr - a.mlr);
+    const groups = allGroups()
+      .filter((g) => S.market === 'all' || g.market === S.market)
+      .sort((a, b) => b.mlr - a.mlr);
+    const scopeGroups = S.group && S.group !== 'all' && E[S.group] ? [E[S.group]] : groups;
     const bars = hBars(
-      groups.map((g) => ({ label: g.name, v: g.mlr, color: { ok: 'var(--c2)', warn: 'var(--c4)', bad: 'var(--unfav)' }[heat(g.mlr, BENCH, false) || 'ok'], bold: g.id === S.group })),
+      groups.map((g) => ({
+        label: g.name,
+        v: g.mlr,
+        color: { ok: 'var(--c2)', warn: 'var(--c4)', bad: 'var(--unfav)' }[heat(g.mlr, BENCH, false) || 'ok'],
+        bold: g.id === S.group,
+      })),
       { min: 70, max: 105, ref: BENCH, refLabel: 'Goal ' + BENCH.toFixed(1) + '%', fmt: (v) => v.toFixed(1) + '%', label: 'MLR by provider group', L: 170, rh: 24 }
     );
-    const nets = D.fact_network_mlr || [];
-    const ntbl = `<div class="tw"><table><thead><tr><th>Network</th><th>Members</th><th>MLR</th><th>PMPM cost</th><th>vs benchmark</th></tr></thead><tbody>${nets.map((n) => {
-      const c = heat(n.mlr_pct, BENCH, false);
-      return `<tr><td>${esc(n.network_name)}</td><td class="num">${f0(n.members)}</td><td class="num ${c}">${pct(n.mlr_pct)}${cellBar(n.mlr_pct - 70, 25, 'var(--c3)')}</td><td class="num">${$$(n.pmpm_cost)}</td><td><span class="pill ${c}">${{ ok: 'On track', warn: 'Above goal', bad: 'Off track' }[c]}</span></td></tr>`;
-    }).join('')}</tbody></table></div>`;
-    const k = (D.ref_plan_kpi_deltas || D.kpi_tiles || []).filter((r) => r.category === 'mlr');
-    const tiles = `<div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">${(k.length ? k : [
-      { kpi_label: 'Network-wide MLR', value_display: '85.1%', delta_display: '-0.8 pt QoQ', delta_is_favorable: 'yes' },
-      { kpi_label: 'Providers below MLR target', value_display: '12 of 145', delta_display: '+3 vs. last qtr', delta_is_favorable: 'no' },
-      { kpi_label: 'Highest MLR (Network C · Rural)', value_display: '91.4%', delta_display: '+1.2 pt QoQ', delta_is_favorable: 'no' },
-      { kpi_label: 'Provider cost variance index', value_display: '1.08', delta_display: '+0.02 QoQ', delta_is_favorable: 'no' },
-    ]).map((r) => kpi(r.kpi_label, r.value_display, `${dlt(esc(r.delta_display), r.delta_is_favorable === 'yes')}`)).join('')}</div>`;
-    const gt = `<div class="tw"><table><thead><tr><th>Provider group</th><th>Market</th><th>Members</th><th>Revenue</th><th>Med cost</th><th>MLR</th><th>vs goal</th><th>Rev PMPM</th><th>Med PMPM</th></tr></thead><tbody>${groups.map((g) => `<tr class="${g.id === S.group ? 'sel' : ''}" data-entity="${esc(g.id)}" style="cursor:pointer"><td>${esc(g.name)}</td><td>${esc(E[g.market] ? E[g.market].name : '')}</td><td class="num">${f0(g.members)}</td><td class="num">${M(g.rev)}</td><td class="num">${M(g.cost)}</td><td ${hcn(g.mlr, BENCH, false)}>${pct(g.mlr)}</td><td class="num ${g.mlr <= BENCH ? 'fav' : 'unfav'}">${sPt(g.mlr - BENCH)}</td><td class="num">${$$(pm$(g, 'rev'))}</td><td class="num">${$$(pm$(g, 'cost'))}</td></tr>`).join('')}</tbody></table></div>`;
+
+    const baseNets = D.fact_network_mlr || [];
+    const memRatio = P.members ? f.members / P.members : 1;
+    const mlrDiff = f.mlr - (P.mlr || 84.5);
+    const pmpmRatio = P.pmpm ? f.pmpm / P.pmpm : 1;
+    const nets = baseNets.map((n) => ({
+      ...n,
+      members: Math.round((n.members || 0) * memRatio),
+      mlr_pct: Number(((n.mlr_pct || 84.5) + mlrDiff).toFixed(1)),
+      pmpm_cost: Math.round((n.pmpm_cost || 1317) * pmpmRatio),
+    }));
+
+    const ntbl = `<div class="tw"><table><thead><tr><th>Network</th><th>Members</th><th>MLR</th><th>PMPM cost</th><th>vs benchmark</th></tr></thead><tbody>${nets
+      .map((n) => {
+        const c = heat(n.mlr_pct, BENCH, false);
+        return `<tr><td>${esc(n.network_name)}</td><td class="num">${f0(n.members)}</td><td class="num ${c}">${pct(n.mlr_pct)}${cellBar(n.mlr_pct - 70, 25, 'var(--c3)')}</td><td class="num">${$$(n.pmpm_cost)}</td><td><span class="pill ${c}">${{ ok: 'On track', warn: 'Above goal', bad: 'Off track' }[c]}</span></td></tr>`;
+      })
+      .join('')}<tr class="tot"><td>${esc(scopeName())} Total</td><td class="num">${f0(f.members)}</td><td ${hcn(f.mlr, BENCH, false)}>${pct(f.mlr)}</td><td class="num">${$$(f.pmpm)}</td><td><span class="pill ${heat(f.mlr, BENCH, false)}">${f.mlr <= BENCH ? 'On track' : 'Above goal'}</span></td></tr></tbody></table></div>`;
+
+    const belowTargetCount = scopeGroups.filter((g) => g.mlr <= BENCH).length;
+    const hiGroup = scopeGroups[0] || f;
+    const costIndex = (f.pmpm / (P.pmpm || 1)).toFixed(2);
+    const cmpMlr = cv(f, 'mlr', cmp);
+    const mlrDelta = f.mlr - cmpMlr;
+
+    const dynamicTiles = [
+      {
+        kpi_label: f === P ? 'Network-wide MLR (Part A/B)' : `${scopeName()} MLR (Part A/B)`,
+        value_display: pct(f.mlr),
+        delta_display: `${sPt(mlrDelta)} vs ${cmpLabel().toLowerCase()}`,
+        favorable: f.mlr <= cmpMlr,
+        spark: monthly(f.id).mlr,
+      },
+      {
+        kpi_label: 'Providers at/below MLR target',
+        value_display: `${belowTargetCount} of ${scopeGroups.length}`,
+        delta_display: `Goal ≤ ${pct(BENCH)}`,
+        favorable: belowTargetCount >= Math.ceil(scopeGroups.length / 2),
+      },
+      {
+        kpi_label: `Highest MLR (${hiGroup.name})`,
+        value_display: pct(hiGroup.mlr),
+        delta_display: `${sPt(hiGroup.mlr - BENCH)} vs ${pct(BENCH)} goal`,
+        favorable: hiGroup.mlr <= BENCH,
+      },
+      {
+        kpi_label: 'Provider cost variance index',
+        value_display: costIndex,
+        delta_display: `${sP(f.pmpmYoy)} YoY PMPM (${$$(f.pmpm)})`,
+        favorable: Number(costIndex) <= 1.0 && f.pmpmYoy <= 0,
+      },
+    ];
+
+    const tiles = `<div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">${dynamicTiles
+      .map((r) => kpi(r.kpi_label, r.value_display, `${dlt(esc(r.delta_display), r.favorable)}`, r.spark))
+      .join('')}</div>`;
+
+    const gt = `<div class="tw"><table><thead><tr><th>Provider group</th><th>Market</th><th>Members</th><th>Revenue</th><th>Med cost</th><th>MLR</th><th>vs goal</th><th>Rev PMPM</th><th>Med PMPM</th></tr></thead><tbody>${groups
+      .map(
+        (g) =>
+          `<tr class="${g.id === S.group ? 'sel' : ''}" data-entity="${esc(g.id)}" style="cursor:pointer"><td>${esc(g.name)}</td><td>${esc(E[g.market] ? E[g.market].name : '')}</td><td class="num">${f0(g.members)}</td><td class="num">${M(g.rev)}</td><td class="num">${M(g.cost)}</td><td ${hcn(g.mlr, BENCH, false)}>${pct(g.mlr)}</td><td class="num ${g.mlr <= BENCH ? 'fav' : 'unfav'}">${sPt(g.mlr - BENCH)}</td><td class="num">${$$(pm$(g, 'rev'))}</td><td class="num">${$$(pm$(g, 'cost'))}</td></tr>`
+      )
+      .join('')}</tbody></table></div>`;
     return (
       scopeHeader() +
       tiles +
-      `<div class="grid2e">${card('Provider group MLR ranking', '2026 YTD · goal ' + pct(BENCH), inner(bars), 'Bars use the 1–19% (yellow) and 20%+ (red) variance-to-goal thresholds.')}${card('Network MLR', 'by network', ntbl)}</div>` +
+      `<div class="grid2e">${card('Provider group MLR ranking', '2026 YTD · goal ' + pct(BENCH), inner(bars), 'Bars use the 1–19% (yellow) and 20%+ (red) variance-to-goal thresholds.')}${card('Network MLR', scopeName() + ' · by network', ntbl)}</div>` +
       card('Provider group detail', 'sorted by MLR, highest first', gt, 'MLR includes provider and member incentives in cost.')
     );
   }

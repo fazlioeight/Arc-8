@@ -146,12 +146,19 @@ const RolePrivilegesManager = ({ initialTab = "user_allotment" }) => {
     return new Set(list);
   }, [matrix, selectedRoleKey]);
 
-  const togglePermission = (permKey) => {
+  const togglePermission = (permKey, parentModKey = null) => {
     const nextSet = new Set(activePermsForRole);
     if (nextSet.has(permKey)) {
       nextSet.delete(permKey);
     } else {
       nextSet.add(permKey);
+      if (parentModKey) {
+        nextSet.add(parentModKey);
+      }
+      if (permKey.startsWith("tab:pp_")) {
+        nextSet.add("menu:executive_dashboards");
+        nextSet.add("sub:exec_financial");
+      }
     }
     updateRolePermissions(selectedRoleKey, Array.from(nextSet));
     triggerToast("Privilege policy updated and synchronized successfully.");
@@ -361,13 +368,28 @@ const RolePrivilegesManager = ({ initialTab = "user_allotment" }) => {
     setUserPrivilegeSearch("");
   };
 
-  const toggleUserCustomPrivilege = (permKey) => {
+  const toggleUserCustomPrivilege = (permKey, parentMod = null) => {
     setUserCustomPerms((prev) => {
       const next = new Set(prev);
       if (next.has(permKey)) {
         next.delete(permKey);
       } else {
         next.add(permKey);
+        if (parentMod && parentMod.key) {
+          next.add(parentMod.key);
+        }
+        if (permKey.startsWith("tab:pp_")) {
+          next.add("menu:executive_dashboards");
+          next.add("sub:exec_financial");
+        }
+        // If enabling a parent module and none of its sub-permissions are enabled yet, enable its sub-permissions
+        const matchedMod = PERMISSION_CATEGORIES.flatMap((c) => c.modules).find((m) => m.key === permKey);
+        if (matchedMod && matchedMod.subPermissions && matchedMod.subPermissions.length > 0) {
+          const hasAnySub = matchedMod.subPermissions.some((s) => next.has(s.key));
+          if (!hasAnySub) {
+            matchedMod.subPermissions.forEach((s) => next.add(s.key));
+          }
+        }
       }
       return next;
     });
@@ -461,7 +483,10 @@ const RolePrivilegesManager = ({ initialTab = "user_allotment" }) => {
   const handleGrantAllPrivileges = () => {
     const allKeys = [];
     PERMISSION_CATEGORIES.forEach((c) => {
-      c.modules.forEach((m) => allKeys.push(m.key));
+      c.modules.forEach((m) => {
+        allKeys.push(m.key);
+        (m.subPermissions || []).forEach((s) => allKeys.push(s.key));
+      });
     });
     setUserCustomPerms(new Set(allKeys));
     triggerToast("Granted all system privileges to user");
@@ -497,10 +522,13 @@ const RolePrivilegesManager = ({ initialTab = "user_allotment" }) => {
   const handleGrantClinicalSuite = () => {
     setUserCustomPerms((prev) => {
       const next = new Set(prev);
-      const careCat = PERMISSION_CATEGORIES.find((c) => c.id === "care_members");
-      const clinicalCat = PERMISSION_CATEGORIES.find((c) => c.id === "clinical_work");
-      if (careCat) careCat.modules.forEach((m) => next.add(m.key));
-      if (clinicalCat) clinicalCat.modules.forEach((m) => next.add(m.key));
+      const clinicalCat = PERMISSION_CATEGORIES.find((c) => c.id === "clinical_operations");
+      if (clinicalCat) {
+        clinicalCat.modules.forEach((m) => {
+          next.add(m.key);
+          (m.subPermissions || []).forEach((s) => next.add(s.key));
+        });
+      }
       return next;
     });
     triggerToast("Granted Care Management & Clinical workflows");
@@ -1286,7 +1314,7 @@ const RolePrivilegesManager = ({ initialTab = "user_allotment" }) => {
 
                                             <button
                                               type="button"
-                                              onClick={() => toggleUserCustomPrivilege(sub.key)}
+                                              onClick={() => toggleUserCustomPrivilege(sub.key, m)}
                                               className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                                                 isSubGranted ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"
                                               }`}
@@ -1888,13 +1916,12 @@ const RolePrivilegesManager = ({ initialTab = "user_allotment" }) => {
                                       <button
                                         type="button"
                                         aria-label={`Toggle privilege ${sub.label}`}
-                                        disabled={!isModuleGranted}
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          togglePermission(sub.key);
+                                          togglePermission(sub.key, mod.key);
                                         }}
                                         className={[
-                                          "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed",
+                                          "relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border border-transparent transition-colors duration-200 ease-in-out",
                                           isSubGranted ? "bg-sky-500" : "bg-slate-300 dark:bg-slate-700",
                                         ].join(" ")}
                                       >

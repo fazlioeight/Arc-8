@@ -1,5 +1,5 @@
 import React, { useContext, useMemo, useState, useRef, useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import PortalPageLayout from '../../../components/PortalPageLayout';
 import { AuthContext } from '../../../context/AuthContext';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
@@ -37,10 +37,24 @@ const TAB_PERMISSIONS = {
   defs: 'tab:pp_defs',
 };
 
+const PP_FILTER_STORAGE_KEY = 'arc8_pp_filters_v1';
+
+const loadPersistedFilters = () => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.sessionStorage.getItem(PP_FILTER_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    return {};
+  }
+};
+
 export default function Member360LabPlanPerformancePage() {
   const { isAuthenticated } = useContext(AuthContext) || {};
   const { can, isAdmin, currentRole } = usePermissions();
   const fileInputRef = useRef(null);
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Administrative authority to upload/manage datasets
   const canManageDataset =
@@ -51,44 +65,99 @@ export default function Member360LabPlanPerformancePage() {
     currentRole === 'admin' ||
     currentRole === 'business_admin' ||
     currentRole === 'payer_executive' ||
-    currentRole === 'billing';
+    currentRole === 'billing' ||
+    currentRole === 'supervisor';
 
   // Available tabs filtered dynamically by user role and tab-level privileges
   const authorizedTabs = useMemo(() => {
     return CONSOLE_TABS.filter(([tabKey]) => {
-      // Platform and System Administrators have full authority over all tabs
-      if (
-        isAdmin ||
-        currentRole === 'platform_admin' ||
-        currentRole === 'admin'
-      ) {
-        return true;
-      }
       const permKey = TAB_PERMISSIONS[tabKey];
       return !permKey || can(permKey);
     });
-  }, [can, isAdmin, currentRole]);
+  }, [can]);
 
-  // Console Navigation & Filter State
-  const location = useLocation();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [selectedMarket, setSelectedMarket] = useState('all');
-  const [selectedGroup, setSelectedGroup] = useState('all');
-  const [comparisonMode, setComparisonMode] = useState('budget'); // 'budget' | 'prior'
-  const [cs, setCs] = useState('inst'); // 'inst' | 'prof'
-  const [spec, setSpec] = useState(null);
+  // Console Navigation & Filter State (hydrated from URL query params or sessionStorage)
+  const initialSaved = useMemo(() => loadPersistedFilters(), []);
+  const [activeTab, setActiveTab] = useState(() => {
+    const p = new URLSearchParams(location.search);
+    const rawTab = p.get('tab');
+    const tabParam = rawTab === 'financials' ? 'fin' : rawTab;
+    if (tabParam && CONSOLE_TABS.some(([k]) => k === tabParam)) return tabParam;
+    if (initialSaved.tab && CONSOLE_TABS.some(([k]) => k === initialSaved.tab)) return initialSaved.tab;
+    return 'overview';
+  });
+  const [selectedMarket, setSelectedMarket] = useState(() => {
+    const p = new URLSearchParams(location.search);
+    return p.get('market') || initialSaved.market || 'all';
+  });
+  const [selectedGroup, setSelectedGroup] = useState(() => {
+    const p = new URLSearchParams(location.search);
+    return p.get('group') || initialSaved.group || 'all';
+  });
+  const [comparisonMode, setComparisonMode] = useState(() => {
+    const p = new URLSearchParams(location.search);
+    const cmp = p.get('cmp') || initialSaved.cmp;
+    return cmp === 'prior' ? 'prior' : 'budget';
+  });
+  const [cs, setCs] = useState(() => initialSaved.cs || 'inst'); // 'inst' | 'prof'
+  const [spec, setSpec] = useState(() => initialSaved.spec || null);
   const [datasetVersion, setDatasetVersion] = useState(0);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
-  // Sync tab with URL query parameter ?tab=
+  // Sync tab & filters when URL query parameters change (e.g. from sidebar navigation or Command Palette)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const rawTab = params.get('tab');
     const tabParam = rawTab === 'financials' ? 'fin' : rawTab;
-    if (tabParam && CONSOLE_TABS.some(([k]) => k === tabParam)) {
+    if (tabParam && CONSOLE_TABS.some(([k]) => k === tabParam) && tabParam !== activeTab) {
       setActiveTab(tabParam);
     }
+    const mktParam = params.get('market');
+    if (mktParam && mktParam !== selectedMarket) {
+      setSelectedMarket(mktParam);
+    }
+    const grpParam = params.get('group');
+    if (grpParam && grpParam !== selectedGroup) {
+      setSelectedGroup(grpParam);
+    }
+    const cmpParam = params.get('cmp');
+    if ((cmpParam === 'budget' || cmpParam === 'prior') && cmpParam !== comparisonMode) {
+      setComparisonMode(cmpParam);
+    }
   }, [location.search]);
+
+  // Persist active filters to sessionStorage & keep URL query parameters synchronized
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.setItem(
+          PP_FILTER_STORAGE_KEY,
+          JSON.stringify({
+            tab: activeTab,
+            market: selectedMarket,
+            group: selectedGroup,
+            cmp: comparisonMode,
+            cs,
+            spec,
+          })
+        );
+      } catch (_) {}
+    }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', activeTab);
+        if (selectedMarket && selectedMarket !== 'all') next.set('market', selectedMarket);
+        else next.delete('market');
+        if (selectedGroup && selectedGroup !== 'all') next.set('group', selectedGroup);
+        else next.delete('group');
+        if (comparisonMode && comparisonMode !== 'budget') next.set('cmp', comparisonMode);
+        else next.delete('cmp');
+        return next;
+      },
+      { replace: true }
+    );
+  }, [activeTab, selectedMarket, selectedGroup, comparisonMode, cs, spec, setSearchParams]);
 
   // Auto-select first authorized tab if current tab is denied
   useEffect(() => {
@@ -292,6 +361,7 @@ export default function Member360LabPlanPerformancePage() {
 
     if (!file.name.toLowerCase().endsWith('.json')) {
       setModalError('Please upload a valid .json file.');
+      if (e.target && typeof e.target.value === 'string') e.target.value = '';
       return;
     }
 
@@ -319,13 +389,20 @@ export default function Member360LabPlanPerformancePage() {
       }
     };
     reader.readAsText(file);
+    if (e.target && typeof e.target.value === 'string') {
+      e.target.value = '';
+    }
   };
 
   // Commit uploaded dataset as a new scenario
   const handleSaveUpload = () => {
     if (!candidateJson) return;
+    if (!candidateScenarioName || !candidateScenarioName.trim()) {
+      setModalError('Please provide a Scenario Display Name before saving.');
+      return;
+    }
     try {
-      const newEntry = saveDatasetToCatalog(candidateJson, candidateScenarioName, candidateFilename);
+      const newEntry = saveDatasetToCatalog(candidateJson, candidateScenarioName.trim(), candidateFilename);
       setDatasetVersion((v) => v + 1);
       setActiveDatasetIdState(newEntry.id);
       setIsModalOpen(false);
@@ -338,12 +415,14 @@ export default function Member360LabPlanPerformancePage() {
 
   // Start inline rename
   const handleStartRename = (item) => {
+    setModalError(null);
     setEditingId(item.id);
     setEditingName(item.name);
   };
 
   // Save inline rename
   const handleSaveRename = (id) => {
+    setModalError(null);
     try {
       renameDatasetInCatalog(id, editingName);
       setDatasetVersion((v) => v + 1);
@@ -351,21 +430,38 @@ export default function Member360LabPlanPerformancePage() {
       setToastMessage('Scenario renamed successfully.');
       setTimeout(() => setToastMessage(null), 3000);
     } catch (err) {
-      alert(err.message);
+      setModalError(err.message || 'Failed to rename scenario.');
+    }
+  };
+
+  // Duplicate a scenario into a custom editable scenario
+  const handleDuplicateDataset = (item) => {
+    setModalError(null);
+    try {
+      const raw = getDatasetDataById(item.id);
+      if (!raw) throw new Error('Could not read source scenario data.');
+      const copyName = `${item.name} (Copy ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`;
+      const newEntry = saveDatasetToCatalog(raw, copyName, item.filename || 'scenario_copy.json');
+      setDatasetVersion((v) => v + 1);
+      setActiveDatasetIdState(newEntry.id);
+      setToastMessage(`Created and activated custom copy "${newEntry.name}".`);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err) {
+      setModalError(err.message || 'Failed to duplicate scenario.');
     }
   };
 
   // Delete a custom dataset
   const handleDeleteDataset = (id, name) => {
-    if (window.confirm(`Are you sure you want to remove scenario "${name}"?`)) {
-      try {
-        deleteDatasetFromCatalog(id);
-        setDatasetVersion((v) => v + 1);
-        setToastMessage(`Removed scenario "${name}".`);
-        setTimeout(() => setToastMessage(null), 4000);
-      } catch (err) {
-        alert(err.message);
-      }
+    setModalError(null);
+    try {
+      deleteDatasetFromCatalog(id);
+      setDatasetVersion((v) => v + 1);
+      setActiveDatasetIdState(getActiveDatasetId());
+      setToastMessage(`Removed scenario "${name}".`);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err) {
+      setModalError(err.message || 'Failed to delete scenario.');
     }
   };
 
@@ -373,7 +469,7 @@ export default function Member360LabPlanPerformancePage() {
   const handleExportDataset = (id, name) => {
     const raw = getDatasetDataById(id);
     if (!raw) {
-      alert('Could not retrieve dataset content.');
+      setModalError('Could not retrieve dataset content.');
       return;
     }
     const blob = new Blob([JSON.stringify(raw, null, 2)], { type: 'application/json' });
@@ -404,10 +500,9 @@ export default function Member360LabPlanPerformancePage() {
   }
 
   const hasFinancialAccess =
-    isAdmin ||
-    currentRole === 'platform_admin' ||
-    currentRole === 'admin' ||
-    can('sub:exec_financial');
+    can('menu:executive_dashboards') &&
+    can('sub:exec_financial') &&
+    authorizedTabs.length > 0;
 
   if (!hasFinancialAccess) {
     return (
@@ -462,8 +557,21 @@ export default function Member360LabPlanPerformancePage() {
             </div>
           </div>
 
-          {/* Right Header Controls: Scope Badge, Filter Collapse Toggle, Manage Datasets */}
+          {/* Right Header Controls: Scenario Selector, Scope Badge, Filter Collapse Toggle, Manage Datasets */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <select
+              value={activeDatasetId}
+              onChange={(e) => switchDataset(e.target.value)}
+              aria-label="Dataset Scenario"
+              className="rounded-lg border border-slate-700 bg-slate-800/90 text-slate-100 px-2.5 py-1 text-xs font-semibold focus:ring-2 focus:ring-sky-500 max-w-[220px] truncate"
+            >
+              {datasetCatalog.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+
             <span className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-800/90 text-sky-300 border border-slate-700">
               <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
               Scope: {renderedConsole.scopeName}
@@ -742,6 +850,11 @@ export default function Member360LabPlanPerformancePage() {
 
               {/* Modal Body */}
               <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                {modalError && modalTab === 'list' && (
+                  <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
+                    <strong>Error:</strong> {modalError}
+                  </div>
+                )}
                 {modalTab === 'list' ? (
                   <div className="space-y-3">
                     <p className="text-xs text-slate-500">
@@ -767,6 +880,10 @@ export default function Member360LabPlanPerformancePage() {
                                     type="text"
                                     value={editingName}
                                     onChange={(e) => setEditingName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveRename(item.id);
+                                      if (e.key === 'Escape') setEditingId(null);
+                                    }}
                                     className="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                                   />
                                   <button
@@ -826,6 +943,14 @@ export default function Member360LabPlanPerformancePage() {
                                   Activate
                                 </button>
                               )}
+                              <button
+                                type="button"
+                                onClick={() => handleDuplicateDataset(item)}
+                                title="Duplicate as Custom Scenario"
+                                className="px-2 py-1 rounded text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                              >
+                                Duplicate
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => handleExportDataset(item.id, item.name)}

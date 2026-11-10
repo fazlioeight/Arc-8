@@ -497,17 +497,6 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "menu:care_options",
     "menu:messages",
     "menu:documents",
-    "menu:executive_dashboards",
-    "sub:exec_financial",
-    "sub:exec_hedis",
-    "tab:pp_overview",
-    "tab:pp_financials",
-    "tab:pp_medical_cost",
-    "tab:pp_mlr",
-    "tab:pp_utilization",
-    "tab:pp_quality",
-    "tab:pp_risk",
-    "tab:pp_defs",
     "menu:provider_directory",
     "menu:ride_booking",
     "menu:ai_chat",
@@ -570,7 +559,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
   ],
 };
 
-const STORAGE_KEY = "arc8_role_permissions_matrix_v5";
+const STORAGE_KEY = "arc8_role_permissions_matrix_v6";
 
 export const getPersistedRolePermissions = () => {
   if (typeof window === "undefined") return DEFAULT_ROLE_PERMISSIONS;

@@ -311,14 +311,14 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
           icon: SvgDashboard,
           permission: 'menu:executive_dashboards',
           subItems: [
-            { label: t('nav.sub.pp_overview', 'Plan Overview'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=overview`, permission: 'tab:pp_overview' },
-            { label: t('nav.sub.pp_financials', 'Plan Financials (PMPM)'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=fin`, permission: 'tab:pp_financials' },
-            { label: t('nav.sub.pp_medical_cost', 'Medical Cost Analytics'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=cost`, permission: 'tab:pp_medical_cost' },
-            { label: t('nav.sub.pp_mlr', 'Provider MLR & Benchmarks'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=mlr`, permission: 'tab:pp_mlr' },
-            { label: t('nav.sub.pp_utilization', 'Utilization & Admits'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=util`, permission: 'tab:pp_utilization' },
-            { label: t('nav.sub.quality_star', 'Quality & Star Ratings'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=qual`, permission: 'tab:pp_quality' },
-            { label: t('nav.sub.pp_risk', 'Risk Adjustment (RAF)'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=risk`, permission: 'tab:pp_risk' },
-            { label: t('nav.sub.pp_defs', 'Definitions & Glossary'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=defs`, permission: 'tab:pp_defs' },
+            { label: t('nav.sub.pp_overview', 'Plan Overview'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=overview`, permission: 'tab:pp_overview', parentSub: 'sub:exec_financial' },
+            { label: t('nav.sub.pp_financials', 'Plan Financials (PMPM)'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=fin`, permission: 'tab:pp_financials', parentSub: 'sub:exec_financial' },
+            { label: t('nav.sub.pp_medical_cost', 'Medical Cost Analytics'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=cost`, permission: 'tab:pp_medical_cost', parentSub: 'sub:exec_financial' },
+            { label: t('nav.sub.pp_mlr', 'Provider MLR & Benchmarks'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=mlr`, permission: 'tab:pp_mlr', parentSub: 'sub:exec_financial' },
+            { label: t('nav.sub.pp_utilization', 'Utilization & Admits'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=util`, permission: 'tab:pp_utilization', parentSub: 'sub:exec_financial' },
+            { label: t('nav.sub.quality_star', 'Quality & Star Ratings'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=qual`, permission: 'tab:pp_quality', parentSub: 'sub:exec_financial' },
+            { label: t('nav.sub.pp_risk', 'Risk Adjustment (RAF)'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=risk`, permission: 'tab:pp_risk', parentSub: 'sub:exec_financial' },
+            { label: t('nav.sub.pp_defs', 'Definitions & Glossary'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=defs`, permission: 'tab:pp_defs', parentSub: 'sub:exec_financial' },
             { label: t('nav.sub.exec_hedis_dashboard', 'HEDIS & Star Ratings'), href: `${ROUTES.DASHBOARD}#hedis`, permission: 'sub:exec_hedis' },
           ],
         },
@@ -356,7 +356,11 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         .map((item) => ({
           ...item,
           subItems: item.subItems
-            ? item.subItems.filter((sub) => !sub.permission || can(sub.permission))
+            ? item.subItems.filter(
+                (sub) =>
+                  (!sub.parentSub || can(sub.parentSub)) &&
+                  (!sub.permission || can(sub.permission))
+              )
             : undefined,
         })),
     }))

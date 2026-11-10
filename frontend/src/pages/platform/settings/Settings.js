@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import PortalPageLayout from "../../../components/PortalPageLayout";
 import PortalCard from "../../../components/PortalCard";
 import KpiTile from "../../../components/ui/KpiTile";
@@ -36,14 +36,25 @@ const NAV_ITEMS = [
 
 const Settings = ({ themePreference, setThemePreference }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, role, token, tenant, logout } = useContext(AuthContext) || {};
   const { roleMenus, setNavVisibility, language, setLanguage, t } = useUserPreferences();
   const { currentRole, can, isAdmin } = usePermissions();
-  const canViewPrivileges = isAdmin || can("menu:role_privileges");
+  const canViewPrivileges = can("menu:role_privileges");
+  const canGeneral = can("sub:settings_general");
+  const canSecurity = can("sub:settings_security");
+  const canIntegrations = can("sub:settings_integrations");
+
+  const resolveHashSection = (hashStr) => {
+    const raw = (hashStr || "").replace("#", "");
+    if (raw === "audit") return "data";
+    if (raw === "integrations") return "beta";
+    return raw;
+  };
 
   const [active, setActive] = useState(() => {
     if (typeof window !== "undefined" && window.location.hash) {
-      const h = window.location.hash.replace("#", "");
+      const h = resolveHashSection(window.location.hash);
       if (["users", "privileges", "general", "data", "personalization", "memory", "notifications", "beta", "about", "navigation"].includes(h)) {
         if ((h === "users" || h === "privileges") && !canViewPrivileges) {
           return "general";
@@ -54,6 +65,19 @@ const Settings = ({ themePreference, setThemePreference }) => {
     return canViewPrivileges ? "users" : "general";
   });
   const [menuRole, setMenuRole] = useState(() => currentRole || role || "admin");
+
+  useEffect(() => {
+    if (location.hash) {
+      const h = resolveHashSection(location.hash);
+      if (["users", "privileges", "general", "data", "personalization", "memory", "notifications", "beta", "about", "navigation"].includes(h)) {
+        if ((h === "users" || h === "privileges") && !canViewPrivileges) {
+          setActive("general");
+        } else {
+          setActive(h);
+        }
+      }
+    }
+  }, [location.hash, canViewPrivileges]);
 
   useEffect(() => {
     if (currentRole || role) {
@@ -211,16 +235,22 @@ const Settings = ({ themePreference, setThemePreference }) => {
         { id: "users", label: t("Users & Privileges") },
         { id: "privileges", label: t("Roles Matrix") },
       ] : []),
-      { id: "general", label: t("General") },
-      { id: "data", label: t("Data controls") },
-      { id: "personalization", label: t("Personalization") },
-      { id: "memory", label: t("Memory") },
-      { id: "notifications", label: t("Notifications") },
-      { id: "beta", label: t("Beta features") },
+      ...(canGeneral ? [
+        { id: "general", label: t("General") },
+        { id: "personalization", label: t("Personalization") },
+        { id: "notifications", label: t("Notifications") },
+      ] : []),
+      ...(canSecurity ? [
+        { id: "data", label: t("Data & Security") },
+        { id: "memory", label: t("Memory") },
+      ] : []),
+      ...(canIntegrations ? [
+        { id: "beta", label: t("FHIR & Beta Integrations") },
+      ] : []),
       { id: "about", label: t("About") },
       ...(isAdmin ? [{ id: "navigation", label: t("Navigation") }] : []),
     ],
-    [canViewPrivileges, isAdmin, t]
+    [canViewPrivileges, canGeneral, canSecurity, canIntegrations, isAdmin, t]
   );
 
   const layoutProps = useMemo(
