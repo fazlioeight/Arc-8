@@ -78,6 +78,7 @@ export default function Member360LabPlanPerformancePage() {
   const [cs, setCs] = useState('inst'); // 'inst' | 'prof'
   const [spec, setSpec] = useState(null);
   const [datasetVersion, setDatasetVersion] = useState(0);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Sync tab with URL query parameter ?tab=
   useEffect(() => {
@@ -99,6 +100,12 @@ export default function Member360LabPlanPerformancePage() {
   // Dataset switching state
   const [activeDatasetId, setActiveDatasetIdState] = useState(() => getActiveDatasetId());
   const [datasetCatalog, setDatasetCatalog] = useState(() => getDatasetCatalog());
+
+  const activeFilterCount =
+    (selectedMarket !== 'all' ? 1 : 0) +
+    (selectedGroup !== 'all' ? 1 : 0) +
+    (comparisonMode !== 'budget' ? 1 : 0) +
+    (activeDatasetId !== 'baseline' ? 1 : 0);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -432,35 +439,95 @@ export default function Member360LabPlanPerformancePage() {
       navItems={PORTAL_NAV_ITEMS}
       hideHeader
     >
-      <div className="space-y-4 pb-12">
-        <LabSubNav activeKey="plan_performance" />
-        {/* Plan Performance Console Brand Header Banner */}
-        <div className="rounded-2xl bg-[#131930] border border-slate-800 shadow-sm overflow-hidden border-b-2 border-b-[#00b5b0] p-5 sm:p-6">
-          <div className="flex items-center justify-between text-[11px] font-medium tracking-wide">
-            <span className="font-extrabold uppercase tracking-wider text-slate-200">
+      <div className="space-y-2.5 pb-10">
+        {/* Compact Plan Performance Console Brand Header Bar */}
+        <div className="rounded-xl bg-[#131930] border border-slate-800 shadow-sm overflow-hidden border-b-2 border-b-[#00b5b0] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 min-w-0">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-300 shrink-0">
               PROMINENCE <span className="text-[#00b5b0]">HEALTH</span>
             </span>
-            <span className="text-slate-400">
-              Plan Performance Console · {dynamicHeaderSubtitle.scenarioText.toLowerCase()}
-            </span>
+            <span className="text-slate-600 hidden sm:inline">•</span>
+            <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight shrink-0">
+              Plan Performance Console
+            </h1>
+            <span className="text-slate-600 hidden md:inline">|</span>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[#00b5b0]">
+              <span>{dynamicHeaderSubtitle.scopeText}</span>
+              <span className="opacity-40 text-slate-400">·</span>
+              <span>{dynamicHeaderSubtitle.dateText}</span>
+              <span className="opacity-40 text-slate-400 hidden lg:inline">·</span>
+              <span className="hidden lg:inline">{dynamicHeaderSubtitle.marketText}</span>
+              <span className="opacity-40 text-slate-400">·</span>
+              <span>{dynamicHeaderSubtitle.datasetBaselineText}</span>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-2.5 mb-1.5">
-            Plan Performance Console
-          </h1>
-          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#00b5b0]">
-            <span>{dynamicHeaderSubtitle.scopeText}</span>
-            <span className="opacity-40 text-slate-400">|</span>
-            <span>{dynamicHeaderSubtitle.dateText}</span>
-            <span className="opacity-40 text-slate-400">|</span>
-            <span>{dynamicHeaderSubtitle.marketText}</span>
-            <span className="opacity-40 text-slate-400">|</span>
-            <span>{dynamicHeaderSubtitle.datasetBaselineText}</span>
+
+          {/* Right Header Controls: Scope Badge, Filter Collapse Toggle, Manage Datasets */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <span className="hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-800/90 text-sky-300 border border-slate-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+              Scope: {renderedConsole.scopeName}
+            </span>
+
+            {(selectedMarket !== 'all' || selectedGroup !== 'all') && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="text-[11px] font-semibold text-sky-400 hover:text-sky-300 underline px-1"
+              >
+                Reset
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setFiltersExpanded((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border transition ${
+                filtersExpanded || activeFilterCount > 0
+                  ? 'bg-[#00b5b0]/15 text-[#00b5b0] border-[#00b5b0]/50 hover:bg-[#00b5b0]/25'
+                  : 'bg-slate-800/80 text-slate-200 border-slate-700 hover:bg-slate-800'
+              }`}
+              title={filtersExpanded ? 'Collapse Filter Block' : 'Expand Filter Block'}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              <span>{filtersExpanded ? 'Hide Filters' : 'Filters'}</span>
+              {activeFilterCount > 0 && (
+                <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#00b5b0] text-slate-950">
+                  {activeFilterCount}
+                </span>
+              )}
+              <svg
+                className={`w-3 h-3 transition-transform ${filtersExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {canManageDataset && (
+              <button
+                type="button"
+                onClick={() => openModal('list')}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition"
+                title="Manage, Edit, Delete, or Upload Datasets"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="hidden sm:inline">Manage Datasets</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* Global Toast Banner */}
         {toastMessage && (
-          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200 flex items-center justify-between shadow-sm animate-fade-in">
             <span className="flex items-center gap-2">
               <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
@@ -473,144 +540,126 @@ export default function Member360LabPlanPerformancePage() {
           </div>
         )}
 
-        {/* Top Header Filter Strip & Scope Controls */}
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Dataset Scenario Selector */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                  Dataset Scenario
-                </label>
-                <select
-                  value={activeDatasetId}
-                  onChange={(e) => switchDataset(e.target.value)}
-                  className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-1.5 text-sm font-semibold focus:ring-2 focus:ring-sky-500"
-                >
-                  {datasetCatalog.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} {d.isBuiltIn ? '• (Built-in)' : '• (Custom)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Market Filter */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                  Market Region
-                </label>
-                <select
-                  value={selectedMarket}
-                  onChange={handleMarketChange}
-                  className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-1.5 text-sm focus:ring-2 focus:ring-sky-500"
-                >
-                  {MARKETS.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Provider Group Filter */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                  Provider Group
-                </label>
-                <select
-                  value={selectedGroup}
-                  onChange={handleGroupChange}
-                  className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-1.5 text-sm focus:ring-2 focus:ring-sky-500 min-w-[190px]"
-                >
-                  <option value="all">All Groups ({availableGroups.length})</option>
-                  {availableGroups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Benchmark Baseline Mode */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                  Benchmark Baseline
-                </label>
-                <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-slate-100 dark:bg-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setComparisonMode('budget')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition ${
-                      comparisonMode === 'budget'
-                        ? 'bg-white dark:bg-sky-600 text-slate-900 dark:text-white shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                    }`}
+        {/* Collapsible Filter Strip & Scope Controls (Collapsed by Default) */}
+        {filtersExpanded && (
+          <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-sm animate-fade-in">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Dataset Scenario Selector */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">
+                    Dataset Scenario
+                  </label>
+                  <select
+                    value={activeDatasetId}
+                    onChange={(e) => switchDataset(e.target.value)}
+                    className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-2.5 py-1 text-xs font-semibold focus:ring-2 focus:ring-sky-500"
                   >
-                    Budget (83% Goal)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setComparisonMode('prior')}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition ${
-                      comparisonMode === 'prior'
-                        ? 'bg-white dark:bg-sky-600 text-slate-900 dark:text-white shadow-sm'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                    }`}
+                    {datasetCatalog.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} {d.isBuiltIn ? '• (Built-in)' : '• (Custom)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Market Filter */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">
+                    Market Region
+                  </label>
+                  <select
+                    value={selectedMarket}
+                    onChange={handleMarketChange}
+                    className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-2.5 py-1 text-xs focus:ring-2 focus:ring-sky-500"
                   >
-                    Prior Year (2025)
-                  </button>
+                    {MARKETS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Provider Group Filter */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">
+                    Provider Group
+                  </label>
+                  <select
+                    value={selectedGroup}
+                    onChange={handleGroupChange}
+                    className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-2.5 py-1 text-xs focus:ring-2 focus:ring-sky-500 min-w-[180px]"
+                  >
+                    <option value="all">All Groups ({availableGroups.length})</option>
+                    {availableGroups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Benchmark Baseline Mode */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-0.5">
+                    Benchmark Baseline
+                  </label>
+                  <div className="inline-flex rounded-lg border border-slate-300 dark:border-slate-700 p-0.5 bg-slate-100 dark:bg-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setComparisonMode('budget')}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${
+                        comparisonMode === 'budget'
+                          ? 'bg-white dark:bg-sky-600 text-slate-900 dark:text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      Budget (83% Goal)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setComparisonMode('prior')}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition ${
+                        comparisonMode === 'prior'
+                          ? 'bg-white dark:bg-sky-600 text-slate-900 dark:text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      Prior Year (2025)
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Scope & The Single Manage Button */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {(selectedMarket !== 'all' || selectedGroup !== 'all') && (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 underline mr-1"
-                >
-                  Reset Filter
-                </button>
-              )}
-
-              {/* Scope Tag */}
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
-                <span className="h-2 w-2 rounded-full bg-sky-500" />
-                Scope: {renderedConsole.scopeName}
-              </span>
-
-              {/* LOB Tag */}
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                LOB: Medicare Advantage (MA)
-              </span>
-
-              {/* The Single Manage Button */}
-              {canManageDataset && (
-                <div className="flex items-center pl-2 border-l border-slate-200 dark:border-slate-800">
+              {/* Scope & LOB Tags */}
+              <div className="flex flex-wrap items-center gap-2">
+                {(selectedMarket !== 'all' || selectedGroup !== 'all') && (
                   <button
                     type="button"
-                    onClick={() => openModal('list')}
-                    className="inline-flex items-center gap-2 rounded-lg bg-sky-600 hover:bg-sky-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition"
-                    title="Manage, Edit, Delete, or Upload Datasets"
+                    onClick={resetFilters}
+                    className="text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 underline mr-1"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Manage Datasets
+                    Reset Filter
                   </button>
-                </div>
-              )}
+                )}
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                  Scope: {renderedConsole.scopeName}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  LOB: Medicare Advantage (MA)
+                </span>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Console Navigation Tabs (Filtered by Role & Tab-Level Privileges) */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 dark:border-slate-800 pb-1.5">
           {authorizedTabs.map(([k, label]) => {
             const isSelected = activeTab === k;
             return (
@@ -618,7 +667,7 @@ export default function Member360LabPlanPerformancePage() {
                 key={k}
                 type="button"
                 onClick={() => setActiveTab(k)}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition shadow-xs ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition shadow-xs ${
                   isSelected
                     ? 'bg-[#1b2348] text-white border-b-2 border-[#00b5b0]'
                     : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/60'
