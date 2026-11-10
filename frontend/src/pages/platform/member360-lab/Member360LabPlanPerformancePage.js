@@ -160,7 +160,6 @@ export default function Member360LabPlanPerformancePage() {
       lastSyncedSearchRef.current = nextSearch;
       setSearchParams(next, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedMarket, selectedGroup, comparisonMode, cs, spec]);
 
   // Auto-select first authorized tab if current tab is denied
