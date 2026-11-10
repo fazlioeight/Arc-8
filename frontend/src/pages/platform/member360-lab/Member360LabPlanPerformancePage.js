@@ -4,6 +4,7 @@ import PortalPageLayout from '../../../components/PortalPageLayout';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import { usePermissions } from '../../../hooks/usePermissions';
+import { LabSubNav } from './components';
 import './planPerformanceConsole.css';
 import {
   CONSOLE_TABS,
@@ -79,7 +80,8 @@ export default function Member360LabPlanPerformancePage() {
   // Sync tab with URL query parameter ?tab=
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const tabParam = params.get('tab');
+    const rawTab = params.get('tab');
+    const tabParam = rawTab === 'financials' ? 'fin' : rawTab;
     if (tabParam && CONSOLE_TABS.some(([k]) => k === tabParam)) {
       setActiveTab(tabParam);
     }
@@ -382,6 +384,35 @@ export default function Member360LabPlanPerformancePage() {
     }
   };
 
+  const hasFinancialAccess =
+    isAdmin ||
+    currentRole === 'platform_admin' ||
+    currentRole === 'admin' ||
+    can('sub:exec_financial');
+
+  if (!hasFinancialAccess) {
+    return (
+      <PortalPageLayout
+        activeNavId="member360"
+        activeSubNavId="member360-plan-performance"
+        navItems={PORTAL_NAV_ITEMS}
+        hideHeader
+      >
+        <div className="space-y-4 pb-12">
+          <LabSubNav activeKey="plan_performance" />
+          <div className="rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-slate-900 p-8 text-center shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Executive Financial Access Required
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Your current role ({currentRole}) does not have permission (<code>sub:exec_financial</code>) to view the Commercial &amp; Payer Plan Performance Console.
+            </p>
+          </div>
+        </div>
+      </PortalPageLayout>
+    );
+  }
+
   return (
     <PortalPageLayout
       activeNavId="member360"
@@ -390,6 +421,7 @@ export default function Member360LabPlanPerformancePage() {
       hideHeader
     >
       <div className="space-y-4 pb-12">
+        <LabSubNav activeKey="plan_performance" />
         {/* Plan Performance Console Brand Header Banner */}
         <div className="rounded-2xl bg-[#131930] border border-slate-800 shadow-sm overflow-hidden border-b-2 border-b-[#00b5b0] p-5 sm:p-6">
           <div className="flex items-center justify-between text-[11px] font-medium tracking-wide">

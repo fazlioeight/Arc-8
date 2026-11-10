@@ -423,6 +423,15 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "menu:ai_chat",
     "menu:executive_dashboards",
     "sub:exec_operational",
+    "sub:exec_financial",
+    "tab:pp_overview",
+    "tab:pp_financials",
+    "tab:pp_medical_cost",
+    "tab:pp_mlr",
+    "tab:pp_utilization",
+    "tab:pp_quality",
+    "tab:pp_risk",
+    "tab:pp_defs",
   ],
   [ROLES.BUSINESS_ADMIN]: [
     "menu:care_intelligence",
@@ -491,6 +500,14 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "menu:executive_dashboards",
     "sub:exec_financial",
     "sub:exec_hedis",
+    "tab:pp_overview",
+    "tab:pp_financials",
+    "tab:pp_medical_cost",
+    "tab:pp_mlr",
+    "tab:pp_utilization",
+    "tab:pp_quality",
+    "tab:pp_risk",
+    "tab:pp_defs",
     "menu:provider_directory",
     "menu:ride_booking",
     "menu:ai_chat",
@@ -534,6 +551,14 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "tab:documents",
     "menu:executive_dashboards",
     "sub:exec_financial",
+    "tab:pp_overview",
+    "tab:pp_financials",
+    "tab:pp_medical_cost",
+    "tab:pp_mlr",
+    "tab:pp_utilization",
+    "tab:pp_quality",
+    "tab:pp_risk",
+    "tab:pp_defs",
     "menu:documents",
   ],
   [ROLES.PATIENT]: [
@@ -545,7 +570,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
   ],
 };
 
-const STORAGE_KEY = "arc8_role_permissions_matrix_v4";
+const STORAGE_KEY = "arc8_role_permissions_matrix_v5";
 
 export const getPersistedRolePermissions = () => {
   if (typeof window === "undefined") return DEFAULT_ROLE_PERMISSIONS;

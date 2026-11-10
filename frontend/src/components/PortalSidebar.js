@@ -312,7 +312,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
           permission: 'menu:executive_dashboards',
           subItems: [
             { label: t('nav.sub.pp_overview', 'Plan Overview'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=overview`, permission: 'tab:pp_overview' },
-            { label: t('nav.sub.pp_financials', 'Plan Financials (PMPM)'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=financials`, permission: 'tab:pp_financials' },
+            { label: t('nav.sub.pp_financials', 'Plan Financials (PMPM)'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=fin`, permission: 'tab:pp_financials' },
             { label: t('nav.sub.pp_medical_cost', 'Medical Cost Analytics'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=cost`, permission: 'tab:pp_medical_cost' },
             { label: t('nav.sub.pp_mlr', 'Provider MLR & Benchmarks'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=mlr`, permission: 'tab:pp_mlr' },
             { label: t('nav.sub.pp_utilization', 'Utilization & Admits'), href: `${ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE}?tab=util`, permission: 'tab:pp_utilization' },
