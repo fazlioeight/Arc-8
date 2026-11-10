@@ -140,6 +140,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const currentHash = location.hash;
 
   const [expandedMenuKeys, setExpandedMenuKeys] = useState({
+    [ROUTES.MEMBER360_LAB.PLAN_PERFORMANCE]: true,
     [ROUTES.SETTINGS]: false,
   });
 
