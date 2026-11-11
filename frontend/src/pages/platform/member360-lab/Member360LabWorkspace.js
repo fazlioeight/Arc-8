@@ -138,8 +138,13 @@ const Member360LabWorkspace = () => {
     }
   }, [visibleTabs, tab, setSearchParams]);
 
-  const handleTabChange = useCallback((newTab) => {
+  const handleTabChange = useCallback((newTab, subTab) => {
     setTab(newTab);
+    if (newTab === 'clinical_gaps' && subTab) {
+      setClinicalSubTab(subTab);
+    } else if (newTab === 'medications_labs' && subTab) {
+      setMedsSubTab(subTab);
+    }
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('tab', newTab);
@@ -436,7 +441,7 @@ const Member360LabWorkspace = () => {
     if (!detail) return null;
     switch (tab) {
       case 'timeline':
-        return <MemberTimeline detail={detail} />;
+        return <MemberTimeline detail={detail} onNavigateTab={handleTabChange} />;
       case 'notes':
         return (
           <div className="space-y-3">
@@ -588,8 +593,42 @@ const Member360LabWorkspace = () => {
         const a = detail.accumulator || {};
         const dedPct = a.deductible ? Math.min(((a.deductible_met || 0) / a.deductible) * 100, 100) : 0;
         const oopPct = a.out_of_pocket_max ? Math.min(((a.out_of_pocket_met || 0) / a.out_of_pocket_max) * 100, 100) : 0;
+        const claimsList = detail.claims || [];
+        const erVisits = claimsList.filter((c) => String(c.category || '').toLowerCase() === 'emergency').length;
+        const inpatientVisits = claimsList.filter((c) => String(c.category || '').toLowerCase() === 'inpatient').length;
+        const totalBilled = claimsList.reduce((acc, c) => acc + (Number(c.billed_amount) || 0), 0);
+        const totalPaid = claimsList.reduce((acc, c) => acc + (Number(c.paid_amount) || 0), 0);
+        const primaryCov = (detail.coverages || [])[0];
         return (
           <div className="space-y-6">
+            {/* Utilization & Eligibility Overview Strip */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="coding-surface-subtle rounded-xl p-3 border border-slate-200 dark:border-slate-800/60">
+                <p className="text-[10px] uppercase tracking-wider coding-text-muted">Plan & Eligibility</p>
+                <p className="text-sm font-semibold coding-text-strong mt-0.5 truncate">{member?.plan_name || 'Active Plan'}</p>
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium capitalize">
+                  ● {primaryCov?.coverage_status || 'active'} · {member?.line_of_business || 'Member'}
+                </p>
+              </div>
+              <div className="coding-surface-subtle rounded-xl p-3 border border-slate-200 dark:border-slate-800/60">
+                <p className="text-[10px] uppercase tracking-wider coding-text-muted">Acute Utilization (ER / IP)</p>
+                <p className="text-sm font-semibold coding-text-strong mt-0.5 tabular-nums">
+                  {erVisits} ER · {inpatientVisits} Inpatient
+                </p>
+                <p className="text-[11px] coding-text-soft">{claimsList.length} total medical claims</p>
+              </div>
+              <div className="coding-surface-subtle rounded-xl p-3 border border-slate-200 dark:border-slate-800/60">
+                <p className="text-[10px] uppercase tracking-wider coding-text-muted">Total Billed</p>
+                <p className="text-sm font-semibold coding-text-strong mt-0.5 tabular-nums">{currencyFmt.format(totalBilled)}</p>
+                <p className="text-[11px] coding-text-soft">Current plan year</p>
+              </div>
+              <div className="coding-surface-subtle rounded-xl p-3 border border-slate-200 dark:border-slate-800/60">
+                <p className="text-[10px] uppercase tracking-wider coding-text-muted">Plan Paid</p>
+                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5 tabular-nums">{currencyFmt.format(totalPaid)}</p>
+                <p className="text-[11px] coding-text-soft">Adjudicated benefit spend</p>
+              </div>
+            </div>
+
             {/* Deductible & Out-of-pocket Accumulator summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="coding-surface-subtle rounded-xl p-4 border border-slate-200 dark:border-slate-800/60">
@@ -690,7 +729,7 @@ const Member360LabWorkspace = () => {
       default:
         return null;
     }
-  }, [detail, member, tab, handleStageTransition, handleJourneyTransition, reload]);
+  }, [detail, member, tab, clinicalSubTab, medsSubTab, gap, missingHccCount, handleTabChange, handleAction, handleStageTransition, handleJourneyTransition, reload]);
 
   if (loading) {
     return (
@@ -736,11 +775,13 @@ const Member360LabWorkspace = () => {
 
       <RecordHeader
         member={member}
+        detail={detail}
         gapCount={missingHccCount}
         onAction={(key) => handleAction(key)}
         actions={availableActions}
         onBack={() => navigate(ROUTES.MEMBER360_LAB.MEMBERS)}
         onDashboard={() => navigate(ROUTES.MEMBER360_LAB.DASHBOARD)}
+        onSelectTab={handleTabChange}
         pcpHref={pcpHref}
         pcpState={pcpState}
       />
@@ -804,6 +845,7 @@ const Member360LabWorkspace = () => {
         <div className="col-span-12 xl:col-span-6 space-y-4">
           <MemberSummaryCard
             member={member}
+            detail={detail}
             pcpHref={pcpHref}
             pcpState={pcpState}
             onSaveField={saveMemberField}

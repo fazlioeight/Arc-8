@@ -1,0 +1,1 @@
+﻿claimid|claimline|ClaimEditRuleID|RemitReasonID|EOBReasonID|ClaimEditDescription|RemitDescription|CleanClaim

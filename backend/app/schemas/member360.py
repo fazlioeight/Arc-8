@@ -50,6 +50,7 @@ class MemberUpdate(BaseModel):
     """Editable subset of MemberDetail. All fields optional — partial PATCH."""
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    date_of_birth: Optional[date] = None
     gender: Optional[str] = None
     plan_name: Optional[str] = None
     line_of_business: Optional[str] = None
@@ -412,8 +413,22 @@ class Lab(BaseModel):
     status: str
 
 
+class Coverage(BaseModel):
+    id: int
+    member_id: int
+    plan_name: Optional[str] = None
+    line_of_business: Optional[str] = None
+    coverage_status: str = "active"
+    effective_date: Optional[date] = None
+    term_date: Optional[date] = None
+    coverage_tier: Optional[str] = None
+    relationship_to_subscriber: str = "subscriber"
+    is_primary: bool = True
+
+
 class MemberDetailResponse(BaseModel):
     member: MemberDetail
+    coverages: list[Coverage] = Field(default_factory=list)
     risk_insights: list[RiskInsight] = Field(default_factory=list)
     tasks: list[Task] = Field(default_factory=list)
     care_journeys: list[CareJourney] = Field(default_factory=list)

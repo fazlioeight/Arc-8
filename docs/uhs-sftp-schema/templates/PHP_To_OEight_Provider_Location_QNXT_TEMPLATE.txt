@@ -1,0 +1,1 @@
+﻿ProviderID|ProviderLastName|ProviderFirstName|ProviderGroupID|isPCPLocation|LocationID|LocationName|LocationAddr1|LocationAddr2|LocationAddrCity|LocationAddrState|LocationAddrZip|LocationPhoneNumber|LocationFaxNumber|LocationAddrCounty|PrimaryLocation|isPar|LOB

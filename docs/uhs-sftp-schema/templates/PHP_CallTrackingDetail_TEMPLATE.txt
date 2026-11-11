@@ -1,0 +1,1 @@
+﻿enrollid|programudtypename|callerid|callcode|calltype_category|calltype_description|sponsor|status|resolution_category|resolution_description|createdate|createid|CallReceivedDate|CallReceivedTime|lastupdate|MemID

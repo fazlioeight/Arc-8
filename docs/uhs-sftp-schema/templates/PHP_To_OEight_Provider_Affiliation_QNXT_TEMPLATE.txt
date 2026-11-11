@@ -1,0 +1,1 @@
+﻿ProviderID|GroupTaxID|InternalVendorID|VendorID|GroupName|GroupAffiliationEffDate|GroupAffiliationTermDate|IsPCP|ParorNonPar|GroupClass|GroupType|LOB|Program

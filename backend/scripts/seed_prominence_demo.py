@@ -1245,6 +1245,8 @@ async def _align_member_pcps(
     pcp_set = set(pcp_names)
     changes = 0
     for m in members:
+        if (m.member_key or "").startswith("MEM"):
+            continue
         if (m.primary_care_provider or "") in pcp_set:
             continue
         # Stable round-robin: same member.id always picks the same PCP.
@@ -1409,7 +1411,9 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
             }
 
             for m in all_members:
-                seq = int((m.member_key or "PROM-0000").rsplit("-", 1)[-1] or 0)
+                raw_tail = (m.member_key or "PROM-0000").rsplit("-", 1)[-1]
+                digits = "".join(ch for ch in raw_tail if ch.isdigit())
+                seq = int(digits) if digits else m.id
 
                 # Problems first — meds use the problem codes for indication
                 # matching, so we generate problems before medications.

@@ -190,33 +190,91 @@ export function SectionCard({ title, subtitle, action, children, className = '' 
  * existing call-site signature (member, gapCount, onBack/onDashboard, etc.)
  * while delegating layout to the generic component.
  */
-export function RecordHeader({ member, gapCount, onAction, actions = [], onBack, onDashboard, pcpHref, pcpState }) {
+export function RecordHeader({
+  member,
+  detail,
+  gapCount,
+  onAction,
+  actions = [],
+  onBack,
+  onDashboard,
+  onSelectTab,
+  pcpHref,
+  pcpState,
+}) {
   if (!member) return null;
   const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.member_key;
+  const dobText = member.date_of_birth
+    ? `DOB ${member.date_of_birth}${member.age != null ? ` (Age ${member.age})` : ''}`
+    : member.age != null
+    ? `Age ${member.age}`
+    : null;
   const meta = [
     member.member_key,
     member.plan_name,
-    member.age != null ? `Age ${member.age}` : null,
+    dobText,
     member.gender,
     member.line_of_business,
   ];
-  const pcpValue = member.primary_care_provider;
-  const link = pcpHref && pcpValue ? (
-    <>
-      <span>PCP </span>
-      <Link to={pcpHref} state={pcpState} className="font-medium text-[var(--brand-primary)] hover:underline">
-        {pcpValue}
-      </Link>
-    </>
-  ) : null;
+  const pcpValue = (member.primary_care_provider || '').trim();
+  const link = pcpValue ? (
+    pcpHref ? (
+      <>
+        <span>PCP </span>
+        <Link to={pcpHref} state={pcpState} className="font-medium text-[var(--brand-primary)] hover:underline">
+          {pcpValue}
+        </Link>
+      </>
+    ) : (
+      <span>PCP {pcpValue}</span>
+    )
+  ) : (
+    <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 text-rose-800 ring-1 ring-rose-200 px-2 py-0.5 text-[11px] font-semibold dark:bg-rose-900/30 dark:text-rose-200 dark:ring-rose-700/40">
+      ⚠️ Missing PCP — Assign In-Network PCP
+    </span>
+  );
+
+  const activeJourneyCount =
+    detail?.care_journeys?.filter((j) => j.status === 'active' || j.status === 'paused').length ??
+    member.active_journey_count ??
+    0;
+  const zeroRefillCount = (detail?.medications || []).filter(
+    (m) => m.status === 'active' && m.refills_remaining === 0
+  ).length;
+  const effectiveGapCount = gapCount != null && gapCount > 0 ? gapCount : (member.open_care_gaps ?? 0);
 
   const badges = (
     <>
       <RiskBadge tier={member.risk_tier} score={member.risk_score_composite} />
-      {gapCount != null && gapCount > 0 && (
-        <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 ring-1 ring-amber-200 px-2 py-0.5 text-[11px] font-semibold dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-700/40">
-          {gapCount} gap{gapCount === 1 ? '' : 's'}
-        </span>
+      {effectiveGapCount > 0 && (
+        <button
+          type="button"
+          onClick={() => onSelectTab?.('clinical_gaps', 'gaps')}
+          className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 ring-1 ring-amber-200 px-2 py-0.5 text-[11px] font-semibold hover:opacity-85 transition dark:bg-amber-900/30 dark:text-amber-200 dark:ring-amber-700/40"
+          title="View open care gaps"
+        >
+          {effectiveGapCount} gap{effectiveGapCount === 1 ? '' : 's'}
+        </button>
+      )}
+      {activeJourneyCount > 0 && (
+        <button
+          type="button"
+          onClick={() => onSelectTab?.('care_journey')}
+          className="inline-flex items-center rounded-full bg-sky-100 text-sky-800 ring-1 ring-sky-200 px-2 py-0.5 text-[11px] font-semibold hover:opacity-85 transition dark:bg-sky-900/30 dark:text-sky-200 dark:ring-sky-700/40"
+          title="View active care journeys"
+        >
+          {activeJourneyCount} active journey{activeJourneyCount === 1 ? '' : 's'}
+        </button>
+      )}
+      {zeroRefillCount > 0 && (
+        <button
+          type="button"
+          onClick={() => onSelectTab?.('medications_labs', 'medications')}
+          className="inline-flex items-center rounded-full bg-rose-100 text-rose-800 ring-1 ring-rose-200 px-2 py-0.5 text-[11px] font-semibold hover:opacity-85 transition dark:bg-rose-900/30 dark:text-rose-200 dark:ring-rose-700/40"
+          title="View prescriptions with 0 refills remaining"
+        >
+          Rx alert: {zeroRefillCount} w/ 0 refills
+        </button>
       )}
     </>
   );
@@ -249,15 +307,58 @@ export function RecordHeader({ member, gapCount, onAction, actions = [], onBack,
   );
 }
 
-export function MemberSummaryCard({ member, pcpHref, pcpState, onSaveField }) {
+export function MemberSummaryCard({ member, detail, pcpHref, pcpState, onSaveField }) {
   if (!member) return null;
   const pcpValue = member.primary_care_provider;
   const pcpNode = pcpHref && pcpValue ? (
     <Link to={pcpHref} state={pcpState} className="text-[var(--brand-primary)] hover:underline">
       {pcpValue}
     </Link>
-  ) : pcpValue;
-  const cityValue = member.address_city ? `${member.address_city}, ${member.address_state || ''}` : null;
+  ) : pcpValue || (
+    <span className="inline-flex items-center rounded bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200 px-1.5 py-0.5 text-[11px] font-semibold">
+      Missing PCP
+    </span>
+  );
+  const dobDisplay = member.date_of_birth
+    ? `${member.date_of_birth}${member.age != null ? ` (Age ${member.age})` : ''}`
+    : member.age != null
+    ? `Age ${member.age}`
+    : null;
+  const cityStateZip = [
+    member.address_city,
+    [member.address_state, member.address_zip].filter(Boolean).join(' '),
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const fullAddress = [member.address_line1, cityStateZip].filter(Boolean).join(' · ') || cityStateZip || null;
+
+  // Primary eligibility / coverage span
+  const primaryCoverage = (detail?.coverages || [])[0] || {
+    plan_name: member.plan_name,
+    line_of_business: member.line_of_business,
+    coverage_status: 'active',
+    effective_date: detail?.accumulator?.plan_year_start || `${new Date().getFullYear()}-01-01`,
+    term_date: `${new Date().getFullYear()}-12-31`,
+    coverage_tier: 'Individual',
+    relationship_to_subscriber: 'subscriber',
+  };
+  const coverageDates = [primaryCoverage.effective_date, primaryCoverage.term_date || 'Present']
+    .filter(Boolean)
+    .join(' → ');
+
+  // Care team synthesis from journeys, tasks, medications, and claims
+  const careCoordinator =
+    (detail?.care_journeys || []).find((j) => j.assigned_to)?.assigned_to ||
+    (detail?.tasks || []).find((t) => t.assigned_user)?.assigned_user ||
+    'care.team@prominencehealth.com';
+  const careTeamSpecialists = Array.from(
+    new Set(
+      [
+        ...(detail?.medications || []).map((m) => m.prescriber),
+        ...(detail?.claims || []).map((c) => c.provider),
+      ].filter((p) => p && p !== pcpValue)
+    )
+  ).slice(0, 3);
 
   // When onSaveField is supplied, build per-row save handlers. Without it,
   // rows render as visual-only (editable pencil affordance but no commit).
@@ -270,11 +371,12 @@ export function MemberSummaryCard({ member, pcpHref, pcpState, onSaveField }) {
   return (
     <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
       <header className="px-4 py-2.5 border-b coding-border flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">About this member</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">Demographics & Contact</h3>
+        <span className="font-mono text-[11px] coding-text-muted">{member.member_key}</span>
       </header>
       <dl>
-        <SharedPropertyRow label="Plan" value={member.plan_name} onEdit={save('plan_name')} editable />
-        <SharedPropertyRow label="Line of business" value={member.line_of_business} onEdit={save('line_of_business')} editable />
+        <SharedPropertyRow label="DOB & Age" value={dobDisplay} />
+        <SharedPropertyRow label="Gender" value={member.gender} onEdit={save('gender')} editable />
         <SharedPropertyRow label="Phone" value={member.phone} type="tel" onEdit={save('phone')} editable />
         <SharedPropertyRow
           label="Email"
@@ -285,10 +387,17 @@ export function MemberSummaryCard({ member, pcpHref, pcpState, onSaveField }) {
           editable
         />
         <SharedPropertyRow
-          label="PCP"
-          value={pcpNode}
-          editValue={pcpValue || ''}
-          onEdit={save('primary_care_provider')}
+          label="Address"
+          value={fullAddress}
+          editValue={member.address_line1 || member.address_city || ''}
+          onEdit={save('address_line1')}
+          editable
+        />
+        <SharedPropertyRow
+          label="City"
+          value={cityStateZip || member.address_city}
+          editValue={member.address_city || ''}
+          onEdit={save('address_city')}
           editable
         />
         <SharedPropertyRow
@@ -301,14 +410,44 @@ export function MemberSummaryCard({ member, pcpHref, pcpState, onSaveField }) {
           editable
         />
         <SharedPropertyRow label="Language" value={member.preferred_language} onEdit={save('preferred_language')} editable />
-        <SharedPropertyRow
-          label="City"
-          value={cityValue}
-          editValue={member.address_city || ''}
-          onEdit={save('address_city')}
-          editable
-        />
       </dl>
+
+      <PropertySection title="Eligibility & Plan">
+        <dl>
+          <SharedPropertyRow
+            label="Eligibility"
+            value={
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 px-2 py-0.5 text-[11px] font-semibold capitalize">
+                ● {primaryCoverage.coverage_status || 'active'}
+              </span>
+            }
+          />
+          <SharedPropertyRow label="Plan" value={member.plan_name} onEdit={save('plan_name')} editable />
+          <SharedPropertyRow label="Line of business" value={member.line_of_business} onEdit={save('line_of_business')} editable />
+          <SharedPropertyRow label="Effective dates" value={coverageDates} />
+          <SharedPropertyRow
+            label="Tier / Relation"
+            value={`${primaryCoverage.coverage_tier || 'Individual'} · ${primaryCoverage.relationship_to_subscriber || 'Subscriber'}`}
+          />
+        </dl>
+      </PropertySection>
+
+      <PropertySection title="Care Team">
+        <dl>
+          <SharedPropertyRow
+            label="PCP"
+            value={pcpNode}
+            editValue={pcpValue || ''}
+            onEdit={save('primary_care_provider')}
+            editable
+          />
+          <SharedPropertyRow label="Care coordinator" value={careCoordinator} />
+          <SharedPropertyRow
+            label="Care network"
+            value={careTeamSpecialists.length ? careTeamSpecialists.join(' · ') : 'In-network primary care'}
+          />
+        </dl>
+      </PropertySection>
 
       <PropertySection title="Quick stats">
         <div className="grid grid-cols-2 gap-2 p-3">
@@ -602,47 +741,172 @@ function SBARField({ label, value, accent }) {
   );
 }
 
-export function MemberTimeline({ detail }) {
+export function MemberTimeline({ detail, onNavigateTab }) {
   const events = React.useMemo(() => {
     const items = [];
-    (detail?.notes || []).forEach((n) => items.push({ kind: 'note', timestamp: n.created_at, title: `${n.channel} note`, body: n.body, author: n.author_name }));
-    (detail?.messages || []).forEach((m) => items.push({ kind: 'message', timestamp: m.timestamp, title: `${m.channel} ${m.direction}`, body: m.body, author: m.sender }));
-    (detail?.tasks || []).forEach((t) => items.push({ kind: 'task', timestamp: t.created_at, title: t.title, body: t.recommended_next_action || t.description, author: t.assigned_user }));
-    (detail?.claims || []).forEach((c) => items.push({ kind: 'claim', timestamp: c.service_date, title: `Claim ${c.claim_number}`, body: `${c.category} · ${c.provider || ''}`, author: null }));
-    (detail?.care_options || []).forEach((o) => items.push({ kind: 'care_option', timestamp: detail?.member?.last_interaction_at || new Date().toISOString(), title: `Care option · ${o.service_type}`, body: o.rationale, author: o.recommended_provider }));
+    (detail?.notes || []).forEach((n) =>
+      items.push({
+        kind: 'note',
+        targetTab: 'notes',
+        timestamp: n.created_at,
+        title: `${n.channel || 'Internal'} note`,
+        body: n.body,
+        author: n.author_name || n.author_email,
+      })
+    );
+    (detail?.messages || []).forEach((m) =>
+      items.push({
+        kind: 'message',
+        targetTab: 'notes',
+        timestamp: m.timestamp,
+        title: `${m.channel} ${m.direction}`,
+        body: m.body,
+        author: m.sender,
+      })
+    );
+    (detail?.tasks || []).forEach((t) =>
+      items.push({
+        kind: 'task',
+        targetTab: 'care_journey',
+        timestamp: t.updated_at || t.created_at,
+        title: `Task · ${t.title} (${t.status})`,
+        body: t.recommended_next_action || t.description,
+        author: t.assigned_user || t.assigned_queue,
+      })
+    );
+    (detail?.care_journeys || []).forEach((j) => {
+      if (j.start_date) {
+        items.push({
+          kind: 'journey',
+          targetTab: 'care_journey',
+          timestamp: j.start_date,
+          title: `Care journey started · ${j.name}`,
+          body: j.description || `${j.status} pathway`,
+          author: j.assigned_to,
+        });
+      }
+      (j.stages || []).forEach((s) => {
+        if (s.completed_at) {
+          items.push({
+            kind: 'journey_stage',
+            targetTab: 'care_journey',
+            timestamp: s.completed_at,
+            title: `Journey stage completed · ${s.name}`,
+            body: `${j.name}`,
+            author: j.assigned_to,
+          });
+        }
+      });
+    });
+    (detail?.claims || []).forEach((c) =>
+      items.push({
+        kind: 'claim',
+        targetTab: 'claims_benefits',
+        timestamp: c.service_date,
+        title: `Claim ${c.claim_number} (${c.status})`,
+        body: `${c.category || 'medical'} · ${c.provider || ''}${
+          c.billed_amount != null ? ` · $${Number(c.billed_amount).toFixed(2)} billed` : ''
+        }`,
+        author: c.provider,
+      })
+    );
+    (detail?.documents || []).forEach((d) =>
+      items.push({
+        kind: 'document',
+        targetTab: 'documents',
+        timestamp: d.uploaded_at,
+        title: `Document · ${d.document_type || 'File'}`,
+        body: d.file_name,
+        author: d.uploaded_by,
+      })
+    );
+    (detail?.care_options || []).forEach((o) =>
+      items.push({
+        kind: 'care_option',
+        targetTab: 'care_journey',
+        timestamp: detail?.member?.last_interaction_at || new Date().toISOString(),
+        title: `Care option · ${o.service_type}`,
+        body: o.rationale,
+        author: o.recommended_provider,
+      })
+    );
     return items
       .filter((i) => i.timestamp)
       .sort((a, b) => (parseUtcDate(b.timestamp)?.getTime() || 0) - (parseUtcDate(a.timestamp)?.getTime() || 0))
-      .slice(0, 25);
+      .slice(0, 30);
   }, [detail]);
 
   if (!events.length) return <p className="text-xs coding-text-soft">No activity yet.</p>;
   return (
-    <ol className="space-y-3">
-      {events.map((e, idx) => (
-        <li key={`${e.kind}-${idx}`} className="flex gap-3">
-          <div className="flex flex-col items-center">
-            <span className={joinClass(
-              'mt-1.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-900',
-              e.kind === 'note' ? 'bg-sky-400' :
-              e.kind === 'message' ? 'bg-violet-400' :
-              e.kind === 'task' ? 'bg-amber-400' :
-              e.kind === 'care_option' ? 'bg-emerald-400' :
-              'bg-slate-400'
-            )} />
-            <span className="flex-1 w-px bg-slate-200 dark:bg-slate-700" />
-          </div>
-          <div className="flex-1 pb-3">
-            <div className="flex items-center justify-between text-xs">
-              <p className="font-semibold coding-text-strong">{e.title}</p>
-              <p className="coding-text-muted">{formatLocalDateTime(e.timestamp)}</p>
-            </div>
-            <p className="text-sm coding-text-strong line-clamp-2">{e.body}</p>
-            {e.author && <p className="text-[11px] coding-text-soft">{e.author}</p>}
-          </div>
-        </li>
-      ))}
-    </ol>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between text-xs coding-text-muted pb-1 border-b coding-border-subtle">
+        <span>Chronological touchpoints across calls, notes, care journeys, tasks, claims, and documents</span>
+        <span>{events.length} recent touches</span>
+      </div>
+      <ol className="space-y-2.5">
+        {events.map((e, idx) => {
+          const clickable = Boolean(onNavigateTab && e.targetTab);
+          return (
+            <li key={`${e.kind}-${idx}`} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <span
+                  className={joinClass(
+                    'mt-2 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-900',
+                    e.kind === 'note'
+                      ? 'bg-sky-400'
+                      : e.kind === 'message'
+                      ? 'bg-violet-400'
+                      : e.kind === 'task'
+                      ? 'bg-amber-400'
+                      : e.kind === 'journey' || e.kind === 'journey_stage'
+                      ? 'bg-emerald-500'
+                      : e.kind === 'document'
+                      ? 'bg-indigo-400'
+                      : e.kind === 'care_option'
+                      ? 'bg-teal-400'
+                      : 'bg-slate-400'
+                  )}
+                />
+                <span className="flex-1 w-px bg-slate-200 dark:bg-slate-700" />
+              </div>
+              <div
+                role={clickable ? 'button' : undefined}
+                tabIndex={clickable ? 0 : undefined}
+                onClick={clickable ? () => onNavigateTab(e.targetTab) : undefined}
+                onKeyDown={
+                  clickable
+                    ? (ev) => {
+                        if (ev.key === 'Enter' || ev.key === ' ') {
+                          ev.preventDefault();
+                          onNavigateTab(e.targetTab);
+                        }
+                      }
+                    : undefined
+                }
+                className={joinClass(
+                  'flex-1 rounded-lg px-3 py-2 mb-1 coding-surface-subtle transition',
+                  clickable && 'cursor-pointer hover:ring-1 hover:ring-[var(--brand-primary)]/40'
+                )}
+              >
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <p className="font-semibold coding-text-strong">{e.title}</p>
+                  <p className="coding-text-muted shrink-0">{formatLocalDateTime(e.timestamp)}</p>
+                </div>
+                {e.body && <p className="text-sm coding-text-strong line-clamp-2 mt-0.5">{e.body}</p>}
+                <div className="flex items-center justify-between mt-1">
+                  {e.author ? <p className="text-[11px] coding-text-soft">{e.author}</p> : <span />}
+                  {clickable && (
+                    <span className="text-[11px] font-medium text-[var(--brand-primary)]">
+                      Open in tab →
+                    </span>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 

@@ -256,6 +256,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
             selectinload(Member360Member.problems),
             selectinload(Member360Member.medications),
             selectinload(Member360Member.labs),
+            selectinload(Member360Member.coverages),
         )
     )
     member = await session.scalar(stmt)
@@ -363,8 +364,48 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
             "plan_year_start": a.plan_year_start,
         }
 
+    coverages_payload = [
+        {
+            "id": cov.id,
+            "member_id": cov.member_id,
+            "plan_name": cov.plan_name or member.plan_name,
+            "line_of_business": cov.line_of_business or member.line_of_business,
+            "coverage_status": cov.coverage_status or "active",
+            "effective_date": cov.effective_date,
+            "term_date": cov.term_date,
+            "coverage_tier": cov.coverage_tier or "Individual",
+            "relationship_to_subscriber": cov.relationship_to_subscriber or "subscriber",
+            "is_primary": bool(cov.is_primary),
+        }
+        for cov in sorted(
+            member.coverages,
+            key=lambda x: (not bool(x.is_primary), -(x.effective_date or date.min).toordinal()),
+        )
+    ]
+    if not coverages_payload and (member.plan_name or member.line_of_business):
+        eff_date = (
+            member.accumulator.plan_year_start
+            if member.accumulator and member.accumulator.plan_year_start
+            else date(date.today().year, 1, 1)
+        )
+        coverages_payload = [
+            {
+                "id": member.id,
+                "member_id": member.id,
+                "plan_name": member.plan_name,
+                "line_of_business": member.line_of_business,
+                "coverage_status": "active",
+                "effective_date": eff_date,
+                "term_date": date(eff_date.year, 12, 31),
+                "coverage_tier": "Individual",
+                "relationship_to_subscriber": "subscriber",
+                "is_primary": True,
+            }
+        ]
+
     return {
         "member": detail,
+        "coverages": coverages_payload,
         "risk_insights": [
             {
                 "id": r.id,
@@ -582,7 +623,7 @@ async def update_member(session: AsyncSession, member_id: int, payload: dict) ->
     if not member:
         return None
     editable_fields = (
-        "first_name", "last_name", "gender", "plan_name", "line_of_business",
+        "first_name", "last_name", "date_of_birth", "gender", "plan_name", "line_of_business",
         "phone", "email", "address_line1", "address_city", "address_state",
         "address_zip", "preferred_language", "preferred_channel",
         "primary_care_provider",

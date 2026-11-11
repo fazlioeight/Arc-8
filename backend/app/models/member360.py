@@ -756,3 +756,90 @@ class Member360GeocodeCache(TenantDataBase):
     longitude: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="ok")  # ok | failed
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+# ---------------------- UHS / QNXT SFTP Reference & Key Mapping Tables -------
+
+
+class Member360ExternalKeyMap(TenantDataBase):
+    """Cross-reference table mapping QNXT internal identifiers (e.g.
+    ``InternalMemberID`` ``QEMEM...`` or ``ProviderID`` ``PR000...``) to the
+    canonical ``m360_members.id`` or ``m360_providers.id`` row."""
+
+    __tablename__ = "m360_external_key_maps"
+    __table_args__ = (
+        UniqueConstraint("entity_type", "external_key", name="uq_m360_ext_key_map"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(32), index=True)  # member | provider
+    external_key: Mapped[str] = mapped_column(String(64), index=True)
+    canonical_key: Mapped[str] = mapped_column(String(64), index=True)
+    target_id: Mapped[int] = mapped_column(Integer, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Member360EmployerGroup(TenantDataBase):
+    """Employer group and benefit plan master record imported from
+    ``PHP_To_OEight_GroupDetails``."""
+
+    __tablename__ = "m360_employer_groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    group_number: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    cust_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    group_name: Mapped[str] = mapped_column(String(160))
+    effective_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    expiration_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    renewal_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    benefit_plan_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    benefit_plan_name: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    program_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    program_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    contact_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    contact_phone: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    contact_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    address_line1: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    state: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
+    postal_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    group_size: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    region: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    line_of_business: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Member360Broker(TenantDataBase):
+    """Broker assignment record imported from ``PHP_To_OEight_BorkerDetails``."""
+
+    __tablename__ = "m360_brokers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    broker_id: Mapped[str] = mapped_column(String(64), index=True)
+    group_number: Mapped[Optional[str]] = mapped_column(String(64), index=True, nullable=True)
+    broker_name: Mapped[str] = mapped_column(String(160))
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Member360ProviderPayTo(TenantDataBase):
+    """Vendor / 1099 Pay-To entity imported from ``PHP_To_OEight_Provider_PayTo_QNXT``."""
+
+    __tablename__ = "m360_provider_payto"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    vendor_id: Mapped[str] = mapped_column(String(64), index=True)
+    internal_vendor_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    legal_name: Mapped[str] = mapped_column(String(160))
+    tax_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    tax_id_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    effective_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    term_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    address_line1: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    state: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)
+    postal_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    county: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+

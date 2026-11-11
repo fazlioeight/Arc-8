@@ -1,0 +1,1 @@
+﻿claimid|MemberNumber|MemberName|PayeeName|MailDate

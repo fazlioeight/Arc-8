@@ -23,7 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
 from ..db.session import control_session
-from ..models.tables import DataImportJob, DataImportJobLog
+from ..db.tenant_manager import TenantContext, tenant_connection_manager
+from ..models.tables import DataImportJob, DataImportJobLog, Tenant
+from .uhs_sftp_importer import detect_uhs_feed_type, import_uhs_file
 
 logger = logging.getLogger(__name__)
 
@@ -226,18 +228,43 @@ async def process_job(job_id: str) -> None:
         await session.commit()
 
         file_path = job.file_path
+        tenant_id = job.tenant_id
         suffix = Path(file_path).suffix.lower() if file_path else ""
+        tenant_ctx: Optional[TenantContext] = None
+        if tenant_id:
+            tenant_row = await session.get(Tenant, tenant_id)
+            if tenant_row and tenant_row.db_connection_uri:
+                tenant_ctx = TenantContext(
+                    id=tenant_row.id,
+                    key=tenant_row.key,
+                    slug=tenant_row.slug,
+                    db_connection_uri=tenant_row.db_connection_uri,
+                    db_schema=tenant_row.db_schema,
+                )
 
     records_processed = 0
     error_message: Optional[str] = None
     parsed = False
+    uhs_feed_loaded: Optional[str] = None
 
     try:
         if not file_path:
             error_message = "No file attached to this job"
         elif suffix in (".csv", ".txt"):
-            records_processed = _count_csv_rows(file_path)
-            parsed = True
+            header_line = ""
+            with Path(file_path).open("r", encoding="utf-8", errors="ignore") as fh:
+                header_line = fh.readline().strip()
+            feed_type = detect_uhs_feed_type(Path(file_path).name, header_line)
+            if feed_type and tenant_ctx is not None:
+                async with tenant_connection_manager.get_session(tenant_ctx) as t_session:
+                    uhs_feed_loaded, records_processed = await import_uhs_file(
+                        t_session, file_path
+                    )
+                    await t_session.commit()
+                parsed = True
+            else:
+                records_processed = _count_csv_rows(file_path)
+                parsed = True
         else:
             # No parser wired up for this file type yet — record that explicitly
             # rather than fabricating a count.
@@ -261,7 +288,14 @@ async def process_job(job_id: str) -> None:
             row.records_failed = 0
             row.progress = 100
             row.completed_at = datetime.now(timezone.utc)
-            if parsed:
+            if uhs_feed_loaded:
+                await append_log(
+                    session,
+                    row.id,
+                    f"Completed UHS SFTP '{uhs_feed_loaded}' import. {records_processed} records loaded into tenant database.",
+                    level="info",
+                )
+            elif parsed:
                 await append_log(
                     session,
                     row.id,
@@ -294,7 +328,18 @@ async def fail_job(job_id: str, message: str) -> None:
 
 
 ALLOWED_EXTENSIONS = {"txt", "csv", "xlsx"}
-ALLOWED_ENTITIES = {"members", "providers", "claims", "mao004", "charts"}
+ALLOWED_ENTITIES = {
+    "members",
+    "providers",
+    "claims",
+    "mao004",
+    "charts",
+    "enrollments",
+    "accumulators",
+    "pharmacy",
+    "call_tracking",
+    "uhs_sftp",
+}
 
 
 def validate_upload(file_name: str, entity: str) -> tuple[bool, Optional[str]]:

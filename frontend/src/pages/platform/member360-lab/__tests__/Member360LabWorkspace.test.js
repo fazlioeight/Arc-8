@@ -13,13 +13,16 @@ import { AuthContext } from "../../../../context/AuthContext";
 // state. Other write endpoints aren't touched on initial render and only
 // matter if the test simulates a click — left as jest.fn() stubs.
 jest.mock("../../../../services/member360LabService", () => ({
-  fetchMember360MemberDetail: jest.fn(() =>
+  fetchMember360MemberDetail: () =>
     Promise.resolve({
       member: {
         id: 1,
         member_key: "M360-0001",
         first_name: "Maria",
         last_name: "Hernandez",
+        date_of_birth: "1955-03-30",
+        age: 71,
+        gender: "F",
         plan_name: "ProminenceCare Gold",
         line_of_business: "Medicare Advantage",
         risk_tier: "Critical",
@@ -32,6 +35,20 @@ jest.mock("../../../../services/member360LabService", () => ({
         preferred_channel: "Phone",
         primary_care_provider: "Dr. Whitley",
       },
+      coverages: [
+        {
+          id: 1,
+          member_id: 1,
+          plan_name: "ProminenceCare Gold",
+          line_of_business: "Medicare Advantage",
+          coverage_status: "active",
+          effective_date: "2026-01-01",
+          term_date: "2026-12-31",
+          coverage_tier: "Individual",
+          relationship_to_subscriber: "subscriber",
+          is_primary: true,
+        },
+      ],
       risk_insights: [
         {
           id: 1,
@@ -43,7 +60,25 @@ jest.mock("../../../../services/member360LabService", () => ({
         },
       ],
       tasks: [],
-      care_journeys: [],
+      care_journeys: [
+        {
+          id: 10,
+          member_id: 1,
+          name: "Post-Discharge Follow-Up",
+          status: "active",
+          assigned_to: "care.team@prominencehealth.com",
+          start_date: "2026-09-01",
+          stages: [
+            {
+              id: 100,
+              sequence: 0,
+              name: "Discharge intake",
+              status: "completed",
+              completed_at: "2026-09-02T12:00:00Z",
+            },
+          ],
+        },
+      ],
       notes: [],
       messages: [],
       claims: [],
@@ -52,11 +87,21 @@ jest.mock("../../../../services/member360LabService", () => ({
       savings: [],
       documents: [],
       problems: [],
-      medications: [],
+      medications: [
+        {
+          id: 20,
+          member_id: 1,
+          rx_number: "RX-1001",
+          drug_name: "Insulin glargine 100u/ml",
+          refills_remaining: 0,
+          prescriber: "Dr. Whitley",
+          pharmacy: "CVS Pharmacy",
+          status: "active",
+        },
+      ],
       labs: [],
-    })
-  ),
-  fetchMember360GapAnalysis: jest.fn(() =>
+    }),
+  fetchMember360GapAnalysis: () =>
     Promise.resolve({
       member: { id: 1, member_key: "M360-0001", risk_tier: "Critical" },
       mao_records: [],
@@ -64,24 +109,23 @@ jest.mock("../../../../services/member360LabService", () => ({
       stale_records: [],
       immediate_actions: [],
       submission_year: 2026,
-    })
-  ),
-  updateMember360Member: jest.fn(),
-  createMember360Task: jest.fn(),
-  updateMember360Task: jest.fn(),
-  createMember360Note: jest.fn(),
-  createMember360Message: jest.fn(),
-  createMember360CareOption: jest.fn(),
-  generateMember360SubmissionExport: jest.fn(),
+    }),
+  updateMember360Member: () => Promise.resolve({}),
+  createMember360Task: () => Promise.resolve({}),
+  updateMember360Task: () => Promise.resolve({}),
+  createMember360Note: () => Promise.resolve({}),
+  createMember360Message: () => Promise.resolve({}),
+  createMember360CareOption: () => Promise.resolve({}),
+  generateMember360SubmissionExport: () => Promise.resolve({}),
   // Templates load on mount for the Start Journey dialog. Return an empty
   // list so the workspace still renders when the dialog is not opened.
-  fetchMember360JourneyTemplates: jest.fn(() => Promise.resolve([])),
-  createMember360CareJourney: jest.fn(),
-  updateMember360CareJourney: jest.fn(),
-  updateMember360CareJourneyStage: jest.fn(),
-  uploadMember360Document: jest.fn(),
-  downloadMember360Document: jest.fn(),
-  fetchMember360MemberAudit: jest.fn(() => Promise.resolve({ items: [], total: 0 })),
+  fetchMember360JourneyTemplates: () => Promise.resolve([]),
+  createMember360CareJourney: () => Promise.resolve({}),
+  updateMember360CareJourney: () => Promise.resolve({}),
+  updateMember360CareJourneyStage: () => Promise.resolve({}),
+  uploadMember360Document: () => Promise.resolve({}),
+  downloadMember360Document: () => Promise.resolve({}),
+  fetchMember360MemberAudit: () => Promise.resolve({ items: [], total: 0 }),
 }));
 
 // Chart sub-pages live in `./chart/*.jsx`. CRA's Jest defaults don't
@@ -100,15 +144,15 @@ jest.mock("../chart/SettingsPage", () => () => null);
 jest.mock("../../../../context/UserPreferencesContext", () => ({
   useUserPreferences: () => ({
     favorites: [],
-    toggleFavorite: jest.fn(),
-    isFavorite: jest.fn(),
-    isNavItemEnabled: jest.fn(() => true),
-    recordViewPreference: jest.fn(),
-    getViewPreference: jest.fn(),
-    markNotificationRead: jest.fn(),
+    toggleFavorite: () => {},
+    isFavorite: () => false,
+    isNavItemEnabled: () => true,
+    recordViewPreference: () => {},
+    getViewPreference: () => null,
+    markNotificationRead: () => {},
     navVisibility: {},
-    updateRoleMenus: jest.fn(),
-    setNavVisibility: jest.fn(),
+    updateRoleMenus: () => {},
+    setNavVisibility: () => {},
     viewPreferences: {},
     notificationPrefs: { dismissed: [], lastRead: null },
   }),
@@ -146,21 +190,25 @@ const renderWorkspaceAt = (memberId) => {
 };
 
 describe("Member360LabWorkspace", () => {
-  it("renders the member name after the detail fetch resolves", async () => {
+  it("renders the member name, demographics, eligibility, care team, and header alerts", async () => {
     renderWorkspaceAt(1);
 
-    // Wait for the loading state to clear and the member's name to render.
-    // We look for it as text (the workspace puts it in the record header)
-    // rather than role:heading so we don't tie the test to heading-level.
     await waitFor(() => {
-      // Heading is "Maria Hernandez" — there will be multiple matches
-      // (header + summary card), so getAllByText not getByText.
       const matches = screen.getAllByText(/Maria Hernandez/);
       expect(matches.length).toBeGreaterThan(0);
     });
 
-    // The Timeline tab is the default — the workspace renders a tab list
-    // with at least 'Timeline' visible
+    // Timeline tab is default and renders recent touchpoints including journey stages
     expect(screen.getAllByText(/Timeline/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Journey stage completed · Discharge intake/i).length).toBeGreaterThan(0);
+
+    // Demographics, Eligibility & Plan, and Care Team sections render
+    expect(screen.getAllByText(/Demographics & Contact/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Eligibility & Plan/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Care Team/i).length).toBeGreaterThan(0);
+
+    // Header alerts for active journey and 0-refill Rx render
+    expect(screen.getAllByText(/1 active journey/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Rx alert: 1 w\/ 0 refills/i).length).toBeGreaterThan(0);
   });
 });

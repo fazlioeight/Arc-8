@@ -1,0 +1,1 @@
+﻿InternalPCPID|PCPProvID|PCPEffDate|PCPTermDate|MemberID|PCPSpeciality|PCPSpecialityCode|InternalEnrollID|PCPNPI|Source|PCPAffiliationID|ProviderGroupTIN|ProviderGroupName|PCPTYPE|PCPFirstName|PCPLastName|InternalMemberID|LOB

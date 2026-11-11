@@ -240,7 +240,7 @@ async def test_member_detail_payload_has_all_collections(fastapi_app, seeded_mem
     body = resp.json()
     assert body["member"]["member_key"] == "T360-001"
     # The detail wrapper always carries these arrays even if empty
-    for collection in ("risk_insights", "tasks", "care_journeys", "notes", "messages",
+    for collection in ("coverages", "risk_insights", "tasks", "care_journeys", "notes", "messages",
                        "claims", "care_options", "savings", "documents"):
         assert collection in body, f"missing {collection}"
         assert isinstance(body[collection], list)

@@ -1,0 +1,1 @@
+﻿InternalVendorID|VendorID|InboundVendorID_QNXT|Vendor1099ReportInfoID|LegalName|TaxID|EffDate|TermDate|RowState|AddressID|TaxIDType|StreetAddress1|StreetAddress2|City|State|ZipCode|ProvinceOrState|Country|County|RowNumber
