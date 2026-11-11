@@ -9,6 +9,17 @@ import simulatedQ3Data from '../data/mock/simulatedQ3Dataset.json';
 const CATALOG_KEY = 'arc8_plan_performance_dataset_catalog';
 const ACTIVE_ID_KEY = 'arc8_plan_performance_active_id';
 const DATA_PREFIX = 'arc8_plan_performance_data_';
+const DELETED_BUILTIN_KEY = 'arc8_plan_performance_deleted_builtins';
+
+export const getDeletedBuiltInIds = () => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const stored = window.localStorage.getItem(DELETED_BUILTIN_KEY);
+      if (stored) return JSON.parse(stored) || [];
+    } catch (_) {}
+  }
+  return [];
+};
 
 export const MARKETS = [
   { id: 'all', name: 'All Markets' },
@@ -51,6 +62,9 @@ export const BUILTIN_DATASETS = [
  * Retrieves the full catalog of available datasets (built-ins + custom uploads).
  */
 export const getDatasetCatalog = () => {
+  const deletedBuiltins = getDeletedBuiltInIds();
+  const visibleBuiltins = BUILTIN_DATASETS.filter((b) => !deletedBuiltins.includes(b.id));
+
   let customList = [];
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
@@ -62,7 +76,12 @@ export const getDatasetCatalog = () => {
       console.warn('Failed to parse dataset catalog from localStorage:', e);
     }
   }
-  return [...BUILTIN_DATASETS, ...customList];
+
+  const combined = [...visibleBuiltins, ...customList];
+  if (combined.length === 0) {
+    return BUILTIN_DATASETS.slice(0, 1);
+  }
+  return combined;
 };
 
 /**
@@ -80,7 +99,8 @@ export const getActiveDatasetId = () => {
       }
     } catch (_) {}
   }
-  return 'baseline';
+  const catalog = getDatasetCatalog();
+  return catalog[0]?.id || 'baseline';
 };
 
 /**
@@ -221,30 +241,52 @@ export const saveDatasetToCatalog = (jsonObj, displayName, filename = 'uploaded_
 };
 
 /**
- * Deletes a custom dataset from the catalog.
+ * Deletes a dataset (built-in or custom) from the catalog.
  */
 export const deleteDatasetFromCatalog = (id) => {
-  if (id === 'baseline' || id === 'simulated_q3') {
-    throw new Error('Built-in baseline datasets cannot be deleted.');
+  const catalog = getDatasetCatalog();
+  if (catalog.length <= 1) {
+    throw new Error('At least one dataset scenario must remain in the catalog.');
   }
 
   if (typeof window !== 'undefined' && window.localStorage) {
-    window.localStorage.removeItem(`${DATA_PREFIX}${id}`);
+    const isBuiltIn = BUILTIN_DATASETS.some((b) => b.id === id);
 
-    let customList = [];
-    try {
-      const stored = window.localStorage.getItem(CATALOG_KEY);
-      if (stored) customList = JSON.parse(stored) || [];
-    } catch (_) {}
+    if (isBuiltIn) {
+      const deletedList = getDeletedBuiltInIds();
+      if (!deletedList.includes(id)) {
+        deletedList.push(id);
+        window.localStorage.setItem(DELETED_BUILTIN_KEY, JSON.stringify(deletedList));
+      }
+    } else {
+      window.localStorage.removeItem(`${DATA_PREFIX}${id}`);
 
-    customList = customList.filter((d) => d.id !== id);
-    window.localStorage.setItem(CATALOG_KEY, JSON.stringify(customList));
+      let customList = [];
+      try {
+        const stored = window.localStorage.getItem(CATALOG_KEY);
+        if (stored) customList = JSON.parse(stored) || [];
+      } catch (_) {}
 
-    // If active was deleted, reset to baseline
+      customList = customList.filter((d) => d.id !== id);
+      window.localStorage.setItem(CATALOG_KEY, JSON.stringify(customList));
+    }
+
+    // If active was deleted, reset to first remaining dataset
     const currentActive = window.localStorage.getItem(ACTIVE_ID_KEY);
     if (currentActive === id) {
-      window.localStorage.setItem(ACTIVE_ID_KEY, 'baseline');
+      const remainingCatalog = getDatasetCatalog();
+      const nextActiveId = remainingCatalog[0]?.id || 'baseline';
+      window.localStorage.setItem(ACTIVE_ID_KEY, nextActiveId);
     }
+  }
+};
+
+/**
+ * Restores all built-in dataset scenarios to the catalog.
+ */
+export const restoreDefaultDatasets = () => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.removeItem(DELETED_BUILTIN_KEY);
   }
 };
 

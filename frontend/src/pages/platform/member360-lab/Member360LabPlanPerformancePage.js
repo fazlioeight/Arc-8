@@ -22,6 +22,7 @@ import {
   saveDatasetToCatalog,
   deleteDatasetFromCatalog,
   renameDatasetInCatalog,
+  restoreDefaultDatasets,
   getDatasetDataById,
   validateDataset,
 } from '../../../services/planPerformanceService';
@@ -454,17 +455,36 @@ export default function Member360LabPlanPerformancePage() {
     }
   };
 
-  // Delete a custom dataset
+  // Delete a dataset scenario (built-in or custom)
   const handleDeleteDataset = (id, name) => {
     setModalError(null);
+    if (!window.confirm(`Are you sure you want to permanently delete the dataset scenario "${name}"?`)) {
+      return;
+    }
     try {
       deleteDatasetFromCatalog(id);
       setDatasetVersion((v) => v + 1);
-      setActiveDatasetIdState(getActiveDatasetId());
+      const nextId = getActiveDatasetId();
+      setActiveDatasetIdState(nextId);
       setToastMessage(`Removed scenario "${name}".`);
       setTimeout(() => setToastMessage(null), 4000);
     } catch (err) {
       setModalError(err.message || 'Failed to delete scenario.');
+    }
+  };
+
+  // Restore default built-in scenarios
+  const handleRestoreDefaults = () => {
+    setModalError(null);
+    try {
+      restoreDefaultDatasets();
+      setDatasetVersion((v) => v + 1);
+      const nextId = getActiveDatasetId();
+      setActiveDatasetIdState(nextId);
+      setToastMessage('Restored default built-in dataset scenarios.');
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err) {
+      setModalError(err.message || 'Failed to restore default scenarios.');
     }
   };
 
@@ -963,29 +983,46 @@ export default function Member360LabPlanPerformancePage() {
                                 Export
                               </button>
                               {!item.isBuiltIn && !isEditing && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartRename(item)}
-                                    title="Rename Scenario"
-                                    className="px-2 py-1 rounded text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                                  >
-                                    Rename
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteDataset(item.id, item.name)}
-                                    title="Delete Scenario"
-                                    className="px-2 py-1 rounded text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50"
-                                  >
-                                    Delete
-                                  </button>
-                                </>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartRename(item)}
+                                  title="Rename Scenario"
+                                  className="px-2 py-1 rounded text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                >
+                                  Rename
+                                </button>
+                              )}
+                              {!isEditing && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDataset(item.id, item.name)}
+                                  title="Delete Scenario"
+                                  className="px-2 py-1 rounded text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 flex items-center gap-1 transition"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                  Delete
+                                </button>
                               )}
                             </div>
                           </div>
                         );
                       })}
+                    </div>
+                    {/* Catalog Controls / Reset */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 text-xs">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {datasetCatalog.length} scenario{datasetCatalog.length === 1 ? '' : 's'} available
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRestoreDefaults}
+                        className="px-2.5 py-1 text-xs font-semibold rounded text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        title="Restore original built-in scenarios if deleted"
+                      >
+                        ↺ Restore Default Scenarios
+                      </button>
                     </div>
                   </div>
                 ) : (

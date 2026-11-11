@@ -113,6 +113,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
   const { t: rawT } = useUserPreferences();
   const t = typeof rawT === 'function' ? rawT : (_key, fallback) => fallback ?? _key;
   const [showPersonaModal, setShowPersonaModal] = useState(false);
+  const [memberBadgeCount, setMemberBadgeCount] = useState('100');
   const [taskBadgeCount, setTaskBadgeCount] = useState('89');
   const [journeyBadgeCount, setJourneyBadgeCount] = useState('19');
 
@@ -128,8 +129,10 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!d) return;
+        const tm = d.metrics?.find((m) => m.key === 'total_members')?.value;
         const aj = d.metrics?.find((m) => m.key === 'active_journeys')?.value;
         const ot = d.metrics?.find((m) => m.key === 'open_tasks')?.value;
+        if (tm !== undefined) setMemberBadgeCount(String(Math.round(tm)));
         if (aj !== undefined) setJourneyBadgeCount(String(Math.round(aj)));
         if (ot !== undefined) setTaskBadgeCount(String(Math.round(ot)));
       })
@@ -281,7 +284,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
           label: t('nav.patient_roster', 'Patient Roster'),
           href: ROUTES.MEMBER360_LAB.MEMBERS,
           icon: SvgUsers,
-          badge: '50',
+          badge: memberBadgeCount,
           permission: 'menu:patient_roster',
         },
         { label: t('nav.clinical_tasks', 'Clinical Tasks'), href: ROUTES.MEMBER360_LAB.TASKS, icon: SvgTasks, badge: taskBadgeCount, badgeTone: 'critical', permission: 'menu:tasks' },
