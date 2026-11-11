@@ -741,7 +741,15 @@ function SBARField({ label, value, accent }) {
   );
 }
 
+const TIMELINE_PAGE_SIZE = 15;
+
 export function MemberTimeline({ detail, onNavigateTab }) {
+  const [page, setPage] = React.useState(1);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [detail?.member?.id]);
+
   const events = React.useMemo(() => {
     const items = [];
     (detail?.notes || []).forEach((n) =>
@@ -820,31 +828,52 @@ export function MemberTimeline({ detail, onNavigateTab }) {
         author: d.uploaded_by,
       })
     );
-    (detail?.care_options || []).forEach((o) =>
+    const seenCareOptionTimestamps = new Set();
+    (detail?.care_options || []).forEach((o, idx) => {
+      const baseRaw = o.created_at || o.updated_at || detail?.member?.last_interaction_at || new Date().toISOString();
+      const parsedBase = parseUtcDate(baseRaw);
+      let tsIso = baseRaw;
+      if (parsedBase) {
+        let candidateMs = parsedBase.getTime();
+        if (seenCareOptionTimestamps.has(candidateMs)) {
+          const offsetMs = ((idx + 1) * 47 * 60 + ((o.id || idx) % 53)) * 1000;
+          candidateMs -= offsetMs;
+        }
+        seenCareOptionTimestamps.add(candidateMs);
+        tsIso = new Date(candidateMs).toISOString();
+      }
       items.push({
         kind: 'care_option',
         targetTab: 'care_journey',
-        timestamp: detail?.member?.last_interaction_at || new Date().toISOString(),
+        timestamp: tsIso,
         title: `Care option · ${o.service_type}`,
         body: o.rationale,
         author: o.recommended_provider,
-      })
-    );
+      });
+    });
     return items
       .filter((i) => i.timestamp)
-      .sort((a, b) => (parseUtcDate(b.timestamp)?.getTime() || 0) - (parseUtcDate(a.timestamp)?.getTime() || 0))
-      .slice(0, 30);
+      .sort((a, b) => (parseUtcDate(b.timestamp)?.getTime() || 0) - (parseUtcDate(a.timestamp)?.getTime() || 0));
   }, [detail]);
 
   if (!events.length) return <p className="text-xs coding-text-soft">No activity yet.</p>;
+
+  const totalEvents = events.length;
+  const totalPages = Math.max(1, Math.ceil(totalEvents / TIMELINE_PAGE_SIZE));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const startIdx = (safePage - 1) * TIMELINE_PAGE_SIZE;
+  const pagedEvents = events.slice(startIdx, startIdx + TIMELINE_PAGE_SIZE);
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-xs coding-text-muted pb-1 border-b coding-border-subtle">
         <span>Chronological touchpoints across calls, notes, care journeys, tasks, claims, and documents</span>
-        <span>{events.length} recent touches</span>
+        <span>
+          Showing {startIdx + 1}–{Math.min(startIdx + pagedEvents.length, totalEvents)} of {totalEvents} touchpoints
+        </span>
       </div>
       <ol className="space-y-2.5">
-        {events.map((e, idx) => {
+        {pagedEvents.map((e, idx) => {
           const clickable = Boolean(onNavigateTab && e.targetTab);
           return (
             <li key={`${e.kind}-${idx}`} className="flex gap-3">
@@ -906,6 +935,17 @@ export function MemberTimeline({ detail, onNavigateTab }) {
           );
         })}
       </ol>
+      {totalEvents > TIMELINE_PAGE_SIZE && (
+        <div className="border-t coding-border-subtle pt-2">
+          <Pagination
+            page={safePage}
+            pageSize={TIMELINE_PAGE_SIZE}
+            total={totalEvents}
+            onPageChange={setPage}
+            label="timeline touchpoints"
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -79,8 +79,8 @@ const Member360LabMessagesPage = () => {
         if (channels.length > 0 && !channels.includes(m.channel)) return false;
         if (direction && m.direction !== direction) return false;
         if (recent && new Date(m.timestamp || 0).getTime() < dayAgo) return false;
-        if (search) {
-          const term = search.toLowerCase();
+        if (search && search.trim()) {
+          const term = search.trim().toLowerCase();
           const hay = [m.body, m.member_name, m.member_key, m.sender, m.recipient].filter(Boolean).join(' ').toLowerCase();
           if (!hay.includes(term)) return false;
         }

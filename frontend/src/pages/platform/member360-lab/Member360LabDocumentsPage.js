@@ -69,6 +69,7 @@ const Member360LabDocumentsPage = () => {
   const [uploadFile, setUploadFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,6 +107,12 @@ const Member360LabDocumentsPage = () => {
     }
     setUploading(true);
     setUploadError(null);
+    const uploadedFileName = uploadFile.name;
+    const uploadedDocType = uploadDocType;
+    const selectedMember = memberRoster.find((m) => String(m.id) === String(uploadMemberId));
+    const memberLabel = selectedMember
+      ? `${selectedMember.first_name || ''} ${selectedMember.last_name || ''}`.trim() || selectedMember.member_key
+      : null;
     try {
       await uploadMember360Document(token, tenant, Number(uploadMemberId), uploadFile, {
         documentType: uploadDocType,
@@ -113,6 +120,9 @@ const Member360LabDocumentsPage = () => {
       setShowUploadModal(false);
       setUploadFile(null);
       setRefreshTick((n) => n + 1);
+      setUploadSuccessMessage(
+        `Document "${uploadedFileName}" (${uploadedDocType}) uploaded successfully${memberLabel ? ` for ${memberLabel}` : ''}.`
+      );
     } catch (err) {
       setUploadError(err.message || 'Failed to upload document');
     } finally {
@@ -154,8 +164,8 @@ const Member360LabDocumentsPage = () => {
         if (statuses.length > 0 && !statuses.includes(d.status)) return false;
         if (waiversOnly && !(d.document_type || '').toLowerCase().includes('waiver')) return false;
         if (recent && (parseUtcDate(d.uploaded_at)?.getTime() || 0) < weekAgo) return false;
-        if (search) {
-          const term = search.toLowerCase();
+        if (search && search.trim()) {
+          const term = search.trim().toLowerCase();
           const hay = [d.file_name, d.document_type, d.member_name, d.member_key, d.uploaded_by].filter(Boolean).join(' ').toLowerCase();
           if (!hay.includes(term)) return false;
         }
@@ -192,6 +202,23 @@ const Member360LabDocumentsPage = () => {
       mainClassName="space-y-4"
     >
       {!isPatientRole && <LabSubNav />}
+
+      {uploadSuccessMessage && (
+        <div
+          role="status"
+          className="flex items-center justify-between gap-3 rounded-lg ring-1 ring-emerald-200 dark:ring-emerald-700/40 bg-emerald-50/80 dark:bg-emerald-900/25 px-4 py-3 text-sm font-medium text-emerald-900 dark:text-emerald-200"
+        >
+          <span>✓ {uploadSuccessMessage}</span>
+          <button
+            type="button"
+            onClick={() => setUploadSuccessMessage(null)}
+            className="text-xs text-emerald-700 dark:text-emerald-300 hover:opacity-80 font-bold"
+            aria-label="Dismiss notification"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiTile label="All documents" value={summary.total} />
@@ -414,7 +441,27 @@ const Member360LabDocumentsPage = () => {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={6} className="px-3 py-12 text-center text-sm coding-text-soft">No documents on file.</td></tr>
+                  <tr>
+                    <td colSpan={6} className="px-3 py-12 text-center text-sm coding-text-soft">
+                      {rows.length > 0 || Boolean(search.trim()) || activeFilterCount > 0 || activeView !== 'all' ? (
+                        <div className="space-y-2">
+                          <p>No documents match the current filters or search criteria.</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSearch('');
+                              applySavedView('all');
+                            }}
+                            className="text-xs font-medium text-[var(--brand-primary)] hover:underline"
+                          >
+                            Clear filters and search
+                          </button>
+                        </div>
+                      ) : (
+                        'No documents on file.'
+                      )}
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

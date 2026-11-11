@@ -58,19 +58,26 @@ export default function DocumentsPage({ detail, memberId, onUploaded }) {
   const [docType, setDocType] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
 
   const resolvedMemberId = memberId ?? detail?.member?.id;
 
   const handleUpload = async (event) => {
     setError(null);
+    setSuccessMessage(null);
     const file = event.target.files?.[0];
     if (!file || !resolvedMemberId) return;
+    const uploadedName = file.name;
+    const uploadedType = docType.trim();
     setUploading(true);
     try {
       await uploadMember360Document(token, tenant, resolvedMemberId, file, {
-        documentType: docType || undefined,
+        documentType: uploadedType || undefined,
       });
+      setSuccessMessage(
+        `Document "${uploadedName}"${uploadedType ? ` (${uploadedType})` : ""} uploaded successfully.`
+      );
       onUploaded?.();
     } catch (err) {
       setError(err.message || "Upload failed");
@@ -130,6 +137,23 @@ export default function DocumentsPage({ detail, memberId, onUploaded }) {
         />
         {uploading && <span className="text-xs coding-text-soft">Uploading…</span>}
       </div>
+
+      {successMessage && (
+        <div
+          role="status"
+          className="flex items-center justify-between gap-2 rounded-lg ring-1 ring-emerald-200 dark:ring-emerald-700/40 bg-emerald-50/80 dark:bg-emerald-900/25 px-3 py-2 text-xs font-medium text-emerald-900 dark:text-emerald-200"
+        >
+          <span>✓ {successMessage}</span>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage(null)}
+            className="text-emerald-700 dark:text-emerald-300 hover:opacity-80 font-bold"
+            aria-label="Dismiss notification"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg ring-1 ring-rose-200 dark:ring-rose-700/40 bg-rose-50/60 dark:bg-rose-900/20 px-3 py-2 text-xs coding-text-strong">

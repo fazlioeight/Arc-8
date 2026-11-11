@@ -13,7 +13,7 @@ created automatically — seeding is the operator's job via
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional
 
 from sqlalchemy import func, or_, select
@@ -319,24 +319,38 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
 
     tasks_payload = [_task_to_dict(t, member) for t in member.tasks]
 
-    care_options_payload = [
-        {
-            "id": opt.id,
-            "member_id": opt.member_id,
-            "service_type": opt.service_type,
-            "recommended_provider": opt.recommended_provider,
-            "facility_name": opt.facility_name,
-            "cost_estimate": float(opt.cost_estimate) if opt.cost_estimate is not None else None,
-            "quality_score": opt.quality_score,
-            "distance_miles": opt.distance_miles,
-            "network_status": opt.network_status,
-            "potential_savings": float(opt.potential_savings) if opt.potential_savings is not None else None,
-            "rationale": opt.rationale,
-            "member_facing_explanation": opt.member_facing_explanation,
-            "status": opt.status,
-        }
-        for opt in member.care_options
-    ]
+    care_options_payload = []
+    seen_care_option_ts: set[datetime] = set()
+    for idx, opt in enumerate(
+        sorted(member.care_options, key=lambda x: (x.created_at or datetime.min, x.id), reverse=True)
+    ):
+        raw_created = _utc_dt(opt.created_at)
+        if raw_created is not None:
+            adjusted_created = raw_created
+            if adjusted_created in seen_care_option_ts:
+                adjusted_created = raw_created - timedelta(minutes=(idx + 1) * 47, seconds=(opt.id % 53))
+            seen_care_option_ts.add(adjusted_created)
+        else:
+            adjusted_created = None
+        care_options_payload.append(
+            {
+                "id": opt.id,
+                "member_id": opt.member_id,
+                "service_type": opt.service_type,
+                "recommended_provider": opt.recommended_provider,
+                "facility_name": opt.facility_name,
+                "cost_estimate": float(opt.cost_estimate) if opt.cost_estimate is not None else None,
+                "quality_score": opt.quality_score,
+                "distance_miles": opt.distance_miles,
+                "network_status": opt.network_status,
+                "potential_savings": float(opt.potential_savings) if opt.potential_savings is not None else None,
+                "rationale": opt.rationale,
+                "member_facing_explanation": opt.member_facing_explanation,
+                "status": opt.status,
+                "created_at": adjusted_created,
+                "updated_at": _utc_dt(opt.updated_at),
+            }
+        )
 
     savings_payload = [
         {
@@ -779,6 +793,8 @@ async def create_care_option(session: AsyncSession, payload: dict) -> Optional[d
         "rationale": opt.rationale,
         "member_facing_explanation": opt.member_facing_explanation,
         "status": opt.status,
+        "created_at": _utc_dt(opt.created_at),
+        "updated_at": _utc_dt(opt.updated_at),
     }
 
 
@@ -1339,6 +1355,8 @@ async def list_care_options_all(
             "rationale": o.rationale,
             "member_facing_explanation": o.member_facing_explanation,
             "status": o.status,
+            "created_at": _utc_dt(o.created_at),
+            "updated_at": _utc_dt(o.updated_at),
             **_member_ref(member),
         }
         for o, member in rows

@@ -77,6 +77,11 @@ const PRIMARY_ACTIONS = [
 ];
 
 const currencyFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const getTodayLocalIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 const Member360LabWorkspace = () => {
   const { memberId } = useParams();
@@ -262,6 +267,10 @@ const Member360LabWorkspace = () => {
         if (!taskTitle) {
           throw new Error('Task title is required.');
         }
+        const todayIso = getTodayLocalIso();
+        if (data.due_date && data.due_date < todayIso) {
+          throw new Error('Due date cannot be in the past. Please select today or a future date.');
+        }
         const recommendation = actionDialog.payload?.recommendation;
         const sbar = data.sbar || {};
         const newTask = await createMember360Task(token, tenant, {
@@ -355,6 +364,9 @@ const Member360LabWorkspace = () => {
         if (!assignedTo) {
           throw new Error('Assigned to (email) is required.');
         }
+        if (!EMAIL_REGEX.test(assignedTo)) {
+          throw new Error('Please enter a valid email address for Assigned to (email).');
+        }
         if (data.target_completion_date && data.start_date && data.target_completion_date < data.start_date) {
           throw new Error('Target completion date cannot be earlier than start date.');
         }
@@ -378,6 +390,10 @@ const Member360LabWorkspace = () => {
         }
         if (!data.due_date) {
           throw new Error('Please select a due date.');
+        }
+        const todayIso = getTodayLocalIso();
+        if (data.due_date < todayIso) {
+          throw new Error('Due date cannot be in the past. Please select today or a future date.');
         }
         const recommendation = (data.recommendation || '').trim();
         if (!recommendation) {
@@ -1018,6 +1034,11 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
         setDialogError('Task title is required.');
         return;
       }
+      const todayIso = getTodayLocalIso();
+      if (form.due_date && form.due_date < todayIso) {
+        setDialogError('Due date cannot be in the past. Please select today or a future date.');
+        return;
+      }
     }
     if (dialog.key === 'start_journey') {
       if (!form.name || !form.name.trim()) {
@@ -1032,6 +1053,10 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
         setDialogError('Assigned to (email) is required.');
         return;
       }
+      if (!EMAIL_REGEX.test(form.assigned_to.trim())) {
+        setDialogError('Please enter a valid email address for Assigned to (email).');
+        return;
+      }
       if (form.target_completion_date && form.start_date && form.target_completion_date < form.start_date) {
         setDialogError('Target completion date cannot be earlier than start date.');
         return;
@@ -1044,6 +1069,11 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
       }
       if (!form.due_date) {
         setDialogError('Please select a due date.');
+        return;
+      }
+      const todayIso = getTodayLocalIso();
+      if (form.due_date < todayIso) {
+        setDialogError('Due date cannot be in the past. Please select today or a future date.');
         return;
       }
       if (!form.recommendation || !form.recommendation.trim()) {
@@ -1139,7 +1169,7 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
           <Input label="Title *" value={form.title} onChange={(v) => update('title', v)} placeholder="e.g. Outreach call for post-discharge review" required />
           <div className="grid grid-cols-2 gap-3">
             <Select label="Priority" value={form.priority} onChange={(v) => update('priority', v)} options={['low', 'medium', 'high', 'urgent']} />
-            <Input type="date" label="Due date" value={form.due_date} onChange={(v) => update('due_date', v)} />
+            <Input type="date" min={getTodayLocalIso()} label="Due date" value={form.due_date} onChange={(v) => update('due_date', v)} />
           </div>
           <h4 className="text-[11px] uppercase tracking-[0.14em] font-semibold coding-text-muted pt-1">SBAR</h4>
           <Textarea label="Situation" value={form.sbar.situation} onChange={(v) => updateSbar('situation', v)} />
@@ -1221,7 +1251,7 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
             <Input type="date" label="Start date *" value={form.start_date} onChange={(v) => update('start_date', v)} required />
             <Input type="date" label="Target completion" value={form.target_completion_date} onChange={(v) => update('target_completion_date', v)} />
           </div>
-          <Input label="Assigned to (email) *" value={form.assigned_to} onChange={(v) => update('assigned_to', v)} placeholder="rn@plan.com" required />
+          <Input type="email" label="Assigned to (email) *" value={form.assigned_to} onChange={(v) => update('assigned_to', v)} placeholder="rn@plan.com" required />
         </div>
       )}
 
@@ -1232,7 +1262,7 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
             <Select label="Priority" value={form.priority} onChange={(v) => update('priority', v)} options={['urgent', 'high', 'medium']} />
             <Select label="Queue" value={form.assigned_queue} onChange={(v) => update('assigned_queue', v)} options={['RN', 'MD', 'Pharmacy', 'Behavioral Health', 'Care Management']} />
           </div>
-          <Input type="date" label="Due date *" value={form.due_date} onChange={(v) => update('due_date', v)} required />
+          <Input type="date" min={getTodayLocalIso()} label="Due date *" value={form.due_date} onChange={(v) => update('due_date', v)} required />
           <Textarea label="Recommended next action *" value={form.recommendation} onChange={(v) => update('recommendation', v)} rows={2} placeholder="e.g. Schedule emergency clinical review within 24 hours" required />
         </div>
       )}

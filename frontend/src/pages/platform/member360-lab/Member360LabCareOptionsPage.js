@@ -92,8 +92,8 @@ const Member360LabCareOptionsPage = () => {
       .filter((o) => {
         if (statuses.length > 0 && !statuses.includes(o.status)) return false;
         if (networks.length > 0 && !networks.includes(o.network_status)) return false;
-        if (search) {
-          const term = search.toLowerCase();
+        if (search && search.trim()) {
+          const term = search.trim().toLowerCase();
           const hay = [o.service_type, o.recommended_provider, o.facility_name, o.member_name, o.member_key, o.rationale].filter(Boolean).join(' ').toLowerCase();
           if (!hay.includes(term)) return false;
         }

@@ -100,8 +100,8 @@ const Member360LabCareJourneysPage = () => {
   const filteredJourneys = useMemo(() => {
     return journeys.filter((j) => {
       if (statuses.length > 0 && !statuses.includes(j.status)) return false;
-      if (search) {
-        const term = search.toLowerCase();
+      if (search && search.trim()) {
+        const term = search.trim().toLowerCase();
         const hay = [j.name, j.template_name, j.member_name, j.member_key, j.assigned_to].filter(Boolean).join(' ').toLowerCase();
         if (!hay.includes(term)) return false;
       }

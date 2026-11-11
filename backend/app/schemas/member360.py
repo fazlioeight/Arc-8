@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import re
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 class MemberSummary(BaseModel):
@@ -135,6 +138,18 @@ class CareJourneyCreate(BaseModel):
             return s if s else None
         return None
 
+    @field_validator("assigned_to")
+    @classmethod
+    def validate_assigned_to(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            s = v.strip()
+            if not s:
+                return None
+            if not _EMAIL_RE.match(s):
+                raise ValueError("Please enter a valid email address for Assigned to (email).")
+            return s
+        return None
+
     @model_validator(mode="after")
     def validate_journey(self) -> "CareJourneyCreate":
         if self.start_date and self.target_completion_date:
@@ -151,6 +166,18 @@ class CareJourneyUpdate(BaseModel):
     assigned_to: Optional[str] = None
     start_date: Optional[date] = None
     target_completion_date: Optional[date] = None
+
+    @field_validator("assigned_to")
+    @classmethod
+    def validate_assigned_to(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            s = v.strip()
+            if not s:
+                return None
+            if not _EMAIL_RE.match(s):
+                raise ValueError("Please enter a valid email address for Assigned to (email).")
+            return s
+        return None
 
 
 class CareJourneyStageUpdate(BaseModel):
@@ -220,6 +247,13 @@ class TaskCreate(BaseModel):
         if not s:
             raise ValueError("Task title is required.")
         return s
+
+    @field_validator("due_date")
+    @classmethod
+    def validate_due_date(cls, v: Optional[date]) -> Optional[date]:
+        if v is not None and v < date.today():
+            raise ValueError("Due date cannot be in the past. Please select today or a future date.")
+        return v
 
 
 class TaskUpdate(BaseModel):
@@ -312,6 +346,8 @@ class CareOption(BaseModel):
     rationale: Optional[str] = None
     member_facing_explanation: Optional[str] = None
     status: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 class CareOptionCreate(BaseModel):

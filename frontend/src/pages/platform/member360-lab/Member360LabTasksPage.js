@@ -48,7 +48,7 @@ const SORT_OPTIONS = [
 const SAVED_VIEWS = [
   { key: 'all', label: 'All tasks' },
   { key: 'open', label: 'Open & in progress', statuses: ['open', 'in_progress'] },
-  { key: 'urgent', label: 'Urgent', priorities: ['urgent'] },
+  { key: 'urgent', label: 'Urgent', priorities: ['urgent'], statuses: ['open', 'in_progress', 'waiting', 'escalated'] },
   { key: 'overdue', label: 'Overdue', due: 'overdue' },
   { key: 'completed', label: 'Completed', statuses: ['completed'] },
 ];
@@ -204,10 +204,11 @@ const Member360LabTasksPage = () => {
     const weekOut = new Date(today.getTime() + 7 * 86400000);
     return rows
       .filter((t) => {
+        if (activeView === 'urgent' && t.status === 'completed') return false;
         if (statuses.length > 0 && !statuses.includes(t.status)) return false;
         if (priorities.length > 0 && !priorities.includes(t.priority)) return false;
-        if (search) {
-          const term = search.toLowerCase();
+        if (search && search.trim()) {
+          const term = search.trim().toLowerCase();
           const hay = [t.title, t.member_name, t.member_key, t.assigned_queue, t.assigned_user, t.recommended_next_action, t.sbar?.recommendation].filter(Boolean).join(' ').toLowerCase();
           if (!hay.includes(term)) return false;
         }
@@ -230,7 +231,7 @@ const Member360LabTasksPage = () => {
         if (sortKey === 'recent') return new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0);
         return 0;
       });
-  }, [rows, statuses, priorities, due, search, sortKey]);
+  }, [rows, activeView, statuses, priorities, due, search, sortKey]);
 
   const summary = useMemo(() => {
     const today = startOfDay(new Date());
