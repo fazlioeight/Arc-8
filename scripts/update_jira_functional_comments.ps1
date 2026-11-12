@@ -1,6 +1,6 @@
 $token = "ATATT3xFfGF0tHRbQ9VADQES-RoRi3egsAzs0Uqcig5UqQCx2Ko6Dwhx7mEfILz_P8TRHf4oley91MLUTlcrK8IBsKvk5_zYgQSalpGsqRpZErfwefJNG72jguH5T8mwwVYM-R6spWOm3nTs7hGLh6o4B-8756a419L5a7G6mdstEK5ASW8f52g=F867C376"
 $email = "syed.fazli@oeight.io"
-$domain = "altdigitalmsp"
+$domain = "oeightio"
 $pair = "$($email):$($token)"
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($pair)
 $b64 = [System.Convert]::ToBase64String($bytes)
