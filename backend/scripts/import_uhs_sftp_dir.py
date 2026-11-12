@@ -183,5 +183,7 @@ if __name__ == "__main__":
         / "uhs_synthetic_sftp"
         / "10Nov2026"
     )
+    if not default_dir.exists():
+        default_dir = Path(__file__).resolve().parent / "uhs_synthetic_sftp" / "10Nov2026"
     target = Path(sys.argv[1]) if len(sys.argv) > 1 else default_dir
     asyncio.run(run_batch(target))

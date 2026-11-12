@@ -1,13 +1,15 @@
 <#
 .SYNOPSIS
-  One-click deployment script from local Arc-8 workspace to AWS EC2 (16.59.20.139).
+  One-click deployment script from local Arc-8 workspace to AWS EC2 servers:
+  - 16.59.20.139 (dev.arc8-mvp.site & arc8-mvp.site)
+  - 3.130.110.51 (test.arc8-mvp.site)
 
 .DESCRIPTION
   1. Builds the production frontend bundle (via local npm or Docker node:20-alpine).
   2. Packages backend source and frontend/build into compressed tarballs.
-  3. Uploads both bundles to ubuntu@16.59.20.139:/home/ubuntu/arc8 via SCP.
-  4. Extracts updates, restarts arc8-backend, arc8-frontend (7777), and arc8-frontend-testing (7778).
-  5. Runs database migrations/seeds and verifies HTTP 200 health checks.
+  3. Uploads both bundles to all target AWS EC2 servers via SCP.
+  4. Extracts updates, restarts arc8-backend, arc8-frontend (7777), arc8-frontend-testing (7778), and arc8-frontend-prod (7779).
+  5. Runs database migrations, UHS SFTP batch import, and demo seeds, and verifies HTTP 200 health checks.
   6. Optionally commits & pushes to GitHub (-GitPush -CommitMessage "...").
 
 .EXAMPLE
@@ -17,7 +19,7 @@
 #>
 
 param(
-  [string]$ServerHost = "16.59.20.139",
+  [string[]]$ServerHosts = @("16.59.20.139", "3.130.110.51"),
   [string]$ServerUser = "ubuntu",
   [string]$SshKeyPath = "D:\OnStak-Projects\VPS\arc8-key.pem",
   [string]$RemoteDir  = "/home/ubuntu/arc8",
@@ -34,7 +36,7 @@ if ($ProjectRoot -like "*\scripts") {
 }
 
 Write-Host "=========================================================" -ForegroundColor Cyan
-Write-Host "  Arc-8 Local -> AWS EC2 Deployment ($ServerUser@$ServerHost)" -ForegroundColor Cyan
+Write-Host "  Arc-8 Local -> AWS EC2 Deployment ($($ServerHosts -join ', '))" -ForegroundColor Cyan
 Write-Host "=========================================================" -ForegroundColor Cyan
 
 if (!(Test-Path $SshKeyPath)) {
@@ -127,18 +129,11 @@ tar -czf $FrontendTar -C $BuildDir .
 
 Write-Host "  -> Packaged backend ($([math]::Round((Get-Item $BackendTar).Length / 1KB, 1)) KB) & frontend ($([math]::Round((Get-Item $FrontendTar).Length / 1KB, 1)) KB)." -ForegroundColor Green
 
-# 4. Upload to AWS EC2 Server via SCP
-Write-Host "`n[4/5] Uploading archives to AWS ($ServerUser@$ServerHost`:$RemoteDir)..." -ForegroundColor Yellow
-scp -o StrictHostKeyChecking=no -i $SshKeyPath $BackendTar "${ServerUser}@${ServerHost}:${RemoteDir}/deploy_backend.tar.gz"
-scp -o StrictHostKeyChecking=no -i $SshKeyPath $FrontendTar "${ServerUser}@${ServerHost}:${RemoteDir}/deploy_frontend.tar.gz"
-Write-Host "  -> Upload complete." -ForegroundColor Green
-
-# 5. Extract, Restart Containers, Seed Database & Verify Health on AWS
-Write-Host "`n[5/5] Applying updates and restarting Docker services on AWS..." -ForegroundColor Yellow
+# 4 & 5. Upload, Extract, Restart Containers, Seed Database & Verify Health on each AWS Server
 $seedCmd = if ($SkipSeed) {
   "echo 'Skipping seed scripts (-SkipSeed)'"
 } else {
-  "docker exec arc8-backend python -m scripts.seed_prominence && docker exec arc8-backend python seed_demo_users.py && docker exec arc8-backend python -m scripts.seed_prominence_demo --topup"
+  "docker exec arc8-backend python -m scripts.seed_prominence && docker exec arc8-backend python seed_demo_users.py && docker exec arc8-backend python -m scripts.import_uhs_sftp_dir && docker exec arc8-backend python -m scripts.seed_prominence_demo"
 }
 
 $remoteScript = @"
@@ -153,17 +148,28 @@ $seedCmd
 ./status.sh
 "@ -replace "`r`n", "`n"
 
-ssh -o StrictHostKeyChecking=no -i $SshKeyPath "${ServerUser}@${ServerHost}" $remoteScript
+foreach ($ServerHost in $ServerHosts) {
+  Write-Host "`n[4/5] Uploading archives to AWS ($ServerUser@$ServerHost`:$RemoteDir)..." -ForegroundColor Yellow
+  scp -o StrictHostKeyChecking=no -i $SshKeyPath $BackendTar "${ServerUser}@${ServerHost}:${RemoteDir}/deploy_backend.tar.gz"
+  scp -o StrictHostKeyChecking=no -i $SshKeyPath $FrontendTar "${ServerUser}@${ServerHost}:${RemoteDir}/deploy_frontend.tar.gz"
+  Write-Host "  -> Upload complete for $ServerHost." -ForegroundColor Green
+
+  Write-Host "`n[5/5] Applying updates, restarting Docker services, and seeding DB on $ServerHost..." -ForegroundColor Yellow
+  ssh -o StrictHostKeyChecking=no -i $SshKeyPath "${ServerUser}@${ServerHost}" $remoteScript
+}
 
 # Also sync local running Docker containers if Docker is running locally
 $localRunning = docker ps --format "{{.Names}}" 2>$null
 if ($localRunning -match "arc8-frontend") {
   Write-Host "`nSyncing local Docker containers (arc8-backend, arc8-frontend, arc8-frontend-testing)..." -ForegroundColor DarkCyan
   docker restart arc8-backend arc8-frontend arc8-frontend-testing 2>$null | Out-Null
+  if (-not $SkipSeed) {
+    docker exec arc8-backend python -m scripts.seed_prominence_demo | Out-Null
+  }
 }
 
 Write-Host "`n=========================================================" -ForegroundColor Green
-Write-Host "  AWS Deployment Complete!" -ForegroundColor Green
-Write-Host "  To open SSH tunnel for browser access:" -ForegroundColor White
-Write-Host "  ssh -i `"$SshKeyPath`" -L 7778:localhost:7778 -L 7777:localhost:7777 -L 8989:localhost:8989 $ServerUser@$ServerHost" -ForegroundColor Cyan
+Write-Host "  AWS Multi-Server Deployment Complete!" -ForegroundColor Green
+Write-Host "  Servers Updated: $($ServerHosts -join ', ')" -ForegroundColor Cyan
+Write-Host "  Domains Synced:  https://dev.arc8-mvp.site | https://test.arc8-mvp.site | https://arc8-mvp.site" -ForegroundColor Cyan
 Write-Host "=========================================================" -ForegroundColor Green

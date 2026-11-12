@@ -51,7 +51,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -70,13 +70,16 @@ from app.models.member360 import (  # noqa: E402
     Member360Accumulator,
     Member360CareJourney,
     Member360CareJourneyStage,
+    Member360CareOption,
     Member360Claim,
     Member360Document,
     Member360Lab,
     Member360Medication,
     Member360Member,
+    Member360Message,
     Member360Problem,
     Member360RiskInsight,
+    Member360Savings,
     Member360Task,
 )
 from app.models.dashboard_facts import (  # noqa: E402
@@ -699,7 +702,7 @@ def _gen_tasks_for_member(rng: random.Random, member: Member360Member) -> Iterab
     n = rng.randint(1, 3)
     for title, priority, sbar_s, next_action in pool[:n]:
         due = date.today() + timedelta(days=rng.randint(-7, 30))
-        status = rng.choice(("open", "open", "in_progress", "done"))
+        status = rng.choice(("open", "open", "in_progress", "completed"))
         yield {
             "member_id": member.id,
             "title": title,
@@ -814,6 +817,156 @@ def _gen_documents_for_member(
             "status": status,
             "content_type": mime,
             "size_bytes": base_size + rng.randint(-12000, 24000),
+        }
+
+
+_CARE_OPTION_TEMPLATES: tuple[tuple[str, str, float, float, float, str], ...] = (
+    (
+        "Outpatient Orthopedic MRI",
+        "Renown Regional Imaging Center",
+        485.00,
+        1120.00,
+        4.8,
+        "Free-standing high-value in-network imaging center with lower member copay and 56% plan savings vs. hospital outpatient.",
+    ),
+    (
+        "Comprehensive Cardiology Consultation",
+        "Northern Nevada Heart & Vascular Institute",
+        240.00,
+        360.00,
+        4.9,
+        "Preferred Tier-1 cardiology group with integrated heart failure transitional care clinic.",
+    ),
+    (
+        "Ambulatory GI Endoscopy & Screening",
+        "Sierra Nevada Endoscopy Center",
+        790.00,
+        1450.00,
+        4.7,
+        "ASC site-of-care steerage reduces facility fee while maintaining top-decile quality outcomes.",
+    ),
+    (
+        "Outpatient Physical Therapy Program (6 Visits)",
+        "Tahoe Orthopedic & Sports Rehab",
+        420.00,
+        680.00,
+        4.8,
+        "Bundled musculoskeletal recovery pathway with zero prior-authorization delay.",
+    ),
+    (
+        "Home Sleep Apnea Diagnostic Study",
+        "Prominence Preferred Sleep Diagnostics",
+        195.00,
+        910.00,
+        4.6,
+        "In-home polysomnography avoids inpatient sleep lab facility charges.",
+    ),
+    (
+        "Outpatient Infusion & Biologic Therapy",
+        "Carson Valley Ambulatory Infusion Suite",
+        1250.00,
+        2400.00,
+        4.9,
+        "Specialty pharmacy site-of-care optimization with dedicated RN monitoring.",
+    ),
+)
+
+
+def _gen_care_options_for_member(
+    rng: random.Random, member: Member360Member, member_seq: int
+) -> Iterable[dict]:
+    if member_seq > 25 and member.risk_tier not in ("high", "complex"):
+        return
+    pool = list(_CARE_OPTION_TEMPLATES)
+    rng.shuffle(pool)
+    n = 2 if member.risk_tier in ("high", "complex") or member_seq <= 5 else 1
+    for idx, (service_type, facility, cost, savings, quality, rationale) in enumerate(pool[:n], start=1):
+        created = _naive_utcnow() - timedelta(
+            days=rng.randint(1, 45),
+            hours=rng.randint(1, 22),
+            minutes=(member.id * 7 + idx * 13) % 59,
+            seconds=(member.id * 11 + idx * 17) % 59,
+        )
+        status = rng.choice(("recommended", "recommended", "steered", "completed"))
+        yield {
+            "member_id": member.id,
+            "service_type": service_type,
+            "recommended_provider": member.primary_care_provider or facility,
+            "facility_name": facility,
+            "cost_estimate": Decimal(f"{cost:.2f}"),
+            "quality_score": quality,
+            "distance_miles": round(rng.uniform(1.4, 14.8), 1),
+            "network_status": "in_network",
+            "potential_savings": Decimal(f"{savings:.2f}"),
+            "rationale": rationale,
+            "member_facing_explanation": rationale,
+            "status": status,
+            "created_at": created,
+            "updated_at": created,
+        }
+
+
+_MESSAGE_TEMPLATES: tuple[tuple[str, str, str], ...] = (
+    (
+        "SMS",
+        "outbound",
+        "Prominence Care Team: Hi {first_name}, your upcoming care coordination check-in with {pcp} is ready to schedule. Reply YES to confirm.",
+    ),
+    (
+        "Secure Message",
+        "outbound",
+        "Your latest lab panel and care summary have been reviewed by {pcp}. No urgent changes to your medication regimen are required.",
+    ),
+    (
+        "Email",
+        "outbound",
+        "Reminder: Annual Wellness Visit and preventive screening benefits are available at $0 copay with your in-network primary care provider.",
+    ),
+    (
+        "SMS",
+        "inbound",
+        "Thank you! Please schedule my follow-up appointment for next Tuesday morning.",
+    ),
+)
+
+
+def _gen_messages_for_member(
+    rng: random.Random, member: Member360Member, member_seq: int
+) -> Iterable[dict]:
+    if member_seq > 30 and member.risk_tier not in ("high", "complex"):
+        return
+    pool = list(_MESSAGE_TEMPLATES)
+    rng.shuffle(pool)
+    n = 2 if member_seq <= 10 else 1
+    for idx, (channel, direction, template) in enumerate(pool[:n], start=1):
+        ts = _naive_utcnow() - timedelta(
+            days=rng.randint(1, 30),
+            hours=rng.randint(1, 20),
+            minutes=(member.id * 5 + idx * 19) % 59,
+        )
+        sender = (
+            member.phone or f"{member.first_name} {member.last_name}"
+            if direction == "inbound"
+            else rng.choice(_DOCUMENT_UPLOADERS)
+        )
+        recipient = (
+            "care.team@prominencehealth.com"
+            if direction == "inbound"
+            else (member.phone or member.email or f"{member.first_name} {member.last_name}")
+        )
+        body = template.format(
+            first_name=member.first_name or "Member",
+            pcp=member.primary_care_provider or "your care team",
+        )
+        yield {
+            "member_id": member.id,
+            "channel": channel,
+            "direction": direction,
+            "sender": sender,
+            "recipient": recipient,
+            "body": body,
+            "status": "delivered",
+            "timestamp": ts,
         }
 
 
@@ -1393,6 +1546,47 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
             summary["pcp_realigned"] = await _align_member_pcps(session)
             await session.flush()
 
+            # 1.8) Clean up automated QA probe spam rows and normalize legacy
+            #      task statuses ('done' -> 'completed') and blank assignees.
+            await session.execute(
+                delete(Member360CareOption).where(
+                    (Member360CareOption.service_type.ilike("QA%"))
+                    | (Member360CareOption.recommended_provider.is_(None))
+                    | (Member360CareOption.recommended_provider == "")
+                    | (Member360CareOption.recommended_provider == "ddddddddd")
+                )
+            )
+            await session.execute(
+                delete(Member360Task).where(
+                    (Member360Task.title.ilike("%QA-%"))
+                    | (Member360Task.title == "New task")
+                )
+            )
+            await session.execute(
+                update(Member360Task)
+                .where(Member360Task.status == "done")
+                .values(status="completed")
+            )
+            await session.execute(
+                update(Member360Task)
+                .where((Member360Task.assigned_user.is_(None)) | (Member360Task.assigned_user == ""))
+                .values(assigned_user="coordinator@prominencehealth.com")
+            )
+            await session.execute(
+                delete(Member360Message).where(Member360Message.body.ilike("QA-%"))
+            )
+            await session.execute(
+                delete(Member360CareJourney).where(Member360CareJourney.name.ilike("QA-%"))
+            )
+            await session.execute(
+                delete(Member360Document).where(
+                    (Member360Document.file_name.ilike("QA-%"))
+                    | (Member360Document.file_name.ilike("qa-probe%"))
+                    | (Member360Document.file_name.ilike("Screenshot%"))
+                )
+            )
+            await session.flush()
+
             # 2) Iterate every member and top up the child tables.
             all_members = list(
                 (await session.execute(select(Member360Member))).scalars()
@@ -1408,6 +1602,8 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
                 "accumulators": 0,
                 "care_journey_rows": 0,
                 "documents": 0,
+                "care_options": 0,
+                "messages": 0,
             }
 
             for m in all_members:
@@ -1463,6 +1659,16 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
                     session, m, Member360Document,
                     fk_column="member_id",
                     rows=_gen_documents_for_member(_per_member_rng(m.id, 9), m, seq),
+                )
+                counts["care_options"] += await _topup_table(
+                    session, m, Member360CareOption,
+                    fk_column="member_id",
+                    rows=_gen_care_options_for_member(_per_member_rng(m.id, 10), m, seq),
+                )
+                counts["messages"] += await _topup_table(
+                    session, m, Member360Message,
+                    fk_column="member_id",
+                    rows=_gen_messages_for_member(_per_member_rng(m.id, 11), m, seq),
                 )
 
             # 3) Coding app (members + open chases + qualifying claims) so the
