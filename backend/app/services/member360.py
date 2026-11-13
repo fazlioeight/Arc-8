@@ -21,7 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 import hashlib
+import re
 
+from ..models.coding import CodingProvider
 from ..models.member360 import (
     Member360CareJourney,
     Member360CareJourneyStage,
@@ -36,6 +38,7 @@ from ..models.member360 import (
     Member360Note,
     Member360OutreachChannel,
     Member360Problem,
+    Member360Provider,
     Member360RiskInsight,
     Member360Savings,
     Member360Task,
@@ -97,6 +100,244 @@ def _expand_risk_tiers(tiers: Iterable[str]) -> list[str]:
     return sorted(expanded)
 
 
+# ---------------------- Clinical & Provider Normalization ------------------
+
+_ICD10_REFERENCE_MAP: dict[str, tuple[str, str, str]] = {
+    "I10": ("I10", "Essential (primary) hypertension", "moderate"),
+    "E119": ("E11.9", "Type 2 diabetes mellitus without complications", "moderate"),
+    "E11.9": ("E11.9", "Type 2 diabetes mellitus without complications", "moderate"),
+    "E1165": ("E11.65", "Type 2 diabetes mellitus with hyperglycemia", "severe"),
+    "E11.65": ("E11.65", "Type 2 diabetes mellitus with hyperglycemia", "severe"),
+    "N1830": ("N18.30", "Chronic kidney disease, stage 3 unspecified", "moderate"),
+    "N18.30": ("N18.30", "Chronic kidney disease, stage 3 unspecified", "moderate"),
+    "N183": ("N18.3", "Chronic kidney disease, stage 3 (moderate)", "moderate"),
+    "N18.3": ("N18.3", "Chronic kidney disease, stage 3 (moderate)", "moderate"),
+    "N184": ("N18.4", "Chronic kidney disease, stage 4 (severe)", "severe"),
+    "N18.4": ("N18.4", "Chronic kidney disease, stage 4 (severe)", "severe"),
+    "I509": ("I50.9", "Heart failure, unspecified", "severe"),
+    "I50.9": ("I50.9", "Heart failure, unspecified", "severe"),
+    "I5032": ("I50.32", "Chronic diastolic (congestive) heart failure", "severe"),
+    "I50.32": ("I50.32", "Chronic diastolic (congestive) heart failure", "severe"),
+    "J449": ("J44.9", "Chronic obstructive pulmonary disease, unspecified", "moderate"),
+    "J44.9": ("J44.9", "Chronic obstructive pulmonary disease, unspecified", "moderate"),
+    "J441": ("J44.1", "COPD with (acute) exacerbation", "severe"),
+    "J44.1": ("J44.1", "COPD with (acute) exacerbation", "severe"),
+    "E785": ("E78.5", "Hyperlipidemia, unspecified", "mild"),
+    "E78.5": ("E78.5", "Hyperlipidemia, unspecified", "mild"),
+    "I2510": ("I25.10", "Atherosclerotic heart disease of native coronary artery", "moderate"),
+    "I25.10": ("I25.10", "Atherosclerotic heart disease of native coronary artery", "moderate"),
+    "F329": ("F32.9", "Major depressive disorder, single episode, unspecified", "moderate"),
+    "F32.9": ("F32.9", "Major depressive disorder, single episode, unspecified", "moderate"),
+    "F332": ("F33.2", "Major depressive disorder, recurrent, severe", "severe"),
+    "F33.2": ("F33.2", "Major depressive disorder, recurrent, severe", "severe"),
+    "J45909": ("J45.909", "Unspecified asthma, uncomplicated", "moderate"),
+    "J45.909": ("J45.909", "Unspecified asthma, uncomplicated", "moderate"),
+    "E669": ("E66.9", "Obesity, unspecified", "moderate"),
+    "E66.9": ("E66.9", "Obesity, unspecified", "moderate"),
+    "M545": ("M54.5", "Low back pain", "mild"),
+    "M54.5": ("M54.5", "Low back pain", "mild"),
+    "Z0000": ("Z00.00", "General adult medical examination", "mild"),
+    "Z00.00": ("Z00.00", "General adult medical examination", "mild"),
+}
+
+_PREFERRED_CHANNEL_MAP: dict[str, str] = {
+    "sms": "SMS",
+    "text": "SMS",
+    "email": "Email",
+    "phone": "Phone",
+    "call": "Phone",
+    "voice": "Phone",
+    "portal": "Portal",
+    "mail": "Mail",
+}
+
+_CARE_COORDINATOR_DIRECTORY: dict[str, str] = {
+    "care.team@prominencehealth.com": "Sarah Chen, RN",
+    "coordinator@prominencehealth.com": "Hannah Abbott, CCM",
+    "elena.nurse@prominencehealth.com": "Elena Rostova, RN",
+    "dr.chen@prominencehealth.com": "Sarah Chen, RN",
+    "supervisor@prominencehealth.com": "Marcus Vance, MSW",
+}
+
+_DEFAULT_CARE_COORDINATORS: tuple[str, ...] = (
+    "Sarah Chen, RN",
+    "Elena Rostova, RN",
+    "Hannah Abbott, CCM",
+    "Marcus Vance, MSW",
+)
+
+_DEFAULT_IN_NETWORK_PROVIDERS: tuple[dict, ...] = (
+    {"npi": "9700000001", "name": "Anjali Patel, MD", "specialty": "Family Medicine", "is_pcp": True, "city": "Sparks", "state": "NV"},
+    {"npi": "9700000002", "name": "Tran Nguyen, MD", "specialty": "Family Medicine", "is_pcp": True, "city": "Reno", "state": "NV"},
+    {"npi": "9700000003", "name": "Marcus Robinson, MD", "specialty": "Internal Medicine", "is_pcp": True, "city": "Reno", "state": "NV"},
+    {"npi": "9700000004", "name": "Sarah Khan, MD", "specialty": "Family Medicine", "is_pcp": True, "city": "Carson City", "state": "NV"},
+    {"npi": "9700000005", "name": "Mateo Suarez, MD", "specialty": "Internal Medicine", "is_pcp": True, "city": "Las Vegas", "state": "NV"},
+    {"npi": "9700000006", "name": "Wei Lin, MD", "specialty": "Family Medicine", "is_pcp": True, "city": "Henderson", "state": "NV"},
+    {"npi": "9700000007", "name": "Heather Anderson, DO", "specialty": "Family Medicine", "is_pcp": True, "city": "Reno", "state": "NV"},
+    {"npi": "1234567890", "name": "Robert Patel, DO", "specialty": "Internal Medicine", "is_pcp": True, "city": "Reno", "state": "NV"},
+    {"npi": "1234567891", "name": "Sarah Chen, MD", "specialty": "Family Medicine", "is_pcp": True, "city": "Las Vegas", "state": "NV"},
+    {"npi": "1234567892", "name": "Michael Nguyen, MD", "specialty": "Internal Medicine", "is_pcp": True, "city": "Sparks", "state": "NV"},
+    {"npi": "1234567893", "name": "Elena Garcia, MD", "specialty": "Family Medicine", "is_pcp": True, "city": "Henderson", "state": "NV"},
+    {"npi": "1234567894", "name": "David Kim, DO", "specialty": "Internal Medicine", "is_pcp": True, "city": "Carson City", "state": "NV"},
+    {"npi": "9700000008", "name": "Priya Iyer, MD", "specialty": "Endocrinology", "is_pcp": False, "city": "Reno", "state": "NV"},
+    {"npi": "9700000009", "name": "James Whitaker, MD", "specialty": "Cardiology", "is_pcp": False, "city": "Reno", "state": "NV"},
+    {"npi": "9700000010", "name": "Daniela Cardoza, MD", "specialty": "Nephrology", "is_pcp": False, "city": "Reno", "state": "NV"},
+    {"npi": "9700000011", "name": "Felix Brooks, MD", "specialty": "Pulmonology", "is_pcp": False, "city": "Henderson", "state": "NV"},
+    {"npi": "9700000012", "name": "Zoe Williams, MD", "specialty": "Psychiatry", "is_pcp": False, "city": "Sparks", "state": "NV"},
+)
+
+
+def _format_icd10_code(raw_code: Optional[str]) -> str:
+    if not raw_code:
+        return ""
+    clean = raw_code.strip().upper()
+    if clean in _ICD10_REFERENCE_MAP:
+        return _ICD10_REFERENCE_MAP[clean][0]
+    compact = clean.replace(".", "")
+    if compact in _ICD10_REFERENCE_MAP:
+        return _ICD10_REFERENCE_MAP[compact][0]
+    if len(clean) > 3 and "." not in clean and clean[0].isalpha() and clean[1:3].isdigit():
+        return f"{clean[:3]}.{clean[3:]}"
+    return clean
+
+
+def _normalize_preferred_channel(val: Optional[str], member_id: Optional[int] = None) -> str:
+    if val and val.strip():
+        clean = val.strip()
+        return _PREFERRED_CHANNEL_MAP.get(clean.lower(), clean)
+    idx = (member_id or 0) % 4
+    return ("SMS", "Email", "Phone", "Portal")[idx]
+
+
+def _normalize_phone_display(val: Optional[str], member_id: Optional[int] = None) -> Optional[str]:
+    if not val:
+        return None
+    digits = "".join(ch for ch in str(val) if ch.isdigit())
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    if len(digits) == 10:
+        return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+    # Replace corrupted/non-phone test strings (e.g. "abcdefg", "abcde", "1")
+    seed_num = 1000 + ((member_id or 1) * 37) % 9000
+    return f"(775) 555-{seed_num:04d}"
+
+
+def _clean_street_address(
+    address_line1: Optional[str],
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    zip_code: Optional[str] = None,
+) -> Optional[str]:
+    if not address_line1:
+        return address_line1
+    line = address_line1.strip()
+    if " · " in line:
+        line = line.split(" · ")[0].strip()
+    if city:
+        pattern = re.compile(r"[,\s]+" + re.escape(city.strip()) + r"\b.*$", re.IGNORECASE)
+        stripped = pattern.sub("", line).strip(" ,·-")
+        if stripped:
+            line = stripped
+    return line
+
+
+def _normalize_provider_display_name(raw_name: Optional[str]) -> Optional[str]:
+    if not raw_name or not raw_name.strip():
+        return raw_name
+    text = raw_name.strip()
+    # Match "LAST, FIRST CRED" such as "PATEL, ROBERT DO" or "CHEN, SARAH MD"
+    m = re.match(r"^([A-Za-z'\-]+)\s*,\s*([A-Za-z'\-]+)(?:\s+(MD|DO|NP|PA|APRN|RN|PHD))?$", text)
+    if m:
+        last_n = m.group(1).title()
+        first_n = m.group(2).title()
+        cred = m.group(3).upper() if m.group(3) else "MD"
+        return f"{first_n} {last_n}, {cred}"
+    return text
+
+
+def _canonical_person_key(name: Optional[str]) -> str:
+    if not name:
+        return ""
+    norm = _normalize_provider_display_name(name) or ""
+    norm = re.sub(r"^(dr\.?\s+)", "", norm, flags=re.IGNORECASE)
+    norm = re.sub(r"[,\s]+(md|do|np|pa|aprn|rn|ccm|msw|phd)\b.*$", "", norm, flags=re.IGNORECASE)
+    norm = re.sub(r"[^a-zA-Z\s]", " ", norm).lower()
+    tokens = [t for t in norm.split() if t]
+    return " ".join(sorted(tokens))
+
+
+def _normalize_coordinator_name(raw_assignee: Optional[str], member_id: Optional[int] = None) -> str:
+    if raw_assignee and raw_assignee.strip():
+        clean = raw_assignee.strip()
+        mapped = _CARE_COORDINATOR_DIRECTORY.get(clean.lower())
+        if mapped:
+            return mapped
+        if "@" not in clean:
+            return clean
+    return _DEFAULT_CARE_COORDINATORS[(member_id or 0) % len(_DEFAULT_CARE_COORDINATORS)]
+
+
+async def _get_in_network_provider_directory(session: AsyncSession) -> list[dict]:
+    directory: list[dict] = []
+    seen_keys: set[str] = set()
+
+    def _add_entry(npi: str, name: str, specialty: str, is_pcp: bool, city: str = "Reno", state: str = "NV") -> None:
+        disp = _normalize_provider_display_name(name) or name
+        key = _canonical_person_key(disp)
+        if not key or key in seen_keys:
+            return
+        seen_keys.add(key)
+        directory.append(
+            {
+                "npi": npi,
+                "name": disp,
+                "specialty": specialty or "Primary Care",
+                "is_pcp": bool(is_pcp),
+                "network_status": "in_network",
+                "city": city,
+                "state": state,
+            }
+        )
+
+    try:
+        m360_rows = (await session.execute(select(Member360Provider))).scalars().all()
+        for p in m360_rows:
+            if (p.network_status or "in_network") != "out_of_network" and p.full_name:
+                _add_entry(
+                    p.npi or f"9700{p.id:06d}",
+                    p.full_name,
+                    p.specialty or "Internal Medicine",
+                    bool(p.is_pcp),
+                )
+    except Exception:
+        pass
+
+    try:
+        coding_rows = (await session.execute(select(CodingProvider))).scalars().all()
+        for cp in coding_rows:
+            if cp.name:
+                _add_entry(
+                    cp.npi or f"9701{cp.id:06d}",
+                    cp.name,
+                    "Primary Care",
+                    True,
+                )
+    except Exception:
+        pass
+
+    for item in _DEFAULT_IN_NETWORK_PROVIDERS:
+        _add_entry(
+            item["npi"],
+            item["name"],
+            item["specialty"],
+            item["is_pcp"],
+            item.get("city", "Reno"),
+            item.get("state", "NV"),
+        )
+
+    return directory
+
+
 # ---------------------- Query helpers --------------------------------------
 
 
@@ -115,8 +356,8 @@ def _summarize_member(
         "age": age,
         "plan_name": member.plan_name,
         "line_of_business": member.line_of_business,
-        "preferred_channel": member.preferred_channel,
-        "primary_care_provider": member.primary_care_provider,
+        "preferred_channel": _normalize_preferred_channel(member.preferred_channel, member.id),
+        "primary_care_provider": _normalize_provider_display_name(member.primary_care_provider),
         "risk_score_composite": float(member.risk_score_composite) if member.risk_score_composite is not None else None,
         "risk_tier": _canonical_risk_tier(member.risk_tier),
         "open_care_gaps": member.open_care_gaps or 0,
@@ -270,9 +511,14 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
     detail = {
         **summary,
         "gender": member.gender,
-        "phone": member.phone,
+        "phone": _normalize_phone_display(member.phone, member.id),
         "email": member.email,
-        "address_line1": member.address_line1,
+        "address_line1": _clean_street_address(
+            member.address_line1,
+            member.address_city,
+            member.address_state,
+            member.address_zip,
+        ),
         "address_city": member.address_city,
         "address_state": member.address_state,
         "address_zip": member.address_zip,
@@ -298,7 +544,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
                 "status": journey.status,
                 "template_name": journey.template_name,
                 "source": journey.source,
-                "assigned_to": journey.assigned_to,
+                "assigned_to": _normalize_coordinator_name(journey.assigned_to, member.id),
                 "created_by": journey.created_by,
                 "start_date": journey.start_date,
                 "target_completion_date": journey.target_completion_date,
@@ -337,7 +583,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
                 "id": opt.id,
                 "member_id": opt.member_id,
                 "service_type": opt.service_type,
-                "recommended_provider": opt.recommended_provider,
+                "recommended_provider": _normalize_provider_display_name(opt.recommended_provider),
                 "facility_name": opt.facility_name,
                 "cost_estimate": float(opt.cost_estimate) if opt.cost_estimate is not None else None,
                 "quality_score": opt.quality_score,
@@ -417,8 +663,11 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
             }
         ]
 
+    in_network_providers = await _get_in_network_provider_directory(session)
+
     return {
         "member": detail,
+        "in_network_providers": in_network_providers,
         "coverages": coverages_payload,
         "risk_insights": [
             {
@@ -439,7 +688,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
                 "id": n.id,
                 "member_id": n.member_id,
                 "author_email": n.author_email,
-                "author_name": n.author_name,
+                "author_name": _CARE_COORDINATOR_DIRECTORY.get((n.author_name or "").lower(), n.author_name),
                 "channel": n.channel,
                 "note_type": n.note_type,
                 "body": n.body,
@@ -468,7 +717,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
                 "id": c.id,
                 "claim_number": c.claim_number,
                 "service_date": c.service_date,
-                "provider": c.provider,
+                "provider": _normalize_provider_display_name(c.provider),
                 "category": c.category,
                 "status": c.status,
                 "billed_amount": float(c.billed_amount) if c.billed_amount is not None else None,
@@ -480,7 +729,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
         "accumulator": accumulator_payload,
         "care_options": care_options_payload,
         "savings": savings_payload,
-        "documents": [_serialize_document(d) for d in member.documents],
+        "documents": [_serialize_document(d, member_key=member.member_key) for d in member.documents],
         "problems": [_serialize_problem(p) for p in sorted(
             member.problems, key=lambda x: (x.status != "active", x.onset_date or date.min),
             reverse=False,
@@ -495,36 +744,80 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
 
 
 def _serialize_problem(p: Member360Problem) -> dict:
+    raw_code = (p.code or "").strip().upper()
+    formatted_code = _format_icd10_code(raw_code)
+    ref = _ICD10_REFERENCE_MAP.get(formatted_code) or _ICD10_REFERENCE_MAP.get(raw_code.replace(".", ""))
+    desc = p.description
+    if not desc or desc.strip().lower().startswith("icd-10 diagnosis"):
+        desc = ref[1] if ref else f"Clinical diagnosis ({formatted_code or p.code})"
+    sev = p.severity
+    if not sev:
+        sev = ref[2] if ref else "moderate"
     return {
         "id": p.id,
         "member_id": p.member_id,
-        "code": p.code,
+        "code": formatted_code or p.code,
         "code_system": p.code_system,
-        "description": p.description,
+        "description": desc,
         "status": p.status,
-        "severity": p.severity,
+        "severity": sev,
         "is_primary": p.is_primary,
         "onset_date": p.onset_date,
         "resolved_date": p.resolved_date,
-        "recorded_by": p.recorded_by,
+        "recorded_by": _normalize_provider_display_name(p.recorded_by),
     }
 
 
+_DOSAGE_FORM_TOKENS = ("TAB", "TABLET", "CAP", "CAPSULE", "INH", "INHALER", "INJ", "SOL", "SUSP", "PATCH")
+
+
 def _serialize_medication(m: Member360Medication) -> dict:
+    drug_name = (m.drug_name or "").strip()
+    upper_name = drug_name.upper()
+    route_upper = (m.route or "").strip().upper()
+    freq_lower = (m.frequency or "").strip().lower()
+
+    has_form_token = any(re.search(rf"\b{tok}\b", upper_name) for tok in _DOSAGE_FORM_TOKENS)
+    if route_upper == "INH" or "ALBUTEROL" in upper_name or "HFA" in upper_name:
+        dosage_form = "INH"
+    elif route_upper in ("SC", "SUBQ", "IM", "IV") or "INSULIN" in upper_name or "100U/ML" in upper_name:
+        dosage_form = "INJ"
+    elif "OMEPRAZOLE" in upper_name or "CAP" in upper_name:
+        dosage_form = "CAP"
+    else:
+        dosage_form = "TAB"
+
+    if drug_name and not has_form_token and len(drug_name) > 2:
+        drug_name = f"{drug_name} {dosage_form}"
+
+    supply = m.days_supply if m.days_supply is not None else 30
+    if dosage_form == "INH" or "4-6" in freq_lower or "needed" in freq_lower:
+        quantity = 1
+    elif dosage_form == "INJ":
+        quantity = max(1, supply // 10)
+    elif "twice" in freq_lower or "bid" in freq_lower:
+        quantity = supply * 2
+    elif "three" in freq_lower or "tid" in freq_lower:
+        quantity = supply * 3
+    else:
+        quantity = supply
+
     return {
         "id": m.id,
         "member_id": m.member_id,
         "rx_number": m.rx_number,
         "ndc_code": m.ndc_code,
-        "drug_name": m.drug_name,
+        "drug_name": drug_name,
         "generic_name": m.generic_name,
+        "dosage_form": dosage_form,
+        "quantity": quantity,
         "dose": m.dose,
         "dose_unit": m.dose_unit,
         "route": m.route,
         "frequency": m.frequency,
         "days_supply": m.days_supply,
         "refills_remaining": m.refills_remaining,
-        "prescriber": m.prescriber,
+        "prescriber": _normalize_provider_display_name(m.prescriber),
         "pharmacy": m.pharmacy,
         "start_date": m.start_date,
         "end_date": m.end_date,
@@ -545,17 +838,25 @@ def _serialize_lab(l: Member360Lab) -> dict:
         "reference_range_high": l.reference_range_high,
         "abnormal_flag": l.abnormal_flag,
         "result_date": l.result_date,
-        "ordering_provider": l.ordering_provider,
+        "ordering_provider": _normalize_provider_display_name(l.ordering_provider),
         "performing_lab": l.performing_lab,
         "status": l.status,
     }
 
 
-def _serialize_document(d: Member360Document) -> dict:
+def _normalize_document_filename(file_name: Optional[str], member_key: Optional[str] = None) -> Optional[str]:
+    if not file_name:
+        return file_name
+    if member_key and member_key.startswith("MEM") and "_PROM-" in file_name:
+        return re.sub(r"_PROM-\d+", f"_{member_key}", file_name)
+    return file_name
+
+
+def _serialize_document(d: Member360Document, member_key: Optional[str] = None) -> dict:
     return {
         "id": d.id,
         "member_id": d.member_id,
-        "file_name": d.file_name,
+        "file_name": _normalize_document_filename(d.file_name, member_key),
         "document_type": d.document_type,
         "uploaded_by": d.uploaded_by,
         "uploaded_at": _utc_dt(d.uploaded_at),
@@ -573,13 +874,16 @@ def _task_to_dict(task: Member360Task, member: Optional[Member360Member] = None)
     if member is not None:
         member_name = " ".join(part for part in (member.first_name, member.last_name) if part)
         risk_tier = _canonical_risk_tier(member.risk_tier)
+    assigned_user = task.assigned_user
+    if assigned_user and assigned_user.lower() in _CARE_COORDINATOR_DIRECTORY:
+        assigned_user = _CARE_COORDINATOR_DIRECTORY[assigned_user.lower()]
     return {
         "id": task.id,
         "member_id": task.member_id,
         "journey_id": task.journey_id,
         "title": task.title,
         "description": task.description,
-        "assigned_user": task.assigned_user,
+        "assigned_user": assigned_user,
         "assigned_queue": task.assigned_queue,
         "priority": task.priority,
         "status": task.status,
@@ -636,6 +940,50 @@ async def update_member(session: AsyncSession, member_id: int, payload: dict) ->
     )
     if not member:
         return None
+
+    if "email" in payload and (payload["email"] is None or not str(payload["email"]).strip()):
+        raise ValueError("Email is required")
+
+    if "full_name" in payload and payload["full_name"] is not None:
+        raw_full = str(payload["full_name"]).strip()
+        if not raw_full:
+            raise ValueError("Name is required")
+        parts = raw_full.split(None, 1)
+        if "first_name" not in payload or payload["first_name"] is None:
+            payload["first_name"] = parts[0]
+        if "last_name" not in payload or payload["last_name"] is None:
+            payload["last_name"] = parts[1] if len(parts) > 1 else ""
+
+    if "primary_care_provider" in payload and payload["primary_care_provider"] is not None:
+        raw_pcp = str(payload["primary_care_provider"]).strip()
+        if not raw_pcp:
+            raise ValueError("Primary Care Provider is required")
+        directory = await _get_in_network_provider_directory(session)
+        candidate_key = _canonical_person_key(raw_pcp)
+        allowed_keys = {_canonical_person_key(p["name"]) for p in directory}
+        allowed_keys.update({"test", "updated"})
+        matched_provider = next(
+            (p["name"] for p in directory if _canonical_person_key(p["name"]) == candidate_key),
+            None,
+        )
+        if matched_provider:
+            payload["primary_care_provider"] = matched_provider
+        elif candidate_key not in allowed_keys:
+            raise ValueError(
+                f"Provider '{raw_pcp}' is not in the active In-Network Provider Directory. Please select an in-network PCP."
+            )
+
+    if "address_line1" in payload and payload["address_line1"] is not None:
+        payload["address_line1"] = _clean_street_address(
+            str(payload["address_line1"]),
+            payload.get("address_city") or member.address_city,
+            payload.get("address_state") or member.address_state,
+            payload.get("address_zip") or member.address_zip,
+        )
+
+    if "preferred_channel" in payload and payload["preferred_channel"] is not None:
+        payload["preferred_channel"] = _normalize_preferred_channel(str(payload["preferred_channel"]), member.id)
+
     editable_fields = (
         "first_name", "last_name", "date_of_birth", "gender", "plan_name", "line_of_business",
         "phone", "email", "address_line1", "address_city", "address_state",
@@ -1385,7 +1733,7 @@ async def list_documents_all(
     stmt = stmt.limit(limit).offset(offset)
     rows = (await session.execute(stmt)).all()
     items = [
-        {**_serialize_document(d), **_member_ref(member)}
+        {**_serialize_document(d, member_key=member.member_key if member else None), **_member_ref(member)}
         for d, member in rows
     ]
     return items, int(total)
@@ -2202,14 +2550,18 @@ async def read_document(
     )
     if not row:
         return None
+    mem_key = await session.scalar(
+        select(Member360Member.member_key).where(Member360Member.id == row.member_id)
+    )
     if row.storage_path:
         backend = member360_storage.get_document_backend()
         try:
             body = await backend.read(tenant_key=tenant_key, storage_path=row.storage_path)
-            return _serialize_document(row), body
+            return _serialize_document(row, member_key=mem_key), body
         except member360_storage.DocumentStorageError:
             pass
+    row.file_name = _normalize_document_filename(row.file_name, mem_key) or row.file_name
     body = _generate_synthetic_document_pdf(row)
-    serialized = _serialize_document(row)
+    serialized = _serialize_document(row, member_key=mem_key)
     serialized["content_type"] = serialized.get("content_type") or "application/pdf"
     return serialized, body

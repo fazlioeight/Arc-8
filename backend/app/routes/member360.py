@@ -243,10 +243,13 @@ async def update_member(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    data = payload.model_dump(exclude_none=True)
+    data = payload.model_dump(exclude_unset=True)
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No changes provided")
-    detail = await member360_service.update_member(session, member_id, data)
+    try:
+        detail = await member360_service.update_member(session, member_id, data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if not detail:
         record_phi_access(
             request,

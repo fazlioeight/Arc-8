@@ -34,6 +34,7 @@ const MEDICATION_COLUMNS = [
     ),
   },
   { label: "Sig", accessor: "sig" },
+  { label: "Quantity", accessor: "quantity" },
   { label: "Supply", accessor: "days_supply" },
   { label: "Last fill", accessor: "last_fill" },
   {
@@ -94,11 +95,41 @@ const formatSig = (m) =>
     .filter(Boolean)
     .join(" ") || "—";
 
+const DOSAGE_FORM_TOKENS = ["TAB", "TABLET", "CAP", "CAPSULE", "INH", "INHALER", "INJ", "SOL", "SUSP", "PATCH"];
+
+const inferDosageForm = (m) => {
+  if (m?.dosage_form) return String(m.dosage_form).toUpperCase();
+  const upperName = String(m?.drug_name || "").toUpperCase();
+  const routeUpper = String(m?.route || "").toUpperCase();
+  if (routeUpper === "INH" || upperName.includes("ALBUTEROL") || upperName.includes("HFA")) return "INH";
+  if (["SC", "SUBQ", "IM", "IV"].includes(routeUpper) || upperName.includes("INSULIN") || upperName.includes("100U/ML")) return "INJ";
+  if (upperName.includes("OMEPRAZOLE") || upperName.includes("CAP")) return "CAP";
+  return "TAB";
+};
+
 const formatDrug = (m) => {
-  const base = m.drug_name || "Unnamed medication";
-  return m.generic_name && m.generic_name !== m.drug_name
+  let base = (m.drug_name || "Unnamed medication").trim();
+  const upper = base.toUpperCase();
+  const hasToken = DOSAGE_FORM_TOKENS.some((tok) => new RegExp(`\\b${tok}\\b`).test(upper));
+  const form = inferDosageForm(m);
+  if (!hasToken && base !== "Unnamed medication") {
+    base = `${base} ${form}`;
+  }
+  return m.generic_name && m.generic_name.toLowerCase() !== base.toLowerCase()
     ? `${base} (${m.generic_name})`
     : base;
+};
+
+const formatQuantity = (m) => {
+  if (m?.quantity != null) return `${m.quantity} ${inferDosageForm(m)}`;
+  const supply = m?.days_supply != null ? Number(m.days_supply) : 30;
+  const form = inferDosageForm(m);
+  const freq = String(m?.frequency || "").toLowerCase();
+  if (form === "INH" || freq.includes("4-6") || freq.includes("needed")) return `1 ${form}`;
+  if (form === "INJ") return `${Math.max(1, Math.floor(supply / 10))} ${form}`;
+  if (freq.includes("twice") || freq.includes("bid")) return `${supply * 2} ${form}`;
+  if (freq.includes("three") || freq.includes("tid")) return `${supply * 3} ${form}`;
+  return `${supply} ${form}`;
 };
 
 export default function MedicationsPage({ detail }) {
@@ -124,6 +155,7 @@ export default function MedicationsPage({ detail }) {
     drug: formatDrug(m),
     is_critical: isCriticalDrug(m),
     sig: formatSig(m),
+    quantity: formatQuantity(m),
     days_supply: m.days_supply != null ? `${m.days_supply}d` : "—",
     last_fill: formatDate(m.last_fill_date),
     raw_refills: m.refills_remaining,

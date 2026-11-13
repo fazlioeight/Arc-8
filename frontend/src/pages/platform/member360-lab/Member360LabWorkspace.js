@@ -26,6 +26,7 @@ import {
 import {
   CareJourneyCard,
   CareOptionCard,
+  EditProfileModal,
   GuidedTriagePanel,
   MemberSummaryCard,
   MemberTimeline,
@@ -104,6 +105,8 @@ const Member360LabWorkspace = () => {
   const [submissionResult, setSubmissionResult] = useState(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [journeyTemplates, setJourneyTemplates] = useState([]);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [editProfileBusy, setEditProfileBusy] = useState(false);
 
   const isComplianceAuditor = role === 'compliance_auditor';
   const isBusinessAdmin = role === 'business_admin';
@@ -171,6 +174,19 @@ const Member360LabWorkspace = () => {
     // Merge the canonical detail payload (member + nested arrays) back into
     // local state so badges/quick-stats reflect the saved value immediately.
     setDetail((prev) => prev ? { ...prev, ...(updated || {}) } : updated);
+  }, [token, tenant, memberId]);
+
+  const handleSaveProfileModal = useCallback(async (payload) => {
+    if (!memberId) return;
+    setEditProfileBusy(true);
+    try {
+      const updated = await updateMember360Member(token, tenant, Number(memberId), payload);
+      setDetail((prev) => prev ? { ...prev, ...(updated || {}) } : updated);
+      setEditProfileOpen(false);
+      setActionMessage('Member profile updated.');
+    } finally {
+      setEditProfileBusy(false);
+    }
   }, [token, tenant, memberId]);
 
   useEffect(() => { reload(); }, [reload]);
@@ -864,7 +880,16 @@ const Member360LabWorkspace = () => {
             detail={detail}
             pcpHref={pcpHref}
             pcpState={pcpState}
-            onSaveField={saveMemberField}
+            onSaveField={isComplianceAuditor ? undefined : saveMemberField}
+            onEditProfile={isComplianceAuditor ? undefined : () => setEditProfileOpen(true)}
+          />
+          <EditProfileModal
+            open={editProfileOpen}
+            member={member}
+            detail={detail}
+            busy={editProfileBusy}
+            onClose={() => setEditProfileOpen(false)}
+            onSubmit={handleSaveProfileModal}
           />
 
           <SectionCard

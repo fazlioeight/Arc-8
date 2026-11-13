@@ -53,6 +53,7 @@ class MemberUpdate(BaseModel):
     """Editable subset of MemberDetail. All fields optional — partial PATCH."""
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    full_name: Optional[str] = None
     date_of_birth: Optional[date] = None
     gender: Optional[str] = None
     plan_name: Optional[str] = None
@@ -66,6 +67,43 @@ class MemberUpdate(BaseModel):
     preferred_language: Optional[str] = None
     preferred_channel: Optional[str] = None
     primary_care_provider: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            raise ValueError("Phone number is required and must be a valid 10-digit US number (e.g., (775) 555-0199).")
+        if re.search(r"[A-Za-z]", s):
+            raise ValueError("Phone number must contain only digits and standard formatting characters (e.g., (775) 555-0199).")
+        digits = re.sub(r"\D", "", s)
+        if len(digits) == 11 and digits.startswith("1"):
+            digits = digits[1:]
+        if len(digits) != 10:
+            raise ValueError("Phone number must be a valid 10-digit US phone number (e.g., (775) 555-0199).")
+        return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_field(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        s = str(v).strip()
+        if not s:
+            raise ValueError("Email is required")
+        if not _EMAIL_RE.match(s):
+            raise ValueError("Please enter a valid email address.")
+        return s
+
+    @model_validator(mode="after")
+    def check_explicitly_cleared_required_fields(self) -> "MemberUpdate":
+        if "email" in self.model_fields_set and (self.email is None or not str(self.email).strip()):
+            raise ValueError("Email is required")
+        if "phone" in self.model_fields_set and (self.phone is None or not str(self.phone).strip()):
+            raise ValueError("Phone number is required and must be a valid 10-digit US number (e.g., (775) 555-0199).")
+        return self
 
 
 class RiskInsight(BaseModel):
@@ -421,6 +459,8 @@ class Medication(BaseModel):
     generic_name: Optional[str] = None
     dose: Optional[str] = None
     dose_unit: Optional[str] = None
+    dosage_form: Optional[str] = None
+    quantity: Optional[int] = None
     route: Optional[str] = None
     frequency: Optional[str] = None
     days_supply: Optional[int] = None
@@ -478,6 +518,7 @@ class MemberDetailResponse(BaseModel):
     problems: list[Problem] = Field(default_factory=list)
     medications: list[Medication] = Field(default_factory=list)
     labs: list[Lab] = Field(default_factory=list)
+    in_network_providers: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class DashboardMetric(BaseModel):

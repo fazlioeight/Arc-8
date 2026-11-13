@@ -16,6 +16,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.coding import CodingMember, CodingProvider
+from .member360 import (
+    _ICD10_REFERENCE_MAP,
+    _format_icd10_code,
+    _normalize_preferred_channel,
+    _normalize_provider_display_name,
+)
 from ..models.member360 import (
     Member360Accumulator,
     Member360AccumulatorScope,
@@ -259,6 +265,10 @@ async def import_uhs_file(
             lang = (row.get("PrimaryLanguage") or "").title()
             if lang:
                 member.preferred_language = lang[:48]
+            member.preferred_channel = _normalize_preferred_channel(
+                row.get("PreferredChannel") or member.preferred_channel,
+                member.id,
+            )
 
             # Mirror core demographics into CodingMember as well
             coding_mem = await session.scalar(
@@ -426,11 +436,12 @@ async def import_uhs_file(
                 )
             )
             if not claim:
+                raw_prov = (row.get("RenderingProvider") or row.get("PayToFacilityName") or "")[:160] or None
                 claim = Member360Claim(
                     member_id=member.id,
                     claim_number=claim_num[:64],
                     service_date=svc_date,
-                    provider=(row.get("RenderingProvider") or row.get("PayToFacilityName") or "")[:160] or None,
+                    provider=_normalize_provider_display_name(raw_prov) if raw_prov else None,
                     category=(row.get("ClaimType") or row.get("PosDesc") or "Medical")[:64],
                     status=status_val,
                     billed_amount=billed,
@@ -464,29 +475,47 @@ async def import_uhs_file(
             diag_cols = ["PrinDiag", "AdmitDiag"] + [f"DiagCode{i}" for i in range(1, 41)]
             seen_codes: set[str] = set()
             for idx, col in enumerate(diag_cols):
-                code = (row.get(col) or "").strip()
-                if not code or code in seen_codes:
+                raw_code = (row.get(col) or "").strip()
+                if not raw_code:
                     continue
-                seen_codes.add(code)
+                formatted_code = _format_icd10_code(raw_code)[:32]
+                if formatted_code in seen_codes:
+                    continue
+                seen_codes.add(formatted_code)
+                ref = _ICD10_REFERENCE_MAP.get(formatted_code) or _ICD10_REFERENCE_MAP.get(raw_code.upper().replace(".", ""))
+                diag_desc = ref[1] if ref else f"Clinical diagnosis ({formatted_code})"
+                diag_sev = ref[2] if ref else "moderate"
+                rec_by = _normalize_provider_display_name(
+                    (row.get("RenderingProvider") or "QNXT Claim Feed")[:255]
+                )
                 existing_prob = await session.scalar(
                     select(Member360Problem).where(
                         Member360Problem.member_id == member.id,
-                        Member360Problem.code == code[:32],
+                        Member360Problem.code.in_([formatted_code, raw_code[:32]]),
                     )
                 )
                 if not existing_prob:
                     session.add(
                         Member360Problem(
                             member_id=member.id,
-                            code=code[:32],
+                            code=formatted_code,
                             code_system="ICD-10",
-                            description=f"ICD-10 Diagnosis {code}",
+                            description=diag_desc,
+                            severity=diag_sev,
                             status="active",
                             is_primary=(idx == 0),
                             onset_date=svc_date,
-                            recorded_by=(row.get("RenderingProvider") or "QNXT Claim Feed")[:255],
+                            recorded_by=rec_by,
                         )
                     )
+                else:
+                    existing_prob.code = formatted_code
+                    if not existing_prob.description or existing_prob.description.lower().startswith("icd-10 diagnosis"):
+                        existing_prob.description = diag_desc
+                    if not existing_prob.severity:
+                        existing_prob.severity = diag_sev
+                    if rec_by:
+                        existing_prob.recorded_by = rec_by
             processed += 1
 
     elif feed_type == "claim_edits":

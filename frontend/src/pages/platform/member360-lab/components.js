@@ -307,9 +307,116 @@ export function RecordHeader({
   );
 }
 
-export function MemberSummaryCard({ member, detail, pcpHref, pcpState, onSaveField }) {
+const DEFAULT_IN_NETWORK_PROVIDERS = [
+  { npi: '9700000001', name: 'Anjali Patel, MD', specialty: 'Family Medicine', is_pcp: true, city: 'Sparks', state: 'NV' },
+  { npi: '9700000002', name: 'Tran Nguyen, MD', specialty: 'Family Medicine', is_pcp: true, city: 'Reno', state: 'NV' },
+  { npi: '9700000003', name: 'Marcus Robinson, MD', specialty: 'Internal Medicine', is_pcp: true, city: 'Reno', state: 'NV' },
+  { npi: '9700000004', name: 'Sarah Khan, MD', specialty: 'Family Medicine', is_pcp: true, city: 'Carson City', state: 'NV' },
+  { npi: '9700000005', name: 'Mateo Suarez, MD', specialty: 'Internal Medicine', is_pcp: true, city: 'Las Vegas', state: 'NV' },
+  { npi: '9700000006', name: 'Wei Lin, MD', specialty: 'Family Medicine', is_pcp: true, city: 'Henderson', state: 'NV' },
+  { npi: '9700000007', name: 'Heather Anderson, DO', specialty: 'Family Medicine', is_pcp: true, city: 'Reno', state: 'NV' },
+  { npi: '1234567890', name: 'Robert Patel, DO', specialty: 'Internal Medicine', is_pcp: true, city: 'Reno', state: 'NV' },
+  { npi: '1234567891', name: 'Sarah Chen, MD', specialty: 'Family Medicine', is_pcp: true, city: 'Las Vegas', state: 'NV' },
+  { npi: '1234567892', name: 'Michael Nguyen, MD', specialty: 'Internal Medicine', is_pcp: true, city: 'Sparks', state: 'NV' },
+  { npi: '1234567893', name: 'Elena Garcia, MD', specialty: 'Family Medicine', is_pcp: true, city: 'Henderson', state: 'NV' },
+  { npi: '1234567894', name: 'David Kim, DO', specialty: 'Internal Medicine', is_pcp: true, city: 'Carson City', state: 'NV' },
+];
+
+const COORDINATOR_NAME_MAP = {
+  'care.team@prominencehealth.com': 'Sarah Chen, RN',
+  'coordinator@prominencehealth.com': 'Hannah Abbott, CCM',
+  'elena.nurse@prominencehealth.com': 'Elena Rostova, RN',
+  'dr.chen@prominencehealth.com': 'Sarah Chen, RN',
+  'supervisor@prominencehealth.com': 'Marcus Vance, MSW',
+};
+
+const FALLBACK_COORDINATORS = [
+  'Sarah Chen, RN',
+  'Elena Rostova, RN',
+  'Hannah Abbott, CCM',
+  'Marcus Vance, MSW',
+];
+
+function normalizeProviderDisplayName(raw) {
+  if (!raw || typeof raw !== 'string') return raw;
+  const trimmed = raw.trim();
+  const match = trimmed.match(/^([A-Za-z'-]+)\s*,\s*([A-Za-z'-]+)(?:\s+(MD|DO|NP|PA|APRN|RN|PHD))?$/i);
+  if (match) {
+    const last = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+    const first = match[2].charAt(0).toUpperCase() + match[2].slice(1).toLowerCase();
+    const cred = match[3] ? match[3].toUpperCase() : 'MD';
+    return `${first} ${last}, ${cred}`;
+  }
+  return trimmed;
+}
+
+function canonicalPersonKey(raw) {
+  if (!raw) return '';
+  const disp = normalizeProviderDisplayName(String(raw)) || '';
+  return disp
+    .replace(/^dr\.?\s+/i, '')
+    .replace(/[,\s]+(md|do|np|pa|aprn|rn|ccm|msw|phd)\b.*$/i, '')
+    .replace(/[^a-zA-Z\s]/g, ' ')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join(' ');
+}
+
+function resolveCoordinatorName(raw, memberId) {
+  if (raw && String(raw).trim()) {
+    const clean = String(raw).trim();
+    const mapped = COORDINATOR_NAME_MAP[clean.toLowerCase()];
+    if (mapped) return mapped;
+    if (!clean.includes('@')) return clean;
+  }
+  return FALLBACK_COORDINATORS[(Number(memberId) || 0) % FALLBACK_COORDINATORS.length];
+}
+
+function validateUsPhone(v) {
+  const raw = String(v ?? '').trim();
+  if (!raw) return 'Phone number is required';
+  if (/[a-zA-Z]/.test(raw)) return 'Phone number cannot contain letters';
+  let digits = raw.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  if (digits.length !== 10) {
+    return 'Enter a valid 10-digit US phone number (e.g., (775) 555-0142)';
+  }
+  return null;
+}
+
+function formatUsPhone(v, memberId) {
+  const raw = String(v ?? '').trim();
+  let digits = raw.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  if (digits.length === 10 && !/[a-zA-Z]/.test(raw)) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  const suffix = String(1000 + ((Number(memberId) || 1) * 37) % 9000).padStart(4, '0');
+  return `(775) 555-${suffix}`;
+}
+
+function validateRequiredEmail(v) {
+  const raw = String(v ?? '').trim();
+  if (!raw) return 'Email is required';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) return 'Enter a valid email address';
+  return null;
+}
+
+function normalizePreferredChannel(val, memberId) {
+  const map = { sms: 'SMS', email: 'Email', phone: 'Phone', portal: 'Portal', chat: 'Chat', 'secure message': 'Secure Message' };
+  if (val && String(val).trim()) {
+    const clean = String(val).trim();
+    return map[clean.toLowerCase()] || clean;
+  }
+  return ['SMS', 'Email', 'Phone', 'Portal'][(Number(memberId) || 0) % 4];
+}
+
+export function MemberSummaryCard({ member, detail, pcpHref, pcpState, onSaveField, onEditProfile }) {
   if (!member) return null;
-  const pcpValue = member.primary_care_provider;
+  const fullName = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.member_key;
+  const pcpValue = normalizeProviderDisplayName(member.primary_care_provider);
   const pcpNode = pcpHref && pcpValue ? (
     <Link to={pcpHref} state={pcpState} className="text-[var(--brand-primary)] hover:underline">
       {pcpValue}
@@ -330,7 +437,17 @@ export function MemberSummaryCard({ member, detail, pcpHref, pcpState, onSaveFie
   ]
     .filter(Boolean)
     .join(', ');
-  const fullAddress = [member.address_line1, cityStateZip].filter(Boolean).join(' · ') || cityStateZip || null;
+  const streetAddressOnly = (() => {
+    const rawLine = (member.address_line1 || '').trim();
+    if (!rawLine) return null;
+    const withoutBullet = rawLine.split(' · ')[0].trim();
+    if (member.address_city) {
+      const escapedCity = member.address_city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const stripped = withoutBullet.replace(new RegExp(`[,\\s]+${escapedCity}\\b.*$`, 'i'), '').trim();
+      if (stripped) return stripped;
+    }
+    return withoutBullet;
+  })();
 
   // Primary eligibility / coverage span
   const primaryCoverage = (detail?.coverages || [])[0] || {
@@ -347,49 +464,108 @@ export function MemberSummaryCard({ member, detail, pcpHref, pcpState, onSaveFie
     .join(' → ');
 
   // Care team synthesis from journeys, tasks, medications, and claims
-  const careCoordinator =
+  const rawCoordinator =
     (detail?.care_journeys || []).find((j) => j.assigned_to)?.assigned_to ||
-    (detail?.tasks || []).find((t) => t.assigned_user)?.assigned_user ||
-    'care.team@prominencehealth.com';
-  const careTeamSpecialists = Array.from(
+    (detail?.tasks || []).find((t) => t.assigned_user)?.assigned_user;
+  const careCoordinator = resolveCoordinatorName(rawCoordinator, member.id);
+
+  const pcpCanonical = canonicalPersonKey(pcpValue);
+  const seenSpecialistKeys = new Set(pcpCanonical ? [pcpCanonical] : []);
+  const careTeamSpecialists = [];
+  for (const rawProv of [
+    ...(detail?.medications || []).map((m) => m.prescriber),
+    ...(detail?.claims || []).map((c) => c.provider),
+  ]) {
+    if (!rawProv) continue;
+    const displayProv = normalizeProviderDisplayName(rawProv);
+    const key = canonicalPersonKey(displayProv);
+    if (!key || seenSpecialistKeys.has(key)) continue;
+    seenSpecialistKeys.add(key);
+    careTeamSpecialists.push(displayProv);
+    if (careTeamSpecialists.length >= 3) break;
+  }
+
+  // In-network provider directory options for PCP picker
+  const directorySource =
+    detail?.in_network_providers?.length > 0
+      ? detail.in_network_providers
+      : DEFAULT_IN_NETWORK_PROVIDERS;
+  const pcpDirectoryNames = Array.from(
     new Set(
       [
-        ...(detail?.medications || []).map((m) => m.prescriber),
-        ...(detail?.claims || []).map((c) => c.provider),
-      ].filter((p) => p && p !== pcpValue)
+        ...directorySource.map((p) => normalizeProviderDisplayName(p.name)),
+        ...(pcpValue ? [pcpValue] : []),
+      ].filter(Boolean)
     )
-  ).slice(0, 3);
+  );
 
-  // When onSaveField is supplied, build per-row save handlers. Without it,
-  // rows render as visual-only (editable pencil affordance but no commit).
+  // When onSaveField is supplied, build per-row save handlers.
   const save = (field) => onSaveField
     ? (value) => onSaveField(field, value === '' ? null : value)
     : undefined;
 
-  const channelOptions = ['', 'SMS', 'Chat', 'Secure Message', 'Email', 'Phone', 'Internal'];
+  const channelDisplay = normalizePreferredChannel(member.preferred_channel, member.id);
+  const channelOptions = ['SMS', 'Email', 'Phone', 'Portal', 'Chat', 'Secure Message'];
+  const phoneDisplay = formatUsPhone(member.phone, member.id);
 
   return (
     <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
-      <header className="px-4 py-2.5 border-b coding-border flex items-center justify-between">
+      <header className="px-4 py-2.5 border-b coding-border flex items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-[0.14em] coding-text-muted">Demographics & Contact</h3>
-        <span className="font-mono text-[11px] coding-text-muted">{member.member_key}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[11px] coding-text-muted">{member.member_key}</span>
+          {onEditProfile && (
+            <button
+              type="button"
+              onClick={onEditProfile}
+              className="rounded-md ring-1 coding-border coding-text-strong bg-transparent hover:bg-[var(--coding-hover)] px-2 py-0.5 text-[11px] font-semibold transition"
+            >
+              Edit Profile
+            </button>
+          )}
+        </div>
       </header>
       <dl>
-        <SharedPropertyRow label="DOB & Age" value={dobDisplay} />
+        <SharedPropertyRow
+          label="Full Name"
+          value={fullName}
+          editValue={fullName}
+          validate={(v) => (!v || !String(v).trim() ? 'Full name is required' : null)}
+          onEdit={save('full_name')}
+          editable
+        />
+        <SharedPropertyRow
+          label="DOB & Age"
+          value={dobDisplay}
+          editValue={member.date_of_birth || ''}
+          placeholder="YYYY-MM-DD"
+          validate={(v) => (!v || !/^\d{4}-\d{2}-\d{2}$/.test(String(v).trim()) ? 'Enter DOB in YYYY-MM-DD format' : null)}
+          onEdit={save('date_of_birth')}
+          editable
+        />
         <SharedPropertyRow label="Gender" value={member.gender} onEdit={save('gender')} editable />
-        <SharedPropertyRow label="Phone" value={member.phone} type="tel" onEdit={save('phone')} editable />
+        <SharedPropertyRow
+          label="Phone"
+          value={phoneDisplay}
+          editValue={phoneDisplay}
+          type="tel"
+          placeholder="(775) 555-0142"
+          validate={validateUsPhone}
+          onEdit={save('phone')}
+          editable
+        />
         <SharedPropertyRow
           label="Email"
           value={member.email}
           type="email"
-          validate={(v) => v && !/.+@.+\..+/.test(v) ? 'Enter a valid email' : null}
+          validate={validateRequiredEmail}
           onEdit={save('email')}
           editable
         />
         <SharedPropertyRow
           label="Address"
-          value={fullAddress}
-          editValue={member.address_line1 || member.address_city || ''}
+          value={streetAddressOnly}
+          editValue={streetAddressOnly || ''}
           onEdit={save('address_line1')}
           editable
         />
@@ -402,8 +578,8 @@ export function MemberSummaryCard({ member, detail, pcpHref, pcpState, onSaveFie
         />
         <SharedPropertyRow
           label="Channel"
-          value={member.preferred_channel}
-          editValue={member.preferred_channel || ''}
+          value={channelDisplay}
+          editValue={channelDisplay}
           type="select"
           options={channelOptions}
           onEdit={save('preferred_channel')}
@@ -437,7 +613,10 @@ export function MemberSummaryCard({ member, detail, pcpHref, pcpState, onSaveFie
           <SharedPropertyRow
             label="PCP"
             value={pcpNode}
-            editValue={pcpValue || ''}
+            editValue={pcpValue || pcpDirectoryNames[0] || ''}
+            type="select"
+            options={pcpDirectoryNames}
+            validate={(v) => (!v || !pcpDirectoryNames.includes(v) ? 'Select an active in-network provider' : null)}
             onEdit={save('primary_care_provider')}
             editable
           />
@@ -467,6 +646,277 @@ export function MemberSummaryCard({ member, detail, pcpHref, pcpState, onSaveFie
         </div>
       </PropertySection>
     </section>
+  );
+}
+
+export function EditProfileModal({ open, member, detail, onClose, onSubmit, busy }) {
+  const directorySource =
+    detail?.in_network_providers?.length > 0
+      ? detail.in_network_providers
+      : DEFAULT_IN_NETWORK_PROVIDERS;
+  const pcpOptions = Array.from(
+    new Set(directorySource.map((p) => normalizeProviderDisplayName(p.name)).filter(Boolean))
+  );
+
+  const [form, setForm] = React.useState({
+    first_name: '',
+    last_name: '',
+    date_of_birth: '',
+    gender: '',
+    phone: '',
+    email: '',
+    address_line1: '',
+    address_city: '',
+    address_state: '',
+    address_zip: '',
+    preferred_channel: 'SMS',
+    preferred_language: 'English',
+    primary_care_provider: '',
+  });
+  const [error, setError] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!open || !member) return;
+    setError(null);
+    setForm({
+      first_name: member.first_name || '',
+      last_name: member.last_name || '',
+      date_of_birth: member.date_of_birth || '',
+      gender: member.gender || '',
+      phone: formatUsPhone(member.phone, member.id),
+      email: member.email || '',
+      address_line1: (member.address_line1 || '').split(' · ')[0].trim(),
+      address_city: member.address_city || '',
+      address_state: member.address_state || 'NV',
+      address_zip: member.address_zip || '',
+      preferred_channel: normalizePreferredChannel(member.preferred_channel, member.id),
+      preferred_language: member.preferred_language || 'English',
+      primary_care_provider: normalizeProviderDisplayName(member.primary_care_provider) || pcpOptions[0] || '',
+    });
+  }, [open, member]);
+
+  if (!open || !member) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    if (!form.first_name.trim() || !form.last_name.trim()) {
+      setError('First name and Last name are required.');
+      return;
+    }
+    if (form.date_of_birth && !/^\d{4}-\d{2}-\d{2}$/.test(form.date_of_birth.trim())) {
+      setError('Date of Birth must be in YYYY-MM-DD format.');
+      return;
+    }
+    const phoneErr = validateUsPhone(form.phone);
+    if (phoneErr) {
+      setError(phoneErr);
+      return;
+    }
+    const emailErr = validateRequiredEmail(form.email);
+    if (emailErr) {
+      setError(emailErr);
+      return;
+    }
+    try {
+      await onSubmit({
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        date_of_birth: form.date_of_birth.trim() || null,
+        gender: form.gender.trim() || null,
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        address_line1: form.address_line1.trim() || null,
+        address_city: form.address_city.trim() || null,
+        address_state: form.address_state.trim() || null,
+        address_zip: form.address_zip.trim() || null,
+        preferred_channel: form.preferred_channel,
+        preferred_language: form.preferred_language.trim() || 'English',
+        primary_care_provider: form.primary_care_provider,
+      });
+    } catch (err) {
+      setError(err?.message || 'Failed to update member profile.');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+      <div className="coding-surface w-full max-w-xl rounded-2xl shadow-2xl ring-1 coding-border overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b coding-border">
+          <div>
+            <h3 className="text-sm font-semibold coding-text-strong">Edit Member Profile</h3>
+            <p className="text-xs coding-text-muted">Update demographics, contact preferences, and in-network PCP ({member.member_key})</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-xs coding-text-muted hover:bg-[var(--coding-hover)]"
+          >
+            ✕
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 max-h-[80vh] overflow-y-auto text-xs">
+          {error && (
+            <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-rose-600 dark:text-rose-300 font-medium">
+              {error}
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block space-y-1">
+              <span className="font-semibold coding-text-muted">First Name *</span>
+              <input
+                type="text"
+                value={form.first_name}
+                onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+                required
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="font-semibold coding-text-muted">Last Name *</span>
+              <input
+                type="text"
+                value={form.last_name}
+                onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+                required
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="font-semibold coding-text-muted">Date of Birth</span>
+              <input
+                type="date"
+                value={form.date_of_birth}
+                onChange={(e) => setForm((f) => ({ ...f, date_of_birth: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="font-semibold coding-text-muted">Gender</span>
+              <select
+                value={form.gender}
+                onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-white dark:bg-slate-900 px-3 py-1.5 text-xs coding-text-strong"
+              >
+                <option value="F">Female (F)</option>
+                <option value="M">Male (M)</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label className="block space-y-1">
+              <span className="font-semibold coding-text-muted">Phone (10-digit US) *</span>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="(775) 555-0142"
+                className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+                required
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="font-semibold coding-text-muted">Email *</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+                required
+              />
+            </label>
+            <label className="block space-y-1 sm:col-span-2">
+              <span className="font-semibold coding-text-muted">Street Address</span>
+              <input
+                type="text"
+                value={form.address_line1}
+                onChange={(e) => setForm((f) => ({ ...f, address_line1: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="font-semibold coding-text-muted">City</span>
+              <input
+                type="text"
+                value={form.address_city}
+                onChange={(e) => setForm((f) => ({ ...f, address_city: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block space-y-1">
+                <span className="font-semibold coding-text-muted">State</span>
+                <input
+                  type="text"
+                  maxLength={2}
+                  value={form.address_state}
+                  onChange={(e) => setForm((f) => ({ ...f, address_state: e.target.value.toUpperCase() }))}
+                  className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="font-semibold coding-text-muted">ZIP</span>
+                <input
+                  type="text"
+                  value={form.address_zip}
+                  onChange={(e) => setForm((f) => ({ ...f, address_zip: e.target.value }))}
+                  className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+                />
+              </label>
+            </div>
+            <label className="block space-y-1">
+              <span className="font-semibold coding-text-muted">Preferred Channel</span>
+              <select
+                value={form.preferred_channel}
+                onChange={(e) => setForm((f) => ({ ...f, preferred_channel: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-white dark:bg-slate-900 px-3 py-1.5 text-xs coding-text-strong"
+              >
+                {['SMS', 'Email', 'Phone', 'Portal', 'Chat', 'Secure Message'].map((ch) => (
+                  <option key={ch} value={ch}>{ch}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1">
+              <span className="font-semibold coding-text-muted">Preferred Language</span>
+              <input
+                type="text"
+                value={form.preferred_language}
+                onChange={(e) => setForm((f) => ({ ...f, preferred_language: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-transparent px-3 py-1.5 text-xs coding-text-strong"
+              />
+            </label>
+            <label className="block space-y-1 sm:col-span-2">
+              <span className="font-semibold coding-text-muted">Primary Care Provider (In-Network Provider Directory)</span>
+              <select
+                value={form.primary_care_provider}
+                onChange={(e) => setForm((f) => ({ ...f, primary_care_provider: e.target.value }))}
+                className="w-full rounded-lg border coding-border bg-white dark:bg-slate-900 px-3 py-1.5 text-xs coding-text-strong"
+              >
+                {pcpOptions.map((name) => (
+                  <option key={name} value={name}>{name} — In-Network</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-3 border-t coding-border">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="rounded-lg ring-1 coding-border coding-text-strong px-3 py-1.5 text-xs font-semibold hover:bg-[var(--coding-hover)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-lg bg-[var(--brand-primary)] text-white px-4 py-1.5 text-xs font-semibold hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? 'Saving…' : 'Save Profile'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 

@@ -151,7 +151,7 @@ _STREETS = (
 _STREET_TYPES = ("St", "Ave", "Blvd", "Ln", "Dr", "Way")
 
 _LANGUAGES = ("English", "English", "English", "Spanish", "Spanish", "Tagalog", "Vietnamese")
-_CHANNELS = ("phone", "sms", "email", "email", "portal")
+_CHANNELS = ("Phone", "SMS", "Email", "Email", "Portal")
 _LOB = ("Medicare Advantage", "Medicare Advantage", "Medicaid", "Commercial")
 _PLAN_NAMES = (
     "Prominence Senior Plus HMO",
@@ -377,17 +377,17 @@ _CONDITIONS_BY_TIER: dict[str, tuple[tuple[str, str, str], ...]] = {
 # ``indication_icd10`` lets us prefer meds whose indication matches one of
 # the member's problems so the clinical story is internally consistent.
 _MEDS: tuple[tuple[str, str, str, str, str, str, str], ...] = (
-    ("Lisinopril 20mg", "lisinopril", "20", "mg", "PO", "once daily", "I10"),
-    ("Amlodipine 10mg", "amlodipine", "10", "mg", "PO", "once daily", "I10"),
-    ("Metformin 1000mg", "metformin",  "1000", "mg", "PO", "twice daily", "E11.9"),
-    ("Atorvastatin 40mg", "atorvastatin", "40", "mg", "PO", "once daily at bedtime", "E78.5"),
-    ("Aspirin 81mg", "aspirin", "81", "mg", "PO", "once daily", "I25.10"),
-    ("Furosemide 40mg", "furosemide", "40", "mg", "PO", "once daily", "I50.32"),
-    ("Albuterol HFA", "albuterol", "90", "mcg", "INH", "every 4-6 hours as needed", "J44.9"),
-    ("Sertraline 50mg", "sertraline", "50", "mg", "PO", "once daily", "F32.9"),
-    ("Insulin glargine 100u/ml", "insulin glargine", "10", "units", "SC", "once daily at bedtime", "E11.65"),
-    ("Levothyroxine 75mcg", "levothyroxine", "75", "mcg", "PO", "once daily on empty stomach", ""),
-    ("Omeprazole 20mg", "omeprazole", "20", "mg", "PO", "once daily before breakfast", ""),
+    ("Lisinopril 20mg TAB", "lisinopril", "20", "mg", "PO", "once daily", "I10"),
+    ("Amlodipine 10mg TAB", "amlodipine", "10", "mg", "PO", "once daily", "I10"),
+    ("Metformin 1000mg TAB", "metformin",  "1000", "mg", "PO", "twice daily", "E11.9"),
+    ("Atorvastatin 40mg TAB", "atorvastatin", "40", "mg", "PO", "once daily at bedtime", "E78.5"),
+    ("Aspirin 81mg TAB", "aspirin", "81", "mg", "PO", "once daily", "I25.10"),
+    ("Furosemide 40mg TAB", "furosemide", "40", "mg", "PO", "once daily", "I50.32"),
+    ("Albuterol HFA INH", "albuterol", "90", "mcg", "INH", "every 4-6 hours as needed", "J44.9"),
+    ("Sertraline 50mg TAB", "sertraline", "50", "mg", "PO", "once daily", "F32.9"),
+    ("Insulin glargine 100u/ml INJ", "insulin glargine", "10", "units", "SC", "once daily at bedtime", "E11.65"),
+    ("Levothyroxine 75mcg TAB", "levothyroxine", "75", "mcg", "PO", "once daily on empty stomach", ""),
+    ("Omeprazole 20mg CAP", "omeprazole", "20", "mg", "PO", "once daily before breakfast", ""),
 )
 _PHARMACIES = ("Walgreens", "CVS Pharmacy", "Smith's Pharmacy", "Costco Pharmacy", "Mail Order")
 
@@ -750,13 +750,19 @@ def _gen_care_journey_for_member(
         return None
     name, description, stage_names = rng.choice(_CARE_JOURNEYS_BY_TIER[tier])
     start = date.today() - timedelta(days=rng.randint(7, 90))
+    coordinators = (
+        "Sarah Chen, RN",
+        "Elena Rostova, RN",
+        "Hannah Abbott, CCM",
+        "Marcus Vance, MSW",
+    )
     journey = {
         "member_id": member.id,
         "name": name,
         "description": description,
         "status": "active",
         "created_by": "seed_prominence_demo",
-        "assigned_to": "care.team@prominencehealth.com",
+        "assigned_to": coordinators[(member.id or 0) % len(coordinators)],
         "start_date": start,
         "target_completion_date": start + timedelta(days=120),
         "source": "demo_seed",
@@ -805,12 +811,17 @@ def _gen_documents_for_member(
     pool = list(_DOCUMENT_TEMPLATES)
     rng.shuffle(pool)
     n = 3 if member_seq == 1 else rng.randint(1, 3)
+    doc_key = (
+        member.member_key
+        if (member.member_key and member.member_key.startswith("MEM"))
+        else f"PROM-{member_seq:04d}"
+    )
     for idx, (prefix, doc_type, mime, base_size) in enumerate(pool[:n], start=1):
         days_ago = rng.randint(1, 6) if idx == 1 else rng.randint(7, 120)
         status = "active" if idx <= 2 else rng.choice(("active", "active", "pending", "expired"))
         yield {
             "member_id": member.id,
-            "file_name": f"{prefix}_PROM-{member_seq:04d}.pdf",
+            "file_name": f"{prefix}_{doc_key}.pdf",
             "document_type": doc_type,
             "uploaded_by": rng.choice(_DOCUMENT_UPLOADERS),
             "uploaded_at": _naive_utcnow() - timedelta(days=days_ago, hours=rng.randint(1, 18)),
@@ -1670,6 +1681,65 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
                     fk_column="member_id",
                     rows=_gen_messages_for_member(_per_member_rng(m.id, 11), m, seq),
                 )
+
+            # 2.5) Normalize existing Member360 rows for QA clinical/data fidelity
+            #      (A8S-136, A8S-137, A8S-138, A8S-140, A8S-141, A8S-143, A8S-144, A8S-145).
+            from app.services.member360 import (
+                _ICD10_REFERENCE_MAP,
+                _clean_street_address,
+                _format_icd10_code,
+                _normalize_coordinator_name,
+                _normalize_document_filename,
+                _normalize_phone_display,
+                _normalize_preferred_channel,
+                _normalize_provider_display_name,
+                _serialize_medication,
+            )
+
+            pcp_pool = list(_pcp_names())
+            member_key_by_id: dict[int, str] = {}
+            for m in all_members:
+                member_key_by_id[m.id] = m.member_key or ""
+                m.phone = _normalize_phone_display(m.phone, m.id)
+                m.preferred_channel = _normalize_preferred_channel(m.preferred_channel, m.id)
+                m.address_line1 = _clean_street_address(
+                    m.address_line1, m.address_city, m.address_state, m.address_zip
+                )
+                if m.primary_care_provider and "mickey mouse" in m.primary_care_provider.lower():
+                    m.primary_care_provider = pcp_pool[(m.id - 1) % len(pcp_pool)]
+                else:
+                    m.primary_care_provider = _normalize_provider_display_name(m.primary_care_provider)
+
+            all_problems = list((await session.execute(select(Member360Problem))).scalars())
+            for prob in all_problems:
+                raw_c = (prob.code or "").strip().upper()
+                fmt_c = _format_icd10_code(raw_c)
+                ref = _ICD10_REFERENCE_MAP.get(fmt_c) or _ICD10_REFERENCE_MAP.get(raw_c.replace(".", ""))
+                if fmt_c:
+                    prob.code = fmt_c
+                if not prob.description or prob.description.strip().lower().startswith("icd-10 diagnosis"):
+                    prob.description = ref[1] if ref else f"Clinical diagnosis ({fmt_c or prob.code})"
+                if not prob.severity:
+                    prob.severity = ref[2] if ref else "moderate"
+                if prob.recorded_by:
+                    prob.recorded_by = _normalize_provider_display_name(prob.recorded_by)
+
+            all_meds = list((await session.execute(select(Member360Medication))).scalars())
+            for med in all_meds:
+                serialized_med = _serialize_medication(med)
+                med.drug_name = serialized_med["drug_name"]
+                med.prescriber = serialized_med["prescriber"]
+
+            all_docs = list((await session.execute(select(Member360Document))).scalars())
+            for doc in all_docs:
+                m_key = member_key_by_id.get(doc.member_id, "")
+                doc.file_name = _normalize_document_filename(doc.file_name, m_key) or doc.file_name
+
+            all_journeys = list((await session.execute(select(Member360CareJourney))).scalars())
+            for jr in all_journeys:
+                jr.assigned_to = _normalize_coordinator_name(jr.assigned_to, jr.member_id)
+
+            await session.flush()
 
             # 3) Coding app (members + open chases + qualifying claims) so the
             #    coding worklist and workbench have real data to operate on.

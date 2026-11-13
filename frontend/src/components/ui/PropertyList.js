@@ -241,7 +241,7 @@ export function PropertyRow({
             )}
             onClick={canEdit ? startEdit : undefined}
           >
-            {isEmpty ? <span className="coding-text-soft italic">Empty</span> : value}
+            {isEmpty ? <span className="coding-text-soft">Not specified</span> : value}
           </dd>
           {showEdit && (
             <button

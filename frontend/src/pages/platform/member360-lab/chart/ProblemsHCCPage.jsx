@@ -8,6 +8,58 @@ const HCC_CODE_PREFIXES = [
   "M05", "M06",
 ];
 
+const ICD10_REFERENCE_LOOKUP = {
+  I10: { code: "I10", description: "Essential (primary) hypertension", severity: "moderate" },
+  E119: { code: "E11.9", description: "Type 2 diabetes mellitus without complications", severity: "moderate" },
+  "E11.9": { code: "E11.9", description: "Type 2 diabetes mellitus without complications", severity: "moderate" },
+  E1165: { code: "E11.65", description: "Type 2 diabetes mellitus with hyperglycemia", severity: "severe" },
+  "E11.65": { code: "E11.65", description: "Type 2 diabetes mellitus with hyperglycemia", severity: "severe" },
+  N1830: { code: "N18.30", description: "Chronic kidney disease, stage 3 unspecified", severity: "moderate" },
+  "N18.30": { code: "N18.30", description: "Chronic kidney disease, stage 3 unspecified", severity: "moderate" },
+  N183: { code: "N18.3", description: "Chronic kidney disease, stage 3 (moderate)", severity: "moderate" },
+  "N18.3": { code: "N18.3", description: "Chronic kidney disease, stage 3 (moderate)", severity: "moderate" },
+  N184: { code: "N18.4", description: "Chronic kidney disease, stage 4 (severe)", severity: "severe" },
+  "N18.4": { code: "N18.4", description: "Chronic kidney disease, stage 4 (severe)", severity: "severe" },
+  I509: { code: "I50.9", description: "Heart failure, unspecified", severity: "severe" },
+  "I50.9": { code: "I50.9", description: "Heart failure, unspecified", severity: "severe" },
+  I5032: { code: "I50.32", description: "Chronic diastolic (congestive) heart failure", severity: "severe" },
+  "I50.32": { code: "I50.32", description: "Chronic diastolic (congestive) heart failure", severity: "severe" },
+  J449: { code: "J44.9", description: "Chronic obstructive pulmonary disease, unspecified", severity: "moderate" },
+  "J44.9": { code: "J44.9", description: "Chronic obstructive pulmonary disease, unspecified", severity: "moderate" },
+  J441: { code: "J44.1", description: "COPD with (acute) exacerbation", severity: "severe" },
+  "J44.1": { code: "J44.1", description: "COPD with (acute) exacerbation", severity: "severe" },
+};
+
+const formatIcd10Code = (raw) => {
+  const clean = String(raw || "").trim().toUpperCase();
+  if (!clean) return "—";
+  if (ICD10_REFERENCE_LOOKUP[clean]) return ICD10_REFERENCE_LOOKUP[clean].code;
+  const compact = clean.replace(/\./g, "");
+  if (ICD10_REFERENCE_LOOKUP[compact]) return ICD10_REFERENCE_LOOKUP[compact].code;
+  if (clean.length > 3 && !clean.includes(".") && /^[A-Z]\d{2}/.test(clean)) {
+    return `${clean.slice(0, 3)}.${clean.slice(3)}`;
+  }
+  return clean;
+};
+
+const resolveClinicalDescription = (problem, formattedCode) => {
+  const rawDesc = String(problem?.description || "").trim();
+  const compact = String(problem?.code || "").trim().toUpperCase().replace(/\./g, "");
+  const ref = ICD10_REFERENCE_LOOKUP[formattedCode] || ICD10_REFERENCE_LOOKUP[compact];
+  if (!rawDesc || /^icd-10 diagnosis\b/i.test(rawDesc)) {
+    return ref?.description || `Clinical diagnosis (${formattedCode})`;
+  }
+  return rawDesc;
+};
+
+const resolveClinicalSeverity = (problem, formattedCode) => {
+  const rawSev = String(problem?.severity || "").trim().toLowerCase();
+  if (rawSev && rawSev !== "—") return rawSev;
+  const compact = String(problem?.code || "").trim().toUpperCase().replace(/\./g, "");
+  const ref = ICD10_REFERENCE_LOOKUP[formattedCode] || ICD10_REFERENCE_LOOKUP[compact];
+  return ref?.severity || "moderate";
+};
+
 const isHccImpactCode = (problem) => {
   if (!problem) return false;
   if (problem.is_primary) return true;
@@ -98,20 +150,24 @@ const sortProblems = (problems) =>
 
 export default function ProblemsHCCPage({ detail }) {
   const problems = sortProblems(detail?.problems || []);
-  const rows = problems.map((p) => ({
-    id: p.id,
-    raw_code: p.code,
-    code: p.is_primary ? `${p.code} ★` : p.code,
-    is_primary: Boolean(p.is_primary),
-    is_hcc: isHccImpactCode(p),
-    code_system: p.code_system,
-    description: p.description || "—",
-    status: p.status,
-    severity: p.severity || "—",
-    onset_date: formatDate(p.onset_date),
-    resolved_date: formatDate(p.resolved_date),
-    recorded_by: p.recorded_by || "—",
-  }));
+  const rows = problems.map((p) => {
+    const formattedCode = formatIcd10Code(p.code);
+    const resolvedSeverity = resolveClinicalSeverity(p, formattedCode);
+    return {
+      id: p.id,
+      raw_code: formattedCode,
+      code: p.is_primary ? `${formattedCode} ★` : formattedCode,
+      is_primary: Boolean(p.is_primary),
+      is_hcc: isHccImpactCode({ ...p, code: formattedCode, severity: resolvedSeverity }),
+      code_system: p.code_system || "ICD-10",
+      description: resolveClinicalDescription(p, formattedCode),
+      status: p.status,
+      severity: resolvedSeverity,
+      onset_date: formatDate(p.onset_date),
+      resolved_date: formatDate(p.resolved_date),
+      recorded_by: p.recorded_by || "—",
+    };
+  });
 
   return (
     <div>
