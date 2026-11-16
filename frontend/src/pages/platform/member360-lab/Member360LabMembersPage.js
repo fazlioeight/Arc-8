@@ -23,6 +23,7 @@ const SORT_OPTIONS = [
 const SAVED_VIEWS = [
   { key: 'all', label: 'All members' },
   { key: 'critical', label: 'Critical & High', tiers: ['Critical', 'High'] },
+  { key: 'rising_risk', label: 'Rising risk', tiers: ['Moderate', 'High'] },
   { key: 'active_journey', label: 'In a journey', journey: 'yes' },
   { key: 'open_tasks', label: 'Open tasks', task: 'yes' },
 ];

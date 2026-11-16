@@ -40,6 +40,8 @@ const Member360LabRiskIntelligencePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [domain, setDomain] = useState(null);
+  const [cohortTier, setCohortTier] = useState(null);
+  const [cohortSearch, setCohortSearch] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -114,10 +116,26 @@ const Member360LabRiskIntelligencePage = () => {
   }, [insights, domain]);
 
   const topMembers = useMemo(() => {
-    return [...members]
+    let list = [...members];
+    if (cohortTier === 'Rising') {
+      list = list.filter((m) => m.risk_tier === 'Moderate' || m.risk_tier === 'High');
+    } else if (cohortTier) {
+      list = list.filter((m) => m.risk_tier === cohortTier);
+    }
+    if (cohortSearch.trim()) {
+      const q = cohortSearch.trim().toLowerCase();
+      list = list.filter(
+        (m) =>
+          `${m.first_name || ''} ${m.last_name || ''}`.toLowerCase().includes(q) ||
+          (m.member_key || '').toLowerCase().includes(q) ||
+          (m.plan_name || '').toLowerCase().includes(q) ||
+          (m.next_best_action || '').toLowerCase().includes(q)
+      );
+    }
+    return list
       .sort((a, b) => (b.risk_score_composite || 0) - (a.risk_score_composite || 0))
-      .slice(0, 12);
-  }, [members]);
+      .slice(0, 20);
+  }, [members, cohortTier, cohortSearch]);
 
   const totalMembers = members.length || 1;
 
@@ -270,9 +288,50 @@ const Member360LabRiskIntelligencePage = () => {
           </section>
 
           <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
-            <header className="px-5 py-3 border-b coding-border">
-              <h3 className="text-sm font-semibold coding-text-strong">Highest composite risk</h3>
-              <p className="text-xs coding-text-soft">Top members ranked by composite score.</p>
+            <header className="px-5 py-3 border-b coding-border flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold coding-text-strong">Highest composite risk & rising-risk cohorts</h3>
+                <p className="text-xs coding-text-soft">Top members ranked by composite score, filterable by stratification tier.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={cohortSearch}
+                  onChange={(e) => setCohortSearch(e.target.value)}
+                  placeholder="Filter by member, ID, or action..."
+                  className="coding-input rounded-md px-2.5 py-1 text-xs w-48"
+                />
+                <FilterDropdown label="Risk cohort" count={cohortTier ? 1 : 0} display={cohortTier === 'Rising' ? 'Rising risk (High & Mod)' : cohortTier}>
+                  {({ close }) => (
+                    <div className="flex flex-col gap-1 min-w-[180px]">
+                      <button
+                        type="button"
+                        onClick={() => { setCohortTier(null); close(); }}
+                        className={`text-left px-2 py-1 rounded hover:bg-[var(--coding-hover)] ${!cohortTier ? 'coding-text-strong font-semibold' : 'coding-text-soft'}`}
+                      >
+                        All tiers
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setCohortTier('Rising'); close(); }}
+                        className={`text-left px-2 py-1 rounded hover:bg-[var(--coding-hover)] ${cohortTier === 'Rising' ? 'coding-text-strong font-semibold' : 'coding-text-soft'}`}
+                      >
+                        Rising risk (High & Moderate)
+                      </button>
+                      {TIER_ORDER.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => { setCohortTier(t); close(); }}
+                          className={`text-left px-2 py-1 rounded hover:bg-[var(--coding-hover)] ${cohortTier === t ? 'coding-text-strong font-semibold' : 'coding-text-soft'}`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </FilterDropdown>
+              </div>
             </header>
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
