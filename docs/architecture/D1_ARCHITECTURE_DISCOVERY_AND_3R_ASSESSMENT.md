@@ -21,7 +21,7 @@
 2. **The 3R Disposition (`40% Reuse / 35% Refactor / 25% Rebuild`):**
    - **Reuse (~40%):** FastAPI Member 360 domain routes (`backend/app/routes/member360.py`), SQLAlchemy `m360_*` relational models (`backend/app/models/member360.py`), multi-tenant context resolution (`backend/app/middleware/tenant.py`), and the React portal shell (`frontend/src/pages/platform/member360-lab/`).
    - **Refactor (~35%):** Decouple runtime configuration (`backend/app/core/config.py`) from Azure Key Vault/Blob/Entra ID; standardize authentication on OIDC/JWT + RBAC (`backend/app/utils/rbac.py`); bring `m360_*` tables under formal PostgreSQL Alembic migrations; consolidate Member 360 UI into 8 role-gated operational tabs; standardize platform branding as `Arc-8`.
-   - **Rebuild (~25%):** Replace legacy Azure Bicep/PowerShell scripts (`infra/azure/`) with HIPAA-eligible **AWS Infrastructure** (Amazon S3 + CloudFront, EC2/ECS compute, RDS PostgreSQL 16, ElastiCache Redis 7, AWS Secrets Manager, CloudWatch WORM logs) and build automated SFTP/batch ETL & 10-year CMS cold archival pipelines.
+   - **Rebuild (~25%):** Replace legacy Azure Bicep/PowerShell scripts (`infra/azure/`) with Terraform-managed **AWS Infrastructure** (`A8S-30`, `A8S-50`: Amazon CloudFront TLS 1.3 + EC2 Docker Compose stack with FastAPI, React, PostgreSQL 16, Redis 7, encrypted EBS volumes, and GitHub Actions OIDC CI/CD) and build the UHS SFTP batch ETL importer (`uhs_sftp_importer.py`).
 
 ---
 
@@ -66,10 +66,10 @@ Arc-8/
 | **Member 360 API** | `backend/app/routes/member360.py`, `services/member360.py` | **REUSE / REFACTOR** | Preserved rich domain endpoints (search, profile, claims, accumulators, gaps, meds, labs, journeys, tasks, notes, documents) while adding strict capability gates and PHI audit hooks. |
 | **Data Model** | `backend/app/models/member360.py` (`m360_*` tables) | **REUSE / REFACTOR** | 16 normalized `m360_*` tables cover 90%+ of Prominence Health requirements; transitioning from runtime `create_all` to formal Alembic migrations + Provider $\leftrightarrow$ Facility $M:N$ mapping. |
 | **Security & PHI** | `backend/app/utils/encryption.py`, `utils/phi_audit.py` | **REUSE** | `MultiFernet` column-level `EncryptedString` and dual-sink append-only HIPAA audit logging (`phi_audit` + `tenant_audit_events`) meet HIPAA §164.312(a)(2)(iv) & §164.312(b). |
-| **Document Storage** | `backend/app/services/member360_storage.py` | **REFACTOR** | Decoupled from Azure Blob Storage; supports local encrypted volume and AWS S3 SSE-KMS buckets for member PDFs/HRAs. |
+| **Document Storage** | `backend/app/services/member360_storage.py` | **REFACTOR** | Decoupled from Azure Blob Storage; stores member PDFs/HRAs on encrypted EC2 host volumes (`STORAGE_BACKEND=local`, with S3 adapter ready if needed). |
 | **Staff Frontend** | `frontend/src/pages/platform/member360-lab/` | **REFACTOR** | Rebranded to **Arc-8**; hidden out-of-scope modules (`Ride Booking`, `Coding Worklist` for non-coding roles, `Messages`, `Portal Preview`, redundant `Chart` tab); filtered horizontal sub-tabs by role permissions. |
 | **External Portal** | `frontend-member/`, `edge/member-portal/` | **DEFER (OUT OF SCOPE)** | Excluded from AWS deployment per SOW No. 3 because Prominence uses **AaNeel** for external member/provider portals. |
-| **Cloud Infra** | `infra/azure/*` $\rightarrow$ AWS CloudFront / EC2 / ECS / RDS | **REBUILD** | Replaced Azure Bicep topology with AWS CloudFront (`https://dmp0wwecjzzmr.cloudfront.net`), AWS compute environments (`:7777` Dev, `:7778` Test, `:8989` API), PostgreSQL 16, and Redis 7. |
+| **Cloud Infra** | `infra/azure/*` $\rightarrow$ AWS CloudFront + EC2 Docker | **REBUILD** | Replaced Azure Bicep topology with Terraform-managed AWS CloudFront (`https://dmp0wwecjzzmr.cloudfront.net`, `dev.arc8-mvp.site`, `test.arc8-mvp.site`), AWS EC2 Docker environments (`16.59.20.139` Dev, `3.130.110.51` Test), PostgreSQL 16, and Redis 7. |
 
 ---
 
@@ -89,10 +89,10 @@ Arc-8/
 
 | Environment Tier | Endpoint / Port | Purpose & Verification Status |
 | :--- | :--- | :--- |
-| **AWS Hosted Dev (CloudFront CDN)** | `https://dmp0wwecjzzmr.cloudfront.net/login` | Publicly reachable HTTPS edge distribution with TLS 1.3 fronting the Arc-8 SPA (**Verified Operational**). |
-| **AWS Server — Development** | `http://16.59.20.139:7777` (via SSH tunnel) | Active developer verification environment (**Verified Operational**). |
-| **AWS Server — QA Testing** | `http://16.59.20.139:7778` (via SSH tunnel) | Dedicated isolated QA testing environment used with `docs/TESTER_USER_MANUAL.md` (**Verified Operational**). |
-| **AWS Backend FastAPI Service** | `http://16.59.20.139:8989/docs` | OpenAPI / Swagger gateway connected to PostgreSQL 16 (`prominence_tenant`) & Redis 7 (**Verified Operational**). |
+| **AWS Hosted Edge (CloudFront CDN)** | `https://dmp0wwecjzzmr.cloudfront.net/login` (`dev.arc8-mvp.site` / `test.arc8-mvp.site`) | Publicly reachable HTTPS edge distribution with TLS 1.3 fronting the Arc-8 SPA (**Verified Operational**). |
+| **AWS EC2 Server — Development** | `16.59.20.139` (`:7777` UI, `:8989` API) | Active developer verification environment running Docker Compose stack (**Verified Operational**). |
+| **AWS EC2 Server — QA Testing** | `3.130.110.51` (`:7778` UI, `:8989` API) | Dedicated isolated QA testing environment (`A8S-50`) used with `docs/TESTER_USER_MANUAL.md` (**Verified Operational**). |
+| **AWS Backend FastAPI Service** | `http://16.59.20.139:8989/docs` & `http://3.130.110.51:8989/docs` | OpenAPI / Swagger gateway connected to PostgreSQL 16 (`prominence_tenant`) & Redis 7 (**Verified Operational**). |
 
 ---
 
