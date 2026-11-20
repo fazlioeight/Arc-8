@@ -8,7 +8,22 @@ from pydantic import BaseModel, Field
 from .types import NormalizedEmail
 
 PortalAccessLevel = Literal["admin", "manager", "user"]
-UserRole = Literal["admin", "user", "platform_admin"]
+UserRole = Literal[
+    "platform_admin",
+    "admin",
+    "business_admin",
+    "payer_executive",
+    "supervisor",
+    "coordinator",
+    "compliance_auditor",
+    "clinician",
+    "nurse",
+    "coder",
+    "billing",
+    "patient",
+    "user",
+    "analyst",
+]
 
 
 class ApplicationDefinition(BaseModel):

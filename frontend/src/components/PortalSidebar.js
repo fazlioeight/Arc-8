@@ -440,14 +440,14 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
         </div>
       )}
 
-      {/* ── Organization / Security strip ────────────────────────── */}
+      {/* ── Organization / Security strip (G-16) ────────────────────────── */}
       {!collapsed && (
         <div className="px-4 py-2 bg-[#d6dfec] border-b border-slate-300/90 dark:bg-slate-900/60 dark:border-slate-800/40 flex items-center justify-between text-[11px]">
           <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
-            {t('sidebar.hipaa_compliant', 'HIPAA Compliant')}
+            {t('sidebar.hipaa_compliant', 'Built for HIPAA')}
           </span>
-          <span className="text-slate-600 dark:text-slate-500 font-mono font-semibold text-[10px]">SOC-2 TYPE II</span>
+          <span className="text-slate-600 dark:text-slate-500 font-mono font-semibold text-[10px]">SOC-2 IN PROGRESS</span>
         </div>
       )}
 

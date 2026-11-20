@@ -237,20 +237,15 @@ const Settings = ({ themePreference, setThemePreference }) => {
       ] : []),
       ...(canGeneral ? [
         { id: "general", label: t("General") },
-        { id: "personalization", label: t("Personalization") },
         { id: "notifications", label: t("Notifications") },
       ] : []),
       ...(canSecurity ? [
         { id: "data", label: t("Data & Security") },
-        { id: "memory", label: t("Memory") },
-      ] : []),
-      ...(canIntegrations ? [
-        { id: "beta", label: t("FHIR & Beta Integrations") },
       ] : []),
       { id: "about", label: t("About") },
       ...(isAdmin ? [{ id: "navigation", label: t("Navigation") }] : []),
     ],
-    [canViewPrivileges, canGeneral, canSecurity, canIntegrations, isAdmin, t]
+    [canViewPrivileges, canGeneral, canSecurity, isAdmin, t]
   );
 
   const layoutProps = useMemo(
@@ -278,10 +273,9 @@ const Settings = ({ themePreference, setThemePreference }) => {
       utilityBar={isAuthenticated}
     >
       {!(active === "users" || active === "privileges") && (
-        <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <KpiTile label={t("Role")} value={(currentRole || menuRole || 'User').replace(/_/g, ' ')} hint="Access level" small />
           <KpiTile label={t("Sections")} value={navSections.length} hint="Available" />
-          <KpiTile label={t("Memories")} value={memories.length} hint="Saved" />
           <KpiTile label={t("Theme")} value={prefs.theme || 'light'} hint="Current" small />
         </section>
       )}

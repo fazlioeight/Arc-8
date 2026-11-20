@@ -27,7 +27,7 @@ export const TRANSLATIONS = {
     'nav.sub.general_profile': 'General Profile',
     'nav.sub.security_hipaa': 'Security & HIPAA',
     'nav.sub.fhir_integrations': 'FHIR Integrations',
-    'sidebar.hipaa_compliant': 'HIPAA Compliant',
+    'sidebar.hipaa_compliant': 'Built for HIPAA',
     'sidebar.switch_role': 'Switch Role ▾',
     'sidebar.switch_persona_title': 'Switch Clinical Persona',
     'sidebar.switch_persona_desc': 'Select a persona to immediately preview role-specific clinical permissions.',

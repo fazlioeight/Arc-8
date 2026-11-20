@@ -39,6 +39,34 @@ class Settings(BaseSettings):
     TENANT_CONNECTION_CACHE_SIZE: int = 32
 
     REDIS_URL: Optional[str] = None
+    # FR-DAT-02: 30-Day Redis Hot Cache TTL (2,592,000 seconds) for Member 360 & Live API responses
+    REDIS_HOT_CACHE_TTL_SECONDS: int = 30 * 24 * 60 * 60
+    REDIS_HOT_CACHE_ENABLED: bool = True
+
+    # ── G-08: 6 Live Client API Connectors Configuration ─────────────────────
+    QNXT_API_BASE_URL: Optional[str] = None
+    QNXT_API_KEY: Optional[str] = None
+    QNXT_TIMEOUT_SECONDS: float = 8.0
+
+    TALKDESK_API_BASE_URL: Optional[str] = None
+    TALKDESK_API_KEY: Optional[str] = None
+    TALKDESK_WEBHOOK_SECRET: Optional[str] = None
+
+    SAML_IDP_ENTITY_ID: Optional[str] = None
+    SAML_SSO_URL: Optional[str] = None
+
+    ABARCA_PBM_API_BASE_URL: Optional[str] = None
+    ABARCA_PBM_API_KEY: Optional[str] = None
+
+    CAREADVANCE_API_BASE_URL: Optional[str] = None
+    CAREADVANCE_API_KEY: Optional[str] = None
+
+    CLINICAL_LABS_API_BASE_URL: Optional[str] = None
+    CLINICAL_LABS_API_KEY: Optional[str] = None
+    TITAN_MRA_API_BASE_URL: Optional[str] = None
+    TITAN_MRA_API_KEY: Optional[str] = None
+    CLARITY_GL_API_BASE_URL: Optional[str] = None
+    CLARITY_GL_API_KEY: Optional[str] = None
 
     USAGE_DAILY_LIMIT: int = 10000
 

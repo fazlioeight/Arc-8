@@ -26,15 +26,10 @@ const Docs = () => {
 
   useEffect(() => {
     setQ(qParam);
-    if (!qParam) {
-      setArticles([]);
-      setSearchError(null);
-      return undefined;
-    }
     let active = true;
     setIsLoading(true);
     setSearchError(null);
-    searchDocsArticles({ token, tenant, query: qParam })
+    searchDocsArticles({ token, tenant, query: qParam || undefined })
       .then((payload) => {
         if (!active) return;
         setArticles(payload?.articles || []);
@@ -95,59 +90,60 @@ const Docs = () => {
           </form>
         </section>
 
-        {qParam ? (
-          <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
-            <header className="px-5 py-3 border-b coding-border">
-              <p className="text-xs coding-text-soft">
-                Showing results for <span className="coding-text-strong font-medium">{qParam}</span>
+        <section className="coding-surface rounded-2xl shadow-sm overflow-hidden">
+          <header className="px-5 py-3 border-b coding-border">
+            <p className="text-xs coding-text-soft">
+              {qParam ? (
+                <>Showing results for <span className="coding-text-strong font-medium">{qParam}</span></>
+              ) : (
+                <span className="coding-text-strong font-medium">Published User Manuals & Clinical Implementation Guides</span>
+              )}
+            </p>
+          </header>
+          <div className="p-5 space-y-3">
+            {isLoading && (
+              <p className="text-sm coding-text-soft">Loading documentation...</p>
+            )}
+            {!isLoading && searchError && (
+              <AlertShell tone="danger" title="Search failed" description={searchError} />
+            )}
+            {!isLoading && !searchError && articles.length > 0 && (
+              <div className="space-y-3">
+                {articles.map((article) => (
+                  <article
+                    key={article.id}
+                    className="coding-surface-subtle rounded-md px-4 py-3"
+                  >
+                    <h2 className="text-base font-semibold coding-text-strong">{article.title}</h2>
+                    {article.summary && (
+                      <p className="mt-1 text-sm coding-text-soft">{article.summary}</p>
+                    )}
+                    {article.content && (
+                      <p className="mt-2 text-xs coding-text-muted whitespace-pre-line">{article.content}</p>
+                    )}
+                    {Array.isArray(article.tags) && article.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {article.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-medium coding-text-muted"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+            {!isLoading && !searchError && articles.length === 0 && (
+              <p className="text-sm coding-text-soft italic">
+                No indexed docs match this search yet.
               </p>
-            </header>
-            <div className="p-5 space-y-3">
-              {isLoading && (
-                <p className="text-sm coding-text-soft">Searching documentation...</p>
-              )}
-              {!isLoading && searchError && (
-                <AlertShell tone="danger" title="Search failed" description={searchError} />
-              )}
-              {!isLoading && !searchError && articles.length > 0 && (
-                <div className="space-y-3">
-                  {articles.map((article) => (
-                    <article
-                      key={article.id}
-                      className="coding-surface-subtle rounded-md px-4 py-3"
-                    >
-                      <h2 className="text-base font-semibold coding-text-strong">{article.title}</h2>
-                      {article.summary && (
-                        <p className="mt-1 text-sm coding-text-soft">{article.summary}</p>
-                      )}
-                      {Array.isArray(article.tags) && article.tags.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {article.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-medium coding-text-muted"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              )}
-              {!isLoading && !searchError && articles.length === 0 && (
-                <p className="text-sm coding-text-soft italic">
-                  No indexed docs match this search yet.
-                </p>
-              )}
-            </div>
-          </section>
-        ) : (
-          <p className="text-sm coding-text-soft">
-            Try a query above to search the docs library.
-          </p>
-        )}
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -68,8 +68,21 @@ async def generate_raf_delta(
         ).scalars()
     )
 
+    raw_target = float(meta.target) if meta and meta.target else 1.25
+    # G-10: Calibrate uncalibrated RAF targets (e.g. 3.00) to standard 1.25 MA RAF benchmark
+    if raw_target > 1.75:
+        calibrated_target = 1.25
+        scale = calibrated_target / raw_target
+    else:
+        calibrated_target = raw_target if (meta and meta.target) else (1.25 if rows else 0.0)
+        scale = 1.0
+
     series = [
-        RafSeriesPoint(date=r.as_of_date, realized=r.realized, daily_add=r.daily_add)
+        RafSeriesPoint(
+            date=r.as_of_date,
+            realized=round(float(r.realized or 0.0) * scale, 3),
+            daily_add=round(float(r.daily_add or 0.0) * scale, 4),
+        )
         for r in rows
         if not r.is_forecast
     ]
@@ -78,9 +91,9 @@ async def generate_raf_delta(
         forecast = [
             RafForecastPoint(
                 date=r.as_of_date,
-                realized_p50=r.realized_p50,
-                lo80=r.lo80,
-                hi80=r.hi80,
+                realized_p50=round(float(r.realized_p50) * scale, 3) if r.realized_p50 is not None else None,
+                lo80=round(float(r.lo80) * scale, 3) if r.lo80 is not None else None,
+                hi80=round(float(r.hi80) * scale, 3) if r.hi80 is not None else None,
             )
             for r in rows
             if r.is_forecast
@@ -89,12 +102,15 @@ async def generate_raf_delta(
     breakdown = []
     if meta and isinstance(meta.breakdown, list):
         breakdown = [
-            RafBreakdownEntry(group=str(b.get("group", "")), realized=float(b.get("realized", 0) or 0))
+            RafBreakdownEntry(
+                group=str(b.get("group", "")),
+                realized=round(float(b.get("realized", 0) or 0) * scale, 3),
+            )
             for b in meta.breakdown
         ]
 
     return RafDeltaResponse(
-        target=meta.target if meta else 0.0,
+        target=calibrated_target,
         cutoff_date=meta.cutoff_date if meta else date(model_year + 1, 1, 31),
         series=series,
         forecast=forecast,

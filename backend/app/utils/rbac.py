@@ -58,6 +58,28 @@ class Role(str, enum.Enum):
     SUPERVISOR = "supervisor"
     BUSINESS_ADMIN = "business_admin"
     COMPLIANCE_AUDITOR = "compliance_auditor"
+    PAYER_EXECUTIVE = "payer_executive"
+    CLINICIAN = "clinician"
+    NURSE = "nurse"
+    CODER = "coder"
+    BILLING = "billing"
+    PATIENT = "patient"
+
+
+ALL_12_RBAC_ROLES: tuple[str, ...] = (
+    Role.PLATFORM_ADMIN.value,
+    Role.ADMIN.value,
+    Role.BUSINESS_ADMIN.value,
+    Role.PAYER_EXECUTIVE.value,
+    Role.SUPERVISOR.value,
+    Role.COORDINATOR.value,
+    Role.COMPLIANCE_AUDITOR.value,
+    Role.CLINICIAN.value,
+    Role.NURSE.value,
+    Role.CODER.value,
+    Role.BILLING.value,
+    Role.PATIENT.value,
+)
 
 
 # platform_admin is the superuser: it satisfies any role requirement. admin is
@@ -82,6 +104,9 @@ ROLE_ALIASES: Dict[str, str] = {
     "compliance_auditor": Role.COMPLIANCE_AUDITOR.value,
     "compliance auditor": Role.COMPLIANCE_AUDITOR.value,
     "auditor": Role.COMPLIANCE_AUDITOR.value,
+    "payer_executive": Role.PAYER_EXECUTIVE.value,
+    "payer executive": Role.PAYER_EXECUTIVE.value,
+    "coder": Role.ANALYST.value,
 }
 
 
@@ -116,6 +141,9 @@ ROLE_CAPABILITIES: Dict[str, frozenset[str]] = {
     Role.COMPLIANCE_AUDITOR.value: frozenset({
         "m360:read", "timeline:read", "audit:read", "audit:export",
         "compliance:read", "documents:read", "notes:read",
+    }),
+    Role.PAYER_EXECUTIVE.value: frozenset({
+        "dashboard:read", "analytics:read", "plan_performance:read",
     }),
     # Backwards-compatible legacy roles:
     Role.ADMIN.value: frozenset({

@@ -21,6 +21,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
+from ..core.redis import hot_cache
 
 from ..db.session import get_control_session
 from ..db.tenant_manager import TenantContext
@@ -130,6 +131,15 @@ documents_router = APIRouter(
 )
 
 
+@router.get("/cache/stats")
+async def get_cache_stats(
+    tenant: TenantContext = Depends(get_tenant_context),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """FR-DAT-02: Inspect 30-Day Redis Hot Cache telemetry and hit rates."""
+    return {"tenant": tenant.key, **hot_cache.stats()}
+
+
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard(
     tenant: TenantContext = Depends(get_tenant_context),
@@ -137,7 +147,10 @@ async def get_dashboard(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    payload = await member360_service.build_dashboard(session)
+    payload = await hot_cache.get_json(tenant.key, "dashboard", "summary")
+    if payload is None:
+        payload = await member360_service.build_dashboard(session)
+        await hot_cache.set_json(tenant.key, "dashboard", "summary", payload)
     await record_audit_event(
         control_session,
         tenant_id=tenant.id,
@@ -168,15 +181,22 @@ async def list_members(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Patient role is not permitted to query the population member roster",
         )
-    items, total = await member360_service.list_members(
-        session,
-        search=search,
-        risk_tier=risk_tier,
-        has_active_journey=has_active_journey,
-        has_open_task=has_open_task,
-        limit=limit,
-        offset=offset,
-    )
+    tiers_key = ",".join(sorted(risk_tier)) if risk_tier else ""
+    cache_id = f"q={search or ''}|rt={tiers_key}|aj={has_active_journey}|ot={has_open_task}|l={limit}|o={offset}"
+    cached = await hot_cache.get_json(tenant.key, "members_list", cache_id)
+    if cached is not None:
+        items, total = cached["items"], cached["total"]
+    else:
+        items, total = await member360_service.list_members(
+            session,
+            search=search,
+            risk_tier=risk_tier,
+            has_active_journey=has_active_journey,
+            has_open_task=has_open_task,
+            limit=limit,
+            offset=offset,
+        )
+        await hot_cache.set_json(tenant.key, "members_list", cache_id, {"items": items, "total": total})
     await record_audit_event(
         control_session,
         tenant_id=tenant.id,
@@ -198,7 +218,11 @@ async def get_member(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    detail = await member360_service.get_member_detail(session, member_id)
+    detail = await hot_cache.get_json(tenant.key, "member_detail", str(member_id))
+    if detail is None:
+        detail = await member360_service.get_member_detail(session, member_id)
+        if detail is not None:
+            await hot_cache.set_json(tenant.key, "member_detail", str(member_id), detail)
     if not detail:
         # Record the failed access attempt too — a denied/miss read is exactly
         # what a compliance reviewer needs to see for anomaly detection.
@@ -279,6 +303,8 @@ async def update_member(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, member_id)
+    await hot_cache.set_json(tenant.key, "member_detail", str(member_id), detail)
     return detail
 
 
@@ -313,6 +339,7 @@ async def create_task(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, task["member_id"])
     return task
 
 
@@ -340,6 +367,7 @@ async def update_task(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, task.get("member_id"))
     return task
 
 
@@ -372,6 +400,7 @@ async def create_note(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, member_id)
     return note
 
 
@@ -398,6 +427,7 @@ async def create_message(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, member_id)
     return message
 
 
@@ -423,6 +453,7 @@ async def create_care_option(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, payload.member_id)
     return result
 
 
@@ -459,6 +490,7 @@ async def create_care_journey(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, journey["member_id"])
     return journey
 
 
@@ -468,7 +500,9 @@ async def list_templates(
     session: AsyncSession = Depends(get_tenant_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    return await member360_service.list_care_journey_templates(session)
+    templates = await member360_service.list_care_journey_templates(session)
+    await session.commit()
+    return templates
 
 
 @router.get("/members/{member_id}/gaps", response_model=GapAnalysisResponse)
@@ -480,7 +514,12 @@ async def get_member_gap_analysis(
     control_session: AsyncSession = Depends(get_control_session),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    result = await member360_service.build_gap_analysis(session, member_id, submission_year)
+    gap_cache_key = f"{member_id}:{submission_year or 'current'}"
+    result = await hot_cache.get_json(tenant.key, "member_gaps", gap_cache_key)
+    if result is None:
+        result = await member360_service.build_gap_analysis(session, member_id, submission_year)
+        if result is not None:
+            await hot_cache.set_json(tenant.key, "member_gaps", gap_cache_key, result)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
     await record_audit_event(
@@ -764,6 +803,7 @@ async def patch_care_journey(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, journey.get("member_id"))
     return journey
 
 
@@ -797,6 +837,7 @@ async def add_care_journey_stage(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, journey.get("member_id"))
     return journey
 
 
@@ -830,6 +871,7 @@ async def patch_care_journey_stage(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, journey.get("member_id"))
     return journey
 
 
@@ -864,6 +906,7 @@ async def import_members(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_namespace(tenant.key)
     return summary
 
 
@@ -892,6 +935,7 @@ async def import_claims(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_namespace(tenant.key)
     return summary
 
 
@@ -962,6 +1006,7 @@ async def upload_document(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_member(tenant.key, member_id)
     return doc
 
 
@@ -1055,6 +1100,7 @@ async def import_risk_insights(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_namespace(tenant.key)
     return summary
 
 
@@ -1083,6 +1129,7 @@ async def import_problems(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_namespace(tenant.key)
     return summary
 
 
@@ -1111,6 +1158,7 @@ async def import_medications(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_namespace(tenant.key)
     return summary
 
 
@@ -1139,4 +1187,5 @@ async def import_labs(
     )
     await session.commit()
     await control_session.commit()
+    await hot_cache.invalidate_namespace(tenant.key)
     return summary

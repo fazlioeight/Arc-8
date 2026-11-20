@@ -53,10 +53,25 @@ const summarizeApplications = (appDefinitions, appPermissions) => {
   return summary.length ? summary.join(", ") : "No access";
 };
 
+const ROLE_LABELS = {
+  platform_admin: 'Platform Admin',
+  admin: 'System Admin',
+  business_admin: 'Business Admin',
+  payer_executive: 'Payer Executive',
+  supervisor: 'Clinical Supervisor',
+  coordinator: 'Care Coordinator',
+  compliance_auditor: 'Compliance Auditor',
+  clinician: 'Clinician (MD/DO)',
+  nurse: 'Nurse (RN)',
+  coder: 'Coder (CPC/CRC)',
+  billing: 'Billing Specialist',
+  patient: 'Member / Patient',
+  analyst: 'Clinical Analyst',
+  user: 'User',
+};
+
 const formatGlobalRole = (value) => {
-  if (value === 'platform_admin') return 'Platform admin';
-  if (value === 'admin') return 'Admin';
-  return 'User';
+  return ROLE_LABELS[value] || (value ? value.replace(/_/g, ' ') : 'User');
 };
 
 const roleTone = (value) => {
@@ -720,13 +735,18 @@ const filteredUsers = useMemo(() => {
                         onChange={(e) => handleFieldChange("role", e.target.value)}
                         className={INPUT}
                       >
+                        {isPlatformAdmin && <option value="platform_admin">Platform Administrator</option>}
+                        <option value="admin">System Administrator</option>
+                        <option value="business_admin">Business Administrator</option>
+                        <option value="payer_executive">Medicare Advantage & Payer Executive</option>
+                        <option value="supervisor">Clinical / Ops Supervisor</option>
+                        <option value="coordinator">Care Coordinator</option>
+                        <option value="compliance_auditor">Compliance Auditor</option>
                         <option value="clinician">Clinician / Physician (MD/DO)</option>
                         <option value="nurse">Care Coordinator / Nurse (RN)</option>
                         <option value="coder">Risk Adjustment Coder (CPC/CRC)</option>
                         <option value="billing">Billing & Capitation Specialist</option>
                         <option value="patient">Member / Patient</option>
-                        <option value="admin">Tenant Administrator / Supervisor</option>
-                        {isPlatformAdmin && <option value="platform_admin">Platform Administrator</option>}
                         <option value="user">General Staff User</option>
                       </select>
                     </label>

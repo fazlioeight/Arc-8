@@ -49,7 +49,9 @@ async def list_templates(
     session: AsyncSession = Depends(get_tenant_session),
     current_user: AuthenticatedUser = Depends(require_admin),
 ):
-    return await member360_service.list_care_journey_templates(session)
+    rows = await member360_service.list_care_journey_templates(session)
+    await session.commit()
+    return rows
 
 
 @router.post("/templates", response_model=CareJourneyTemplate, status_code=status.HTTP_201_CREATED)
@@ -128,7 +130,9 @@ async def list_risk_rules(
     session: AsyncSession = Depends(get_tenant_session),
     current_user: AuthenticatedUser = Depends(require_admin),
 ):
-    return await admin_service.list_risk_rules(session)
+    rows = await admin_service.list_risk_rules(session)
+    await session.commit()
+    return rows
 
 
 @router.post("/risk-rules", response_model=RiskRule, status_code=status.HTTP_201_CREATED)
@@ -207,7 +211,9 @@ async def list_task_queues(
     session: AsyncSession = Depends(get_tenant_session),
     current_user: AuthenticatedUser = Depends(require_admin),
 ):
-    return await admin_service.list_task_queues(session)
+    rows = await admin_service.list_task_queues(session)
+    await session.commit()
+    return rows
 
 
 @router.post("/task-queues", response_model=TaskQueue, status_code=status.HTTP_201_CREATED)
@@ -286,7 +292,9 @@ async def list_outreach_channels(
     session: AsyncSession = Depends(get_tenant_session),
     current_user: AuthenticatedUser = Depends(require_admin),
 ):
-    return await admin_service.list_outreach_channels(session)
+    rows = await admin_service.list_outreach_channels(session)
+    await session.commit()
+    return rows
 
 
 @router.post("/outreach-channels", response_model=OutreachChannel, status_code=status.HTTP_201_CREATED)
@@ -365,7 +373,9 @@ async def list_care_option_policies(
     session: AsyncSession = Depends(get_tenant_session),
     current_user: AuthenticatedUser = Depends(require_admin),
 ):
-    return await admin_service.list_care_option_policies(session)
+    rows = await admin_service.list_care_option_policies(session)
+    await session.commit()
+    return rows
 
 
 @router.post(

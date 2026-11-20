@@ -53,7 +53,15 @@ const SAVED_VIEWS = [
   { key: 'completed', label: 'Completed', statuses: ['completed'] },
 ];
 
-const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const startOfDay = (d) => {
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.trim())) {
+    const [y, m, day] = d.trim().split('-').map(Number);
+    return new Date(y, m - 1, day, 0, 0, 0, 0);
+  }
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
 
 const TASKS_FILTER_STORAGE_KEY = 'arc8.tasks.filters.v1';
 
@@ -215,7 +223,7 @@ const Member360LabTasksPage = () => {
         if (due !== 'any') {
           if (!t.due_date) return false;
           const d = startOfDay(t.due_date);
-          if (due === 'overdue' && !(d < today && ['open', 'in_progress'].includes(t.status))) return false;
+          if (due === 'overdue' && !(d < today && ['open', 'in_progress', 'waiting'].includes(t.status))) return false;
           if (due === 'today' && d.getTime() !== today.getTime()) return false;
           if (due === 'week' && (d < today || d > weekOut)) return false;
         }
@@ -239,7 +247,7 @@ const Member360LabTasksPage = () => {
       total: rows.length,
       open: rows.filter((t) => ['open', 'in_progress', 'waiting'].includes(t.status)).length,
       urgent: rows.filter((t) => t.priority === 'urgent' && t.status !== 'completed').length,
-      overdue: rows.filter((t) => t.due_date && startOfDay(t.due_date) < today && ['open', 'in_progress'].includes(t.status)).length,
+      overdue: rows.filter((t) => t.due_date && startOfDay(t.due_date) < today && ['open', 'in_progress', 'waiting'].includes(t.status)).length,
     };
   }, [rows]);
 

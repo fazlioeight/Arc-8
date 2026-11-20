@@ -25,6 +25,8 @@ from ..models.coding import (
     CodingProviderLocation,
     CodingSubmissionBatch,
 )
+from ..models.member360 import Member360Member, Member360Provider
+from .member360 import _canonical_person_key, _normalize_provider_display_name
 
 DEFAULT_PAGE_SIZE = 25
 MAX_PAGE_SIZE = 100
@@ -198,6 +200,68 @@ async def list_attachments(session: AsyncSession, member_id: int) -> list[Coding
     return list((await session.scalars(stmt)).all())
 
 
+async def _attach_provider_attribution_counts(
+    session: AsyncSession,
+    providers: Sequence[CodingProvider],
+) -> None:
+    """G-07: Link 17-feed SFTP Member 360 and Coding member & open gap counts to Provider Directory."""
+    if not providers:
+        return
+
+    # 1. Load 17-feed SFTP / Member360 attribution grouped by canonical PCP name
+    m360_rows = (
+        await session.execute(
+            select(
+                Member360Member.primary_care_provider,
+                func.count(Member360Member.id),
+                func.coalesce(func.sum(Member360Member.open_care_gaps), 0),
+            )
+            .where(Member360Member.primary_care_provider.is_not(None))
+            .group_by(Member360Member.primary_care_provider)
+        )
+    ).all()
+    m360_by_key: dict[str, tuple[int, int]] = {}
+    for pcp_raw, m_cnt, g_cnt in m360_rows:
+        ckey = _canonical_person_key(pcp_raw)
+        if not ckey:
+            continue
+        prev_m, prev_g = m360_by_key.get(ckey, (0, 0))
+        m360_by_key[ckey] = (prev_m + int(m_cnt or 0), prev_g + int(g_cnt or 0))
+
+    # 2. Load CodingMember + CodingMemberChase attribution grouped by NPI and canonical name
+    coding_rows = (
+        await session.execute(
+            select(
+                CodingMember.pcp_npi,
+                CodingMember.pcp_name,
+                func.count(func.distinct(CodingMember.id)),
+                func.count(func.distinct(CodingMemberChase.id)),
+            )
+            .join(CodingMemberChase, CodingMemberChase.member_id == CodingMember.id, isouter=True)
+            .group_by(CodingMember.pcp_npi, CodingMember.pcp_name)
+        )
+    ).all()
+    coding_by_npi: dict[str, tuple[int, int]] = {}
+    coding_by_key: dict[str, tuple[int, int]] = {}
+    for npi, p_name, m_cnt, c_cnt in coding_rows:
+        if npi:
+            pm, pg = coding_by_npi.get(npi, (0, 0))
+            coding_by_npi[npi] = (pm + int(m_cnt or 0), pg + int(c_cnt or 0))
+        ckey = _canonical_person_key(p_name)
+        if ckey:
+            pm, pg = coding_by_key.get(ckey, (0, 0))
+            coding_by_key[ckey] = (pm + int(m_cnt or 0), pg + int(c_cnt or 0))
+
+    for p in providers:
+        ckey = _canonical_person_key(p.name)
+        m360_m, m360_g = m360_by_key.get(ckey, (0, 0))
+        cod_m, cod_g = coding_by_npi.get(p.npi or "", (0, 0))
+        if cod_m == 0 and ckey in coding_by_key:
+            cod_m, cod_g = coding_by_key[ckey]
+        p.member_count = max(m360_m, cod_m) if (m360_m and cod_m) else (m360_m + cod_m)
+        p.open_gaps = max(m360_g, cod_g) if (m360_g and cod_g) else (m360_g + cod_g)
+
+
 async def list_providers(
     session: AsyncSession,
     *,
@@ -226,8 +290,9 @@ async def list_providers(
 
     total = int(await session.scalar(total_stmt) or 0)
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    providers = (await session.scalars(stmt)).all()
-    return list(providers), total
+    providers = list((await session.scalars(stmt)).all())
+    await _attach_provider_attribution_counts(session, providers)
+    return providers, total
 
 
 async def get_provider(session: AsyncSession, provider_id: int) -> CodingProvider | None:
@@ -235,6 +300,7 @@ async def get_provider(session: AsyncSession, provider_id: int) -> CodingProvide
     provider = await session.scalar(stmt)
     if provider:
         await session.refresh(provider, attribute_names=["location"])
+        await _attach_provider_attribution_counts(session, [provider])
     return provider
 
 

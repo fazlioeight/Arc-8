@@ -30,6 +30,7 @@ from .routes import contact as contact_router
 from .routes import coding_dashboards as coding_dashboards_router
 from .routes import dashboard as dashboard_router
 from .routes import imports as imports_router
+from .routes import live_client_apis as live_client_apis_router
 from .routes import docs as docs_router
 from .routes import terminology as terminology_router
 from .routes import member_cost as member_cost_router
@@ -604,10 +605,16 @@ async def oidc_auth_exchange(
     oidc_role_apps = {
         "admin": {"admin_console": "admin", "chat": "admin", "coding": "admin", "dashboard": "admin", "docs": "admin", "job_center": "admin", "member360": "admin", "portal": "admin", "ride_booking": "admin", "settings": "admin", "providers": "admin"},
         "platform_admin": {"admin_console": "admin", "chat": "admin", "coding": "admin", "dashboard": "admin", "docs": "admin", "job_center": "admin", "member360": "admin", "portal": "admin", "ride_booking": "admin", "settings": "admin", "providers": "admin"},
-        "coordinator": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "providers": "user"},
-        "supervisor": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user", "dashboard": "user", "settings": "user", "providers": "user"},
         "business_admin": {"member360": "user", "admin_console": "admin", "portal": "user", "docs": "user", "settings": "admin", "job_center": "admin"},
+        "payer_executive": {"member360": "admin", "dashboard": "admin", "portal": "admin", "docs": "admin", "settings": "user"},
+        "supervisor": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "chat": "user", "dashboard": "user", "settings": "user", "providers": "user"},
+        "coordinator": {"member360": "user", "portal": "user", "ride_booking": "user", "docs": "user", "providers": "user"},
         "compliance_auditor": {"member360": "user", "portal": "user", "docs": "user"},
+        "clinician": {"member360": "user", "providers": "user", "portal": "user", "chat": "user", "docs": "user", "dashboard": "user", "coding": "user"},
+        "nurse": {"member360": "user", "ride_booking": "user", "portal": "user", "chat": "user", "docs": "user", "dashboard": "user", "providers": "user"},
+        "coder": {"coding": "user", "member360": "user", "portal": "user", "dashboard": "user", "docs": "user"},
+        "billing": {"dashboard": "user", "portal": "user", "docs": "user", "member360": "user"},
+        "patient": {"portal": "user", "ride_booking": "user"},
     }
     default_perms_for_role = dict(oidc_role_apps.get(mapped_role, {"member360": "user", "portal": "user"}))
 
@@ -819,4 +826,5 @@ app.include_router(chat_router.router)
 app.include_router(ai_router.router)
 app.include_router(staff_router.router)
 app.include_router(contact_router.router)
+app.include_router(live_client_apis_router.router)
 

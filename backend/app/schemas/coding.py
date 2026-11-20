@@ -203,6 +203,8 @@ class CodingProviderSummary(BaseModel):
     tax_id: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    member_count: int = 0
+    open_gaps: int = 0
 
 
 class CodingProviderLocation(BaseModel):

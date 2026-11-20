@@ -50,13 +50,19 @@ export function transformRafDelta(raw = {}) {
 
 export function transformSuspectsFunnel(raw = {}, range = {}) {
   const stages = Array.isArray(raw.stages) ? raw.stages : [];
+  const topCount = Number(stages[0]?.count) || 0;
   const ordered = stages.map((stage, index) => {
     const next = stages[index + 1];
-    const conversion = next && stage.count ? next.count / stage.count : 0;
+    const currentCount = Number(stage.count) || 0;
+    const conversion = next && currentCount
+      ? Number(next.count) / currentCount
+      : topCount > 0
+      ? currentCount / topCount
+      : 0;
     return {
       key: stage.key,
       label: stageLabel(stage.key),
-      count: Number(stage.count) || 0,
+      count: currentCount,
       medianDays: Number(stage.median_days) || 0,
       conversion: Number.isFinite(conversion) ? conversion : 0,
     };

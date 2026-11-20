@@ -1050,7 +1050,7 @@ async def _ensure_dashboard_facts(session: AsyncSession, rng: random.Random) -> 
     # ── RAF delta: meta + 30-day realized series + forecast points ───────────
     for my in model_years:
         for lob in _DASHBOARD_LOBS:
-            target = round(rng.uniform(2.6, 4.2), 2)
+            target = 1.25
             realized_total = round(target * rng.uniform(0.55, 0.8), 3)
             cutoff = date(my + 1, 1, 31)
 

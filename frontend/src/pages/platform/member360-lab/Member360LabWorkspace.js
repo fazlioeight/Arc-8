@@ -891,39 +891,7 @@ const Member360LabWorkspace = () => {
             onClose={() => setEditProfileOpen(false)}
             onSubmit={handleSaveProfileModal}
           />
-
-          <SectionCard
-            title="Coding actions"
-            subtitle="Preview a payer submission for this member."
-          >
-            <button
-              type="button"
-              onClick={onSubmitToPayer}
-              disabled={submissionState === 'working'}
-              className="w-full rounded-md bg-[var(--brand-primary)] text-white px-3 py-2 text-xs font-semibold hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submissionState === 'working' ? 'Generating export...' : 'Submit to Payer (Preview)'}
-            </button>
-            {submissionResult?.batch_id && (
-              <div className="mt-2 space-y-1">
-                <p className="text-[11px] coding-text-muted">
-                  Last batch {submissionResult.batch_id}
-                  {submissionResult.record_count != null
-                    ? ` · ${submissionResult.record_count} record${submissionResult.record_count === 1 ? '' : 's'}`
-                    : ''}
-                </p>
-                {submissionResult.csv && (
-                  <button
-                    type="button"
-                    onClick={() => downloadSubmissionCsv(submissionResult, member?.member_key)}
-                    className="text-[11px] font-semibold text-[var(--brand-primary)] hover:underline"
-                  >
-                    Download CSV again
-                  </button>
-                )}
-              </div>
-            )}
-          </SectionCard>
+          {/* G-11: Direct EDI / Submit to Payer button shifted to V2-F09 */}
         </div>
 
         {/* Right rail — associations */}

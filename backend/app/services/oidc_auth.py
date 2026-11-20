@@ -27,10 +27,16 @@ ROLE_PRIORITY: List[str] = [
     Role.PLATFORM_ADMIN.value,
     Role.ADMIN.value,
     Role.BUSINESS_ADMIN.value,
+    Role.PAYER_EXECUTIVE.value,
     Role.SUPERVISOR.value,
     Role.COORDINATOR.value,
     Role.COMPLIANCE_AUDITOR.value,
+    Role.CLINICIAN.value,
+    Role.NURSE.value,
+    Role.CODER.value,
+    Role.BILLING.value,
     Role.ANALYST.value,
+    Role.PATIENT.value,
     Role.USER.value,
 ]
 
@@ -56,6 +62,29 @@ def _jwks_client(jwks_url: str) -> jwt.PyJWKClient:
     return jwt.PyJWKClient(jwks_url)
 
 
+_EXTENDED_12_ROLE_IDP_GROUP_MAP: Dict[str, str] = {
+    "Prominence_Platform_Admins": "platform_admin",
+    "Prominence_Administrators": "admin",
+    "Prominence_Business_Admins": "business_admin",
+    "Prominence_Payer_Executives": "payer_executive",
+    "Prominence_Clinical_Supervisors": "supervisor",
+    "Prominence_Care_Coordinators": "coordinator",
+    "Prominence_Compliance_Auditors": "compliance_auditor",
+    "Prominence_Clinicians": "clinician",
+    "Prominence_Nurses": "nurse",
+    "Prominence_Coders": "coder",
+    "Prominence_Billing_Specialists": "billing",
+    "Prominence_Members": "patient",
+    "Platform_Admins": "platform_admin",
+    "Payer_Executives": "payer_executive",
+    "Clinicians": "clinician",
+    "Nurses": "nurse",
+    "Coders": "coder",
+    "Billing_Specialists": "billing",
+    "Members": "patient",
+}
+
+
 def resolve_role_from_groups(groups: List[str]) -> Optional[str]:
     """Map IdP groups to the canonical application role.
 
@@ -66,18 +95,19 @@ def resolve_role_from_groups(groups: List[str]) -> Optional[str]:
         return None
 
     matched_roles: set[str] = set()
-    mapping = settings.IDP_GROUP_ROLE_MAPPING or {}
+    mapping = {**_EXTENDED_12_ROLE_IDP_GROUP_MAP, **(settings.IDP_GROUP_ROLE_MAPPING or {})}
 
     for group_raw in groups:
         group = group_raw.strip()
         # Direct lookup
         if group in mapping:
-            matched_roles.add(normalize_role(mapping[group]))
+            raw_mapped = mapping[group]
+            matched_roles.add(raw_mapped if raw_mapped in ROLE_PRIORITY else normalize_role(raw_mapped))
             continue
         # Case-insensitive lookup
         for map_key, map_role in mapping.items():
             if map_key.lower() == group.lower():
-                matched_roles.add(normalize_role(map_role))
+                matched_roles.add(map_role if map_role in ROLE_PRIORITY else normalize_role(map_role))
                 break
 
     if not matched_roles:
@@ -193,17 +223,31 @@ def validate_oidc_token(id_token: str, *, nonce: Optional[str] = None) -> Dict[s
         # e.g. mock_coordinator, mock_supervisor, mock_business_admin, mock_auditor, mock_unauthorized
         sub_type = code_part.replace("mock_", "").replace("demo_", "")
         email_map = {
+            "platform_admin": "platform.admin@prominencehealth.com",
             "coordinator": "coordinator@prominencehealth.com",
             "supervisor": "supervisor@prominencehealth.com",
             "business_admin": "business.admin@prominencehealth.com",
+            "payer_executive": "jessica.funiestas@prominencehealth.com",
             "compliance_auditor": "auditor@prominencehealth.com",
+            "clinician": "dr.chen@prominencehealth.com",
+            "nurse": "elena.nurse@prominencehealth.com",
+            "coder": "marcus.coder@prominencehealth.com",
+            "billing": "rachel.billing@prominencehealth.com",
+            "patient": "james.member@prominencehealth.com",
             "admin": "admin@prominencehealth.com",
         }
         groups_map = {
+            "platform_admin": ["Prominence_Platform_Admins"],
             "coordinator": ["Prominence_Care_Coordinators"],
             "supervisor": ["Prominence_Clinical_Supervisors"],
             "business_admin": ["Prominence_Business_Admins"],
+            "payer_executive": ["Prominence_Payer_Executives"],
             "compliance_auditor": ["Prominence_Compliance_Auditors"],
+            "clinician": ["Prominence_Clinicians"],
+            "nurse": ["Prominence_Nurses"],
+            "coder": ["Prominence_Coders"],
+            "billing": ["Prominence_Billing_Specialists"],
+            "patient": ["Prominence_Members"],
             "admin": ["Prominence_Administrators"],
             "unauthorized": ["Unknown_Guest_Group"],
         }

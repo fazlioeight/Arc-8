@@ -176,6 +176,8 @@ def _provider_to_summary(provider) -> CodingProviderSummary:
         tax_id=provider.tax_id,
         phone=provider.phone,
         email=provider.email,
+        member_count=int(getattr(provider, "member_count", 0) or 0),
+        open_gaps=int(getattr(provider, "open_gaps", 0) or 0),
     )
 
 

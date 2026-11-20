@@ -8,7 +8,7 @@ import { ROUTES } from '../../../constants/routes';
 import { fetchMember360CareOptions } from '../../../services/member360LabService';
 import { LabSubNav, Pagination, RiskBadge } from './components';
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 500;
 import FilterDropdown from '../../../components/ui/FilterDropdown';
 import KpiTile from '../../../components/ui/KpiTile';
 import SavedViewsBar from '../../../components/ui/SavedViewsBar';
