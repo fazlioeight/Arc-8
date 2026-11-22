@@ -32,7 +32,8 @@ class TenantRegistry:
         return lock
 
     def _cache_key(self, tenant_key: str) -> str:
-        return f"{_REDIS_CACHE_PREFIX}{tenant_key}"
+        env = (settings.ENVIRONMENT or "development").strip().lower()
+        return f"{_REDIS_CACHE_PREFIX}{env}:{tenant_key}"
 
     def _serialize(self, context: TenantContext) -> Dict[str, Any]:
         return {

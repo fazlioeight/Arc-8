@@ -11,6 +11,7 @@ Provides:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from collections import OrderedDict
@@ -29,11 +30,33 @@ from .config import settings
 THIRTY_DAYS_SECONDS: int = 30 * 24 * 60 * 60  # 2,592,000 seconds (FR-DAT-02)
 
 
-@lru_cache(maxsize=1)
+_redis_clients_by_loop: dict[int, "Redis"] = {}
+
+
 def get_redis_client() -> Optional["Redis"]:
     if not settings.redis_enabled or Redis is None:
         return None
-    return Redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+    try:
+        loop_id = id(asyncio.get_running_loop())
+    except RuntimeError:
+        loop_id = 0
+    client = _redis_clients_by_loop.get(loop_id)
+    if client is None:
+        client = Redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        if len(_redis_clients_by_loop) > 16:
+            _redis_clients_by_loop.clear()
+        _redis_clients_by_loop[loop_id] = client
+    return client
+
+
+def mask_redis_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    if "@" in url and "://" in url:
+        scheme, rest = url.split("://", 1)
+        _, host_part = rest.rsplit("@", 1)
+        return f"{scheme}://***@{host_part}"
+    return url
 
 
 def _json_default(obj: Any) -> Any:
@@ -200,6 +223,7 @@ class HotCacheManager:
         return {
             "enabled": self.enabled,
             "redis_configured": bool(settings.redis_enabled and Redis is not None),
+            "redis_endpoint": mask_redis_url(settings.REDIS_URL),
             "ttl_seconds": self.default_ttl,
             "ttl_days": round(self.default_ttl / 86400, 1),
             "memory_entries": len(self._mem_store),
@@ -209,6 +233,25 @@ class HotCacheManager:
             "invalidations": self._invalidations,
             "hit_rate": round(self._hits / total_lookups, 4) if total_lookups > 0 else 0.0,
         }
+
+    async def async_stats(self) -> dict[str, Any]:
+        base = self.stats()
+        client = get_redis_client()
+        if client is None:
+            base["redis_vps_online"] = False
+            return base
+        t0 = time.perf_counter()
+        try:
+            pong = await client.ping()
+            ping_ms = round((time.perf_counter() - t0) * 1000, 2)
+            db_keys = await client.dbsize()
+            base["redis_vps_online"] = bool(pong)
+            base["redis_vps_ping_ms"] = ping_ms
+            base["redis_vps_keys"] = int(db_keys)
+        except Exception as exc:
+            base["redis_vps_online"] = False
+            base["redis_vps_error"] = str(exc)
+        return base
 
 
 hot_cache = HotCacheManager()

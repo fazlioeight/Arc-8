@@ -136,8 +136,8 @@ async def get_cache_stats(
     tenant: TenantContext = Depends(get_tenant_context),
     current_user: AuthenticatedUser = Depends(get_current_user),
 ):
-    """FR-DAT-02: Inspect 30-Day Redis Hot Cache telemetry and hit rates."""
-    return {"tenant": tenant.key, **hot_cache.stats()}
+    """FR-DAT-02: Inspect 30-Day Redis Hot Cache telemetry, hit rates, and live Redis VPS status."""
+    return {"tenant": tenant.key, **(await hot_cache.async_stats())}
 
 
 @router.get("/dashboard", response_model=DashboardResponse)
