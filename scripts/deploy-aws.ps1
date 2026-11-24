@@ -124,10 +124,10 @@ if (-not $SkipBuild) {
 set -e
 mkdir -p ${RemoteDir}/frontend_builder
 tar -xzf ${RemoteDir}/frontend_src.tar.gz -C ${RemoteDir}/frontend_builder
-docker run --rm -v ${RemoteDir}/frontend_builder:/app -w /app -e CI=false -e REACT_APP_API_BASE="" -e REACT_APP_DEFAULT_TENANT="prominencehealth" node:20-alpine sh -c "if [ ! -d node_modules ]; then npm install --legacy-peer-deps --no-audit --no-fund; fi && npm run build"
+docker run --rm -v ${RemoteDir}/frontend_builder:/app -w /app -e CI=false -e REACT_APP_API_BASE="" -e REACT_APP_DEFAULT_TENANT="prominencehealth" node:20-alpine sh -c 'if [ ! -d node_modules ]; then npm install --legacy-peer-deps --no-audit --no-fund; fi && npm run build'
 tar -czf ${RemoteDir}/remote_built_frontend.tar.gz -C ${RemoteDir}/frontend_builder/build .
 "@ -replace "`r`n", "`n"
-    ssh -o StrictHostKeyChecking=no -i $SshKeyPath "${ServerUser}@${BuildHost}" $remoteBuildScript
+    $remoteBuildScript | ssh -o StrictHostKeyChecking=no -i $SshKeyPath "${ServerUser}@${BuildHost}" "bash -s"
     if ($LASTEXITCODE -ne 0) {
       throw "Remote frontend build on $BuildHost failed with exit code $LASTEXITCODE"
     }
