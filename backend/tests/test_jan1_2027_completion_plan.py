@@ -120,9 +120,9 @@ async def test_week1_g01_risk_score_unification_and_g02_qnxt_mpi_dedup(fastapi_a
         # Only 1 deduplicated MPI record for Carlos Mendoza
         carlos_rows = [m for m in items if m["first_name"] == "Carlos" and m["last_name"] == "Mendoza"]
         assert len(carlos_rows) == 1
-        # G-01: Both composite and clinical risk scores are on 0-100 scale (> 50, <= 100)
-        assert 50.0 <= carlos_rows[0]["risk_score_composite"] <= 100.0
-        assert 50.0 <= carlos_rows[0]["clinical_risk_score"] <= 100.0
+        # G-01: Both composite and clinical risk scores unify onto the 0.0-10.0 scale (> 5.0, <= 10.0)
+        assert 5.0 <= carlos_rows[0]["risk_score_composite"] <= 10.0
+        assert 5.0 <= carlos_rows[0]["clinical_risk_score"] <= 10.0
 
 
 async def test_week1_g03_live_admin_default_seeds(fastapi_app):

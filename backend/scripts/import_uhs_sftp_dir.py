@@ -130,7 +130,7 @@ async def run_batch(directory: Path) -> None:
                 )
                 await c_sess.commit()
 
-        # Enrich imported UHS members (MEM001001..MEM001050) with risk scores & insights for the UI
+        # Enrich imported UHS members (MEM001001..MEM001050) with 0.0-10.0 risk scores & plain-English insights
         uhs_members = (
             await session.execute(
                 select(Member360Member).where(Member360Member.member_key.like("MEM0010%"))
@@ -143,33 +143,72 @@ async def run_batch(directory: Path) -> None:
             "Review chronic condition care gaps (Diabetes / Hypertension)",
             "Follow up on recent specialist claim and copay accumulator",
         ]
+        insight_templates = [
+            ("Clinical", "Hypertensive readings trending up over last quarter", "Schedule BP recheck and medication review."),
+            ("Clinical", "Uncontrolled HbA1c with last result above goal", "Schedule diabetes follow-up within 2 weeks."),
+            ("Clinical", "Multiple chronic conditions requiring coordination", "Enroll in chronic condition management program."),
+            ("Clinical", "Recent ED visit indicating acute care risk", "Care manager outreach within 48 hours."),
+            ("Utilization", "PCP visit gap exceeds 12 months", "Outreach to schedule annual wellness visit."),
+            ("Utilization", "Frequent specialist visits without PCP coordination", "Care navigation referral."),
+            ("Cost", "Pharmacy spend trending up year-over-year", "Medication review for therapeutic alternatives."),
+            ("Engagement", "Low portal engagement and missed digital reminders", "Switch outreach channel to phone."),
+        ]
         for i, m in enumerate(uhs_members):
             tier = tiers[i % len(tiers)]
-            base_score = {"low": 24.5, "moderate": 48.0, "high": 74.5, "complex": 89.0}[tier]
-            m.risk_tier = tier
-            m.risk_score_composite = Decimal(f"{base_score + (i % 7):.2f}")
-            m.clinical_risk_score = Decimal(f"{base_score + 3.0:.2f}")
-            m.utilization_risk_score = Decimal(f"{base_score - 4.0:.2f}")
-            m.cost_risk_score = Decimal(f"{base_score + 1.5:.2f}")
-            m.engagement_risk_score = Decimal(f"{base_score - 2.0:.2f}")
+            base_score = {"low": 2.3, "moderate": 4.7, "high": 6.9, "complex": 8.8}[tier]
+            step = ((i // 4) % 5) * 0.1
+            clinical = round(min(9.8, base_score + 0.4 + step), 1)
+            utilization = round(max(1.0, base_score - 0.3 + step), 1)
+            cost = round(min(9.7, base_score + 0.2 + step), 1)
+            engagement = round(max(1.0, base_score - 0.5 + step), 1)
+            composite = round(0.35 * clinical + 0.25 * utilization + 0.25 * cost + 0.15 * engagement, 1)
+            if composite >= 8.0:
+                m.risk_tier = "complex"
+            elif composite >= 6.0:
+                m.risk_tier = "high"
+            elif composite >= 3.5:
+                m.risk_tier = "moderate"
+            else:
+                m.risk_tier = "low"
+            m.risk_score_composite = Decimal(f"{composite:.1f}")
+            m.clinical_risk_score = Decimal(f"{clinical:.1f}")
+            m.utilization_risk_score = Decimal(f"{utilization:.1f}")
+            m.cost_risk_score = Decimal(f"{cost:.1f}")
+            m.engagement_risk_score = Decimal(f"{engagement:.1f}")
             m.open_care_gaps = (i % 4) + 1
             m.next_best_action = actions[i % len(actions)]
             m.last_interaction_at = datetime(2026, 10, 15, 10, 30)
 
-            has_insight = await session.scalar(
-                select(Member360RiskInsight).where(Member360RiskInsight.member_id == m.id)
-            )
-            if not has_insight:
+            dom_label, driver_text, rec_text = insight_templates[i % len(insight_templates)]
+            dom_score = {
+                "Clinical": clinical,
+                "Utilization": utilization,
+                "Cost": cost,
+                "Engagement": engagement,
+            }.get(dom_label, clinical)
+            existing_insights = (
+                await session.execute(
+                    select(Member360RiskInsight).where(Member360RiskInsight.member_id == m.id)
+                )
+            ).scalars().all()
+            if not existing_insights:
                 session.add(
                     Member360RiskInsight(
                         member_id=m.id,
-                        domain="clinical",
-                        score=float(m.clinical_risk_score),
-                        driver="QNXT Claim & Rx Feed Analysis",
-                        recommendation=m.next_best_action,
+                        domain=dom_label,
+                        score=float(dom_score),
+                        driver=driver_text,
+                        recommendation=rec_text,
                         confidence=0.92,
                     )
                 )
+            else:
+                for ins in existing_insights:
+                    if not ins.driver or "qnxt" in ins.driver.lower() or "feed analysis" in ins.driver.lower():
+                        ins.domain = dom_label
+                        ins.driver = driver_text
+                        ins.recommendation = rec_text
+                        ins.score = float(dom_score)
         await session.commit()
 
     await engine.dispose()

@@ -9,16 +9,22 @@ import {
   fetchMember360Members,
   fetchMember360RiskInsights,
 } from '../../../services/member360LabService';
-import { LabSubNav, RiskBadge } from './components';
+import {
+  LabSubNav,
+  Pagination,
+  RiskBadge,
+  formatPlainEnglishDriver,
+  formatRiskDomainName,
+  normalizeScore0To10,
+} from './components';
+import FilterDropdown from '../../../components/ui/FilterDropdown';
+import KpiTile from '../../../components/ui/KpiTile';
 
 // Risk intelligence is an analytics page (tier distribution, domain averages,
 // driver rollups) rather than a row-by-row list, so it intentionally fetches
 // up to 500 members and 500 risk insights in one shot rather than paginating.
-// Real customer scale will want server-side rollup endpoints — until then we
-// surface the cap below as an honest footnote.
 const ANALYTICS_SAMPLE_SIZE = 500;
-import FilterDropdown from '../../../components/ui/FilterDropdown';
-import KpiTile from '../../../components/ui/KpiTile';
+const COHORT_PAGE_SIZE = 30;
 
 const TIER_ORDER = ['Critical', 'High', 'Moderate', 'Low'];
 const DOMAINS = ['Clinical', 'Utilization', 'Cost', 'Engagement'];
@@ -28,6 +34,13 @@ const TIER_BAR = {
   High: 'bg-amber-500',
   Moderate: 'bg-sky-500',
   Low: 'bg-emerald-500',
+};
+
+const DOMAIN_BAR = {
+  Clinical: 'bg-rose-500 dark:bg-rose-400',
+  Utilization: 'bg-amber-500 dark:bg-amber-400',
+  Cost: 'bg-sky-500 dark:bg-sky-400',
+  Engagement: 'bg-emerald-500 dark:bg-emerald-400',
 };
 
 const Member360LabRiskIntelligencePage = () => {
@@ -42,6 +55,11 @@ const Member360LabRiskIntelligencePage = () => {
   const [domain, setDomain] = useState(null);
   const [cohortTier, setCohortTier] = useState(null);
   const [cohortSearch, setCohortSearch] = useState('');
+  const [cohortPage, setCohortPage] = useState(1);
+
+  useEffect(() => {
+    setCohortPage(1);
+  }, [cohortTier, cohortSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,30 +93,52 @@ const Member360LabRiskIntelligencePage = () => {
   const domainAverages = useMemo(() => {
     return DOMAINS.map((d) => {
       const dKey = d.toLowerCase();
-      let scores = members.map((m) => Number(m[`${dKey}_risk_score`])).filter((v) => Number.isFinite(v) && v > 0);
+      let scores = members
+        .map((m) => normalizeScore0To10(m[`${dKey}_risk_score`]))
+        .filter((v) => v != null && v > 0);
       if (scores.length === 0) {
-        scores = insights.filter((i) => (i.domain || '').toLowerCase() === dKey).map((i) => Number(i.score)).filter((v) => Number.isFinite(v) && v > 0);
+        scores = insights
+          .filter((i) => formatRiskDomainName(i.domain).toLowerCase() === dKey)
+          .map((i) => normalizeScore0To10(i.score))
+          .filter((v) => v != null && v > 0);
       }
       const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-      const high = scores.filter((v) => v >= 1.5 || v >= 7).length;
-      return { domain: d, average: avg, high };
+      const high = scores.filter((v) => v >= 7.0).length;
+      const pct = Math.max(0, Math.min(avg * 10, 100));
+      return { domain: d, average: avg, high, pct };
     });
-  }, [members]);
+  }, [members, insights]);
 
   const driverRollup = useMemo(() => {
-    const filtered = !domain ? insights : insights.filter((i) => (i.domain || '').toLowerCase() === domain.toLowerCase());
+    const normalizedInsights = insights.map((i, idx) => ({
+      ...i,
+      domain: formatRiskDomainName(i.domain),
+      driver: formatPlainEnglishDriver(i.driver, i.id || idx),
+      score: normalizeScore0To10(i.score) ?? 0,
+    }));
+    const filtered = !domain
+      ? normalizedInsights
+      : normalizedInsights.filter((i) => i.domain.toLowerCase() === domain.toLowerCase());
     const map = new Map();
     filtered.forEach((i) => {
       const key = `${i.domain}|${i.driver}`;
-      const entry = map.get(key) || { domain: i.domain, driver: i.driver, recommendation: i.recommendation, members: [], total: 0, confidence: 0, confidenceCount: 0 };
+      const entry = map.get(key) || {
+        domain: i.domain,
+        driver: i.driver,
+        recommendation: i.recommendation,
+        members: [],
+        total: 0,
+        confidence: 0,
+        confidenceCount: 0,
+      };
       entry.members.push({
         id: i.member_id,
         name: i.member_name,
         member_key: i.member_key,
         risk_tier: i.risk_tier,
-        score: Number(i.score) || 0,
+        score: i.score,
       });
-      entry.total += Number(i.score) || 0;
+      entry.total += i.score;
       if (i.confidence != null) {
         entry.confidence += Number(i.confidence);
         entry.confidenceCount += 1;
@@ -115,13 +155,8 @@ const Member360LabRiskIntelligencePage = () => {
       .sort((a, b) => b.average_score - a.average_score);
   }, [insights, domain]);
 
-  const topMembers = useMemo(() => {
+  const filteredCohortMembers = useMemo(() => {
     let list = [...members];
-    if (cohortTier === 'Rising') {
-      list = list.filter((m) => m.risk_tier === 'Moderate' || m.risk_tier === 'High');
-    } else if (cohortTier) {
-      list = list.filter((m) => m.risk_tier === cohortTier);
-    }
     if (cohortSearch.trim()) {
       const q = cohortSearch.trim().toLowerCase();
       list = list.filter(
@@ -132,10 +167,31 @@ const Member360LabRiskIntelligencePage = () => {
           (m.next_best_action || '').toLowerCase().includes(q)
       );
     }
-    return list
-      .sort((a, b) => (b.risk_score_composite || 0) - (a.risk_score_composite || 0))
-      .slice(0, 20);
+    if (cohortTier === 'Rising') {
+      const highList = list
+        .filter((m) => m.risk_tier === 'High')
+        .sort((a, b) => (b.risk_score_composite || 0) - (a.risk_score_composite || 0));
+      const modList = list
+        .filter((m) => m.risk_tier === 'Moderate')
+        .sort((a, b) => (b.risk_score_composite || 0) - (a.risk_score_composite || 0));
+      const interleaved = [];
+      const maxLen = Math.max(highList.length, modList.length);
+      for (let idx = 0; idx < maxLen; idx += 1) {
+        if (idx < highList.length) interleaved.push(highList[idx]);
+        if (idx < modList.length) interleaved.push(modList[idx]);
+      }
+      return interleaved;
+    }
+    if (cohortTier) {
+      list = list.filter((m) => m.risk_tier === cohortTier);
+    }
+    return list.sort((a, b) => (b.risk_score_composite || 0) - (a.risk_score_composite || 0));
   }, [members, cohortTier, cohortSearch]);
+
+  const topMembers = useMemo(() => {
+    const startIdx = (cohortPage - 1) * COHORT_PAGE_SIZE;
+    return filteredCohortMembers.slice(startIdx, startIdx + COHORT_PAGE_SIZE);
+  }, [filteredCohortMembers, cohortPage]);
 
   const totalMembers = members.length || 1;
 
@@ -206,7 +262,7 @@ const Member360LabRiskIntelligencePage = () => {
             <section className="coding-surface rounded-2xl shadow-sm p-5">
               <header className="mb-3">
                 <h3 className="text-sm font-semibold coding-text-strong">Average score by domain</h3>
-                <p className="text-xs coding-text-soft">Where risk concentrates across the population.</p>
+                <p className="text-xs coding-text-soft">Where risk concentrates across the population (0.0–10.0 scale).</p>
               </header>
               <ul className="space-y-3">
                 {domainAverages.map((d) => (
@@ -216,7 +272,7 @@ const Member360LabRiskIntelligencePage = () => {
                       <span className="tabular-nums coding-text-muted">avg {d.average.toFixed(1)} · {d.high} ≥7</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-200/50 dark:bg-slate-700/40 overflow-hidden">
-                      <div className="h-full bg-[var(--brand-primary)]" style={{ width: `${Math.min(d.average * 10, 100)}%` }} />
+                      <div className={`h-full transition-all ${DOMAIN_BAR[d.domain] || 'bg-[var(--brand-primary)]'}`} style={{ width: `${d.pct}%` }} />
                     </div>
                   </li>
                 ))}
@@ -291,7 +347,9 @@ const Member360LabRiskIntelligencePage = () => {
             <header className="px-5 py-3 border-b coding-border flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold coding-text-strong">Highest composite risk & rising-risk cohorts</h3>
-                <p className="text-xs coding-text-soft">Top members ranked by composite score, filterable by stratification tier.</p>
+                <p className="text-xs coding-text-soft">
+                  Top members ranked by composite score ({filteredCohortMembers.length} matching member{filteredCohortMembers.length === 1 ? '' : 's'}).
+                </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -348,31 +406,45 @@ const Member360LabRiskIntelligencePage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {topMembers.map((m) => (
-                    <tr
-                      key={m.id}
-                      className="cursor-pointer border-b coding-border-subtle hover:bg-[var(--coding-hover)] transition"
-                      onClick={() => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${m.id}`)}
-                    >
-                      <td className="px-4 py-3">
-                        <p className="coding-text-strong font-medium">{m.first_name} {m.last_name}</p>
-                        <p className="text-[11px] coding-text-muted">{m.member_key}</p>
-                      </td>
-                      <td className="px-3 py-3"><RiskBadge tier={m.risk_tier} /></td>
-                      <td className="px-3 py-3 text-right tabular-nums coding-text-strong font-medium">{m.risk_score_composite != null ? Number(m.risk_score_composite).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{m.clinical_risk_score != null ? Number(m.clinical_risk_score).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{m.utilization_risk_score != null ? Number(m.utilization_risk_score).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{m.cost_risk_score != null ? Number(m.cost_risk_score).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{m.engagement_risk_score != null ? Number(m.engagement_risk_score).toFixed(1) : '—'}</td>
-                      <td className="px-3 py-3 text-xs coding-text-soft">{m.next_best_action || '—'}</td>
-                    </tr>
-                  ))}
+                  {topMembers.map((m) => {
+                    const comp = normalizeScore0To10(m.risk_score_composite);
+                    const clin = normalizeScore0To10(m.clinical_risk_score);
+                    const util = normalizeScore0To10(m.utilization_risk_score);
+                    const cost = normalizeScore0To10(m.cost_risk_score);
+                    const eng = normalizeScore0To10(m.engagement_risk_score);
+                    return (
+                      <tr
+                        key={m.id}
+                        className="cursor-pointer border-b coding-border-subtle hover:bg-[var(--coding-hover)] transition"
+                        onClick={() => navigate(`${ROUTES.MEMBER360_LAB.MEMBER_WORKSPACE_ROOT}/${m.id}`)}
+                      >
+                        <td className="px-4 py-3">
+                          <p className="coding-text-strong font-medium">{m.first_name} {m.last_name}</p>
+                          <p className="text-[11px] coding-text-muted">{m.member_key}</p>
+                        </td>
+                        <td className="px-3 py-3"><RiskBadge tier={m.risk_tier} /></td>
+                        <td className="px-3 py-3 text-right tabular-nums coding-text-strong font-medium">{comp != null ? comp.toFixed(1) : '—'}</td>
+                        <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{clin != null ? clin.toFixed(1) : '—'}</td>
+                        <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{util != null ? util.toFixed(1) : '—'}</td>
+                        <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{cost != null ? cost.toFixed(1) : '—'}</td>
+                        <td className="px-3 py-3 text-right tabular-nums coding-text-soft">{eng != null ? eng.toFixed(1) : '—'}</td>
+                        <td className="px-3 py-3 text-xs coding-text-soft">{m.next_best_action || '—'}</td>
+                      </tr>
+                    );
+                  })}
                   {topMembers.length === 0 && (
                     <tr><td colSpan={8} className="px-3 py-12 text-center text-sm coding-text-soft">No members loaded.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={cohortPage}
+              pageSize={COHORT_PAGE_SIZE}
+              total={filteredCohortMembers.length}
+              onPageChange={setCohortPage}
+              label="members"
+            />
           </section>
         </>
       )}

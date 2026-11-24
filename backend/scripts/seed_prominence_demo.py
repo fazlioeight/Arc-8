@@ -437,14 +437,14 @@ _LAB_DEFS: tuple[dict, ...] = (
 
 # Risk-insight templates. (domain, driver, recommendation)
 _RISK_INSIGHTS_TEMPLATES = (
-    ("clinical",    "Uncontrolled HbA1c with last result above goal",      "Schedule diabetes follow-up within 2 weeks."),
-    ("clinical",    "Recent ED visit indicating acute care risk",          "Care manager outreach within 48 hours."),
-    ("clinical",    "Hypertensive readings trending up over last quarter", "Schedule BP recheck and medication review."),
-    ("clinical",    "Multiple chronic conditions requiring coordination",  "Enroll in chronic condition management program."),
-    ("utilization", "PCP visit gap exceeds 12 months",                     "Outreach to schedule annual wellness visit."),
-    ("utilization", "Frequent specialist visits without PCP coordination", "Care navigation referral."),
-    ("cost",        "Pharmacy spend trending up year-over-year",           "Medication review for therapeutic alternatives."),
-    ("engagement",  "Low portal engagement and missed digital reminders",  "Switch outreach channel to phone."),
+    ("Clinical",    "Uncontrolled HbA1c with last result above goal",      "Schedule diabetes follow-up within 2 weeks."),
+    ("Clinical",    "Recent ED visit indicating acute care risk",          "Care manager outreach within 48 hours."),
+    ("Clinical",    "Hypertensive readings trending up over last quarter", "Schedule BP recheck and medication review."),
+    ("Clinical",    "Multiple chronic conditions requiring coordination",  "Enroll in chronic condition management program."),
+    ("Utilization", "PCP visit gap exceeds 12 months",                     "Outreach to schedule annual wellness visit."),
+    ("Utilization", "Frequent specialist visits without PCP coordination", "Care navigation referral."),
+    ("Cost",        "Pharmacy spend trending up year-over-year",           "Medication review for therapeutic alternatives."),
+    ("Engagement",  "Low portal engagement and missed digital reminders",  "Switch outreach channel to phone."),
 )
 
 
@@ -510,10 +510,26 @@ def _gen_member(rng: random.Random, seq: int) -> dict:
     plan = rng.choice(_PLAN_NAMES)
     lob = rng.choice(_LOB)
     risk_tier = rng.choice(_RISK_TIERS)
-    # Risk score correlates loosely with the tier so demo dashboards have
-    # internally consistent data.
-    base_score = {"low": 0.4, "rising": 0.9, "high": 1.6, "complex": 2.4}[risk_tier]
-    composite = round(base_score + rng.uniform(-0.15, 0.35), 2)
+    tier_band = {
+        "low": (1.2, 3.3),
+        "rising": (3.6, 5.8),
+        "moderate": (3.6, 5.8),
+        "high": (6.1, 7.8),
+        "complex": (8.1, 9.7),
+    }[risk_tier]
+    clinical = round(rng.uniform(*tier_band), 1)
+    utilization = round(rng.uniform(*tier_band), 1)
+    cost = round(rng.uniform(*tier_band), 1)
+    engagement = round(rng.uniform(max(1.0, tier_band[0] - 0.5), tier_band[1]), 1)
+    composite = round(0.35 * clinical + 0.25 * utilization + 0.25 * cost + 0.15 * engagement, 1)
+    if composite >= 8.0:
+        risk_tier = "complex"
+    elif composite >= 6.0:
+        risk_tier = "high"
+    elif composite >= 3.5:
+        risk_tier = "moderate"
+    else:
+        risk_tier = "low"
 
     return {
         "member_key": f"PROM-{seq:04d}",
@@ -532,12 +548,12 @@ def _gen_member(rng: random.Random, seq: int) -> dict:
         "preferred_language": rng.choice(_LANGUAGES),
         "preferred_channel": rng.choice(_CHANNELS),
         "primary_care_provider": rng.choice(_PCPS),
-        "risk_score_composite": Decimal(str(composite)),
+        "risk_score_composite": Decimal(f"{composite:.1f}"),
         "risk_tier": risk_tier,
-        "clinical_risk_score": Decimal(str(round(composite + rng.uniform(-0.2, 0.2), 2))),
-        "utilization_risk_score": Decimal(str(round(composite + rng.uniform(-0.2, 0.2), 2))),
-        "cost_risk_score": Decimal(str(round(composite + rng.uniform(-0.3, 0.3), 2))),
-        "engagement_risk_score": Decimal(str(round(rng.uniform(0.2, 1.5), 2))),
+        "clinical_risk_score": Decimal(f"{clinical:.1f}"),
+        "utilization_risk_score": Decimal(f"{utilization:.1f}"),
+        "cost_risk_score": Decimal(f"{cost:.1f}"),
+        "engagement_risk_score": Decimal(f"{engagement:.1f}"),
         "open_care_gaps": rng.randint(0, 4),
         "next_best_action": rng.choice((
             "Outreach for annual wellness visit",
@@ -677,22 +693,20 @@ def _gen_risk_insights_for_member(rng: random.Random, member: Member360Member) -
     rng.shuffle(pool)
     n = rng.randint(1, 3)
     for domain, driver, recommendation in pool[:n]:
-        # Score the insight using the member's risk for that domain, where
-        # available. Falls back to composite for the catch-all domain.
         domain_score = {
-            "clinical":   member.clinical_risk_score,
+            "clinical": member.clinical_risk_score,
             "utilization": member.utilization_risk_score,
-            "cost":        member.cost_risk_score,
-            "engagement":  member.engagement_risk_score,
-        }.get(domain) or member.risk_score_composite or 0
-        score = float(domain_score) + rng.uniform(-0.1, 0.1)
+            "cost": member.cost_risk_score,
+            "engagement": member.engagement_risk_score,
+        }.get(domain.lower()) or member.risk_score_composite or 5.0
+        score = round(min(10.0, max(0.5, float(domain_score))), 1)
         yield {
             "member_id": member.id,
-            "domain": domain,
-            "score": round(score, 2),
+            "domain": domain.title(),
+            "score": score,
             "driver": driver,
             "recommendation": recommendation,
-            "confidence": round(rng.uniform(0.55, 0.95), 2),
+            "confidence": round(rng.uniform(0.65, 0.95), 2),
         }
 
 
@@ -1698,8 +1712,10 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
 
             pcp_pool = list(_pcp_names())
             member_key_by_id: dict[int, str] = {}
+            member_by_id: dict[int, Member360Member] = {}
             for m in all_members:
                 member_key_by_id[m.id] = m.member_key or ""
+                member_by_id[m.id] = m
                 m.phone = _normalize_phone_display(m.phone, m.id)
                 m.preferred_channel = _normalize_preferred_channel(m.preferred_channel, m.id)
                 m.address_line1 = _clean_street_address(
@@ -1709,6 +1725,72 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
                     m.primary_care_provider = pcp_pool[(m.id - 1) % len(pcp_pool)]
                 else:
                     m.primary_care_provider = _normalize_provider_display_name(m.primary_care_provider)
+
+                # A8S-149, A8S-151, A8S-152, A8S-153, A8S-155:
+                # Normalize all 4 domain scores onto the 0.0-10.0 scale, compute
+                # composite strictly as the weighted average of the 4 domain scores
+                # (so min(domains) <= composite <= max(domains)), and assign risk_tier
+                # deterministically from composite with zero tier overlap.
+                if m.id == 1 or m.member_key == "PROM-0001":
+                    clinical, utilization, cost, engagement = 7.8, 7.3, 7.0, 3.8
+                else:
+                    r_rng = random.Random(RANDOM_SEED + (m.id or 1) * 79)
+                    raw_t = (m.risk_tier or "").strip().lower()
+                    if raw_t in ("critical", "complex"):
+                        band = (8.1, 9.7)
+                    elif raw_t == "high":
+                        band = (6.1, 7.8)
+                    elif raw_t in ("moderate", "rising", "medium"):
+                        band = (3.6, 5.8)
+                    else:
+                        band = (1.2, 3.3)
+                    clinical = round(r_rng.uniform(*band), 1)
+                    utilization = round(r_rng.uniform(*band), 1)
+                    cost = round(r_rng.uniform(*band), 1)
+                    engagement = round(r_rng.uniform(max(1.0, band[0] - 0.4), band[1]), 1)
+
+                composite = round(
+                    0.35 * clinical + 0.25 * utilization + 0.25 * cost + 0.15 * engagement,
+                    1,
+                )
+                if composite >= 8.0:
+                    m.risk_tier = "complex"
+                elif composite >= 6.0:
+                    m.risk_tier = "high"
+                elif composite >= 3.5:
+                    m.risk_tier = "moderate"
+                else:
+                    m.risk_tier = "low"
+
+                m.clinical_risk_score = Decimal(f"{clinical:.1f}")
+                m.utilization_risk_score = Decimal(f"{utilization:.1f}")
+                m.cost_risk_score = Decimal(f"{cost:.1f}")
+                m.engagement_risk_score = Decimal(f"{engagement:.1f}")
+                m.risk_score_composite = Decimal(f"{composite:.1f}")
+
+            # A8S-153, A8S-156, A8S-157: Normalize all Member360RiskInsight rows
+            all_insights = list((await session.execute(select(Member360RiskInsight))).scalars())
+            for idx, ins in enumerate(all_insights):
+                mem_obj = member_by_id.get(ins.member_id)
+                if not ins.driver or "qnxt" in ins.driver.lower() or "feed analysis" in ins.driver.lower():
+                    tpl_dom, tpl_drv, tpl_rec = _RISK_INSIGHTS_TEMPLATES[(ins.member_id + idx) % len(_RISK_INSIGHTS_TEMPLATES)]
+                    ins.domain = tpl_dom
+                    ins.driver = tpl_drv
+                    ins.recommendation = tpl_rec
+                else:
+                    ins.domain = (ins.domain or "Clinical").strip().title()
+
+                if mem_obj is not None:
+                    dom_key = (ins.domain or "Clinical").strip().lower()
+                    target_score = {
+                        "clinical": float(mem_obj.clinical_risk_score or 5.0),
+                        "utilization": float(mem_obj.utilization_risk_score or 5.0),
+                        "cost": float(mem_obj.cost_risk_score or 5.0),
+                        "engagement": float(mem_obj.engagement_risk_score or 5.0),
+                    }.get(dom_key, float(mem_obj.risk_score_composite or 5.0))
+                    ins.score = round(target_score, 1)
+                elif ins.score and ins.score > 10.0:
+                    ins.score = round(min(10.0, float(ins.score) / 10.0), 1)
 
             all_problems = list((await session.execute(select(Member360Problem))).scalars())
             for prob in all_problems:

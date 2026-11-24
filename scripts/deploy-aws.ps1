@@ -78,6 +78,12 @@ $BuildDir    = Join-Path $FrontendDir "build"
 
 if (-not $SkipBuild) {
   Write-Host "`n[2/5] Building production frontend bundle..." -ForegroundColor Yellow
+  $localDockerReady = $false
+  try {
+    docker info 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $localDockerReady = $true }
+  } catch {}
+
   if (Get-Command npm -ErrorAction SilentlyContinue) {
     Push-Location $FrontendDir
     $prevApiBase = $env:REACT_APP_API_BASE
@@ -89,13 +95,46 @@ if (-not $SkipBuild) {
       $env:REACT_APP_API_BASE = $prevApiBase
       Pop-Location
     }
-  } else {
-    Write-Host "  -> Local npm not found in PATH; building via Docker (node:20-alpine)..." -ForegroundColor DarkCyan
+    if ($LASTEXITCODE -ne 0) {
+      throw "Frontend build failed with exit code $LASTEXITCODE"
+    }
+  } elseif ($localDockerReady) {
+    Write-Host "  -> Local npm not found in PATH; building via local Docker (node:20-alpine)..." -ForegroundColor DarkCyan
     $dockerPath = $FrontendDir.Replace('\', '/')
     docker run --rm -v "${dockerPath}:/app" -w /app -e CI=false -e REACT_APP_API_BASE="" -e REACT_APP_DEFAULT_TENANT="prominencehealth" node:20-alpine npm run build
-  }
-  if ($LASTEXITCODE -ne 0) {
-    throw "Frontend build failed with exit code $LASTEXITCODE"
+    if ($LASTEXITCODE -ne 0) {
+      throw "Frontend build failed with exit code $LASTEXITCODE"
+    }
+  } else {
+    $BuildHost = $ServerHosts[0]
+    Write-Host "  -> Local Docker daemon not running; building frontend on AWS EC2 ($BuildHost) via node:20-alpine..." -ForegroundColor DarkCyan
+    $FrontendSrcTar = Join-Path $env:TEMP "arc8_frontend_src.tar.gz"
+    $RemoteBuiltTar = Join-Path $env:TEMP "arc8_remote_built_frontend.tar.gz"
+    if (Test-Path $FrontendSrcTar) { Remove-Item $FrontendSrcTar -Force }
+    if (Test-Path $RemoteBuiltTar) { Remove-Item $RemoteBuiltTar -Force }
+
+    tar -czf $FrontendSrcTar `
+      --exclude="node_modules" `
+      --exclude="build" `
+      --exclude=".git" `
+      -C $FrontendDir .
+
+    scp -o StrictHostKeyChecking=no -i $SshKeyPath $FrontendSrcTar "${ServerUser}@${BuildHost}:${RemoteDir}/frontend_src.tar.gz"
+    $remoteBuildScript = @"
+set -e
+mkdir -p ${RemoteDir}/frontend_builder
+tar -xzf ${RemoteDir}/frontend_src.tar.gz -C ${RemoteDir}/frontend_builder
+docker run --rm -v ${RemoteDir}/frontend_builder:/app -w /app -e CI=false -e REACT_APP_API_BASE="" -e REACT_APP_DEFAULT_TENANT="prominencehealth" node:20-alpine sh -c "if [ ! -d node_modules ]; then npm install --legacy-peer-deps --no-audit --no-fund; fi && npm run build"
+tar -czf ${RemoteDir}/remote_built_frontend.tar.gz -C ${RemoteDir}/frontend_builder/build .
+"@ -replace "`r`n", "`n"
+    ssh -o StrictHostKeyChecking=no -i $SshKeyPath "${ServerUser}@${BuildHost}" $remoteBuildScript
+    if ($LASTEXITCODE -ne 0) {
+      throw "Remote frontend build on $BuildHost failed with exit code $LASTEXITCODE"
+    }
+    scp -o StrictHostKeyChecking=no -i $SshKeyPath "${ServerUser}@${BuildHost}:${RemoteDir}/remote_built_frontend.tar.gz" $RemoteBuiltTar
+    if (!(Test-Path $BuildDir)) { New-Item -ItemType Directory -Path $BuildDir | Out-Null }
+    Get-ChildItem -Path $BuildDir -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+    tar -xzf $RemoteBuiltTar -C $BuildDir
   }
   Write-Host "  -> Frontend build completed." -ForegroundColor Green
 } else {
