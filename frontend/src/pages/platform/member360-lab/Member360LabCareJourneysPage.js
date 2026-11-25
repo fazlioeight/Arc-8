@@ -6,6 +6,7 @@ import { LoadingState, ErrorState } from '../../../components/ehr/Primitives';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import {
+  addMember360CareJourneyStage,
   fetchMember360CareJourneys,
   fetchMember360JourneyTemplates,
   updateMember360CareJourney,
@@ -68,6 +69,15 @@ const Member360LabCareJourneysPage = () => {
       console.error('Failed to update stage status:', err);
       setActionMessage(`Could not update stage: ${err.message || err}`);
     }
+  }, [token, tenant]);
+
+  const handleAddStage = useCallback(async (journey, stagePayload) => {
+    const updatedJourney = await addMember360CareJourneyStage(token, tenant, journey.id, stagePayload);
+    setJourneys((prev) =>
+      prev.map((item) => (item.id === journey.id ? { ...item, ...(updatedJourney || {}) } : item))
+    );
+    setActionMessage(`Added stage "${stagePayload.name}" to "${journey.name}".`);
+    setTimeout(() => setActionMessage(null), 4000);
   }, [token, tenant]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -291,6 +301,7 @@ const Member360LabCareJourneysPage = () => {
                         journey={j}
                         onStageTransition={handleStageTransition}
                         onJourneyTransition={handleJourneyTransition}
+                        onAddStage={handleAddStage}
                       />
                     </div>
                   ))}
@@ -298,7 +309,7 @@ const Member360LabCareJourneysPage = () => {
                     <p className="text-sm coding-text-soft col-span-full text-center py-8">No journeys match the current filters.</p>
                   )}
                 </div>
-                <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} label="journeys" />
+                <Pagination page={page} pageSize={PAGE_SIZE} total={filteredJourneys.length} onPageChange={setPage} label="journeys" />
               </section>
             </div>
           </div>

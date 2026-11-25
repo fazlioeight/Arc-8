@@ -324,10 +324,14 @@ const DEFAULT_IN_NETWORK_PROVIDERS = [
 
 const COORDINATOR_NAME_MAP = {
   'care.team@prominencehealth.com': 'Sarah Chen, RN',
+  'sarah.chen@prominencehealth.com': 'Sarah Chen, RN',
   'coordinator@prominencehealth.com': 'Hannah Abbott, CCM',
+  'hannah.abbott@prominencehealth.com': 'Hannah Abbott, CCM',
   'elena.nurse@prominencehealth.com': 'Elena Rostova, RN',
+  'elena.rostova@prominencehealth.com': 'Elena Rostova, RN',
   'dr.chen@prominencehealth.com': 'Sarah Chen, RN',
   'supervisor@prominencehealth.com': 'Marcus Vance, MSW',
+  'marcus.vance@prominencehealth.com': 'Marcus Vance, MSW',
 };
 
 const FALLBACK_COORDINATORS = [
@@ -336,6 +340,24 @@ const FALLBACK_COORDINATORS = [
   'Hannah Abbott, CCM',
   'Marcus Vance, MSW',
 ];
+
+function resolveCoordinatorName(raw, memberId) {
+  if (raw && String(raw).trim()) {
+    const clean = String(raw).trim();
+    const mapped = COORDINATOR_NAME_MAP[clean.toLowerCase()];
+    if (mapped) return mapped;
+    if (clean.includes('@')) {
+      const local = clean.split('@')[0];
+      const parts = local
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase());
+      if (parts.length > 0) return `${parts.join(' ')}, RN`;
+    }
+    if (!clean.includes('@')) return clean;
+  }
+  return FALLBACK_COORDINATORS[(Number(memberId) || 0) % FALLBACK_COORDINATORS.length];
+}
 
 function normalizeProviderDisplayName(raw) {
   if (!raw || typeof raw !== 'string') return raw;
@@ -362,16 +384,6 @@ function canonicalPersonKey(raw) {
     .filter(Boolean)
     .sort()
     .join(' ');
-}
-
-function resolveCoordinatorName(raw, memberId) {
-  if (raw && String(raw).trim()) {
-    const clean = String(raw).trim();
-    const mapped = COORDINATOR_NAME_MAP[clean.toLowerCase()];
-    if (mapped) return mapped;
-    if (!clean.includes('@')) return clean;
-  }
-  return FALLBACK_COORDINATORS[(Number(memberId) || 0) % FALLBACK_COORDINATORS.length];
 }
 
 function validateUsPhone(v) {
@@ -1579,85 +1591,284 @@ function Bar({ v }) {
   );
 }
 
-export function CareJourneyCard({ journey, onStageTransition, onJourneyTransition }) {
+export function CareJourneyCard({ journey, onStageTransition, onJourneyTransition, onAddStage }) {
+  const [addingStage, setAddingStage] = React.useState(false);
+  const [newStageName, setNewStageName] = React.useState('');
+  const [newStageDesc, setNewStageDesc] = React.useState('');
+  const [stageBusy, setStageBusy] = React.useState(false);
+  const [cardWarning, setCardWarning] = React.useState(null);
+
   if (!journey) return null;
-  const completed = journey.stages?.filter((s) => s.status === 'completed').length || 0;
-  const total = journey.stages?.length || 0;
+  const sortedStages = [...(journey.stages || [])].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+  const completed = sortedStages.filter((s) => s.status === 'completed').length;
+  const total = sortedStages.length;
   const pct = total ? (completed / total) * 100 : 0;
   const journeyOpen = journey.status === 'active' || journey.status === 'paused';
+  const hasUnfinishedStages = sortedStages.some((s) => s.status !== 'completed' && s.status !== 'skipped');
+  const nextActiveStage = sortedStages.find((s) => s.status === 'in_progress' || s.status === 'pending');
+  const coordinatorLabel = resolveCoordinatorName(journey.assigned_to, journey.member_id);
+  const openTasksCount = journey.open_task_count ?? 0;
+
+  const handleCompleteJourneyClick = () => {
+    if (hasUnfinishedStages) {
+      const remaining = sortedStages
+        .filter((s) => s.status !== 'completed' && s.status !== 'skipped')
+        .map((s) => s.name)
+        .join(', ');
+      setCardWarning(
+        `Cannot mark journey complete while stages are still unfinished (${remaining}). Complete all stages in order first.`
+      );
+      return;
+    }
+    setCardWarning(null);
+    onJourneyTransition?.(journey, 'completed');
+  };
+
+  const handleAddStageSubmit = async (e) => {
+    e.preventDefault();
+    if (!newStageName.trim() || !onAddStage) return;
+    setStageBusy(true);
+    setCardWarning(null);
+    try {
+      await onAddStage(journey, {
+        name: newStageName.trim(),
+        description: newStageDesc.trim() || null,
+      });
+      setNewStageName('');
+      setNewStageDesc('');
+      setAddingStage(false);
+    } catch (err) {
+      setCardWarning(err.message || String(err));
+    } finally {
+      setStageBusy(false);
+    }
+  };
+
   return (
-    <div className="coding-surface-subtle rounded-lg p-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="coding-surface-subtle rounded-lg p-3.5 space-y-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
           <p className="text-sm font-semibold coding-text-strong">{journey.name}</p>
-          <p className="text-[10px] uppercase tracking-wider coding-text-muted">{journey.template_name || journey.source || 'Journey'}</p>
+          <p className="text-[10px] uppercase tracking-wider coding-text-muted">
+            {journey.template_name || journey.source || 'Care Pathway'}
+          </p>
         </div>
-        <span className="text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 ring-1 ring-black/5 dark:ring-white/10 coding-surface coding-text-strong">{journey.status}</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="inline-flex items-center rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-200 px-2 py-0.5 text-[10px] font-semibold">
+            {openTasksCount} open task{openTasksCount === 1 ? '' : 's'}
+          </span>
+          <span className="text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 ring-1 ring-black/5 dark:ring-white/10 coding-surface coding-text-strong">
+            {journey.status}
+          </span>
+        </div>
       </div>
+
+      {/* A8S-186: Assigned Coordinator, Target Date, Goal & Next Step */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs rounded-md bg-white/60 dark:bg-slate-900/40 px-2.5 py-2 ring-1 ring-black/5 dark:ring-white/10">
+        <div>
+          <span className="text-[10px] uppercase tracking-wider coding-text-muted block">Assigned Coordinator</span>
+          <span className="font-semibold coding-text-strong">{coordinatorLabel}</span>
+        </div>
+        <div>
+          <span className="text-[10px] uppercase tracking-wider coding-text-muted block">Target Completion</span>
+          <span className="font-semibold coding-text-strong">
+            {journey.target_completion_date || 'Ongoing'}{' '}
+            {journey.start_date ? <span className="text-[11px] font-normal coding-text-soft">(Started {journey.start_date})</span> : null}
+          </span>
+        </div>
+        <div className="sm:col-span-2">
+          <span className="text-[10px] uppercase tracking-wider coding-text-muted block">Goal & Next Step</span>
+          <p className="coding-text-strong text-xs">
+            {journey.description || 'Coordinate clinical pathway stages and close open care gaps.'}
+          </p>
+          {nextActiveStage && (
+            <p className="text-[11px] text-sky-700 dark:text-sky-300 font-medium mt-0.5">
+              Next step: Stage {nextActiveStage.sequence || 1} — {nextActiveStage.name}
+            </p>
+          )}
+        </div>
+      </div>
+
       <div className="h-1.5 w-full rounded-full bg-slate-200/60 dark:bg-slate-700/40 overflow-hidden">
-        <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
+        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
       </div>
+
+      {cardWarning && (
+        <div
+          role="alert"
+          className="rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700/50 text-amber-900 dark:text-amber-200 px-2.5 py-1.5 text-xs flex items-center justify-between gap-2"
+        >
+          <span>⚠️ {cardWarning}</span>
+          <button type="button" onClick={() => setCardWarning(null)} className="text-xs font-bold">
+            ✕
+          </button>
+        </div>
+      )}
+
       <ol className="space-y-1">
-        {(journey.stages || []).map((s) => (
-          <li key={s.id} className="flex items-center justify-between text-xs px-2 py-1 rounded">
-            <span className="flex items-center gap-2 min-w-0">
-              <span className={joinClass(
-                'inline-block h-2 w-2 rounded-full shrink-0',
-                s.status === 'completed' ? 'bg-emerald-500' :
-                s.status === 'in_progress' ? 'bg-amber-500' :
-                s.status === 'skipped' ? 'bg-slate-400 dark:bg-slate-500' :
-                'bg-slate-300 dark:bg-slate-600'
-              )} />
-              <span className="coding-text-strong truncate">{s.name}</span>
-            </span>
-            <span className="flex items-center gap-1.5 shrink-0">
-              {s.status === 'pending' && (
-                <button
-                  type="button"
-                  onClick={() => onStageTransition?.(journey, s, 'in_progress')}
-                  className="rounded-md bg-white dark:bg-slate-800 coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-1.5 py-0.5 hover:opacity-80"
-                >Start</button>
-              )}
-              {s.status === 'in_progress' && (
-                <button
-                  type="button"
-                  onClick={() => onStageTransition?.(journey, s, 'completed')}
-                  className="rounded-md bg-emerald-600 text-white px-1.5 py-0.5 hover:opacity-90"
-                >Complete</button>
-              )}
-              {s.status === 'completed' && (
-                <button
-                  type="button"
-                  onClick={() => onStageTransition?.(journey, s, 'in_progress')}
-                  className="rounded-md coding-surface coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-1.5 py-0.5 hover:opacity-80"
-                >Reopen</button>
-              )}
-              <span className="coding-text-muted capitalize">{s.status?.replace('_', ' ')}</span>
-            </span>
+        {sortedStages.map((s, idx) => {
+          const prevIncomplete = sortedStages
+            .slice(0, idx)
+            .some((prev) => prev.status !== 'completed' && prev.status !== 'skipped');
+          return (
+            <li key={s.id} className="flex items-center justify-between text-xs px-2 py-1 rounded hover:bg-black/[0.02] dark:hover:bg-white/[0.02]">
+              <span className="flex items-center gap-2 min-w-0">
+                <span
+                  className={joinClass(
+                    'inline-block h-2 w-2 rounded-full shrink-0',
+                    s.status === 'completed'
+                      ? 'bg-emerald-500'
+                      : s.status === 'in_progress'
+                      ? 'bg-amber-500'
+                      : s.status === 'skipped'
+                      ? 'bg-slate-400 dark:bg-slate-500'
+                      : 'bg-slate-300 dark:bg-slate-600'
+                  )}
+                />
+                <span className="coding-text-strong truncate">{s.name}</span>
+              </span>
+              <span className="flex items-center gap-1.5 shrink-0">
+                {s.status === 'pending' && (
+                  <button
+                    type="button"
+                    disabled={prevIncomplete}
+                    title={prevIncomplete ? 'Complete previous stage(s) in order first' : 'Start stage'}
+                    onClick={() => {
+                      if (prevIncomplete) {
+                        setCardWarning('Stages must be completed in order. Please complete earlier stages first.');
+                        return;
+                      }
+                      setCardWarning(null);
+                      onStageTransition?.(journey, s, 'in_progress');
+                    }}
+                    className={joinClass(
+                      'rounded-md bg-white dark:bg-slate-800 coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-1.5 py-0.5',
+                      prevIncomplete ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-80'
+                    )}
+                  >
+                    Start
+                  </button>
+                )}
+                {s.status === 'in_progress' && (
+                  <button
+                    type="button"
+                    disabled={prevIncomplete}
+                    title={prevIncomplete ? 'Complete previous stage(s) in order first' : 'Complete stage'}
+                    onClick={() => {
+                      if (prevIncomplete) {
+                        setCardWarning('Stages must be completed in order. Please complete earlier stages first.');
+                        return;
+                      }
+                      setCardWarning(null);
+                      onStageTransition?.(journey, s, 'completed');
+                    }}
+                    className={joinClass(
+                      'rounded-md bg-emerald-600 text-white px-1.5 py-0.5',
+                      prevIncomplete ? 'opacity-40 cursor-not-allowed' : 'hover:opacity-90'
+                    )}
+                  >
+                    Complete
+                  </button>
+                )}
+                {s.status === 'completed' && (
+                  <button
+                    type="button"
+                    onClick={() => onStageTransition?.(journey, s, 'in_progress')}
+                    className="rounded-md coding-surface coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-1.5 py-0.5 hover:opacity-80"
+                  >
+                    Reopen
+                  </button>
+                )}
+                <span className="coding-text-muted capitalize">{s.status?.replace('_', ' ')}</span>
+              </span>
+            </li>
+          );
+        })}
+        {sortedStages.length === 0 && (
+          <li className="text-xs coding-text-soft italic px-2 py-1">
+            No stages added yet — click &ldquo;+ Add stage&rdquo; below to add a custom stage.
           </li>
-        ))}
+        )}
       </ol>
+
+      {/* A8S-190: Inline Custom Stage Addition Form */}
+      {addingStage && (
+        <form onSubmit={handleAddStageSubmit} className="rounded-lg coding-surface p-2.5 space-y-2 ring-1 coding-border text-xs">
+          <p className="font-semibold coding-text-strong">Add custom stage to journey</p>
+          <input
+            type="text"
+            value={newStageName}
+            onChange={(e) => setNewStageName(e.target.value)}
+            placeholder="Stage name (e.g., 14-Day Clinical Follow-Up Check) *"
+            className="coding-input w-full rounded-md px-2.5 py-1.5 text-xs"
+            required
+          />
+          <input
+            type="text"
+            value={newStageDesc}
+            onChange={(e) => setNewStageDesc(e.target.value)}
+            placeholder="Stage goal / description (optional)"
+            className="coding-input w-full rounded-md px-2.5 py-1.5 text-xs"
+          />
+          <div className="flex justify-end gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setAddingStage(false);
+                setNewStageName('');
+                setNewStageDesc('');
+              }}
+              className="rounded-md ring-1 coding-border coding-text-strong px-2.5 py-1 text-xs font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={stageBusy}
+              className="rounded-md bg-[var(--brand-primary)] text-white px-3 py-1 text-xs font-semibold disabled:opacity-50"
+            >
+              {stageBusy ? 'Adding…' : 'Save stage'}
+            </button>
+          </div>
+        </form>
+      )}
+
       {journeyOpen && (
-        <div className="flex flex-wrap gap-1.5 pt-1 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+          {onAddStage && !addingStage && (
+            <button
+              type="button"
+              onClick={() => setAddingStage(true)}
+              className="rounded-md coding-surface coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-2 py-1 font-semibold hover:opacity-80"
+            >
+              + Add stage
+            </button>
+          )}
           {journey.status === 'active' && (
             <button
               type="button"
               onClick={() => onJourneyTransition?.(journey, 'paused')}
               className="rounded-md coding-surface coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-2 py-1 hover:opacity-80"
-            >Pause</button>
+            >
+              Pause
+            </button>
           )}
           {journey.status === 'paused' && (
             <button
               type="button"
               onClick={() => onJourneyTransition?.(journey, 'active')}
               className="rounded-md coding-surface coding-text-strong ring-1 ring-black/5 dark:ring-white/10 px-2 py-1 hover:opacity-80"
-            >Resume</button>
+            >
+              Resume
+            </button>
           )}
           <button
             type="button"
-            onClick={() => onJourneyTransition?.(journey, 'completed')}
+            onClick={handleCompleteJourneyClick}
             className="rounded-md bg-emerald-600 text-white px-2 py-1 hover:opacity-90"
-          >Mark journey complete</button>
+          >
+            Mark journey complete
+          </button>
         </div>
       )}
     </div>

@@ -93,7 +93,9 @@ const SECTIONS = [
       item.name,
       item.domain,
       Number(item.weight ?? 0).toFixed(2),
-      item.threshold ?? '-',
+      item.threshold != null
+        ? Number(item.threshold > 10 ? item.threshold / 10 : item.threshold).toFixed(1)
+        : '-',
       item.is_active ? 'Yes' : 'No',
     ],
     fields: [

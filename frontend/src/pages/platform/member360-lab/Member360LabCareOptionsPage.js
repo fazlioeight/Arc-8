@@ -66,7 +66,11 @@ const Member360LabCareOptionsPage = () => {
     fetchMember360CareOptions(token, tenant, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE })
       .then((res) => {
         if (cancelled) return;
-        setRows(res.items || []);
+        const normalized = (res.items || []).map((o) => ({
+          ...o,
+          status: o.status === 'steered' ? 'accepted' : o.status,
+        }));
+        setRows(normalized);
         setTotal(res.total || 0);
         setError(null);
       })
@@ -265,7 +269,7 @@ const Member360LabCareOptionsPage = () => {
               </tbody>
             </table>
           </div>
-          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} label="care options" />
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} label="care options" />
         </section>
       )}
     </PortalPageLayout>

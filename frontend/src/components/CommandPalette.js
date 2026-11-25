@@ -7,6 +7,7 @@ import { useUserPreferences } from '../context/UserPreferencesContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { ROUTES } from '../constants/routes';
 import { getCurrentData } from '../services/planPerformanceService';
+import { filterManualArticlesLocally } from '../services/docsService';
 import { resolveApiBase } from '../utils/apiBase';
 
 const CATEGORY_ORDER = ['Favorites', 'Records', 'Providers', 'Knowledge', 'Navigation', 'Workspace', 'Tenant', 'Data', 'Actions', 'Admin', 'Support'];
@@ -433,6 +434,21 @@ const CommandPalette = ({ onThemeToggle }) => {
           }
         } catch (_) {}
       }
+
+      // 3. Search HIPAA Role-Scoped System User Manual Articles
+      const matchingManuals = filterManualArticlesLocally({
+        query: term,
+        role: currentRole || 'coordinator',
+      });
+      matchingManuals.slice(0, 4).forEach((art) => {
+        dynamicResults.push({
+          id: `search-manual-${art.id}`,
+          label: `User Manual: ${art.title}`,
+          category: 'Knowledge',
+          keywords: `${art.title} ${art.summary || ''} ${(art.tags || []).join(' ')} manual docs hipaa`,
+          action: () => navigate(`${ROUTES.DOCS}?q=${encodeURIComponent(term)}`),
+        });
+      });
 
       if (!cancelled) {
         setSearchCommands(dynamicResults);

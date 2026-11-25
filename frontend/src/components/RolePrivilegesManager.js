@@ -814,7 +814,7 @@ const RolePrivilegesManager = ({ initialTab = "user_allotment" }) => {
               >
                 <option value="all">All Roles</option>
                 {ROLE_DEFINITIONS.map((r) => (
-                  <option key={r.key} value={r.key}>{r.name.split(" / ")[0]}</option>
+                  <option key={r.key} value={r.key}>{r.name}</option>
                 ))}
               </select>
 
@@ -897,7 +897,7 @@ const RolePrivilegesManager = ({ initialTab = "user_allotment" }) => {
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${getRoleBadgeClasses(u.role)}`}>
                           <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                          {currentRoleDef.name.split(" / ")[0]}
+                          {currentRoleDef.name}
                         </span>
                       </td>
 

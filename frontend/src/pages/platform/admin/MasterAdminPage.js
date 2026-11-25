@@ -735,19 +735,19 @@ const filteredUsers = useMemo(() => {
                         onChange={(e) => handleFieldChange("role", e.target.value)}
                         className={INPUT}
                       >
-                        {isPlatformAdmin && <option value="platform_admin">Platform Administrator</option>}
                         <option value="admin">System Administrator</option>
                         <option value="business_admin">Business Administrator</option>
                         <option value="payer_executive">Medicare Advantage & Payer Executive</option>
-                        <option value="supervisor">Clinical / Ops Supervisor</option>
+                        <option value="supervisor">Clinical Supervisor</option>
                         <option value="coordinator">Care Coordinator</option>
                         <option value="compliance_auditor">Compliance Auditor</option>
-                        <option value="clinician">Clinician / Physician (MD/DO)</option>
-                        <option value="nurse">Care Coordinator / Nurse (RN)</option>
+                        <option value="clinician">Clinician (MD/DO)</option>
+                        <option value="nurse">Nurse (RN)</option>
                         <option value="coder">Risk Adjustment Coder (CPC/CRC)</option>
                         <option value="billing">Billing & Capitation Specialist</option>
-                        <option value="patient">Member / Patient</option>
-                        <option value="user">General Staff User</option>
+                        <option value="analyst">Analyst</option>
+                        <option value="patient">Patient</option>
+                        {isPlatformAdmin && <option value="platform_admin">Platform Administrator</option>}
                       </select>
                     </label>
 

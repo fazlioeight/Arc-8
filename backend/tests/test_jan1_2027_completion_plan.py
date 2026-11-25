@@ -265,10 +265,46 @@ async def test_week1_g10_calibrated_raf_target_and_g14_docs_manual(fastapi_app):
         assert raf_resp.status_code == 200
         assert raf_resp.json()["target"] == pytest.approx(1.25, abs=0.01)
 
-        # G-14: Docs Library has published manual articles + downloadable PDF
+        # G-14: Docs Library has published manual articles + role-based HIPAA scoping + downloadable PDF
+        # 1. user@example.com has role="analyst" -> mapped to "coder" (sees 4 role-scoped manual chapters)
         docs_resp = await client.get("/api/docs/articles", headers=headers)
         assert docs_resp.status_code == 200
-        assert docs_resp.json()["total"] >= 3
+        docs_body = docs_resp.json()
+        assert docs_body["total"] == 4
+        assert docs_body["active_role"] == "coder"
+        assert docs_body["hipaa_compliant"] is True
+        assert docs_body["audit_logged"] is True
+
+        # 2. Admin sees all 9 system manual chapters
+        admin_docs_resp = await client.get("/api/docs/articles", headers=_admin_headers())
+        assert admin_docs_resp.status_code == 200
+        admin_docs_body = admin_docs_resp.json()
+        assert admin_docs_body["total"] >= 9
+
+        # 3. Role-based filtering: previewing as 'patient' returns only 3 patient-permitted chapters
+        patient_docs_resp = await client.get(
+            "/api/docs/articles",
+            params={"role": "patient"},
+            headers=_admin_headers(),
+        )
+        assert patient_docs_resp.status_code == 200
+        patient_body = patient_docs_resp.json()
+        assert 1 <= patient_body["total"] < admin_docs_body["total"]
+        assert all("patient" in art["allowed_roles"] for art in patient_body["articles"])
+
+        # 4. HIPAA Zero-PHI Guardrail blocks SSNs in article creation
+        bad_phi_resp = await client.post(
+            "/api/docs/articles",
+            json={
+                "title": "Test SSN Leak",
+                "summary": "Contains unmasked SSN 123-45-6789",
+                "content": "Should be rejected by HIPAA guardrail",
+                "app_key": "member360",
+            },
+            headers=_admin_headers(),
+        )
+        assert bad_phi_resp.status_code == 400
+
         pdf_resp = await client.get("/api/docs/manual.pdf", headers=headers)
         assert pdf_resp.status_code == 200
         assert pdf_resp.headers["content-type"].startswith("application/pdf")

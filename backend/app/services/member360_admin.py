@@ -92,7 +92,7 @@ DEFAULT_RISK_RULES: tuple[dict, ...] = (
         "name": "Uncontrolled Diabetes & Renal Progression (HbA1c > 9.0% / CKD 3b+)",
         "domain": "Clinical",
         "weight": 1.45,
-        "threshold": 75.0,
+        "threshold": 7.5,
         "description": "Flags members with poorly controlled diabetes, elevated HbA1c, or declining eGFR requiring intensive clinical management.",
         "recommendation_template": "Enroll in Complex Diabetes & CKD Journey and order HbA1c + uACR lab panel.",
         "is_active": True,
@@ -101,7 +101,7 @@ DEFAULT_RISK_RULES: tuple[dict, ...] = (
         "name": "Frequent ED Utilization & 30-Day Inpatient Readmission Risk",
         "domain": "Utilization",
         "weight": 1.35,
-        "threshold": 70.0,
+        "threshold": 7.0,
         "description": "Triggers when a member has >= 2 emergency department visits or an acute inpatient discharge within the trailing 90 days.",
         "recommendation_template": "Initiate 48-hour Transitions of Care outreach and steer to Tier-1 urgent care / PCP.",
         "is_active": True,
@@ -110,7 +110,7 @@ DEFAULT_RISK_RULES: tuple[dict, ...] = (
         "name": "High-Cost Out-of-Network & Specialty Pharmacy Spend",
         "domain": "Cost",
         "weight": 1.20,
-        "threshold": 65.0,
+        "threshold": 6.5,
         "description": "Identifies members with high out-of-network claims or high-cost specialty referrals eligible for in-network steerage.",
         "recommendation_template": "Generate in-network Tier-1 Care Option recommendation to capture steerage savings.",
         "is_active": True,
@@ -119,7 +119,7 @@ DEFAULT_RISK_RULES: tuple[dict, ...] = (
         "name": "Medication Non-Adherence (0 Refills Remaining / PDC < 80%) & Care Gap Delay",
         "domain": "Engagement",
         "weight": 1.15,
-        "threshold": 60.0,
+        "threshold": 6.0,
         "description": "Flags members with 0 refills remaining on chronic maintenance medications or no PCP contact in > 180 days.",
         "recommendation_template": "Perform coordinator outreach to convert to 90-day mail-order refill and schedule PCP visit.",
         "is_active": True,
@@ -243,6 +243,12 @@ async def ensure_default_admin_seed(session: AsyncSession) -> dict[str, int]:
         for item in DEFAULT_RISK_RULES:
             session.add(Member360RiskRule(**item))
             seeded["risk_rules"] += 1
+    else:
+        existing_rules = (await session.execute(select(Member360RiskRule))).scalars().all()
+        for r in existing_rules:
+            if r.threshold is not None and float(r.threshold) > 10.0:
+                r.threshold = round(float(r.threshold) / 10.0, 1)
+                seeded["risk_rules"] += 1
 
     queue_count = await session.scalar(select(func.count(Member360TaskQueue.id))) or 0
     if queue_count == 0:

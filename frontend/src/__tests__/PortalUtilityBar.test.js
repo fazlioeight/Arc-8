@@ -85,3 +85,20 @@ test('notifications dropdown is right-aligned and shows the heading', async () =
   // Notifications dropdown uses right-0 utility class for right alignment
   expect(container.querySelector('.right-0')).toBeTruthy();
 });
+
+test('top-right User Manual search box opens /docs?q=<term> in a separate window', async () => {
+  const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+  renderBar();
+  const user = userEvent.setup();
+
+  const searchInput = await screen.findByLabelText('Search User Manual');
+  await user.type(searchInput, 'MEAT{enter}');
+
+  expect(openSpy).toHaveBeenCalledWith(
+    '/docs?q=MEAT',
+    '_blank',
+    'noopener,noreferrer'
+  );
+  openSpy.mockRestore();
+});
+

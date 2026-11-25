@@ -261,8 +261,10 @@ _ICD10_REFERENCE_MAP: dict[str, tuple[str, str, str]] = {
     "J45.909": ("J45.909", "Unspecified asthma, uncomplicated", "moderate"),
     "E669": ("E66.9", "Obesity, unspecified", "moderate"),
     "E66.9": ("E66.9", "Obesity, unspecified", "moderate"),
-    "M545": ("M54.5", "Low back pain", "mild"),
-    "M54.5": ("M54.5", "Low back pain", "mild"),
+    "M545": ("M54.50", "Low back pain, unspecified", "mild"),
+    "M54.5": ("M54.50", "Low back pain, unspecified", "mild"),
+    "M5450": ("M54.50", "Low back pain, unspecified", "mild"),
+    "M54.50": ("M54.50", "Low back pain, unspecified", "mild"),
     "Z0000": ("Z00.00", "General adult medical examination", "mild"),
     "Z00.00": ("Z00.00", "General adult medical examination", "mild"),
 }
@@ -280,11 +282,36 @@ _PREFERRED_CHANNEL_MAP: dict[str, str] = {
 
 _CARE_COORDINATOR_DIRECTORY: dict[str, str] = {
     "care.team@prominencehealth.com": "Sarah Chen, RN",
+    "sarah.chen@prominencehealth.com": "Sarah Chen, RN",
     "coordinator@prominencehealth.com": "Hannah Abbott, CCM",
+    "hannah.abbott@prominencehealth.com": "Hannah Abbott, CCM",
     "elena.nurse@prominencehealth.com": "Elena Rostova, RN",
+    "elena.rostova@prominencehealth.com": "Elena Rostova, RN",
     "dr.chen@prominencehealth.com": "Sarah Chen, RN",
     "supervisor@prominencehealth.com": "Marcus Vance, MSW",
+    "marcus.vance@prominencehealth.com": "Marcus Vance, MSW",
 }
+
+_CANONICAL_TASK_QUEUE_MAP: dict[str, str] = {
+    "care_management": "RN Complex Care & Transitions of Care Queue",
+    "rn": "RN Complex Care & Transitions of Care Queue",
+    "clinical": "RN Complex Care & Transitions of Care Queue",
+    "outreach": "Care Coordinator Outreach & Gap Closure Queue",
+    "coding": "Care Coordinator Outreach & Gap Closure Queue",
+    "care_coordinator": "Care Coordinator Outreach & Gap Closure Queue",
+    "pharmacy": "Pharmacy & Prior Authorization (Abarca PBM) Queue",
+    "pbm": "Pharmacy & Prior Authorization (Abarca PBM) Queue",
+    "prior_auth": "Pharmacy & Prior Authorization (Abarca PBM) Queue",
+    "supervisor_escalation": "Clinical Supervisor Escalation Queue",
+    "supervisor": "Clinical Supervisor Escalation Queue",
+}
+
+
+def _normalize_task_queue(raw_queue: Optional[str]) -> str:
+    if not raw_queue or not str(raw_queue).strip():
+        return "RN Complex Care & Transitions of Care Queue"
+    clean = str(raw_queue).strip()
+    return _CANONICAL_TASK_QUEUE_MAP.get(clean.lower(), clean)
 
 _DEFAULT_CARE_COORDINATORS: tuple[str, ...] = (
     "Sarah Chen, RN",
@@ -399,6 +426,15 @@ def _normalize_coordinator_name(raw_assignee: Optional[str], member_id: Optional
         mapped = _CARE_COORDINATOR_DIRECTORY.get(clean.lower())
         if mapped:
             return mapped
+        if "@" in clean:
+            local = clean.split("@", 1)[0]
+            for coord in _DEFAULT_CARE_COORDINATORS:
+                base_tokens = [t.lower() for t in re.sub(r",.*$", "", coord).split()]
+                if all(tok in local.lower() for tok in base_tokens):
+                    return coord
+            parts = [p.capitalize() for p in re.split(r"[._\-]+", local) if p]
+            if parts:
+                return f"{' '.join(parts)}, RN"
         if "@" not in clean:
             return clean
     return _DEFAULT_CARE_COORDINATORS[(member_id or 0) % len(_DEFAULT_CARE_COORDINATORS)]
@@ -654,6 +690,8 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
     task_counts = await _open_task_counts(session, [member.id])
     journey_counts = await _active_journey_counts(session, [member.id])
     summary = _summarize_member(member, task_counts, journey_counts)
+    computed_gaps = _missing_hcc_for_member(member, member.risk_insights, member.problems)
+    summary["open_care_gaps"] = len(computed_gaps)
 
     detail = {
         **summary,
@@ -739,7 +777,7 @@ async def get_member_detail(session: AsyncSession, member_id: int) -> Optional[d
                 "potential_savings": float(opt.potential_savings) if opt.potential_savings is not None else None,
                 "rationale": opt.rationale,
                 "member_facing_explanation": opt.member_facing_explanation,
-                "status": opt.status,
+                "status": "accepted" if (opt.status or "").lower() == "steered" else opt.status,
                 "created_at": adjusted_created,
                 "updated_at": _utc_dt(opt.updated_at),
             }
@@ -1031,7 +1069,7 @@ def _task_to_dict(task: Member360Task, member: Optional[Member360Member] = None)
         "title": task.title,
         "description": task.description,
         "assigned_user": assigned_user,
-        "assigned_queue": task.assigned_queue,
+        "assigned_queue": _normalize_task_queue(task.assigned_queue),
         "priority": task.priority,
         "status": task.status,
         "due_date": task.due_date,
@@ -1532,6 +1570,31 @@ async def create_care_journey(
             )
         await session.flush()
 
+    created_task_count = 0
+    if template and template.default_tasks:
+        assigned_coord = _normalize_coordinator_name(journey.assigned_to, journey.member_id)
+        base_start = journey.start_date or date.today()
+        for t_idx, t_def in enumerate(template.default_tasks):
+            if not isinstance(t_def, dict) or not t_def.get("title"):
+                continue
+            session.add(
+                Member360Task(
+                    member_id=journey.member_id,
+                    journey_id=journey.id,
+                    title=str(t_def["title"]),
+                    description=t_def.get("description") or f"Default task for {journey.name}",
+                    priority=str(t_def.get("priority") or "medium").lower(),
+                    status="open",
+                    assigned_user=assigned_coord,
+                    assigned_queue="RN Complex Care & Transitions of Care Queue",
+                    due_date=base_start + timedelta(days=7 * (t_idx + 1)),
+                    recommended_next_action=str(t_def["title"]),
+                    auto_generated_reason=f"Auto-created from template: {template.name}",
+                )
+            )
+            created_task_count += 1
+        await session.flush()
+
     journey = await session.scalar(
         select(Member360CareJourney)
         .where(Member360CareJourney.id == journey.id)
@@ -1545,7 +1608,7 @@ async def create_care_journey(
         "status": journey.status,
         "template_name": journey.template_name,
         "source": journey.source,
-        "assigned_to": journey.assigned_to,
+        "assigned_to": _normalize_coordinator_name(journey.assigned_to, journey.member_id),
         "created_by": journey.created_by,
         "start_date": journey.start_date,
         "target_completion_date": journey.target_completion_date,
@@ -1558,9 +1621,9 @@ async def create_care_journey(
                 "status": s.status,
                 "completed_at": s.completed_at,
             }
-            for s in journey.stages
+            for s in sorted(journey.stages, key=lambda x: x.sequence)
         ],
-        "open_task_count": 0,
+        "open_task_count": created_task_count,
     }
 
 
@@ -1598,48 +1661,87 @@ _GAP_SCORE_THRESHOLD = 6.0
 
 _CLINICAL_HEDIS_HCC_CATALOG: tuple[dict, ...] = (
     {
-        "hcc_code": "HCC 37 (HEDIS GSD)",
+        "hcc_code": "HCC 38 (HEDIS GSD)",
         "icd10_candidates": ["E11.65", "E11.9"],
-        "reason": "HEDIS Glycemic Status Assessment (GSD): Type 2 Diabetes with Hyperglycemia (HbA1c > 9.0%)",
+        "reason": "HEDIS Glycemic Status Assessment (GSD): Type 2 Diabetes requiring quarterly HbA1c < 8.0% control documentation",
         "recommendation": "Order quarterly HbA1c panel and schedule endocrinology / PCP medication titration.",
         "keywords": ("diabet", "a1c", "hba1c", "glycem", "e11", "insulin", "glucose"),
     },
     {
-        "hcc_code": "HCC 326 (HEDIS KED)",
-        "icd10_candidates": ["N18.30", "N18.4"],
-        "reason": "HEDIS Kidney Health Evaluation (KED): Chronic Kidney Disease Stage 3b/4 without Annual eGFR & uACR",
+        "hcc_code": "HCC 329 (HEDIS KED)",
+        "icd10_candidates": ["N18.30", "N18.3"],
+        "reason": "HEDIS Kidney Health Evaluation (KED): Chronic Kidney Disease Stage 3 without annual eGFR and uACR lab panel",
         "recommendation": "Complete annual eGFR and urine albumin-creatinine ratio (uACR) lab order and nephrology review.",
-        "keywords": ("kidney", "ckd", "renal", "egfr", "n18", "nephro"),
+        "keywords": ("n18.3", "n183", "stage 3", "kidney", "ckd", "renal", "egfr", "nephro"),
     },
     {
-        "hcc_code": "HCC 222 (HEDIS CBP)",
-        "icd10_candidates": ["I50.32", "I10"],
-        "reason": "HEDIS Controlling High Blood Pressure (CBP): Chronic Diastolic Heart Failure & Uncontrolled Hypertension",
+        "hcc_code": "HCC 328 (HEDIS KED)",
+        "icd10_candidates": ["N18.4"],
+        "reason": "HEDIS Kidney Health Evaluation (KED): Chronic Kidney Disease Stage 4 requiring annual eGFR/uACR and nephrology co-management",
+        "recommendation": "Complete annual eGFR and urine albumin-creatinine ratio (uACR) lab order and nephrology review.",
+        "keywords": ("n18.4", "n184", "stage 4"),
+    },
+    {
+        "hcc_code": "HCC 226 (HEDIS HF)",
+        "icd10_candidates": ["I50.32", "I50.9"],
+        "reason": "Heart Failure Guideline-Directed Medical Therapy (GDMT): Post-discharge cardiology reconciliation and beta-blocker/ACEi adherence gap",
         "recommendation": "Perform post-discharge cardiology reconciliation and verify GDMT beta-blocker/ACEi adherence.",
-        "keywords": ("heart", "chf", "cardiac", "hypertens", "bp", "blood pressure", "i50", "i10", "ed visit", "readmission"),
+        "keywords": ("heart failure", "chf", "i50", "diastolic", "systolic"),
+    },
+    {
+        "hcc_code": "HEDIS CBP",
+        "icd10_candidates": ["I10"],
+        "reason": "HEDIS Controlling High Blood Pressure (CBP): Essential hypertension requiring documented blood pressure reading < 140/90 mmHg",
+        "recommendation": "Schedule blood pressure recheck and antihypertensive medication adherence review with PCP.",
+        "keywords": ("hypertens", "blood pressure", "bp recheck", "i10"),
     },
     {
         "hcc_code": "HCC 280 (HEDIS PCE)",
         "icd10_candidates": ["J44.1", "J44.9"],
-        "reason": "HEDIS Pharmacotherapy Management of COPD Exacerbation (PCE): Bronchodilator & Corticosteroid Gap",
+        "reason": "HEDIS Pharmacotherapy Management of COPD Exacerbation (PCE): Bronchodilator and systemic corticosteroid follow-up gap",
         "recommendation": "Verify systemic corticosteroid within 14 days and maintenance bronchodilator within 30 days.",
-        "keywords": ("copd", "pulmon", "asthma", "respirat", "inhaler", "j44", "j45"),
+        "keywords": ("copd", "obstructive pulmonary", "j44"),
     },
     {
         "hcc_code": "HCC 155 (HEDIS DRR-E)",
         "icd10_candidates": ["F33.2", "F32.9"],
-        "reason": "HEDIS Depression Remission or Response (DRR-E): Major Depressive Disorder Follow-Up PHQ-9 Missing",
+        "reason": "HEDIS Depression Remission or Response (DRR-E): Major Depressive Disorder follow-up PHQ-9 assessment overdue",
         "recommendation": "Conduct behavioral health outreach and administer follow-up PHQ-9 screening.",
-        "keywords": ("depress", "mental", "phq", "behav", "f32", "f33", "psych"),
+        "keywords": ("depress", "phq", "f32", "f33"),
     },
     {
-        "hcc_code": "HCC 263 (HEDIS SPC)",
+        "hcc_code": "HEDIS SPC",
         "icd10_candidates": ["I25.10", "E78.5"],
-        "reason": "HEDIS Statin Therapy for Patients with Cardiovascular Disease (SPC): High-Intensity Statin Adherence Gap",
+        "reason": "HEDIS Statin Therapy for Patients with Cardiovascular Disease (SPC): High-intensity statin adherence gap (PDC < 80%)",
         "recommendation": "Convert to 90-day mail-order statin prescription via Abarca PBM to close PDC >= 80% gap.",
-        "keywords": ("statin", "coronary", "cad", "lipid", "cholesterol", "i25", "e78", "refill", "adherence"),
+        "keywords": ("statin", "coronary", "atherosclero", "hyperlipid", "i25", "e78"),
+    },
+    {
+        "hcc_code": "HEDIS AMR",
+        "icd10_candidates": ["J45.909"],
+        "reason": "HEDIS Asthma Medication Ratio (AMR): Controller-to-total asthma medication ratio review required",
+        "recommendation": "Verify inhaled corticosteroid controller refill adherence and asthma action plan.",
+        "keywords": ("asthma", "j45"),
     },
 )
+
+_PROBLEM_CODE_TO_GAP_MAP: dict[str, dict] = {
+    "E11.65": _CLINICAL_HEDIS_HCC_CATALOG[0],
+    "E11.9": _CLINICAL_HEDIS_HCC_CATALOG[0],
+    "N18.30": _CLINICAL_HEDIS_HCC_CATALOG[1],
+    "N18.3": _CLINICAL_HEDIS_HCC_CATALOG[1],
+    "N18.4": _CLINICAL_HEDIS_HCC_CATALOG[2],
+    "I50.32": _CLINICAL_HEDIS_HCC_CATALOG[3],
+    "I50.9": _CLINICAL_HEDIS_HCC_CATALOG[3],
+    "I10": _CLINICAL_HEDIS_HCC_CATALOG[4],
+    "J44.1": _CLINICAL_HEDIS_HCC_CATALOG[5],
+    "J44.9": _CLINICAL_HEDIS_HCC_CATALOG[5],
+    "F33.2": _CLINICAL_HEDIS_HCC_CATALOG[6],
+    "F32.9": _CLINICAL_HEDIS_HCC_CATALOG[6],
+    "I25.10": _CLINICAL_HEDIS_HCC_CATALOG[7],
+    "E78.5": _CLINICAL_HEDIS_HCC_CATALOG[7],
+    "J45.909": _CLINICAL_HEDIS_HCC_CATALOG[8],
+}
 
 
 def _match_hedis_catalog_entry(text: Optional[str], fallback_index: int) -> dict:
@@ -1665,78 +1767,78 @@ def _missing_hcc_for_member(
     insights: Iterable[Member360RiskInsight],
     problems: Optional[Iterable[Member360Problem]] = None,
 ) -> list[dict]:
-    qualifying = _qualifying_insights(insights)
+    """A8S-178, A8S-179, A8S-180, A8S-181: Derive open care gaps strictly from the
+    member's actual diagnosed conditions (or explicit clinical insights when no
+    problems are recorded), with accurate CMS-HCC v28 numbers, valid ICD-10-CM
+    candidates that match each measure, matching clinical measure reasons, and
+    strict deduplication so no gap appears twice."""
     problem_list = list(problems or getattr(member, "problems", []) or [])
     items: list[dict] = []
     used_codes: set[str] = set()
+    base_score = (
+        normalize_risk_score_0_100(member.clinical_risk_score, member_key=member.member_key)
+        or normalize_risk_score_0_100(member.risk_score_composite, member_key=member.member_key)
+        or 75.0
+    )
 
-    for idx, insight in enumerate(qualifying):
-        matched = _match_hedis_catalog_entry(
-            f"{insight.driver or ''} {insight.recommendation or ''} {insight.domain or ''}",
-            (member.id or 0) + idx,
-        )
+    for p in problem_list:
+        if (p.status or "active").lower() not in ("active", "chronic", "open"):
+            continue
+        formatted_icd = _format_icd10_code(p.code)
+        matched = _PROBLEM_CODE_TO_GAP_MAP.get(formatted_icd)
+        if not matched:
+            hay = f"{formatted_icd} {p.description or ''}".lower()
+            for entry in _CLINICAL_HEDIS_HCC_CATALOG:
+                if any(kw in hay for kw in entry["keywords"]):
+                    matched = entry
+                    break
+        if not matched:
+            continue
         hcc_code = matched["hcc_code"]
         if hcc_code in used_codes:
-            matched = _CLINICAL_HEDIS_HCC_CATALOG[((member.id or 0) + idx + 1) % len(_CLINICAL_HEDIS_HCC_CATALOG)]
-            hcc_code = matched["hcc_code"]
+            continue
         used_codes.add(hcc_code)
-
-        driver_text = (insight.driver or "").strip()
-        if not driver_text or driver_text.lower().startswith("open care gap"):
-            reason = matched["reason"]
-        elif "hedis" not in driver_text.lower():
-            reason = f"{matched['reason'].split(':')[0]}: {driver_text}"
+        # Ensure candidate ICD-10 codes strictly belong to this measure
+        measure_icds = list(matched["icd10_candidates"])
+        if formatted_icd in measure_icds:
+            ordered_icds = [formatted_icd] + [c for c in measure_icds if c != formatted_icd]
         else:
-            reason = driver_text
-
+            ordered_icds = measure_icds
         items.append(
             {
                 "hcc_code": hcc_code,
-                "icd10_candidates": list(matched["icd10_candidates"]),
-                "reason": reason,
-                "recommendation": insight.recommendation or matched["recommendation"],
-                "domain": insight.domain or "Clinical",
-                "score": normalize_risk_score_0_100(insight.score, member_key=member.member_key, is_insight_domain=True),
-                "confidence": float(insight.confidence) if insight.confidence is not None else 0.92,
+                "icd10_candidates": ordered_icds,
+                "reason": matched["reason"],
+                "recommendation": matched["recommendation"],
+                "domain": "Clinical",
+                "score": base_score,
+                "confidence": 0.92,
             }
         )
 
-    for p in problem_list:
-        if len(items) >= max(member.open_care_gaps or 0, len(items)):
-            break
-        matched = _match_hedis_catalog_entry(f"{p.code or ''} {p.description or ''}", len(items))
-        if matched["hcc_code"] in used_codes:
-            continue
-        used_codes.add(matched["hcc_code"])
-        formatted_icd = _format_icd10_code(p.code)
-        icds = [formatted_icd] if formatted_icd else list(matched["icd10_candidates"])
-        items.append(
-            {
-                "hcc_code": matched["hcc_code"],
-                "icd10_candidates": icds,
-                "reason": matched["reason"],
-                "recommendation": member.next_best_action or matched["recommendation"],
-                "domain": "Clinical",
-                "score": normalize_risk_score_0_100(member.clinical_risk_score, member_key=member.member_key) or 78.0,
-                "confidence": 0.90,
-            }
-        )
+    if not items and not problem_list:
+        for insight in _qualifying_insights(insights):
+            hay = f"{insight.driver or ''} {insight.recommendation or ''}".lower()
+            matched = None
+            for entry in _CLINICAL_HEDIS_HCC_CATALOG:
+                if any(kw in hay for kw in entry["keywords"]):
+                    matched = entry
+                    break
+            if not matched or matched["hcc_code"] in used_codes:
+                continue
+            used_codes.add(matched["hcc_code"])
+            items.append(
+                {
+                    "hcc_code": matched["hcc_code"],
+                    "icd10_candidates": list(matched["icd10_candidates"]),
+                    "reason": matched["reason"],
+                    "recommendation": matched["recommendation"],
+                    "domain": "Clinical",
+                    "score": normalize_risk_score_0_100(insight.score, member_key=member.member_key, is_insight_domain=True) or base_score,
+                    "confidence": float(insight.confidence) if insight.confidence is not None else 0.90,
+                }
+            )
 
-    desired = max(member.open_care_gaps or 0, len(items))
-    while len(items) < desired:
-        idx = len(items)
-        matched = _CLINICAL_HEDIS_HCC_CATALOG[((member.id or 0) + idx) % len(_CLINICAL_HEDIS_HCC_CATALOG)]
-        items.append(
-            {
-                "hcc_code": matched["hcc_code"],
-                "icd10_candidates": list(matched["icd10_candidates"]),
-                "reason": matched["reason"],
-                "recommendation": member.next_best_action or matched["recommendation"],
-                "domain": "Clinical",
-                "score": normalize_risk_score_0_100(member.risk_score_composite, member_key=member.member_key) or 72.0,
-                "confidence": 0.88,
-            }
-        )
     return items
 
 
@@ -2083,7 +2185,7 @@ async def list_care_options_all(
             "potential_savings": float(o.potential_savings) if o.potential_savings is not None else None,
             "rationale": o.rationale,
             "member_facing_explanation": o.member_facing_explanation,
-            "status": o.status,
+            "status": "accepted" if (o.status or "").lower() == "steered" else o.status,
             "created_at": _utc_dt(o.created_at),
             "updated_at": _utc_dt(o.updated_at),
             **_member_ref(member),
@@ -2165,7 +2267,7 @@ async def list_care_journeys_all(
             "status": j.status,
             "template_name": j.template_name,
             "source": j.source,
-            "assigned_to": j.assigned_to,
+            "assigned_to": _normalize_coordinator_name(j.assigned_to, j.member_id),
             "created_by": j.created_by,
             "start_date": j.start_date,
             "target_completion_date": j.target_completion_date,
@@ -2178,7 +2280,7 @@ async def list_care_journeys_all(
                     "status": s.status,
                     "completed_at": s.completed_at,
                 }
-                for s in j.stages
+                for s in sorted(j.stages, key=lambda x: x.sequence)
             ],
             "open_task_count": open_task_by_journey.get(j.id, 0),
             **_member_ref(member),
@@ -2631,7 +2733,7 @@ def _serialize_journey(journey: Member360CareJourney, open_task_count: int = 0) 
         "status": journey.status,
         "template_name": journey.template_name,
         "source": journey.source,
-        "assigned_to": journey.assigned_to,
+        "assigned_to": _normalize_coordinator_name(journey.assigned_to, journey.member_id),
         "created_by": journey.created_by,
         "start_date": journey.start_date,
         "target_completion_date": journey.target_completion_date,
@@ -2650,6 +2752,16 @@ def _serialize_journey(journey: Member360CareJourney, open_task_count: int = 0) 
     }
 
 
+async def _journey_open_task_count(session: AsyncSession, journey_id: int) -> int:
+    cnt = await session.scalar(
+        select(func.count(Member360Task.id)).where(
+            Member360Task.journey_id == journey_id,
+            Member360Task.status.in_(["open", "in_progress", "waiting"]),
+        )
+    )
+    return int(cnt or 0)
+
+
 async def update_care_journey(
     session: AsyncSession, journey_id: int, payload: dict
 ) -> Optional[dict]:
@@ -2660,6 +2772,17 @@ async def update_care_journey(
     )
     if not journey:
         return None
+    if payload.get("status") == "completed":
+        unfinished = [
+            s.name
+            for s in sorted(journey.stages, key=lambda x: x.sequence)
+            if s.status not in ("completed", "skipped")
+        ]
+        if unfinished:
+            raise ValueError(
+                f"Cannot mark journey complete while stages are still unfinished ({', '.join(unfinished)}). "
+                "Please complete all stages first."
+            )
     for field in _JOURNEY_UPDATE_FIELDS:
         if field in payload and payload[field] is not None:
             if field == "status" and payload[field] not in _VALID_JOURNEY_STATUS:
@@ -2669,7 +2792,8 @@ async def update_care_journey(
                 )
             setattr(journey, field, payload[field])
     await session.flush()
-    return _serialize_journey(journey)
+    open_cnt = await _journey_open_task_count(session, journey.id)
+    return _serialize_journey(journey, open_cnt)
 
 
 async def add_care_journey_stage(
@@ -2713,7 +2837,8 @@ async def add_care_journey_stage(
     # SQLAlchemy already considers loaded, so selectinload won't refresh it.
     journey.stages.append(stage)
     await session.flush()
-    return _serialize_journey(journey)
+    open_cnt = await _journey_open_task_count(session, journey.id)
+    return _serialize_journey(journey, open_cnt)
 
 
 async def update_care_journey_stage(
@@ -2737,6 +2862,21 @@ async def update_care_journey_stage(
                 f"Invalid stage status {new_status!r}; "
                 f"expected one of {sorted(_VALID_STAGE_STATUS)}"
             )
+        if new_status in ("in_progress", "completed"):
+            all_stages = (
+                await session.execute(
+                    select(Member360CareJourneyStage)
+                    .where(Member360CareJourneyStage.journey_id == journey_id)
+                    .order_by(Member360CareJourneyStage.sequence.asc(), Member360CareJourneyStage.id.asc())
+                )
+            ).scalars().all()
+            for earlier in all_stages:
+                if earlier.id == stage.id:
+                    break
+                if earlier.status not in ("completed", "skipped"):
+                    raise ValueError(
+                        f"Stages must be completed in order. Please complete '{earlier.name}' before starting or completing '{stage.name}'."
+                    )
         # Stamp/clear completed_at to match the new state. Completed stages
         # carry a timestamp so timeline + reporting can show "completed on X".
         if new_status == "completed" and stage.status != "completed":
@@ -2756,7 +2896,8 @@ async def update_care_journey_stage(
         .where(Member360CareJourney.id == journey_id)
         .options(selectinload(Member360CareJourney.stages))
     )
-    return _serialize_journey(journey) if journey else None
+    open_cnt = await _journey_open_task_count(session, journey_id)
+    return _serialize_journey(journey, open_cnt) if journey else None
 
 
 # ---------- Outreach delivery ---------------------------------------------

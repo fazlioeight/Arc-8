@@ -1,12 +1,21 @@
 import React from "react";
 import { ChartTabHeader, ChartTable, ChartChip } from "./chartPrimitives";
 
-const HCC_CODE_PREFIXES = [
-  "E10", "E11", "E13", "I10", "I11", "I12", "I13", "I20", "I21", "I25",
-  "I42", "I48", "I50", "I63", "I69", "I70", "I73", "J43", "J44", "J45",
-  "N18", "F20", "F31", "F32", "F33", "C", "G20", "G30", "G35", "K70", "K74",
-  "M05", "M06",
-];
+const CMS_V28_PAYMENT_HCCS = {
+  "E11.9": "HCC 38",
+  "E11.65": "HCC 38",
+  "N18.30": "HCC 329",
+  "N18.3": "HCC 329",
+  "N18.4": "HCC 328",
+  "N18.5": "HCC 326",
+  "N18.6": "HCC 326",
+  "I50.9": "HCC 226",
+  "I50.32": "HCC 226",
+  "J44.9": "HCC 280",
+  "J44.1": "HCC 280",
+  "F32.9": "HCC 155",
+  "F33.2": "HCC 155",
+};
 
 const ICD10_REFERENCE_LOOKUP = {
   I10: { code: "I10", description: "Essential (primary) hypertension", severity: "moderate" },
@@ -28,6 +37,24 @@ const ICD10_REFERENCE_LOOKUP = {
   "J44.9": { code: "J44.9", description: "Chronic obstructive pulmonary disease, unspecified", severity: "moderate" },
   J441: { code: "J44.1", description: "COPD with (acute) exacerbation", severity: "severe" },
   "J44.1": { code: "J44.1", description: "COPD with (acute) exacerbation", severity: "severe" },
+  E785: { code: "E78.5", description: "Hyperlipidemia, unspecified", severity: "mild" },
+  "E78.5": { code: "E78.5", description: "Hyperlipidemia, unspecified", severity: "mild" },
+  I2510: { code: "I25.10", description: "Atherosclerotic heart disease of native coronary artery", severity: "moderate" },
+  "I25.10": { code: "I25.10", description: "Atherosclerotic heart disease of native coronary artery", severity: "moderate" },
+  F329: { code: "F32.9", description: "Major depressive disorder, single episode, unspecified", severity: "moderate" },
+  "F32.9": { code: "F32.9", description: "Major depressive disorder, single episode, unspecified", severity: "moderate" },
+  F332: { code: "F33.2", description: "Major depressive disorder, recurrent, severe", severity: "severe" },
+  "F33.2": { code: "F33.2", description: "Major depressive disorder, recurrent, severe", severity: "severe" },
+  J45909: { code: "J45.909", description: "Unspecified asthma, uncomplicated", severity: "moderate" },
+  "J45.909": { code: "J45.909", description: "Unspecified asthma, uncomplicated", severity: "moderate" },
+  E669: { code: "E66.9", description: "Obesity, unspecified", severity: "moderate" },
+  "E66.9": { code: "E66.9", description: "Obesity, unspecified", severity: "moderate" },
+  M545: { code: "M54.50", description: "Low back pain, unspecified", severity: "mild" },
+  "M54.5": { code: "M54.50", description: "Low back pain, unspecified", severity: "mild" },
+  M5450: { code: "M54.50", description: "Low back pain, unspecified", severity: "mild" },
+  "M54.50": { code: "M54.50", description: "Low back pain, unspecified", severity: "mild" },
+  Z0000: { code: "Z00.00", description: "General adult medical examination", severity: "mild" },
+  "Z00.00": { code: "Z00.00", description: "General adult medical examination", severity: "mild" },
 };
 
 const formatIcd10Code = (raw) => {
@@ -46,7 +73,7 @@ const resolveClinicalDescription = (problem, formattedCode) => {
   const rawDesc = String(problem?.description || "").trim();
   const compact = String(problem?.code || "").trim().toUpperCase().replace(/\./g, "");
   const ref = ICD10_REFERENCE_LOOKUP[formattedCode] || ICD10_REFERENCE_LOOKUP[compact];
-  if (!rawDesc || /^icd-10 diagnosis\b/i.test(rawDesc)) {
+  if (!rawDesc || /^icd-10 diagnosis\b/i.test(rawDesc) || rawDesc.toLowerCase() === "low back pain") {
     return ref?.description || `Clinical diagnosis (${formattedCode})`;
   }
   return rawDesc;
@@ -60,12 +87,9 @@ const resolveClinicalSeverity = (problem, formattedCode) => {
   return ref?.severity || "moderate";
 };
 
-const isHccImpactCode = (problem) => {
-  if (!problem) return false;
-  if (problem.is_primary) return true;
-  if (String(problem.severity || "").toLowerCase() === "severe") return true;
-  const normalized = String(problem.code || "").trim().toUpperCase();
-  return HCC_CODE_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+const resolvePaymentHcc = (formattedCode) => {
+  if (!formattedCode) return null;
+  return CMS_V28_PAYMENT_HCCS[formattedCode] || null;
 };
 
 const PROBLEM_COLUMNS = [
@@ -85,10 +109,10 @@ const PROBLEM_COLUMNS = [
         )}
         {row.is_hcc && (
           <span
-            title="CMS HCC / RAF revenue-impacting condition"
+            title={`CMS-HCC v28 payment condition (${row.hcc_label})`}
             className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:ring-emerald-700/40 px-1.5 py-0.5 text-[10px] font-semibold"
           >
-            $ HCC
+            $ {row.hcc_label || "HCC"}
           </span>
         )}
       </div>
@@ -137,9 +161,6 @@ const formatDate = (iso) => {
   return d.toLocaleDateString();
 };
 
-// Active problems first, then resolved/inactive. The backend already sorts
-// active-first by onset_date; we re-sort here as a safety net since the page
-// also stays usable if a caller hands us a manually-sorted list.
 const sortProblems = (problems) =>
   [...problems].sort((a, b) => {
     const aActive = a.status === "active" ? 0 : 1;
@@ -153,15 +174,17 @@ export default function ProblemsHCCPage({ detail }) {
   const rows = problems.map((p) => {
     const formattedCode = formatIcd10Code(p.code);
     const resolvedSeverity = resolveClinicalSeverity(p, formattedCode);
+    const paymentHcc = resolvePaymentHcc(formattedCode);
     return {
       id: p.id,
       raw_code: formattedCode,
       code: p.is_primary ? `${formattedCode} ★` : formattedCode,
       is_primary: Boolean(p.is_primary),
-      is_hcc: isHccImpactCode({ ...p, code: formattedCode, severity: resolvedSeverity }),
+      is_hcc: Boolean(paymentHcc),
+      hcc_label: paymentHcc,
       code_system: p.code_system || "ICD-10",
       description: resolveClinicalDescription(p, formattedCode),
-      status: p.status,
+      status: p.status || "active",
       severity: resolvedSeverity,
       onset_date: formatDate(p.onset_date),
       resolved_date: formatDate(p.resolved_date),
@@ -169,16 +192,19 @@ export default function ProblemsHCCPage({ detail }) {
     };
   });
 
+  const activeCount = problems.filter((p) => p.status === "active").length;
+  const hccCount = rows.filter((r) => r.is_hcc).length;
+
   return (
     <div>
       <ChartTabHeader
-        title="Problems / HCC"
-        subtitle="Active diagnosis list and HCC-mapped conditions (★ marks the primary diagnosis · $ HCC marks CMS RAF revenue-impact codes)"
+        title="Problems & HCC"
+        subtitle={`${activeCount} active of ${problems.length} total (${hccCount} HCC-impacting)`}
       />
       <ChartTable
         columns={PROBLEM_COLUMNS}
         rows={rows}
-        emptyMessage="No problems on file. Upload via POST /api/member360/import/problems."
+        emptyMessage="No problems on file for this member."
       />
     </div>
   );

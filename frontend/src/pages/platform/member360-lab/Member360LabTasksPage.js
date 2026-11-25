@@ -12,6 +12,7 @@ import {
   fetchMember360Tasks,
   updateMember360Task,
 } from '../../../services/member360LabService';
+import { fetchTaskQueues } from '../../../services/member360AdminService';
 import { LabSubNav, Pagination, PriorityBadge, RiskBadge, TaskStatusBadge } from './components';
 import FilterDropdown from '../../../components/ui/FilterDropdown';
 import KpiTile from '../../../components/ui/KpiTile';
@@ -28,14 +29,32 @@ const COORDINATORS = [
   'Marcus Vance, MSW',
 ];
 
-const QUEUES = [
-  { key: 'care_management', label: 'Care Management' },
-  { key: 'outreach', label: 'Coordinator Outreach' },
-  { key: 'coding', label: 'Clinical Coding & HCC' },
-  { key: 'pharmacy', label: 'Pharmacy (Abarca PBM)' },
-  { key: 'RN', label: 'RN Complex Care' },
-  { key: 'supervisor_escalation', label: 'Supervisor Escalation Queue' },
+const DEFAULT_QUEUES = [
+  { key: 'RN Complex Care & Transitions of Care Queue', label: 'RN Complex Care & Transitions of Care Queue' },
+  { key: 'Care Coordinator Outreach & Gap Closure Queue', label: 'Care Coordinator Outreach & Gap Closure Queue' },
+  { key: 'Pharmacy & Prior Authorization (Abarca PBM) Queue', label: 'Pharmacy & Prior Authorization (Abarca PBM) Queue' },
+  { key: 'Clinical Supervisor Escalation Queue', label: 'Clinical Supervisor Escalation Queue' },
 ];
+
+const LEGACY_QUEUE_MAP = {
+  care_management: 'RN Complex Care & Transitions of Care Queue',
+  rn: 'RN Complex Care & Transitions of Care Queue',
+  clinical: 'RN Complex Care & Transitions of Care Queue',
+  outreach: 'Care Coordinator Outreach & Gap Closure Queue',
+  coding: 'Care Coordinator Outreach & Gap Closure Queue',
+  care_coordinator: 'Care Coordinator Outreach & Gap Closure Queue',
+  pharmacy: 'Pharmacy & Prior Authorization (Abarca PBM) Queue',
+  pbm: 'Pharmacy & Prior Authorization (Abarca PBM) Queue',
+  prior_auth: 'Pharmacy & Prior Authorization (Abarca PBM) Queue',
+  supervisor_escalation: 'Clinical Supervisor Escalation Queue',
+  supervisor: 'Clinical Supervisor Escalation Queue',
+};
+
+const normalizeQueueName = (raw) => {
+  if (!raw || !String(raw).trim()) return 'RN Complex Care & Transitions of Care Queue';
+  const clean = String(raw).trim();
+  return LEGACY_QUEUE_MAP[clean.toLowerCase()] || clean;
+};
 
 const EMAIL_TO_COORDINATOR = {
   'care.team@prominencehealth.com': 'Sarah Chen, RN',
@@ -191,15 +210,16 @@ const Member360LabTasksPage = () => {
   const [queueFilter, setQueueFilter] = useState('any');
   const [sortKey, setSortKey] = useState(initialFilters.sortKey);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [adminQueues, setAdminQueues] = useState(DEFAULT_QUEUES);
 
-  // Create Task Modal state (A8S-75 / A8S-76)
+  // Create Task Modal state (A8S-75 / A8S-76 / A8S-175)
   const [createOpen, setCreateOpen] = useState(false);
   const [membersRoster, setMembersRoster] = useState([]);
   const [createForm, setCreateForm] = useState({
     member_id: '',
     title: '',
     priority: 'high',
-    assigned_queue: 'care_management',
+    assigned_queue: 'RN Complex Care & Transitions of Care Queue',
     assigned_user: currentCoordinatorName,
     due_date: getTodayIso(),
     recommended_next_action: '',
@@ -243,7 +263,11 @@ const Member360LabTasksPage = () => {
     fetchMember360Tasks(token, tenant, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE })
       .then((res) => {
         if (cancelled) return;
-        setRows(res.items || []);
+        const normalizedItems = (res.items || []).map((t) => ({
+          ...t,
+          assigned_queue: normalizeQueueName(t.assigned_queue),
+        }));
+        setRows(normalizedItems);
         setTotal(res.total || 0);
         setError(null);
       })
@@ -257,6 +281,24 @@ const Member360LabTasksPage = () => {
       cancelled = true;
     };
   }, [token, tenant, refreshKey, page]);
+
+  useEffect(() => {
+    if (!token || !tenant) return;
+    fetchTaskQueues(token, tenant)
+      .then((list) => {
+        if (Array.isArray(list) && list.length > 0) {
+          const mapped = list.map((q) => ({ key: q.name, label: q.name }));
+          setAdminQueues(mapped);
+          setCreateForm((prev) => ({
+            ...prev,
+            assigned_queue: mapped.some((m) => m.key === prev.assigned_queue)
+              ? prev.assigned_queue
+              : mapped[0].key,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, [token, tenant]);
 
   useEffect(() => {
     if (!createOpen || membersRoster.length > 0 || !token || !tenant) return;
@@ -443,7 +485,7 @@ const Member360LabTasksPage = () => {
       await updateMember360Task(token, tenant, escalateTaskTarget.id, {
         status: 'escalated',
         priority: 'urgent',
-        assigned_queue: 'supervisor_escalation',
+        assigned_queue: 'Clinical Supervisor Escalation Queue',
         assigned_user: 'Marcus Vance, MSW',
         recommended_next_action: escalateAction.trim() || escalateTaskTarget.recommended_next_action || 'Supervisor review required',
         auto_generated_reason: `Escalated to Supervisor Queue: ${escalateReason.trim()}`,
@@ -594,7 +636,7 @@ const Member360LabTasksPage = () => {
             aria-label="Filter by Queue"
           >
             <option value="any">Queue: All queues</option>
-            {QUEUES.map((q) => (
+            {adminQueues.map((q) => (
               <option key={q.key} value={q.key}>
                 {q.label}
               </option>
@@ -762,12 +804,12 @@ const Member360LabTasksPage = () => {
                       <td className="px-3 py-3 align-top text-xs coding-text-soft">{t.due_date || '—'}</td>
                       <td className="px-3 py-3 align-top text-xs space-y-1">
                         <select
-                          value={t.assigned_queue || 'care_management'}
+                          value={normalizeQueueName(t.assigned_queue)}
                           onChange={(e) => reassignTask(t, { assigned_queue: e.target.value })}
-                          className="coding-input rounded px-1.5 py-0.5 text-[11px] w-40 block"
+                          className="coding-input rounded px-1.5 py-0.5 text-[11px] w-48 block"
                           aria-label="Reassign Queue"
                         >
-                          {QUEUES.map((q) => (
+                          {adminQueues.map((q) => (
                             <option key={q.key} value={q.key}>
                               {q.label}
                             </option>
@@ -851,7 +893,7 @@ const Member360LabTasksPage = () => {
               </tbody>
             </table>
           </div>
-          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} label="tasks" />
+          <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onPageChange={setPage} label="tasks" />
         </section>
       )}
 
@@ -932,7 +974,7 @@ const Member360LabTasksPage = () => {
                     onChange={(e) => setCreateForm((p) => ({ ...p, assigned_queue: e.target.value }))}
                     className="coding-input w-full rounded-md px-3 py-2"
                   >
-                    {QUEUES.map((q) => (
+                    {adminQueues.map((q) => (
                       <option key={q.key} value={q.key}>
                         {q.label}
                       </option>

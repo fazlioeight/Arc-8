@@ -12,6 +12,9 @@ class DocsArticle(BaseModel):
     summary: Optional[str] = None
     content: Optional[str] = None
     app_key: Optional[str] = None
+    category: Optional[str] = None
+    allowed_roles: list[str] = Field(default_factory=list)
+    hipaa_classification: str = "HIPAA Minimum-Necessary Scoped"
     tags: list[str] = Field(default_factory=list)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -22,6 +25,8 @@ class DocsArticleCreate(BaseModel):
     summary: Optional[str] = None
     content: Optional[str] = None
     app_key: Optional[str] = None
+    category: Optional[str] = None
+    allowed_roles: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     status: str = "published"
 
@@ -29,3 +34,7 @@ class DocsArticleCreate(BaseModel):
 class DocsArticleListResponse(BaseModel):
     articles: list[DocsArticle]
     total: int
+    active_role: Optional[str] = None
+    hipaa_compliant: bool = True
+    audit_logged: bool = True
+

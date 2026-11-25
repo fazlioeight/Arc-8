@@ -9,6 +9,7 @@ import { usePermissions } from '../../../hooks/usePermissions';
 import { PORTAL_NAV_ITEMS } from '../portal_page/portalNavItems';
 import { ROUTES } from '../../../constants/routes';
 import {
+  addMember360CareJourneyStage,
   createMember360CareJourney,
   createMember360CareOption,
   createMember360Message,
@@ -520,6 +521,12 @@ const Member360LabWorkspace = () => {
     }
   }, [token, tenant, reload]);
 
+  const handleAddStage = useCallback(async (journey, stagePayload) => {
+    await addMember360CareJourneyStage(token, tenant, journey.id, stagePayload);
+    setActionMessage(`Added stage "${stagePayload.name}" to "${journey.name}".`);
+    await reload();
+  }, [token, tenant, reload]);
+
   const tabContent = useMemo(() => {
     if (!detail) return null;
     switch (tab) {
@@ -571,6 +578,7 @@ const Member360LabWorkspace = () => {
                 journey={j}
                 onStageTransition={handleStageTransition}
                 onJourneyTransition={handleJourneyTransition}
+                onAddStage={handleAddStage}
               />
             ))}
             {(detail.care_journeys || []).length === 0 && <p className="text-xs coding-text-soft">No active care journey. Start one from the right panel.</p>}
@@ -812,7 +820,7 @@ const Member360LabWorkspace = () => {
       default:
         return null;
     }
-  }, [detail, member, tab, clinicalSubTab, medsSubTab, gap, missingHccCount, handleTabChange, handleAction, handleStageTransition, handleJourneyTransition, reload]);
+  }, [detail, member, tab, clinicalSubTab, medsSubTab, gap, missingHccCount, handleTabChange, handleAction, handleStageTransition, handleJourneyTransition, handleAddStage, assignedCaseloadCoordinator, reload]);
 
   if (loading) {
     return (

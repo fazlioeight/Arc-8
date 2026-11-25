@@ -332,6 +332,7 @@ export default function PortalSidebar({ collapsed = false, onToggle }) {
     {
       title: t('nav.group.governance', 'Governance & Admin'),
       items: [
+        { label: t('nav.knowledge_base', 'Docs Library & Manual'), href: ROUTES.DOCS, icon: SvgDocs, badge: 'HIPAA', badgeTone: 'success' },
         { label: t('nav.role_privileges', 'Role & Privileges'), href: `${ROUTES.SETTINGS}#privileges`, icon: SvgPrivileges, badge: 'HIPAA', badgeTone: 'success', permission: 'menu:role_privileges' },
         { label: t('nav.master_admin', 'Master Admin'), href: ROUTES.ADMIN.MASTER, icon: SvgAdmin, permission: 'menu:master_admin' },
         {

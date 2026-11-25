@@ -147,6 +147,7 @@ const Shell = ({ themePreference, setThemePreference }) => {
     ROUTES.RIDE_BOOKING,
     ROUTES.DASHBOARD,
     ROUTES.SETTINGS,
+    ROUTES.DOCS,
     "/admin",
     "/jobs",
     ROUTES.CHAT,

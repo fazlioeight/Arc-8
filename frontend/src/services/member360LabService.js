@@ -125,6 +125,9 @@ export const updateMember360CareJourney = (token, tenant, journeyId, payload) =>
 export const updateMember360CareJourneyStage = (token, tenant, journeyId, stageId, payload) =>
   patch(token, tenant, `/api/member360/care-journeys/${journeyId}/stages/${stageId}`, payload);
 
+export const addMember360CareJourneyStage = (token, tenant, journeyId, payload) =>
+  post(token, tenant, `/api/member360/care-journeys/${journeyId}/stages`, payload);
+
 // ------------------- Batch ingest -------------------
 // These are tenant-admin level surfaces. Each accepts up to a few hundred
 // rows per call (see backend route docs); large imports should chunk on the

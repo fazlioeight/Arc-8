@@ -16,17 +16,11 @@ export const ROLES = {
   NURSE: "nurse",
   CODER: "coder",
   BILLING: "billing",
+  ANALYST: "analyst",
   PATIENT: "patient",
 };
 
 export const ROLE_DEFINITIONS = [
-  {
-    key: ROLES.PLATFORM_ADMIN,
-    name: "Platform Administrator",
-    badgeTone: "purple",
-    description: "Full cross-tenant administrative control, tenant provisioning, system security, and audit enforcement.",
-    icon: "ShieldLock",
-  },
   {
     key: ROLES.ADMIN,
     name: "System Administrator",
@@ -50,7 +44,7 @@ export const ROLE_DEFINITIONS = [
   },
   {
     key: ROLES.SUPERVISOR,
-    name: "Clinical / Ops Supervisor",
+    name: "Clinical Supervisor",
     badgeTone: "indigo",
     description: "Clinical operations supervisor: Coordinator workflows, escalation queues, supervisor notes, settings, and audit logs.",
     icon: "BuildingGear",
@@ -71,14 +65,14 @@ export const ROLE_DEFINITIONS = [
   },
   {
     key: ROLES.CLINICIAN,
-    name: "Clinician / Physician (MD/DO)",
+    name: "Clinician (MD/DO)",
     badgeTone: "cyan",
     description: "Direct clinical care delivery, PHI access, care journey orders, and medical chart reviews.",
     icon: "Stethoscope",
   },
   {
     key: ROLES.NURSE,
-    name: "Care Coordinator / Nurse (RN)",
+    name: "Nurse (RN)",
     badgeTone: "teal",
     description: "Member outreach, care journey tracking, task coordination, and NEMT ride booking.",
     icon: "HeartPulse",
@@ -98,8 +92,15 @@ export const ROLE_DEFINITIONS = [
     icon: "CurrencyDollar",
   },
   {
+    key: ROLES.ANALYST,
+    name: "Analyst",
+    badgeTone: "blue",
+    description: "Clinical & quality data analyst: Risk stratification analytics, HEDIS/RAF dashboards, and population reporting.",
+    icon: "ClipboardCheck",
+  },
+  {
     key: ROLES.PATIENT,
-    name: "Member / Patient",
+    name: "Patient",
     badgeTone: "slate",
     description: "Self-service member portal, personal health tracking, upcoming rides, and care journey visibility.",
     icon: "Person",
@@ -549,6 +550,25 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     "tab:pp_risk",
     "tab:pp_defs",
     "menu:documents",
+  ],
+  [ROLES.ANALYST]: [
+    "menu:care_intelligence",
+    "menu:patient_roster",
+    "tab:timeline",
+    "tab:clinical_gaps",
+    "menu:risk_intelligence",
+    "menu:care_options",
+    "menu:executive_dashboards",
+    "sub:exec_financial",
+    "sub:exec_hedis",
+    "tab:pp_overview",
+    "tab:pp_financials",
+    "tab:pp_medical_cost",
+    "tab:pp_mlr",
+    "tab:pp_utilization",
+    "tab:pp_quality",
+    "tab:pp_risk",
+    "tab:pp_defs",
   ],
   [ROLES.PATIENT]: [
     "menu:documents",

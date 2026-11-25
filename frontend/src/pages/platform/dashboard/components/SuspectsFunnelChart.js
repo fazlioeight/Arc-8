@@ -165,6 +165,7 @@ const SuspectsFunnelChart = ({ data, onStageSelect, partial, asOf }) => {
       .ease(d3.easeCubicOut)
       .attr("width", (stage) => x(stage.count));
 
+    const chartInnerWidth = Math.max(280, width - margin.left - margin.right);
     groups
       .selectAll("text.label")
       .data((stage) => [stage])
@@ -179,7 +180,7 @@ const SuspectsFunnelChart = ({ data, onStageSelect, partial, asOf }) => {
       .data((stage) => [stage])
       .join("text")
       .attr("class", "meta")
-      .attr("x", (stage) => Math.max(12, x(stage.count) - 140))
+      .attr("x", chartInnerWidth - 12)
       .attr("y", barHeight / 2 + 4)
       .attr("text-anchor", "end")
       .text((stage) => `Median ${stage.medianDays} days`);

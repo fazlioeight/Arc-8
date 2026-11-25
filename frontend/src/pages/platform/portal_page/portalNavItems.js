@@ -46,4 +46,12 @@ export const PORTAL_NAV_ITEMS = [
       path === ROUTES.RIDE_BOOKING ||
       path.startsWith(`${ROUTES.RIDE_BOOKING}/`),
   },
+  {
+    key: "docs",
+    label: "Docs Library",
+    href: ROUTES.DOCS,
+    match: (path) =>
+      path === ROUTES.DOCS ||
+      path.startsWith(`${ROUTES.DOCS}/`),
+  },
 ];
