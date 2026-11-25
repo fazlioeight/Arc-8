@@ -1232,11 +1232,14 @@ function SBARField({ label, value, accent }) {
 const TIMELINE_PAGE_SIZE = 15;
 
 export function MemberTimeline({ detail, onNavigateTab }) {
-  const [page, setPage] = React.useState(1);
+  const [page, ReactSetPage] = React.useState(1);
+  const [kindFilter, setKindFilter] = React.useState('all');
+  const [dateWindow, setDateWindow] = React.useState('all');
+  const [searchTerm, setSearchTerm] = React.useState('');
 
   React.useEffect(() => {
-    setPage(1);
-  }, [detail?.member?.id]);
+    ReactSetPage(1);
+  }, [detail?.member?.id, kindFilter, dateWindow, searchTerm]);
 
   const events = React.useMemo(() => {
     const items = [];
@@ -1245,7 +1248,7 @@ export function MemberTimeline({ detail, onNavigateTab }) {
         kind: 'note',
         targetTab: 'notes',
         timestamp: n.created_at,
-        title: `${n.channel || 'Internal'} note`,
+        title: `${n.channel || 'Internal'} note${n.note_type ? ` (${n.note_type})` : ''}`,
         body: n.body,
         author: n.author_name || n.author_email,
       })
@@ -1255,7 +1258,7 @@ export function MemberTimeline({ detail, onNavigateTab }) {
         kind: 'message',
         targetTab: 'notes',
         timestamp: m.timestamp,
-        title: `${m.channel} ${m.direction}`,
+        title: `${m.channel} ${m.direction}${m.status ? ` · ${m.status}` : ''}`,
         body: m.body,
         author: m.sender,
       })
@@ -1344,20 +1347,94 @@ export function MemberTimeline({ detail, onNavigateTab }) {
       .sort((a, b) => (parseUtcDate(b.timestamp)?.getTime() || 0) - (parseUtcDate(a.timestamp)?.getTime() || 0));
   }, [detail]);
 
+  const filteredEvents = React.useMemo(() => {
+    const nowMs = Date.now();
+    const cutoffMs =
+      dateWindow === '30d'
+        ? nowMs - 30 * 86400000
+        : dateWindow === '90d'
+        ? nowMs - 90 * 86400000
+        : null;
+    const term = searchTerm.trim().toLowerCase();
+    return events.filter((e) => {
+      if (kindFilter === 'comms' && e.kind !== 'note' && e.kind !== 'message') return false;
+      if (kindFilter === 'note' && e.kind !== 'note') return false;
+      if (kindFilter === 'message' && e.kind !== 'message') return false;
+      if (kindFilter === 'tasks_journeys' && !['task', 'journey', 'journey_stage', 'care_option'].includes(e.kind)) return false;
+      if (kindFilter === 'claims_docs' && !['claim', 'document'].includes(e.kind)) return false;
+      if (cutoffMs) {
+        const ts = parseUtcDate(e.timestamp)?.getTime() || 0;
+        if (ts < cutoffMs) return false;
+      }
+      if (term) {
+        const hay = [e.title, e.body, e.author].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(term)) return false;
+      }
+      return true;
+    });
+  }, [events, kindFilter, dateWindow, searchTerm]);
+
   if (!events.length) return <p className="text-xs coding-text-soft">No activity yet.</p>;
 
-  const totalEvents = events.length;
+  const totalEvents = filteredEvents.length;
   const totalPages = Math.max(1, Math.ceil(totalEvents / TIMELINE_PAGE_SIZE));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const startIdx = (safePage - 1) * TIMELINE_PAGE_SIZE;
-  const pagedEvents = events.slice(startIdx, startIdx + TIMELINE_PAGE_SIZE);
+  const pagedEvents = filteredEvents.slice(startIdx, startIdx + TIMELINE_PAGE_SIZE);
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between text-xs coding-text-muted pb-1 border-b coding-border-subtle">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b coding-border-subtle">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {[
+            { key: 'all', label: 'All touchpoints' },
+            { key: 'comms', label: 'Communication Log (Calls & Messages)' },
+            { key: 'note', label: 'Clinical Notes' },
+            { key: 'message', label: 'Messages' },
+            { key: 'tasks_journeys', label: 'Tasks & Journeys' },
+            { key: 'claims_docs', label: 'Claims & Documents' },
+          ].map((btn) => (
+            <button
+              key={btn.key}
+              type="button"
+              onClick={() => setKindFilter(btn.key)}
+              className={joinClass(
+                'rounded-md px-2.5 py-1 text-xs font-medium transition',
+                kindFilter === btn.key
+                  ? 'bg-[var(--brand-primary)] text-white'
+                  : 'coding-surface-subtle coding-text-strong hover:opacity-80'
+              )}
+            >
+              {btn.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Filter timeline…"
+            className="coding-input rounded-md px-2.5 py-1 text-xs w-44"
+          />
+          <select
+            value={dateWindow}
+            onChange={(e) => setDateWindow(e.target.value)}
+            className="coding-input rounded-md px-2 py-1 text-xs"
+            aria-label="Timeline Date Window"
+          >
+            <option value="all">All time</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+          </select>
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-xs coding-text-muted pb-1">
         <span>Chronological touchpoints across calls, notes, care journeys, tasks, claims, and documents</span>
         <span>
-          Showing {startIdx + 1}–{Math.min(startIdx + pagedEvents.length, totalEvents)} of {totalEvents} touchpoints
+          {totalEvents > 0
+            ? `Showing ${startIdx + 1}–${Math.min(startIdx + pagedEvents.length, totalEvents)} of ${totalEvents} touchpoints`
+            : '0 matching touchpoints'}
         </span>
       </div>
       <ol className="space-y-2.5">
@@ -1429,7 +1506,7 @@ export function MemberTimeline({ detail, onNavigateTab }) {
             page={safePage}
             pageSize={TIMELINE_PAGE_SIZE}
             total={totalEvents}
-            onPageChange={setPage}
+            onPageChange={ReactSetPage}
             label="timeline touchpoints"
           />
         </div>

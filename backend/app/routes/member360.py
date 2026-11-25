@@ -41,6 +41,7 @@ from ..schemas.member360 import (
     Document,
     DashboardResponse,
     DocumentListResponse,
+    EscalationEvaluateResponse,
     GapAnalysisResponse,
     ImportResponse,
     LabImportRequest,
@@ -54,6 +55,8 @@ from ..schemas.member360 import (
     MessageListResponse,
     Note,
     NoteCreate,
+    NoteListResponse,
+    OutOfCaseloadAccessRequest,
     ProblemImportRequest,
     RiskInsightImportRequest,
     RiskInsightListResponse,
@@ -371,6 +374,34 @@ async def update_task(
     return task
 
 
+@router.post("/tasks/evaluate-escalations", response_model=EscalationEvaluateResponse)
+async def evaluate_task_escalations(
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """A8S-77 / A8S-78: Evaluate configurable SLA escalation triggers and promote
+    overdue or SLA-breached tasks into the Supervisor Escalation Queue."""
+    result = await member360_service.evaluate_escalation_triggers(session)
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.tasks.evaluate_escalations",
+        payload={
+            "evaluated": result["evaluated"],
+            "escalated": result["escalated"],
+            "task_ids": [t["id"] for t in result["items"]],
+        },
+    )
+    await session.commit()
+    await control_session.commit()
+    if result["escalated"] > 0:
+        await hot_cache.invalidate_namespace(tenant.key)
+    return result
+
+
 @router.post("/members/{member_id}/notes", response_model=Note, status_code=status.HTTP_201_CREATED)
 async def create_note(
     member_id: int,
@@ -634,6 +665,37 @@ async def list_messages(
         actor=current_user.email,
         event_type="member360.messages.list",
         payload={"count": len(items), "total": total, "filters": {"member_id": member_id, "channel": channel, "direction": direction}},
+    )
+    await session.commit()
+    await control_session.commit()
+    return {"items": items, "total": total}
+
+
+@router.get("/notes", response_model=NoteListResponse)
+async def list_notes(
+    member_id: Optional[int] = Query(default=None),
+    channel: Optional[str] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """A8S-79 / A8S-80: Population-level clinical outreach & communication notes list."""
+    items, total = await member360_service.list_notes_all(
+        session,
+        limit=limit,
+        offset=offset,
+        member_id=member_id,
+        channel=channel,
+    )
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.notes.list",
+        payload={"count": len(items), "total": total, "filters": {"member_id": member_id, "channel": channel}},
     )
     await session.commit()
     await control_session.commit()
@@ -1037,6 +1099,88 @@ async def list_member_audit(
         limit=limit,
         offset=offset,
     )
+    return {
+        "items": [member360_admin_service.serialize_audit(r) for r in rows],
+        "total": total,
+    }
+
+
+@router.post("/members/{member_id}/access-reason", status_code=status.HTTP_201_CREATED)
+async def log_out_of_caseload_access_reason(
+    member_id: int,
+    payload: OutOfCaseloadAccessRequest,
+    request: Request,
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """A8S-83 / A8S-84: Record an explicit HIPAA Break-the-Glass / Out-of-Caseload
+    access reason when a coordinator views a member outside their assigned caseload."""
+    reason_detail = (payload.reason_detail or "").strip()
+    if not reason_detail:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Out-of-caseload access reason detail is required.",
+        )
+    record_phi_access(
+        request,
+        event=PhiEvent.ACCESS.value,
+        user_id=current_user.email,
+        patient_id=str(member_id),
+        record_type="member360.out_of_caseload_access",
+        action=PhiAction.READ.value,
+        success=True,
+    )
+    audit_payload = {
+        "member_id": member_id,
+        "reason_category": payload.reason_category,
+        "reason_detail": reason_detail,
+        "caseload_coordinator": payload.caseload_coordinator,
+        "accessed_by_role": current_user.role,
+    }
+    await record_audit_event(
+        control_session,
+        tenant_id=tenant.id,
+        actor=current_user.email,
+        event_type="member360.member.out_of_caseload_access",
+        payload=audit_payload,
+    )
+    await session.commit()
+    await control_session.commit()
+    return {"status": "logged", "event_type": "member360.member.out_of_caseload_access", **audit_payload}
+
+
+@router.get("/audit", response_model=AuditEventListResponse)
+async def list_tenant_member360_audit(
+    event_type_prefix: Optional[str] = Query(default="member360."),
+    member_id: Optional[int] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    tenant: TenantContext = Depends(get_tenant_context),
+    session: AsyncSession = Depends(get_tenant_session),
+    control_session: AsyncSession = Depends(get_control_session),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+):
+    """A8S-83 / A8S-84: Tenant-wide Member 360 audit log view for Compliance Auditors
+    and Supervisors across all members and out-of-caseload access events."""
+    if member_id is not None:
+        rows, total = await member360_admin_service.list_audit_events_for_member(
+            control_session,
+            tenant_id=tenant.id,
+            member_id=member_id,
+            event_type_prefix=event_type_prefix or None,
+            limit=limit,
+            offset=offset,
+        )
+    else:
+        rows, total = await member360_admin_service.list_audit_events(
+            control_session,
+            tenant_id=tenant.id,
+            event_type_prefix=event_type_prefix or None,
+            limit=limit,
+            offset=offset,
+        )
     return {
         "items": [member360_admin_service.serialize_audit(r) for r in rows],
         "total": total,

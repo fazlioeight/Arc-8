@@ -545,11 +545,15 @@ class DashboardRecentActivity(BaseModel):
 
 
 class DashboardUpcomingAction(BaseModel):
+    task_id: Optional[int] = None
     member_id: int
     member_name: str
     risk_tier: Optional[str] = None
     next_action: str
     due_date: Optional[date] = None
+    priority: Optional[str] = None
+    assigned_user: Optional[str] = None
+    assigned_queue: Optional[str] = None
 
 
 class DashboardResponse(BaseModel):
@@ -635,6 +639,27 @@ class MessageListItem(Message, _MemberRef):
 class MessageListResponse(BaseModel):
     items: list[MessageListItem]
     total: int
+
+
+class NoteListItem(Note, _MemberRef):
+    pass
+
+
+class NoteListResponse(BaseModel):
+    items: list[NoteListItem]
+    total: int
+
+
+class EscalationEvaluateResponse(BaseModel):
+    evaluated: int = 0
+    escalated: int = 0
+    items: list[Task] = Field(default_factory=list)
+
+
+class OutOfCaseloadAccessRequest(BaseModel):
+    reason_category: str = "Coverage / Cross-Coverage"
+    reason_detail: str = Field(..., min_length=1)
+    caseload_coordinator: Optional[str] = None
 
 
 class CareOptionListItem(CareOption, _MemberRef):

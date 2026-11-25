@@ -1843,6 +1843,12 @@ async def seed(target: int = TARGET_MEMBER_COUNT) -> dict:
             await session.commit()
             summary["topups"] = counts
 
+            try:
+                from app.core.redis import hot_cache
+                await hot_cache.invalidate_namespace("prominencehealth")
+            except Exception:
+                pass
+
         print(f"[seed_prominence_demo] Done. Summary: {summary}")
         return summary
     finally:

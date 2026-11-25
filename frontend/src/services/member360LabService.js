@@ -76,6 +76,22 @@ export const createMember360Task = (token, tenant, payload) =>
 export const updateMember360Task = (token, tenant, taskId, payload) =>
   patch(token, tenant, `/api/member360/tasks/${taskId}`, payload);
 
+export const evaluateMember360TaskEscalations = (token, tenant) =>
+  post(token, tenant, '/api/member360/tasks/evaluate-escalations', {});
+
+export const logMember360AccessReason = (token, tenant, memberId, payload) =>
+  post(token, tenant, `/api/member360/members/${memberId}/access-reason`, payload);
+
+export const fetchMember360TenantAudit = (token, tenant, filters = {}) => {
+  const query = toQuery({
+    event_type_prefix: filters.event_type_prefix,
+    member_id: filters.member_id,
+    limit: filters.limit,
+    offset: filters.offset,
+  });
+  return get(token, tenant, `/api/member360/audit${query}`);
+};
+
 export const updateMember360Member = (token, tenant, memberId, payload) =>
   patch(token, tenant, `/api/member360/members/${memberId}`, payload);
 
@@ -210,6 +226,9 @@ export const fetchMember360Tasks = (token, tenant, filters = {}) =>
 
 export const fetchMember360Messages = (token, tenant, filters = {}) =>
   get(token, tenant, `/api/member360/messages${toQuery(buildListParams(filters))}`);
+
+export const fetchMember360Notes = (token, tenant, filters = {}) =>
+  get(token, tenant, `/api/member360/notes${toQuery(buildListParams(filters))}`);
 
 export const fetchMember360CareOptions = (token, tenant, filters = {}) =>
   get(token, tenant, `/api/member360/care-options${toQuery(buildListParams(filters))}`);

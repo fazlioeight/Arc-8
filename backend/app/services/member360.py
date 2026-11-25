@@ -1445,11 +1445,15 @@ async def build_dashboard(session: AsyncSession) -> dict:
     ).all()
     upcoming_actions = [
         {
+            "task_id": task.id,
             "member_id": member.id,
             "member_name": f"{member.first_name or ''} {member.last_name or ''}".strip(),
             "risk_tier": _canonical_risk_tier(member.risk_tier),
             "next_action": task.recommended_next_action or task.title,
             "due_date": task.due_date,
+            "priority": task.priority,
+            "assigned_user": _CARE_COORDINATOR_DIRECTORY.get((task.assigned_user or "").lower(), task.assigned_user),
+            "assigned_queue": task.assigned_queue,
         }
         for task, member in upcoming_rows
     ]
@@ -1932,6 +1936,117 @@ async def list_messages(
         for msg, member in rows
     ]
     return items, int(total)
+
+
+async def list_notes_all(
+    session: AsyncSession,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    member_id: Optional[int] = None,
+    channel: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    stmt = select(Member360Note, Member360Member).join(
+        Member360Member, Member360Note.member_id == Member360Member.id
+    )
+    if member_id is not None:
+        stmt = stmt.where(Member360Note.member_id == member_id)
+    if channel:
+        stmt = stmt.where(func.lower(Member360Note.channel) == channel.strip().lower())
+
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = stmt.order_by(Member360Note.created_at.desc(), Member360Note.id.desc())
+    stmt = stmt.limit(limit).offset(offset)
+    rows = (await session.execute(stmt)).all()
+    items = [
+        {
+            "id": n.id,
+            "member_id": n.member_id,
+            "author_email": n.author_email,
+            "author_name": _CARE_COORDINATOR_DIRECTORY.get((n.author_name or "").lower(), n.author_name),
+            "channel": n.channel,
+            "note_type": n.note_type,
+            "body": n.body,
+            "related_task_id": n.related_task_id,
+            "related_journey_id": n.related_journey_id,
+            "created_at": _utc_dt(n.created_at),
+            **_member_ref(member),
+        }
+        for n, member in rows
+    ]
+    return items, int(total)
+
+
+async def evaluate_escalation_triggers(session: AsyncSession) -> dict:
+    """A8S-77 / A8S-78: Evaluate configurable Member360TaskQueue SLA escalation rules
+    and automatically escalate overdue or SLA-breached high/urgent tasks into the
+    Supervisor Escalation Queue."""
+    from . import member360_admin
+    await member360_admin.ensure_default_admin_seed(session)
+    queues = await member360_admin.list_task_queues(session)
+    default_sla = {"urgent": 4, "high": 24, "medium": 72, "low": 120}
+    queue_sla_map: dict[str, dict] = {}
+    for q in queues:
+        if q.is_active and isinstance(q.sla_priority_hours, dict):
+            queue_sla_map[(q.name or "").lower()] = q.sla_priority_hours
+
+    today = date.today()
+    now_utc = datetime.utcnow()
+    stmt = (
+        select(Member360Task, Member360Member)
+        .join(Member360Member, Member360Task.member_id == Member360Member.id)
+        .where(Member360Task.status.in_(["open", "in_progress", "waiting"]))
+    )
+    rows = (await session.execute(stmt)).all()
+    evaluated = len(rows)
+    escalated_items: list[dict] = []
+
+    for task, member in rows:
+        pri = (task.priority or "medium").lower()
+        q_key = (task.assigned_queue or "").lower()
+        sla_hours = default_sla.get(pri, 72)
+        for cfg_name, cfg_hours in queue_sla_map.items():
+            if q_key and (q_key in cfg_name or cfg_name in q_key):
+                sla_hours = int(cfg_hours.get(pri, sla_hours))
+                break
+
+        is_overdue = bool(task.due_date and task.due_date < today)
+        age_hours = (
+            (now_utc - task.created_at.replace(tzinfo=None)).total_seconds() / 3600.0
+            if task.created_at
+            else 0.0
+        )
+        is_sla_breached = age_hours > sla_hours and pri in ("urgent", "high")
+
+        if is_overdue or is_sla_breached:
+            task.status = "escalated"
+            task.priority = "urgent"
+            task.assigned_queue = "supervisor_escalation"
+            if not task.assigned_user:
+                task.assigned_user = "Marcus Vance, MSW"
+            breach_desc = (
+                f"Overdue since {task.due_date.isoformat()}"
+                if is_overdue
+                else f"Exceeded {sla_hours}h SLA window"
+            )
+            task.auto_generated_reason = f"SLA breach auto-escalation trigger ({breach_desc})"
+            if not task.sbar_situation:
+                task.sbar_situation = f"Automated supervisor escalation: {task.title} ({breach_desc})."
+            if not task.sbar_recommendation:
+                task.sbar_recommendation = (
+                    task.recommended_next_action
+                    or "Supervisor review and immediate care coordinator reassignment required."
+                )
+            escalated_items.append(_task_to_dict(task, member))
+
+    if escalated_items:
+        await session.flush()
+
+    return {
+        "evaluated": evaluated,
+        "escalated": len(escalated_items),
+        "items": escalated_items,
+    }
 
 
 async def list_care_options_all(

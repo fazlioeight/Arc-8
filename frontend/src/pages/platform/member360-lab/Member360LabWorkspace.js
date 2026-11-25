@@ -18,6 +18,7 @@ import {
   fetchMember360JourneyTemplates,
   fetchMember360MemberDetail,
   generateMember360SubmissionExport,
+  logMember360AccessReason,
   updateMember360CareJourney,
   updateMember360CareJourneyStage,
   updateMember360Member,
@@ -90,7 +91,7 @@ const Member360LabWorkspace = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
 
-  const { token, tenant, role } = useContext(AuthContext) || {};
+  const { token, tenant, role, user } = useContext(AuthContext) || {};
   const { can } = usePermissions();
   const [detail, setDetail] = useState(null);
   const [gap, setGap] = useState(null);
@@ -107,6 +108,11 @@ const Member360LabWorkspace = () => {
   const [journeyTemplates, setJourneyTemplates] = useState([]);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [editProfileBusy, setEditProfileBusy] = useState(false);
+  const [accessReasonModalOpen, setAccessReasonModalOpen] = useState(false);
+  const [accessReasonCategory, setAccessReasonCategory] = useState('Coverage / Cross-Coverage Backup');
+  const [accessReasonDetail, setAccessReasonDetail] = useState('');
+  const [accessReasonLogged, setAccessReasonLogged] = useState(false);
+  const [accessReasonBusy, setAccessReasonBusy] = useState(false);
 
   const isComplianceAuditor = role === 'compliance_auditor';
   const isBusinessAdmin = role === 'business_admin';
@@ -214,6 +220,51 @@ const Member360LabWorkspace = () => {
 
   const member = detail?.member;
   const missingHccCount = (gap?.missing_hcc || []).length;
+
+  const assignedCaseloadCoordinator = useMemo(() => {
+    const journeyAssignee = detail?.care_journeys?.find((j) => j.assigned_to)?.assigned_to;
+    if (journeyAssignee) return journeyAssignee;
+    const taskAssignee = detail?.tasks?.find((t) => t.assigned_user)?.assigned_user;
+    if (taskAssignee) return taskAssignee;
+    const coords = ['Sarah Chen, RN', 'Elena Rostova, RN', 'Hannah Abbott, CCM', 'Marcus Vance, MSW'];
+    return coords[(Number(member?.id) || 0) % coords.length];
+  }, [detail, member]);
+
+  const currentUserCoordinator = useMemo(() => {
+    const emailMap = {
+      'care.team@prominencehealth.com': 'Sarah Chen, RN',
+      'coordinator@prominencehealth.com': 'Hannah Abbott, CCM',
+      'elena.nurse@prominencehealth.com': 'Elena Rostova, RN',
+      'dr.chen@prominencehealth.com': 'Sarah Chen, RN',
+      'supervisor@prominencehealth.com': 'Marcus Vance, MSW',
+    };
+    return emailMap[(user?.email || '').toLowerCase()] || 'Hannah Abbott, CCM';
+  }, [user]);
+
+  const isOutOfCaseload =
+    Boolean(member) &&
+    !isComplianceAuditor &&
+    assignedCaseloadCoordinator !== currentUserCoordinator;
+
+  const handleLogAccessReason = async (e) => {
+    e.preventDefault();
+    if (!member?.id || !accessReasonDetail.trim()) return;
+    setAccessReasonBusy(true);
+    try {
+      await logMember360AccessReason(token, tenant, member.id, {
+        reason_category: accessReasonCategory,
+        reason_detail: accessReasonDetail.trim(),
+        caseload_coordinator: assignedCaseloadCoordinator,
+      });
+      setAccessReasonLogged(true);
+      setAccessReasonModalOpen(false);
+      setActionMessage(`Out-of-caseload access reason recorded in HIPAA audit trail (${accessReasonCategory}).`);
+    } catch (err) {
+      setActionMessage(`Could not log access reason: ${err.message || err}`);
+    } finally {
+      setAccessReasonBusy(false);
+    }
+  };
 
   const pcpHref = useMemo(() => {
     if (!member?.primary_care_provider) return null;
@@ -753,7 +804,7 @@ const Member360LabWorkspace = () => {
       case 'documents':
         return <DocumentsPage detail={detail} memberId={member?.id} onUploaded={reload} />;
       case 'audit_log':
-        return <AuditLogPage memberId={member?.id} />;
+        return <AuditLogPage memberId={member?.id} assignedCoordinator={assignedCaseloadCoordinator} />;
       case 'sharing':
         return <SharingPage />;
       case 'settings':
@@ -801,6 +852,96 @@ const Member360LabWorkspace = () => {
           </span>
           <div>
             <strong>Compliance Auditor View:</strong> Read-only HIPAA audit & compliance mode enabled. Clinical data creation, note authoring, and status mutations are restricted.
+          </div>
+        </div>
+      )}
+
+      {isOutOfCaseload && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50/90 text-amber-950 dark:border-amber-500/40 dark:bg-amber-500/10 px-4 py-2.5 text-xs dark:text-amber-200"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-200 text-amber-900 dark:bg-amber-500/30 dark:text-amber-200 font-bold">
+              🛡️
+            </span>
+            <span>
+              <strong>Out-of-Caseload Record Access:</strong> This member is assigned to{' '}
+              <strong>{assignedCaseloadCoordinator}</strong> (your caseload: {currentUserCoordinator}). All views and edits are recorded in the HIPAA Audit Log.
+            </span>
+          </div>
+          {accessReasonLogged ? (
+            <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold">
+              ✓ Access Reason Logged
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAccessReasonModalOpen(true)}
+              className="rounded-lg bg-amber-600 text-white px-3 py-1 text-xs font-semibold hover:bg-amber-700 shrink-0"
+            >
+              Log Access Reason (Break-the-Glass)
+            </button>
+          )}
+        </div>
+      )}
+
+      {accessReasonModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="coding-surface rounded-2xl shadow-xl max-w-md w-full p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold coding-text-strong">Out-of-Caseload Access Justification</h3>
+              <button type="button" onClick={() => setAccessReasonModalOpen(false)} className="text-xs coding-text-muted">
+                ✕
+              </button>
+            </div>
+            <p className="text-xs coding-text-soft">
+              Member <strong>{member.first_name} {member.last_name}</strong> ({member.member_key}) is assigned to{' '}
+              <strong>{assignedCaseloadCoordinator}</strong>. Document your clinical or operational reason for accessing this record.
+            </p>
+            <form onSubmit={handleLogAccessReason} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold coding-text-strong mb-1">Reason Category *</label>
+                <select
+                  value={accessReasonCategory}
+                  onChange={(e) => setAccessReasonCategory(e.target.value)}
+                  className="coding-input w-full rounded-md px-3 py-2"
+                >
+                  <option value="Coverage / Cross-Coverage Backup">Coverage / Cross-Coverage Backup</option>
+                  <option value="Supervisor Escalation Review">Supervisor Escalation Review</option>
+                  <option value="Urgent Clinical Triage / Transition of Care">Urgent Clinical Triage / Transition of Care</option>
+                  <option value="Quality & HEDIS / HCC Audit Review">Quality & HEDIS / HCC Audit Review</option>
+                  <option value="Member Inbound Call Assistance">Member Inbound Call Assistance</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-semibold coding-text-strong mb-1">Justification Details *</label>
+                <textarea
+                  rows={3}
+                  value={accessReasonDetail}
+                  onChange={(e) => setAccessReasonDetail(e.target.value)}
+                  placeholder="Enter clinical or operational reason for out-of-caseload access…"
+                  className="coding-input w-full rounded-md px-3 py-2"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAccessReasonModalOpen(false)}
+                  className="rounded-md ring-1 coding-border px-3 py-1.5 text-xs font-semibold coding-text-strong"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={accessReasonBusy}
+                  className="rounded-md bg-amber-600 text-white px-4 py-1.5 text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {accessReasonBusy ? 'Recording…' : 'Record Access Reason'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
