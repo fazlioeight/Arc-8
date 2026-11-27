@@ -16,7 +16,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -283,26 +283,51 @@ _PREFERRED_CHANNEL_MAP: dict[str, str] = {
 _CARE_COORDINATOR_DIRECTORY: dict[str, str] = {
     "care.team@prominencehealth.com": "Sarah Chen, RN",
     "sarah.chen@prominencehealth.com": "Sarah Chen, RN",
+    "rn@prominencehealth.com": "Sarah Chen, RN",
+    "clinical@prominencehealth.com": "Sarah Chen, RN",
+    "dr.chen@prominencehealth.com": "Sarah Chen, RN",
     "coordinator@prominencehealth.com": "Hannah Abbott, CCM",
     "hannah.abbott@prominencehealth.com": "Hannah Abbott, CCM",
+    "outreach@prominencehealth.com": "Hannah Abbott, CCM",
+    "coding@prominencehealth.com": "Hannah Abbott, CCM",
     "elena.nurse@prominencehealth.com": "Elena Rostova, RN",
     "elena.rostova@prominencehealth.com": "Elena Rostova, RN",
-    "dr.chen@prominencehealth.com": "Sarah Chen, RN",
+    "pharmacy@prominencehealth.com": "Elena Rostova, RN",
+    "pbm@prominencehealth.com": "Elena Rostova, RN",
     "supervisor@prominencehealth.com": "Marcus Vance, MSW",
     "marcus.vance@prominencehealth.com": "Marcus Vance, MSW",
 }
 
+_CANONICAL_TASK_QUEUES: tuple[str, ...] = (
+    "RN Complex Care & Transitions of Care Queue",
+    "Care Coordinator Outreach & Gap Closure Queue",
+    "Pharmacy & Prior Authorization (Abarca PBM) Queue",
+    "Clinical Supervisor Escalation Queue",
+)
+
 _CANONICAL_TASK_QUEUE_MAP: dict[str, str] = {
     "care_management": "RN Complex Care & Transitions of Care Queue",
+    "care management": "RN Complex Care & Transitions of Care Queue",
+    "care_coordination": "RN Complex Care & Transitions of Care Queue",
+    "care coordination": "RN Complex Care & Transitions of Care Queue",
+    "clinical_quality": "RN Complex Care & Transitions of Care Queue",
+    "clinical quality": "RN Complex Care & Transitions of Care Queue",
     "rn": "RN Complex Care & Transitions of Care Queue",
     "clinical": "RN Complex Care & Transitions of Care Queue",
     "outreach": "Care Coordinator Outreach & Gap Closure Queue",
+    "outreach & engagement": "Care Coordinator Outreach & Gap Closure Queue",
+    "outreach_&_engagement": "Care Coordinator Outreach & Gap Closure Queue",
     "coding": "Care Coordinator Outreach & Gap Closure Queue",
+    "coding_review": "Care Coordinator Outreach & Gap Closure Queue",
+    "coding review": "Care Coordinator Outreach & Gap Closure Queue",
     "care_coordinator": "Care Coordinator Outreach & Gap Closure Queue",
+    "care coordinator": "Care Coordinator Outreach & Gap Closure Queue",
     "pharmacy": "Pharmacy & Prior Authorization (Abarca PBM) Queue",
     "pbm": "Pharmacy & Prior Authorization (Abarca PBM) Queue",
     "prior_auth": "Pharmacy & Prior Authorization (Abarca PBM) Queue",
+    "prior auth": "Pharmacy & Prior Authorization (Abarca PBM) Queue",
     "supervisor_escalation": "Clinical Supervisor Escalation Queue",
+    "supervisor escalation": "Clinical Supervisor Escalation Queue",
     "supervisor": "Clinical Supervisor Escalation Queue",
 }
 
@@ -311,7 +336,21 @@ def _normalize_task_queue(raw_queue: Optional[str]) -> str:
     if not raw_queue or not str(raw_queue).strip():
         return "RN Complex Care & Transitions of Care Queue"
     clean = str(raw_queue).strip()
-    return _CANONICAL_TASK_QUEUE_MAP.get(clean.lower(), clean)
+    if clean in _CANONICAL_TASK_QUEUES:
+        return clean
+    low = clean.lower()
+    slug = re.sub(r"[\s_\-]+", "_", low)
+    if low in _CANONICAL_TASK_QUEUE_MAP:
+        return _CANONICAL_TASK_QUEUE_MAP[low]
+    if slug in _CANONICAL_TASK_QUEUE_MAP:
+        return _CANONICAL_TASK_QUEUE_MAP[slug]
+    if any(k in low for k in ("supervisor", "escalat")):
+        return "Clinical Supervisor Escalation Queue"
+    if any(k in low for k in ("pharm", "pbm", "prior", "abarca", "med")):
+        return "Pharmacy & Prior Authorization (Abarca PBM) Queue"
+    if any(k in low for k in ("outreach", "coding", "gap", "coordinator")):
+        return "Care Coordinator Outreach & Gap Closure Queue"
+    return "RN Complex Care & Transitions of Care Queue"
 
 _DEFAULT_CARE_COORDINATORS: tuple[str, ...] = (
     "Sarah Chen, RN",
@@ -427,14 +466,18 @@ def _normalize_coordinator_name(raw_assignee: Optional[str], member_id: Optional
         if mapped:
             return mapped
         if "@" in clean:
-            local = clean.split("@", 1)[0]
+            local = clean.split("@", 1)[0].lower()
             for coord in _DEFAULT_CARE_COORDINATORS:
                 base_tokens = [t.lower() for t in re.sub(r",.*$", "", coord).split()]
-                if all(tok in local.lower() for tok in base_tokens):
+                if all(tok in local for tok in base_tokens):
                     return coord
-            parts = [p.capitalize() for p in re.split(r"[._\-]+", local) if p]
-            if parts:
-                return f"{' '.join(parts)}, RN"
+            if any(k in local for k in ("outreach", "coord", "gap", "coding", "hannah", "abbott")):
+                return "Hannah Abbott, CCM"
+            if any(k in local for k in ("supervis", "escalat", "marcus", "vance")):
+                return "Marcus Vance, MSW"
+            if any(k in local for k in ("pharm", "pbm", "elena", "rostova")):
+                return "Elena Rostova, RN"
+            return "Sarah Chen, RN"
         if "@" not in clean:
             return clean
     return _DEFAULT_CARE_COORDINATORS[(member_id or 0) % len(_DEFAULT_CARE_COORDINATORS)]
@@ -1059,9 +1102,12 @@ def _task_to_dict(task: Member360Task, member: Optional[Member360Member] = None)
     if member is not None:
         member_name = " ".join(part for part in (member.first_name, member.last_name) if part)
         risk_tier = _canonical_risk_tier(member.risk_tier)
-    assigned_user = task.assigned_user
-    if assigned_user and assigned_user.lower() in _CARE_COORDINATOR_DIRECTORY:
-        assigned_user = _CARE_COORDINATOR_DIRECTORY[assigned_user.lower()]
+    raw_user = (task.assigned_user or "").strip()
+    assigned_user = (
+        _normalize_coordinator_name(raw_user, task.member_id)
+        if raw_user
+        else None
+    )
     return {
         "id": task.id,
         "member_id": task.member_id,
@@ -1069,6 +1115,7 @@ def _task_to_dict(task: Member360Task, member: Optional[Member360Member] = None)
         "title": task.title,
         "description": task.description,
         "assigned_user": assigned_user,
+        "legacy_assignee": raw_user if ("@" in raw_user) else None,
         "assigned_queue": _normalize_task_queue(task.assigned_queue),
         "priority": task.priority,
         "status": task.status,
@@ -1332,15 +1379,20 @@ async def create_care_option(session: AsyncSession, payload: dict) -> Optional[d
 
 
 async def get_overdue_tasks_count(session: AsyncSession, today: Optional[date] = None) -> int:
-    """G-06: Shared SQL query for Overdue Tasks across Dashboard and Clinical Tasks Queue."""
+    """G-06 & A8S-191: Shared SQL query for Overdue / SLA-breached Tasks across Dashboard and Clinical Tasks Queue."""
     ref_day = today or date.today()
     count = await session.scalar(
         select(func.count(Member360Task.id))
         .join(Member360Member, Member360Task.member_id == Member360Member.id)
         .where(
-            Member360Task.status.in_(["open", "in_progress", "waiting"]),
-            Member360Task.due_date.is_not(None),
-            Member360Task.due_date < ref_day,
+            Member360Task.status.in_(["open", "in_progress", "waiting", "escalated"]),
+            or_(
+                and_(
+                    Member360Task.due_date.is_not(None),
+                    Member360Task.due_date < ref_day,
+                ),
+                func.lower(func.coalesce(Member360Task.auto_generated_reason, "")).like("%sla breach%"),
+            ),
         )
     )
     return int(count or 0)

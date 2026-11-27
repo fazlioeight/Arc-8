@@ -36,32 +36,89 @@ const DEFAULT_QUEUES = [
   { key: 'Clinical Supervisor Escalation Queue', label: 'Clinical Supervisor Escalation Queue' },
 ];
 
+const CANONICAL_QUEUE_KEYS = new Set(DEFAULT_QUEUES.map((q) => q.key));
+
 const LEGACY_QUEUE_MAP = {
   care_management: 'RN Complex Care & Transitions of Care Queue',
+  'care management': 'RN Complex Care & Transitions of Care Queue',
+  care_coordination: 'RN Complex Care & Transitions of Care Queue',
+  'care coordination': 'RN Complex Care & Transitions of Care Queue',
+  clinical_quality: 'RN Complex Care & Transitions of Care Queue',
+  'clinical quality': 'RN Complex Care & Transitions of Care Queue',
   rn: 'RN Complex Care & Transitions of Care Queue',
   clinical: 'RN Complex Care & Transitions of Care Queue',
   outreach: 'Care Coordinator Outreach & Gap Closure Queue',
+  'outreach & engagement': 'Care Coordinator Outreach & Gap Closure Queue',
+  'outreach_&_engagement': 'Care Coordinator Outreach & Gap Closure Queue',
   coding: 'Care Coordinator Outreach & Gap Closure Queue',
+  coding_review: 'Care Coordinator Outreach & Gap Closure Queue',
+  'coding review': 'Care Coordinator Outreach & Gap Closure Queue',
   care_coordinator: 'Care Coordinator Outreach & Gap Closure Queue',
+  'care coordinator': 'Care Coordinator Outreach & Gap Closure Queue',
   pharmacy: 'Pharmacy & Prior Authorization (Abarca PBM) Queue',
   pbm: 'Pharmacy & Prior Authorization (Abarca PBM) Queue',
   prior_auth: 'Pharmacy & Prior Authorization (Abarca PBM) Queue',
+  'prior auth': 'Pharmacy & Prior Authorization (Abarca PBM) Queue',
   supervisor_escalation: 'Clinical Supervisor Escalation Queue',
+  'supervisor escalation': 'Clinical Supervisor Escalation Queue',
   supervisor: 'Clinical Supervisor Escalation Queue',
 };
 
 const normalizeQueueName = (raw) => {
   if (!raw || !String(raw).trim()) return 'RN Complex Care & Transitions of Care Queue';
   const clean = String(raw).trim();
-  return LEGACY_QUEUE_MAP[clean.toLowerCase()] || clean;
+  if (CANONICAL_QUEUE_KEYS.has(clean)) return clean;
+  const low = clean.toLowerCase();
+  const slug = low.replace(/[\s_-]+/g, '_');
+  if (LEGACY_QUEUE_MAP[low]) return LEGACY_QUEUE_MAP[low];
+  if (LEGACY_QUEUE_MAP[slug]) return LEGACY_QUEUE_MAP[slug];
+  if (low.includes('supervisor') || low.includes('escalat')) return 'Clinical Supervisor Escalation Queue';
+  if (low.includes('pharm') || low.includes('pbm') || low.includes('prior') || low.includes('abarca') || low.includes('med')) {
+    return 'Pharmacy & Prior Authorization (Abarca PBM) Queue';
+  }
+  if (low.includes('outreach') || low.includes('coding') || low.includes('gap') || low.includes('coordinator')) {
+    return 'Care Coordinator Outreach & Gap Closure Queue';
+  }
+  return 'RN Complex Care & Transitions of Care Queue';
 };
 
 const EMAIL_TO_COORDINATOR = {
   'care.team@prominencehealth.com': 'Sarah Chen, RN',
-  'coordinator@prominencehealth.com': 'Hannah Abbott, CCM',
-  'elena.nurse@prominencehealth.com': 'Elena Rostova, RN',
+  'sarah.chen@prominencehealth.com': 'Sarah Chen, RN',
+  'rn@prominencehealth.com': 'Sarah Chen, RN',
+  'clinical@prominencehealth.com': 'Sarah Chen, RN',
   'dr.chen@prominencehealth.com': 'Sarah Chen, RN',
+  'coordinator@prominencehealth.com': 'Hannah Abbott, CCM',
+  'hannah.abbott@prominencehealth.com': 'Hannah Abbott, CCM',
+  'outreach@prominencehealth.com': 'Hannah Abbott, CCM',
+  'coding@prominencehealth.com': 'Hannah Abbott, CCM',
+  'elena.nurse@prominencehealth.com': 'Elena Rostova, RN',
+  'elena.rostova@prominencehealth.com': 'Elena Rostova, RN',
+  'pharmacy@prominencehealth.com': 'Elena Rostova, RN',
+  'pbm@prominencehealth.com': 'Elena Rostova, RN',
   'supervisor@prominencehealth.com': 'Marcus Vance, MSW',
+  'marcus.vance@prominencehealth.com': 'Marcus Vance, MSW',
+};
+
+const normalizeAssigneeName = (raw) => {
+  if (!raw || !String(raw).trim()) return '';
+  const clean = String(raw).trim();
+  if (COORDINATORS.includes(clean)) return clean;
+  const low = clean.toLowerCase();
+  if (EMAIL_TO_COORDINATOR[low]) return EMAIL_TO_COORDINATOR[low];
+  if (low.includes('@')) {
+    if (low.includes('outreach') || low.includes('coord') || low.includes('coding') || low.includes('hannah') || low.includes('abbott')) {
+      return 'Hannah Abbott, CCM';
+    }
+    if (low.includes('supervis') || low.includes('escalat') || low.includes('marcus') || low.includes('vance')) {
+      return 'Marcus Vance, MSW';
+    }
+    if (low.includes('pharm') || low.includes('pbm') || low.includes('elena') || low.includes('rostova')) {
+      return 'Elena Rostova, RN';
+    }
+    return 'Sarah Chen, RN';
+  }
+  return clean;
 };
 
 const STATUSES = [
@@ -116,6 +173,15 @@ const startOfDay = (d) => {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
+};
+
+const isTaskOverdueOrSlaBreached = (t, todayDate) => {
+  if (!t || t.status === 'completed') return false;
+  const pastDue = Boolean(t.due_date && startOfDay(t.due_date) < todayDate);
+  const hasSlaBreach = Boolean(
+    t.auto_generated_reason && /sla breach/i.test(t.auto_generated_reason)
+  );
+  return pastDue || hasSlaBreach;
 };
 
 const TASKS_FILTER_STORAGE_KEY = 'arc8.tasks.filters.v1';
@@ -266,6 +332,7 @@ const Member360LabTasksPage = () => {
         const normalizedItems = (res.items || []).map((t) => ({
           ...t,
           assigned_queue: normalizeQueueName(t.assigned_queue),
+          assigned_user: normalizeAssigneeName(t.assigned_user),
         }));
         setRows(normalizedItems);
         setTotal(res.total || 0);
@@ -306,9 +373,6 @@ const Member360LabTasksPage = () => {
       .then((res) => {
         const items = res?.items || [];
         setMembersRoster(items);
-        if (items.length > 0) {
-          setCreateForm((prev) => ({ ...prev, member_id: prev.member_id || String(items[0].id) }));
-        }
       })
       .catch(() => {});
   }, [createOpen, membersRoster.length, token, tenant]);
@@ -321,12 +385,11 @@ const Member360LabTasksPage = () => {
     setDue(view?.due || 'any');
     if (key === 'my_todo') {
       setAssigneeFilter(currentCoordinatorName);
-    } else if (key === 'supervisor') {
+    } else {
       setAssigneeFilter('any');
-      setQueueFilter('any');
-    } else if (key === 'all') {
-      setAssigneeFilter('any');
-      setQueueFilter('any');
+      if (key === 'all' || key === 'supervisor') {
+        setQueueFilter('any');
+      }
     }
   };
 
@@ -355,7 +418,7 @@ const Member360LabTasksPage = () => {
     return rows
       .filter((t) => {
         if (activeView === 'urgent' && t.status === 'completed') return false;
-        if (activeView === 'supervisor' && t.status !== 'escalated' && t.assigned_queue !== 'supervisor_escalation') return false;
+        if (activeView === 'supervisor' && t.status !== 'escalated' && t.assigned_queue !== 'Clinical Supervisor Escalation Queue') return false;
         if (statuses.length > 0 && !statuses.includes(t.status)) return false;
         if (priorities.length > 0 && !priorities.includes(t.priority)) return false;
         if (assigneeFilter !== 'any' && (t.assigned_user || '') !== assigneeFilter) return false;
@@ -368,7 +431,11 @@ const Member360LabTasksPage = () => {
             t.member_key,
             t.assigned_queue,
             t.assigned_user,
+            t.legacy_assignee,
             t.recommended_next_action,
+            t.sbar?.situation,
+            t.sbar?.background,
+            t.sbar?.assessment,
             t.sbar?.recommendation,
             t.auto_generated_reason,
           ]
@@ -378,11 +445,14 @@ const Member360LabTasksPage = () => {
           if (!hay.includes(term)) return false;
         }
         if (due !== 'any') {
-          if (!t.due_date) return false;
-          const d = startOfDay(t.due_date);
-          if (due === 'overdue' && !(d < today && ['open', 'in_progress', 'waiting'].includes(t.status))) return false;
-          if (due === 'today' && d.getTime() !== today.getTime()) return false;
-          if (due === 'week' && (d < today || d > weekOut)) return false;
+          if (due === 'overdue') {
+            if (!isTaskOverdueOrSlaBreached(t, today)) return false;
+          } else {
+            if (!t.due_date) return false;
+            const d = startOfDay(t.due_date);
+            if (due === 'today' && d.getTime() !== today.getTime()) return false;
+            if (due === 'week' && (d < today || d > weekOut)) return false;
+          }
         }
         return true;
       })
@@ -404,8 +474,8 @@ const Member360LabTasksPage = () => {
       total: rows.length,
       open: rows.filter((t) => ['open', 'in_progress', 'waiting'].includes(t.status)).length,
       urgent: rows.filter((t) => t.priority === 'urgent' && t.status !== 'completed').length,
-      overdue: rows.filter((t) => t.due_date && startOfDay(t.due_date) < today && ['open', 'in_progress', 'waiting'].includes(t.status)).length,
-      escalated: rows.filter((t) => t.status === 'escalated' || t.assigned_queue === 'supervisor_escalation').length,
+      overdue: rows.filter((t) => isTaskOverdueOrSlaBreached(t, today)).length,
+      escalated: rows.filter((t) => t.status === 'escalated' || t.assigned_queue === 'Clinical Supervisor Escalation Queue').length,
     };
   }, [rows]);
 
@@ -461,6 +531,7 @@ const Member360LabTasksPage = () => {
       setCreateOpen(false);
       setCreateForm((prev) => ({
         ...prev,
+        member_id: '',
         title: '',
         recommended_next_action: '',
         sbar_situation: '',
@@ -562,7 +633,11 @@ const Member360LabTasksPage = () => {
           </button>
           <button
             type="button"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => {
+              setCreateErr(null);
+              setCreateForm((prev) => ({ ...prev, member_id: '' }));
+              setCreateOpen(true);
+            }}
             className="rounded-lg bg-[var(--brand-primary)] text-white px-3.5 py-1.5 text-xs font-semibold shadow-xs hover:opacity-90"
           >
             + Create Task
@@ -745,11 +820,9 @@ const Member360LabTasksPage = () => {
               </thead>
               <tbody>
                 {filtered.map((t) => {
-                  const isOverdue =
-                    t.due_date &&
-                    startOfDay(t.due_date) < today &&
-                    ['open', 'in_progress', 'waiting'].includes(t.status);
-                  const isEscalated = t.status === 'escalated' || t.assigned_queue === 'supervisor_escalation';
+                  const isOverdue = isTaskOverdueOrSlaBreached(t, today);
+                  const isEscalated =
+                    t.status === 'escalated' || t.assigned_queue === 'Clinical Supervisor Escalation Queue';
                   return (
                     <tr key={t.id} className="border-b coding-border-subtle hover:bg-[var(--coding-hover)] transition">
                       <td className="px-4 py-3 align-top max-w-md">
@@ -763,10 +836,29 @@ const Member360LabTasksPage = () => {
                         {t.recommended_next_action && (
                           <p className="text-[11px] coding-text-soft line-clamp-2 mt-0.5">{t.recommended_next_action}</p>
                         )}
-                        {t.sbar?.situation && (
-                          <p className="text-[11px] coding-text-muted mt-0.5">
-                            <strong>SBAR:</strong> {t.sbar.situation}
-                          </p>
+                        {(t.sbar?.situation || t.sbar?.background || t.sbar?.assessment || t.sbar?.recommendation) && (
+                          <div className="text-[11px] coding-text-muted mt-0.5 space-y-0.5">
+                            {t.sbar?.situation && (
+                              <p>
+                                <strong>SBAR Situation:</strong> {t.sbar.situation}
+                              </p>
+                            )}
+                            {t.sbar?.background && (
+                              <p>
+                                <strong>Background:</strong> {t.sbar.background}
+                              </p>
+                            )}
+                            {t.sbar?.assessment && (
+                              <p>
+                                <strong>Assessment:</strong> {t.sbar.assessment}
+                              </p>
+                            )}
+                            {t.sbar?.recommendation && t.sbar.recommendation !== t.recommended_next_action && (
+                              <p>
+                                <strong>Recommendation:</strong> {t.sbar.recommendation}
+                              </p>
+                            )}
+                          </div>
                         )}
                         {t.auto_generated_reason && (
                           <p className="text-[10px] italic text-amber-700 dark:text-amber-300 mt-0.5">{t.auto_generated_reason}</p>
@@ -1013,6 +1105,27 @@ const Member360LabTasksPage = () => {
                     rows={2}
                     value={createForm.sbar_situation}
                     onChange={(e) => setCreateForm((p) => ({ ...p, sbar_situation: e.target.value }))}
+                    placeholder="Current clinical or care barrier situation…"
+                    className="coding-input w-full rounded-md px-2 py-1.5"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold coding-text-strong mb-1">SBAR Background</label>
+                  <textarea
+                    rows={2}
+                    value={createForm.sbar_background}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, sbar_background: e.target.value }))}
+                    placeholder="Relevant clinical history, diagnoses, or recent encounters…"
+                    className="coding-input w-full rounded-md px-2 py-1.5"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold coding-text-strong mb-1">SBAR Assessment</label>
+                  <textarea
+                    rows={2}
+                    value={createForm.sbar_assessment}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, sbar_assessment: e.target.value }))}
+                    placeholder="Coordinator clinical assessment and risk evaluation…"
                     className="coding-input w-full rounded-md px-2 py-1.5"
                   />
                 </div>
@@ -1022,6 +1135,7 @@ const Member360LabTasksPage = () => {
                     rows={2}
                     value={createForm.sbar_recommendation}
                     onChange={(e) => setCreateForm((p) => ({ ...p, sbar_recommendation: e.target.value }))}
+                    placeholder="Recommended intervention or next step…"
                     className="coding-input w-full rounded-md px-2 py-1.5"
                   />
                 </div>
