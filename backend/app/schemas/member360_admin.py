@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ---- Care journey templates (existing table) ----------------------------
@@ -88,6 +88,17 @@ class TaskQueue(BaseModel):
     updated_at: datetime
 
 
+def _validate_positive_sla_hours(val: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    if val is None:
+        return val
+    if not isinstance(val, dict):
+        raise ValueError("SLA hours must be a JSON object mapping priorities to positive hours")
+    for k, v in val.items():
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or float(v) <= 0:
+            raise ValueError(f"SLA hours must be a positive number (invalid value for '{k}': {v})")
+    return val
+
+
 class TaskQueueCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -95,6 +106,11 @@ class TaskQueueCreate(BaseModel):
     escalation_queue: Optional[str] = None
     routing_rules: dict[str, Any] = Field(default_factory=dict)
     is_active: bool = True
+
+    @field_validator("sla_priority_hours")
+    @classmethod
+    def validate_sla_hours(cls, v: dict[str, Any]) -> dict[str, Any]:
+        return _validate_positive_sla_hours(v) or {}
 
 
 class TaskQueueUpdate(BaseModel):
@@ -104,6 +120,11 @@ class TaskQueueUpdate(BaseModel):
     escalation_queue: Optional[str] = None
     routing_rules: Optional[dict[str, Any]] = None
     is_active: Optional[bool] = None
+
+    @field_validator("sla_priority_hours")
+    @classmethod
+    def validate_sla_hours(cls, v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+        return _validate_positive_sla_hours(v)
 
 
 # ---- Outreach channels --------------------------------------------------

@@ -368,7 +368,20 @@ function serializeForm(section, form) {
         continue;
       }
       try {
-        payload[f.key] = JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        payload[f.key] = parsed;
+        if (f.key === 'sla_priority_hours') {
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            errors[f.key] = 'SLA hours must be a JSON object mapping priorities to positive hours';
+          } else {
+            for (const [priKey, priVal] of Object.entries(parsed)) {
+              if (typeof priVal !== 'number' || !Number.isFinite(priVal) || priVal <= 0) {
+                errors[f.key] = `SLA hours must be a positive number (invalid value for "${priKey}": ${priVal})`;
+                break;
+              }
+            }
+          }
+        }
       } catch (err) {
         errors[f.key] = `Invalid JSON: ${err.message}`;
       }

@@ -152,7 +152,7 @@ const SORT_OPTIONS = [
 
 const SAVED_VIEWS = [
   { key: 'all', label: 'All tasks' },
-  { key: 'my_todo', label: 'My To-Do', statuses: ['open', 'in_progress', 'waiting'] },
+  { key: 'my_todo', label: 'My To-Do', statuses: ['open', 'in_progress', 'waiting', 'escalated'] },
   { key: 'open', label: 'Open & in progress', statuses: ['open', 'in_progress'] },
   { key: 'supervisor', label: 'Supervisor Queue (Escalated)', statuses: ['escalated'] },
   { key: 'urgent', label: 'Urgent', priorities: ['urgent'], statuses: ['open', 'in_progress', 'waiting', 'escalated'] },
@@ -557,14 +557,15 @@ const Member360LabTasksPage = () => {
         status: 'escalated',
         priority: 'urgent',
         assigned_queue: 'Clinical Supervisor Escalation Queue',
-        assigned_user: 'Marcus Vance, MSW',
         recommended_next_action: escalateAction.trim() || escalateTaskTarget.recommended_next_action || 'Supervisor review required',
-        auto_generated_reason: `Escalated to Supervisor Queue: ${escalateReason.trim()}`,
+        auto_generated_reason: `Escalated to Supervisor Queue: ${escalateReason.trim()}${
+          escalateAction.trim() ? ` — Supervisor Action: ${escalateAction.trim()}` : ''
+        }`,
         sbar: {
-          situation: escalateReason.trim(),
+          situation: escalateTaskTarget.sbar?.situation || escalateReason.trim(),
           background: escalateTaskTarget.sbar?.background || null,
           assessment: escalateTaskTarget.sbar?.assessment || null,
-          recommendation: escalateAction.trim() || escalateTaskTarget.sbar?.recommendation || 'Supervisor intervention required',
+          recommendation: escalateTaskTarget.sbar?.recommendation || escalateAction.trim() || 'Supervisor intervention required',
         },
       });
       setBannerMsg(`Escalated "${escalateTaskTarget.title}" to Clinical Supervisor Escalation Queue.`);

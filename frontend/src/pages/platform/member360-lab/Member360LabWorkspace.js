@@ -472,7 +472,7 @@ const Member360LabWorkspace = () => {
           title: (data.title || '').trim() || `Escalation: ${reason.slice(0, 60)}`,
           priority: data.priority || 'urgent',
           status: 'escalated',
-          assigned_queue: data.assigned_queue || 'RN',
+          assigned_queue: data.assigned_queue || 'Clinical Supervisor Escalation Queue',
           due_date: data.due_date,
           sbar: {
             situation: reason,
@@ -483,7 +483,7 @@ const Member360LabWorkspace = () => {
           recommended_next_action: recommendation,
           auto_generated_reason: actionDialog.payload?.recommendation ? 'Escalated from guided triage' : 'Manual escalation',
         });
-        setActionMessage(`Escalation routed to ${task.assigned_queue || 'RN'} queue.`);
+        setActionMessage(`Escalation routed to ${task.assigned_queue || 'Clinical Supervisor Escalation Queue'}.`);
       }
       setActionDialog(null);
       await reload();
@@ -1134,7 +1134,7 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
       return {
         reason: rec?.summary || '',
         priority: 'urgent',
-        assigned_queue: 'RN',
+        assigned_queue: 'Clinical Supervisor Escalation Queue',
         due_date: '',
         recommendation: rec?.summary || '',
       };
@@ -1151,7 +1151,7 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
     send_message: 'Send message',
     recommend_care_option: 'Create care option report',
     start_journey: 'Start care journey',
-    escalate: 'Escalate to RN',
+    escalate: 'Escalate to Clinical Supervisor Queue',
   }[dialog.key] || 'Action';
 
   const memberLabel = [member?.first_name, member?.last_name].filter(Boolean).join(' ');
@@ -1402,7 +1402,17 @@ function ActionDialog({ dialog, member, journeyTemplates = [], onSubmit, onCance
           <Textarea label="Reason for escalation *" value={form.reason} onChange={(v) => update('reason', v)} rows={3} placeholder="Describe clinical deterioration, urgent triage rationale, or escalation trigger..." required />
           <div className="grid grid-cols-2 gap-3">
             <Select label="Priority" value={form.priority} onChange={(v) => update('priority', v)} options={['urgent', 'high', 'medium']} />
-            <Select label="Queue" value={form.assigned_queue} onChange={(v) => update('assigned_queue', v)} options={['RN', 'MD', 'Pharmacy', 'Behavioral Health', 'Care Management']} />
+            <Select
+              label="Queue"
+              value={form.assigned_queue}
+              onChange={(v) => update('assigned_queue', v)}
+              options={[
+                'Clinical Supervisor Escalation Queue',
+                'RN Complex Care & Transitions of Care Queue',
+                'Care Coordinator Outreach & Gap Closure Queue',
+                'Pharmacy & Prior Authorization (Abarca PBM) Queue',
+              ]}
+            />
           </div>
           <Input type="date" min={getTodayLocalIso()} label="Due date *" value={form.due_date} onChange={(v) => update('due_date', v)} required />
           <Textarea label="Recommended next action *" value={form.recommendation} onChange={(v) => update('recommendation', v)} rows={2} placeholder="e.g. Schedule emergency clinical review within 24 hours" required />

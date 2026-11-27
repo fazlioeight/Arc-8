@@ -2157,11 +2157,15 @@ async def evaluate_escalation_triggers(session: AsyncSession) -> dict:
 
     for task, member in rows:
         pri = (task.priority or "medium").lower()
-        q_key = (task.assigned_queue or "").lower()
-        sla_hours = default_sla.get(pri, 72)
+        q_key = _normalize_task_queue(task.assigned_queue).lower()
+        raw_q = (task.assigned_queue or "").lower()
+        sla_hours = float(default_sla.get(pri, 72))
         for cfg_name, cfg_hours in queue_sla_map.items():
-            if q_key and (q_key in cfg_name or cfg_name in q_key):
-                sla_hours = int(cfg_hours.get(pri, sla_hours))
+            if (q_key and (q_key == cfg_name or q_key in cfg_name or cfg_name in q_key)) or (
+                raw_q and (raw_q in cfg_name or cfg_name in raw_q)
+            ):
+                if cfg_hours.get(pri) is not None:
+                    sla_hours = float(cfg_hours.get(pri, sla_hours))
                 break
 
         is_overdue = bool(task.due_date and task.due_date < today)
@@ -2170,18 +2174,17 @@ async def evaluate_escalation_triggers(session: AsyncSession) -> dict:
             if task.created_at
             else 0.0
         )
-        is_sla_breached = age_hours > sla_hours and pri in ("urgent", "high")
+        is_sla_breached = age_hours > sla_hours
 
         if is_overdue or is_sla_breached:
             task.status = "escalated"
             task.priority = "urgent"
-            task.assigned_queue = "supervisor_escalation"
-            if not task.assigned_user:
-                task.assigned_user = "Marcus Vance, MSW"
+            task.assigned_queue = "Clinical Supervisor Escalation Queue"
+            sla_label = int(sla_hours) if sla_hours == int(sla_hours) else round(sla_hours, 1)
             breach_desc = (
                 f"Overdue since {task.due_date.isoformat()}"
                 if is_overdue
-                else f"Exceeded {sla_hours}h SLA window"
+                else f"Exceeded {sla_label}h SLA window"
             )
             task.auto_generated_reason = f"SLA breach auto-escalation trigger ({breach_desc})"
             if not task.sbar_situation:
